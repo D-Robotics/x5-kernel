@@ -364,6 +364,7 @@ config ARCH_HOBOT
 config ARCH_HOBOT_X5
 	bool "Horizon Robotics Sunrise5 SoC"
 	depends on ARCH_HOBOT
+	select MFD_SYSCON_TEE
 	help
 	  Say Y if you intend to run the kernel on a Horizon Robotics
 	  ARM64-based Sunrise5 chipset.

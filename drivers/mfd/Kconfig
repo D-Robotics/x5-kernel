@@ -1433,6 +1433,13 @@ config MFD_SYSCON
 	  Select this option to enable accessing system control registers
 	  via regmap.
 
+config MFD_SYSCON_TEE
+	bool "TEE System Controller Register R/W Based on Regmap"
+	select REGMAP_TEE
+	help
+	  Select this option to enable accessing system control registers
+	  via tee regmap.
+
 config MFD_DAVINCI_VOICECODEC
 	tristate
 	select MFD_CORE

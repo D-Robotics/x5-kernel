@@ -628,6 +628,11 @@ struct regmap *__regmap_init_spi_avmm(struct spi_device *spi,
 				      const struct regmap_config *config,
 				      struct lock_class_key *lock_key,
 				      const char *lock_name);
+struct regmap *__regmap_init_tee(struct device *dev, struct device_node *np,
+				 void __iomem *regs,
+				 const struct regmap_config *config,
+				 struct lock_class_key *lock_key,
+				 const char *lock_name);
 
 struct regmap *__devm_regmap_init(struct device *dev,
 				  const struct regmap_bus *bus,
@@ -693,6 +698,11 @@ struct regmap *__devm_regmap_init_spi_avmm(struct spi_device *spi,
 					   const struct regmap_config *config,
 					   struct lock_class_key *lock_key,
 					   const char *lock_name);
+struct regmap *
+__devm_regmap_init_tee(struct device *dev, struct device_node *np,
+		       void __iomem *regs, const struct regmap_config *config,
+		       struct lock_class_key *lock_key, const char *lock_name);
+
 /*
  * Wrapper for regmap_init macros to include a unique lockdep key and name
  * for each call. No-op if CONFIG_LOCKDEP is not set.
@@ -918,6 +928,17 @@ bool regmap_ac97_default_volatile(struct device *dev, unsigned int reg);
 #define regmap_init_spi_avmm(spi, config)					\
 	__regmap_lockdep_wrapper(__regmap_init_spi_avmm, #config,		\
 				 spi, config)
+
+/**
+ * regmap_init_tee() - Initialise register map with register clock
+ *
+ * @dev: Device that will be interacted with
+ * @np: Device Tree Node that will be interacted with
+ * @regs: Pointer to memory-mapped IO region
+ */
+#define regmap_init_tee(dev, np, regs, config)                                 \
+	__regmap_lockdep_wrapper(__regmap_init_tee, #config, dev, np, regs,    \
+				 config)
 
 /**
  * devm_regmap_init() - Initialise managed register map
@@ -1150,6 +1171,11 @@ bool regmap_ac97_default_volatile(struct device *dev, unsigned int reg);
 
 int regmap_mmio_attach_clk(struct regmap *map, struct clk *clk);
 void regmap_mmio_detach_clk(struct regmap *map);
+
+#define devm_regmap_init_tee(dev, np, regs, config)			\
+	__regmap_lockdep_wrapper(__devm_regmap_init_tee, #config, dev, np,     \
+				 regs, config)
+
 void regmap_exit(struct regmap *map);
 int regmap_reinit_cache(struct regmap *map,
 			const struct regmap_config *config);
