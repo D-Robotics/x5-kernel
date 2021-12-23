@@ -4568,6 +4568,7 @@ int dev_uc_sync_multiple(struct net_device *to, struct net_device *from);
 void dev_uc_unsync(struct net_device *to, struct net_device *from);
 void dev_uc_flush(struct net_device *dev);
 void dev_uc_init(struct net_device *dev);
+int dev_uc_add_simplify(struct net_device *dev, const unsigned char *addr);
 
 /**
  *  __dev_uc_sync - Synchonize device's unicast list

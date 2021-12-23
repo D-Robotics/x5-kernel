@@ -674,6 +674,26 @@ int dev_uc_add_excl(struct net_device *dev, const unsigned char *addr)
 EXPORT_SYMBOL(dev_uc_add_excl);
 
 /**
+ *	dev_uc_add_simplify - Add a global secondary unicast address
+ *	@dev: device
+ *	@addr: address to add
+ *	do not call __dev_set_rx_mode
+ */
+int dev_uc_add_simplify(struct net_device *dev, const unsigned char *addr)
+{
+	int err;
+
+	netif_addr_lock_bh(dev);
+	err = __hw_addr_add_ex(&dev->uc, addr, dev->addr_len,
+			       NETDEV_HW_ADDR_T_UNICAST, true, false,
+			       0, true);
+
+	netif_addr_unlock_bh(dev);
+	return err;
+}
+EXPORT_SYMBOL(dev_uc_add_simplify);
+
+/**
  *	dev_uc_add - Add a secondary unicast address
  *	@dev: device
  *	@addr: address to add
