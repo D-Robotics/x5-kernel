@@ -92,9 +92,23 @@ struct uvcg_frame {
 		u16	w_height;
 		u32	dw_min_bit_rate;
 		u32	dw_max_bit_rate;
+
+		/*
+		 * The layout of last three members of framebased frame
+		 * is different from uncompressed frame.
+		 *   Last three members of uncompressed frame are:
+		 *     u32	dw_max_video_frame_buffer_size;
+		 *     u32	dw_default_frame_interval;
+		 *     u8	b_frame_interval_type;
+		 *   Last three members of framebased frame are:
+		 *     u32	dw_default_frame_interval;
+		 *     u8	b_frame_interval_type;
+		 *     u32	dw_bytes_perline;
+		 */
 		u32	dw_max_video_frame_buffer_size;
 		u32	dw_default_frame_interval;
 		u8	b_frame_interval_type;
+#define dw_bytes_perline	dw_max_video_frame_buffer_size
 	} __attribute__((packed)) frame;
 	u32 *dw_frame_interval;
 };
@@ -116,6 +130,14 @@ struct uvcg_uncompressed {
 static inline struct uvcg_uncompressed *to_uvcg_uncompressed(struct config_item *item)
 {
 	return container_of(to_uvcg_format(item), struct uvcg_uncompressed, fmt);
+}
+
+static inline u8 uvcg_uncompressed_subtype(struct uvcg_format *fmt)
+{
+	struct uvcg_uncompressed *ch = container_of(fmt,
+					struct uvcg_uncompressed, fmt);
+
+	return ch->desc.bDescriptorSubType;
 }
 
 /* -----------------------------------------------------------------------------
