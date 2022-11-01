@@ -2820,7 +2820,21 @@ serial8250_do_set_termios(struct uart_port *port, struct ktermios *termios,
 	struct uart_8250_port *up = up_to_u8250p(port);
 	unsigned char cval;
 	unsigned long flags;
-	unsigned int baud, quot, frac = 0;
+	unsigned int baud, quot, frac, busy, wait = 0;
+
+	serial_port_out(port, UART_MCR, serial_port_in(port, UART_MCR) | UART_MCR_LOOP);
+
+	/*Read USR register untill uart is not busy*/
+	busy = serial_port_in(port, 0x1F) & 0x1;
+
+	while (busy && (wait < 6))
+	{
+		usleep_range(1200, 1500);
+		serial8250_clear_and_reinit_fifos(up);
+		busy = serial_port_in(port, 0x1F) & 0x1;
+		wait++;
+	}
+
 
 	if (up->capabilities & UART_CAP_MINI) {
 		termios->c_cflag &= ~(CSTOPB | PARENB | PARODD | CMSPAR);
@@ -2948,6 +2962,7 @@ serial8250_do_set_termios(struct uart_port *port, struct ktermios *termios,
 	/* Don't rewrite B0 */
 	if (tty_termios_baud_rate(termios))
 		tty_termios_encode_baud_rate(termios, baud, baud);
+	serial_port_out(port, UART_MCR, serial_port_in(port, UART_MCR) &(~UART_MCR_LOOP));
 }
 EXPORT_SYMBOL(serial8250_do_set_termios);
 
