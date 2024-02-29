@@ -47,7 +47,7 @@
  * a Trusted OS even if it claims to be capable of migration -- doing so will
  * require cooperation with a Trusted OS driver.
  */
-static int resident_cpu = -1;
+static int resident_cpu = 0;
 struct psci_operations psci_ops;
 static enum arm_smccc_conduit psci_conduit = SMCCC_CONDUIT_NONE;
 
