@@ -176,10 +176,14 @@ static void pll_set_regs(struct drobot_clk_pll *pll,
 	fvco = (parent_rate * rate_table->mint) + ((parent_rate * rate_table->mfrac) >> 16);
 
 	 /* Change PLL parameter values */
-	if (fvco >= 3750 * MHZ)
-		cfg_reg &= ~PLL_LOWFREQ_MASK;
-	else
+	if (fvco <= 3750 * MHZ) {
 		cfg_reg |= PLL_LOWFREQ_MASK;
+	} else if (fvco <= 4500 * MHZ) {
+		cfg_reg &= ~PLL_LOWFREQ_MASK;
+	} else {
+		cfg_reg &= ~PLL_VCOMODE_MASK;
+		cfg_reg |= PLL_LOWFREQ_MASK;
+	}
 	cfg_reg &= ~PLL_PREDIV_MASK;
 	cfg_reg |= SET_PLL_PREDIV(rate_table->prediv - 1);
 

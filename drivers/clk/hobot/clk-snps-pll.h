@@ -70,6 +70,7 @@ struct drobot_clk_pll {
 #define PLL_MFRAC_MASK		GENMASK(15, 0)
 #define PLL_FBDIV_LOAD		BIT(26)
 #define PLL_LOWFREQ_MASK	BIT(4)
+#define PLL_VCOMODE_MASK	BIT(3)
 #define PLL_FRAC_EN		BIT(0)
 #define PLL_CTRL_CFG0		0x3028
 
