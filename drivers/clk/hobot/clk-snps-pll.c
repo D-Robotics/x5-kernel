@@ -202,7 +202,9 @@ static void pll_set_regs(struct drobot_clk_pll *pll,
 
 	writel(fbdiv_reg, pll->cfg_reg + PLL_FBDIV_OFFSET);
 	writel(cfg_reg, pll->cfg_reg);
-	writel(PLL_FRAC_EN, pll->internal_reg);
+	writel(PLL_FRAC_EN, pll->internal_reg + PLL_SCFRAC_CNT);
+	if (fvco >= 4000 * MHZ)
+		writel(PLL_BYPASS_SYNC, pll->internal_reg + PLL_ANAREG6);
 	writel((cfg_reg | PLL_PWRON), pll->cfg_reg);
 	writel(postdiv_reg, pll->cfg_reg + PLL_POSTDIV_OFFSET);
 }

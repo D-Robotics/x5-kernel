@@ -19,12 +19,12 @@
 #include "clk.h"
 #include "idle.h"
 
-#define DSP_PLL_SCFRAC_CNT	0x1038
-#define CPU_PLL_SCFRAC_CNT	0x2038
-#define SYS0_PLL_SCFRAC_CNT	0x2138
-#define SYS1_PLL_SCFRAC_CNT	0x2238
-#define DISP_PLL_SCFRAC_CNT	0x2338
-#define PIXEL_PLL_SCFRAC_CNT	0x2438
+#define DSP_PLL_INTERNAL	0x1000
+#define CPU_PLL_INTERNAL	0x2000
+#define SYS0_PLL_INTERNAL	0x2100
+#define SYS1_PLL_INTERNAL	0x2200
+#define DISP_PLL_INTERNAL	0x2300
+#define PIXEL_PLL_INTERNAL	0x2400
 
 #define AON_CLK_ENB		0x0
 #define DSP_CLK_ENB		0x10
@@ -241,9 +241,9 @@ static int crm_dsp_clk_init(struct platform_device *pdev)
 		return PTR_ERR(base);
 
 	hws[X5_DSP_PLL_P] = clk_hw_register_pll("dsp_pll_p", "osc", base,
-			base + DSP_PLL_SCFRAC_CNT, PLL_P_OUT, x5_pll_rates, ARRAY_SIZE(x5_pll_rates));
+			base + DSP_PLL_INTERNAL, PLL_P_OUT, x5_pll_rates, ARRAY_SIZE(x5_pll_rates));
 	hws[X5_DSP_PLL_R] = clk_hw_register_pll("dsp_pll_r", "osc", base,
-			base + DSP_PLL_SCFRAC_CNT, PLL_R_OUT, NULL, 0);
+			base + DSP_PLL_INTERNAL, PLL_R_OUT, NULL, 0);
 
 	clk_set_rate(hws[X5_DSP_PLL_P]->clk, 1622250000);
 
@@ -385,29 +385,29 @@ static int crm_hps_clk_init(struct platform_device *pdev)
 		return PTR_ERR(base);
 
 	hws[X5_CPU_PLL_P] = clk_hw_register_pll("cpu_pll_p", "osc", base,
-			base + CPU_PLL_SCFRAC_CNT, PLL_P_OUT, x5_pll_rates, ARRAY_SIZE(x5_pll_rates));
+			base + CPU_PLL_INTERNAL, PLL_P_OUT, x5_pll_rates, ARRAY_SIZE(x5_pll_rates));
 	hws[X5_CPU_PLL_R] = clk_hw_register_pll("cpu_pll_r", "osc", base,
-			base + CPU_PLL_SCFRAC_CNT, PLL_R_OUT, NULL, 0);
+			base + CPU_PLL_INTERNAL, PLL_R_OUT, NULL, 0);
 
 	hws[X5_SYS0_PLL_P] = clk_hw_register_pll("sys0_pll_p", "osc", base + 0x10,
-			base + SYS0_PLL_SCFRAC_CNT, PLL_P_OUT, x5_pll_rates, ARRAY_SIZE(x5_pll_rates));
+			base + SYS0_PLL_INTERNAL, PLL_P_OUT, x5_pll_rates, ARRAY_SIZE(x5_pll_rates));
 	hws[X5_SYS0_PLL_R] = clk_hw_register_pll("sys0_pll_r", "osc", base + 0x10,
-			base + SYS0_PLL_SCFRAC_CNT, PLL_R_OUT, NULL, 0);
+			base + SYS0_PLL_INTERNAL, PLL_R_OUT, NULL, 0);
 
 	hws[X5_SYS1_PLL_P] = clk_hw_register_pll("sys1_pll_p", "osc", base + 0x20,
-			base + SYS1_PLL_SCFRAC_CNT, PLL_P_OUT, x5_pll_rates, ARRAY_SIZE(x5_pll_rates));
+			base + SYS1_PLL_INTERNAL, PLL_P_OUT, x5_pll_rates, ARRAY_SIZE(x5_pll_rates));
 	hws[X5_SYS1_PLL_R] = clk_hw_register_pll("sys1_pll_r", "osc", base + 0x20,
-			base + SYS1_PLL_SCFRAC_CNT, PLL_R_OUT, NULL, 0);
+			base + SYS1_PLL_INTERNAL, PLL_R_OUT, NULL, 0);
 
 	hws[X5_DISP_PLL_P] = clk_hw_register_pll("disp_pll_p", "osc", base + 0x30,
-			base + DISP_PLL_SCFRAC_CNT, PLL_P_OUT, x5_pll_rates, ARRAY_SIZE(x5_pll_rates));
+			base + DISP_PLL_INTERNAL, PLL_P_OUT, x5_pll_rates, ARRAY_SIZE(x5_pll_rates));
 	hws[X5_DISP_PLL_R] = clk_hw_register_pll("disp_pll_r", "osc", base + 0x30,
-			base + DISP_PLL_SCFRAC_CNT, PLL_R_OUT, NULL, 0);
+			base + DISP_PLL_INTERNAL, PLL_R_OUT, NULL, 0);
 
 	hws[X5_PIXEL_PLL_P] = clk_hw_register_pll("pixel_pll_p", "osc", base + 0x40,
-			base + PIXEL_PLL_SCFRAC_CNT, PLL_P_OUT, x5_pll_rates, ARRAY_SIZE(x5_pll_rates));
+			base + PIXEL_PLL_INTERNAL, PLL_P_OUT, x5_pll_rates, ARRAY_SIZE(x5_pll_rates));
 	hws[X5_PIXEL_PLL_R] = clk_hw_register_pll("pixel_pll_r", "osc", base + 0x40,
-			base + PIXEL_PLL_SCFRAC_CNT, PLL_R_OUT, NULL, 0);
+			base + PIXEL_PLL_INTERNAL, PLL_R_OUT, NULL, 0);
 
 	if(pll_match == 0)
 		for(i = 0; i < ARRAY_SIZE(soc_pll_rates0); i++)
