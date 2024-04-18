@@ -209,7 +209,7 @@ static int x5_ddrc_check_opps(struct device *dev)
 
 		freq_info = x5_ddrc_find_freq(priv, freq);
 		if (!freq_info) {
-			dev_info(dev, "Disable unsupported OPP %luHz %luMT/s\n",
+			dev_dbg(dev, "Disable unsupported OPP %luHz %luMT/s\n",
 					freq, DIV_ROUND_CLOSEST(freq, 250000));
 			dev_pm_opp_disable(dev, freq);
 		}
