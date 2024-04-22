@@ -125,7 +125,6 @@ static struct x5_rate_list soc_gen_rates[] = {
 	{X5_CPU_CORE_CLK,		1500000000},
 	{X5_CPU_PCLK,			300000000},
 	{X5_CPU_ATCLK,			300000000},
-	{X5_CPU_PERI_CLK,		500000000},
 	{X5_CSS600_TSGEN_CLK,		600000000},
 	{X5_CSS600_DBG_CLK,		150000000},
 	{X5_CSS600_TRACE_CLK,		400000000},
@@ -434,7 +433,6 @@ static int crm_hps_clk_init(struct platform_device *pdev)
 	hws[X5_CPU_SCLK] = drobot_clk_register_generator_flags_no_idle("cpu_sclk", soc_gen_src_sels, ARRAY_SIZE(soc_gen_src_sels), base + HPS_CLK_GEN + 0x1C0, CLK_IS_CRITICAL);
 	hws[X5_CPU_PCLK] = drobot_clk_register_generator_flags_no_idle("cpu_pclk", soc_gen_src_sels, ARRAY_SIZE(soc_gen_src_sels), base + HPS_CLK_GEN + 0x1E0, CLK_IS_CRITICAL);
 	hws[X5_CPU_ATCLK] = drobot_clk_register_generator_flags_no_idle("cpu_atclk", soc_gen_src_sels, ARRAY_SIZE(soc_gen_src_sels), base + HPS_CLK_GEN + 0x200, CLK_IS_CRITICAL);
-	hws[X5_CPU_PERI_CLK] = drobot_clk_register_generator_flags_no_idle("cpu_peri_clk", soc_gen_src_sels, ARRAY_SIZE(soc_gen_src_sels), base + HPS_CLK_GEN + 0x220, CLK_IS_CRITICAL);
 
  	hws[X5_CSS600_TSGEN_CLK] = drobot_clk_register_generator_flags_no_idle("css600_tsgen_clk", soc_gen_src_sels, ARRAY_SIZE(soc_gen_src_sels), base + HPS_CLK_GEN + 0x240, CLK_IS_CRITICAL);
 	hws[X5_CSS600_DBG_CLK] = drobot_clk_register_generator_flags_no_idle("css600_dbg_clk", soc_gen_src_sels, ARRAY_SIZE(soc_gen_src_sels), base + HPS_CLK_GEN + 0x260, CLK_IS_CRITICAL);

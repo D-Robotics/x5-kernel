@@ -22,12 +22,25 @@
 #define CCLK_POST_DIV_MASK		GENMASK(5, CCLK_POST_DIV_SHIFT)
 #define CCLK_MUX_MASK			GENMASK(26, CCLK_MUX_SHIFT)
 #define CCLK_EN				BIT(28)
+#define CCLK_PERI_OFFSET		0x160
 
 #define SET_CCLK_PREDIV(x)		(((x) << CCLK_PRE_DIV_SHIFT) & CCLK_PRE_DIV_MASK)
 #define SET_CCLK_POSTDIV(x)		(((x) << CCLK_POST_DIV_SHIFT) & CCLK_POST_DIV_MASK)
 #define SET_CCLK_MUX(x)			(((x) << CCLK_MUX_SHIFT) & CCLK_MUX_MASK)
 
 #define to_clk_cpu(_hw)		container_of(_hw, struct clk_cpu, hw)
+
+struct clk_pair {
+	unsigned long core_clk;
+	unsigned long div;
+};
+
+static const struct clk_pair cpu_clk_pair[] = {
+	{.core_clk = 1800000000, .div = 4},
+	{.core_clk = 1200000000, .div = 3},
+	{.core_clk = 600000000,  .div = 2},
+	{.core_clk = 300000000,  .div = 1},
+};
 
 struct clk_cpu_div_table {
 	u8 prediv;
@@ -39,6 +52,18 @@ struct clk_cpu {
 	void __iomem *reg;
 	u8 offset;
 };
+
+static void peri_set_clear(struct clk_cpu *cclk, u32 set, u32 clear)
+{
+	u32 val;
+
+	val = readl(cclk->reg);
+
+	val &= ~clear;
+	val |= set;
+
+	writel(val, cclk->reg + CCLK_PERI_OFFSET);
+}
 
 static void gen_set_clear(struct clk_cpu *cclk, u32 set, u32 clear)
 {
@@ -368,9 +393,10 @@ static int clk_cpu_set_rate_and_parent(struct clk_hw *hw,
 					unsigned long parent_rate, u8 index)
 {
 	struct clk_cpu *cclk = to_clk_cpu(hw);
-	struct clk_cpu_div_table table;
-	unsigned int div;
+	struct clk_cpu_div_table table, peri_table;
+	unsigned int div, peri_div;
 	u32 val, mask;
+	int i;
 
 	if (!rate) {
 		pr_err("%s: Invalid rate : %lu for generator clk %s\n", __func__,
@@ -380,11 +406,28 @@ static int clk_cpu_set_rate_and_parent(struct clk_hw *hw,
 
 	div = DIV_ROUND_CLOSEST_ULL((u64)parent_rate, rate);
 
+	for (i = 0; i < ARRAY_SIZE(cpu_clk_pair); i++) {
+		if (rate >= cpu_clk_pair[i].core_clk) {
+			peri_div = div * cpu_clk_pair[i].div;
+			break;
+		}
+	}
+
 	if (!cal_div_table(div, &table)) {
 		pr_err("%s: Invalid rate : %lu for generator clk %s\n", __func__,
 			rate, clk_hw_get_name(hw));
 		return -EINVAL;
 	}
+
+	if (!cal_div_table(peri_div, &peri_table)) {
+		pr_err("%s: Invalid rate : %lu for generator clk %s\n", __func__,
+			rate, clk_hw_get_name(hw));
+		return -EINVAL;
+	}
+
+	val = SET_CCLK_PREDIV(peri_table.prediv) | SET_CCLK_POSTDIV(peri_table.postdiv) | SET_CCLK_MUX(index);
+	mask = CCLK_MUX_MASK | CCLK_PRE_DIV_MASK | CCLK_POST_DIV_MASK;
+	peri_set_clear(cclk, val, mask);
 
 	val = SET_CCLK_PREDIV(table.prediv) | SET_CCLK_POSTDIV(table.postdiv) | SET_CCLK_MUX(index);
 	mask = CCLK_MUX_MASK | CCLK_PRE_DIV_MASK | CCLK_POST_DIV_MASK;
