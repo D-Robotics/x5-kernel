@@ -315,8 +315,8 @@ static int clk_cpu_set_rate(struct clk_hw *hw, unsigned long rate,
 		return -EINVAL;
 	}
 
-	gen_set_clear(cclk, SET_CCLK_PREDIV(table.prediv), CCLK_PRE_DIV_MASK);
-	gen_set_clear(cclk, SET_CCLK_POSTDIV(table.postdiv), CCLK_POST_DIV_MASK);
+	gen_set_clear(cclk, SET_CCLK_PREDIV(table.prediv) | SET_CCLK_POSTDIV(table.postdiv),
+			CCLK_PRE_DIV_MASK | CCLK_POST_DIV_MASK);
 
 	return 0;
 }
@@ -363,6 +363,36 @@ static int clk_cpu_set_parent(struct clk_hw *hw, u8 index)
 	return 0;
 }
 
+static int clk_cpu_set_rate_and_parent(struct clk_hw *hw,
+					unsigned long rate,
+					unsigned long parent_rate, u8 index)
+{
+	struct clk_cpu *cclk = to_clk_cpu(hw);
+	struct clk_cpu_div_table table;
+	unsigned int div;
+	u32 val, mask;
+
+	if (!rate) {
+		pr_err("%s: Invalid rate : %lu for generator clk %s\n", __func__,
+			rate, clk_hw_get_name(hw));
+		return -EINVAL;
+	}
+
+	div = DIV_ROUND_CLOSEST_ULL((u64)parent_rate, rate);
+
+	if (!cal_div_table(div, &table)) {
+		pr_err("%s: Invalid rate : %lu for generator clk %s\n", __func__,
+			rate, clk_hw_get_name(hw));
+		return -EINVAL;
+	}
+
+	val = SET_CCLK_PREDIV(table.prediv) | SET_CCLK_POSTDIV(table.postdiv) | SET_CCLK_MUX(index);
+	mask = CCLK_MUX_MASK | CCLK_PRE_DIV_MASK | CCLK_POST_DIV_MASK;
+	gen_set_clear(cclk, val, mask);
+
+	return 0;
+}
+
 static const struct clk_ops clk_cpu_ops = {
 	.recalc_rate = clk_cpu_recalc_rate,
 	.round_rate = clk_cpu_round_rate,
@@ -373,6 +403,7 @@ static const struct clk_ops clk_cpu_ops = {
 	.is_enabled = clk_cpu_is_enabled,
 	.get_parent = clk_cpu_get_parent,
 	.set_parent = clk_cpu_set_parent,
+	.set_rate_and_parent = clk_cpu_set_rate_and_parent,
 };
 
 /**
