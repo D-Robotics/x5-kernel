@@ -1057,8 +1057,9 @@ n2d_error_t n2d_kernel_hardware_set_power(n2d_hardware_t *hardware, n2d_kernel_p
 
 	if (state > hardware->power_state)
 		ONERROR(_hardware_set_power_off(hardware, state));
-	else
+	else if (state < hardware->power_state)
 		ONERROR(_hardware_set_power_on(hardware, state));
+
 	hardware->power_state = state;
 on_error:
 	if (get_commit_mutex)

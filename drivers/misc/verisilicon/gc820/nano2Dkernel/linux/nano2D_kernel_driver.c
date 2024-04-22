@@ -2050,7 +2050,7 @@ static int gpu_system_suspend(struct device *dev)
 
 static int gpu_system_resume(struct device *dev)
 {
-	return gpu_resume(to_platform_device(dev));
+	return 0;
 }
 #endif
 
