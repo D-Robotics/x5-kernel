@@ -1000,27 +1000,27 @@
 &vin_vcon0 {
 	//status = "okay";	//has enabled
 	bus = <0>;	//i2c-0
-	gpio_oth = <498 497>;	//reset gpio、pwd gpio
+	gpio_oth = <497 498>;	//pwd gpio、reset gpio
 	lpwm_chn = <0 1 2 3>;
 };
 
 &vin_vcon1 {
 	//status = "okay";	//has enabled
 	bus = <1>;	//i2c-1
-	gpio_oth = <502 499>;	//reset gpio、pwd gpio
+	gpio_oth = <499 502>;	//pwd gpio、reset gpio
 	lpwm_chn = <0 1 2 3>;
 };
 
 &vin_vcon2 {
 	//status = "okay";	//has enabled
 	bus = <7>;	//NOTICE i2c-7 same this hifi5
-	gpio_oth = <503 504>;	//reset gpio、pwd gpio
+	gpio_oth = <504 503>;	//pwd gpio、reset gpio
 	lpwm_chn = <0 1 2 3>;
 };
 
 &vin_vcon3 {
 	//status = "okay";	//has enabled
 	bus = <3>;	//i2c-3
-	gpio_oth = <393 392>;	//reset gpio、pwd gpio
+	gpio_oth = <392 393>;	//pwd gpio、reset gpio
 	lpwm_chn = <0 1 2 3>;
 };
