@@ -1,0 +1,48 @@
+if CRYPTO_HW
+
+menu "Trust Engine Driver "
+comment "Arm china Trust Engine Driver Config"
+
+config CRYPTO_DEV_TE
+	tristate "Support for arm China TrustEngine-600 enabled  security processors"
+	depends on OF && CRYPTO_HW
+	default m
+	select CRYPTO_HASH
+	select CRYPTO_SKCIPHER
+	select CRYPTO_LIB_DES
+	select CRYPTO_AEAD
+	select CRYPTO_SHA1
+	select CRYPTO_MD5
+	select CRYPTO_SHA256
+	select CRYPTO_SHA512
+	select CRYPTO_HMAC
+	select CRYPTO_AES
+	select CRYPTO_CBC
+	select CRYPTO_ECB
+	select CRYPTO_CTR
+	select CRYPTO_XTS
+	select CRYPTO_RSA
+	help
+	  This selects the crypto driver for the TrustEngine-500 hardware. It supports
+	  AES/SM4 with ECB, CBC, CTR, OFB and XTS modes. And for hash, it supports MD5,
+	  SHA1, SHA224, SHA256, SHA384 and SHA512. it also supports GCM and CCM.
+
+config HW_RANDOM_TE
+	bool "Trust Engine HW Random Number Generator support"
+        depends on HW_RANDOM  && CRYPTO_DEV_TE
+	default y
+	help
+	  This driver provides kernel-side support for a generic Random
+	  Number Generator.
+
+config CRYPTO_TE_UT
+	tristate "Support ARM China TrustEngine Unit Test"
+	depends on CRYPTO_HW
+	default m
+	help
+	  ARM China TrustEngine Unit Test driver supplies procfs interfaces for user
+	  to manipulate and test the TrustEngine low-level drivers.
+
+endmenu
+
+endif # CRYPTO_HW

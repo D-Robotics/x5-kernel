@@ -21,11 +21,11 @@
 
 static void set_params(struct hantro_ctx *ctx, struct vb2_v4l2_buffer *src_buf)
 {
-	const struct hantro_h264_dec_ctrls *ctrls = &ctx->h264_dec.ctrls;
+	const struct hantro_h264_dec_ctrls *ctrls	     = &ctx->h264_dec.ctrls;
 	const struct v4l2_ctrl_h264_decode_params *dec_param = ctrls->decode;
-	const struct v4l2_ctrl_h264_sps *sps = ctrls->sps;
-	const struct v4l2_ctrl_h264_pps *pps = ctrls->pps;
-	struct hantro_dev *vpu = ctx->dev;
+	const struct v4l2_ctrl_h264_sps *sps		     = ctrls->sps;
+	const struct v4l2_ctrl_h264_pps *pps		     = ctrls->pps;
+	struct hantro_dev *vpu				     = ctx->dev;
 	u32 reg;
 
 	/* Decoder control register 0. */
@@ -112,16 +112,15 @@ static void set_params(struct hantro_ctx *ctx, struct vb2_v4l2_buffer *src_buf)
 	/* Prediction filter tap register. */
 	vdpu_write_relaxed(vpu,
 			   G1_REG_PRED_FLT_PRED_BC_TAP_0_0(1) |
-			   G1_REG_PRED_FLT_PRED_BC_TAP_0_1(-5 & 0x3ff) |
-			   G1_REG_PRED_FLT_PRED_BC_TAP_0_2(20),
+				   G1_REG_PRED_FLT_PRED_BC_TAP_0_1(-5 & 0x3ff) |
+				   G1_REG_PRED_FLT_PRED_BC_TAP_0_2(20),
 			   G1_REG_PRED_FLT);
 
 	/* Reference picture buffer control register. */
 	vdpu_write_relaxed(vpu, 0, G1_REG_REF_BUF_CTRL);
 
 	/* Reference picture buffer control register 2. */
-	vdpu_write_relaxed(vpu, G1_REG_REF_BUF_CTRL2_APF_THRESHOLD(8),
-			   G1_REG_REF_BUF_CTRL2);
+	vdpu_write_relaxed(vpu, G1_REG_REF_BUF_CTRL2_APF_THRESHOLD(8), G1_REG_REF_BUF_CTRL2);
 }
 
 static void set_ref(struct hantro_ctx *ctx)
@@ -149,7 +148,7 @@ static void set_ref(struct hantro_ctx *ctx)
 
 	b0_reflist = ctx->h264_dec.reflists.b0;
 	b1_reflist = ctx->h264_dec.reflists.b1;
-	p_reflist = ctx->h264_dec.reflists.p;
+	p_reflist  = ctx->h264_dec.reflists.p;
 
 	/*
 	 * Each G1_REG_BD_REF_PIC(x) register contains three entries
@@ -227,8 +226,7 @@ static void set_buffers(struct hantro_ctx *ctx, struct vb2_v4l2_buffer *src_buf)
 		unsigned int bytes_per_mb = 384;
 
 		/* DMV buffer for monochrome start directly after Y-plane */
-		if (ctrls->sps->profile_idc >= 100 &&
-		    ctrls->sps->chroma_format_idc == 0)
+		if (ctrls->sps->profile_idc >= 100 && ctrls->sps->chroma_format_idc == 0)
 			bytes_per_mb = 256;
 		offset = bytes_per_mb * MB_WIDTH(ctx->src_fmt.width) *
 			 MB_HEIGHT(ctx->src_fmt.height);
@@ -238,8 +236,8 @@ static void set_buffers(struct hantro_ctx *ctx, struct vb2_v4l2_buffer *src_buf)
 		 * adjust offset for bottom field
 		 */
 		if (ctrls->decode->flags & V4L2_H264_DECODE_PARAM_FLAG_BOTTOM_FIELD)
-			offset += 32 * MB_WIDTH(ctx->src_fmt.width) *
-				  MB_HEIGHT(ctx->src_fmt.height);
+			offset +=
+				32 * MB_WIDTH(ctx->src_fmt.width) * MB_HEIGHT(ctx->src_fmt.height);
 		vdpu_write_relaxed(vpu, dst_dma + offset, G1_REG_ADDR_DIR_MV);
 	}
 
@@ -268,15 +266,11 @@ int hantro_g1_h264_dec_run(struct hantro_ctx *ctx)
 
 	/* Start decoding! */
 	vdpu_write_relaxed(vpu,
-			   G1_REG_CONFIG_DEC_AXI_RD_ID(0xffu) |
-			   G1_REG_CONFIG_DEC_TIMEOUT_E |
-			   G1_REG_CONFIG_DEC_OUT_ENDIAN |
-			   G1_REG_CONFIG_DEC_STRENDIAN_E |
-			   G1_REG_CONFIG_DEC_MAX_BURST(16) |
-			   G1_REG_CONFIG_DEC_OUTSWAP32_E |
-			   G1_REG_CONFIG_DEC_INSWAP32_E |
-			   G1_REG_CONFIG_DEC_STRSWAP32_E |
-			   G1_REG_CONFIG_DEC_CLK_GATE_E,
+			   G1_REG_CONFIG_DEC_AXI_RD_ID(0xffu) | G1_REG_CONFIG_DEC_TIMEOUT_E |
+				   G1_REG_CONFIG_DEC_OUT_ENDIAN | G1_REG_CONFIG_DEC_STRENDIAN_E |
+				   G1_REG_CONFIG_DEC_MAX_BURST(16) | G1_REG_CONFIG_DEC_OUTSWAP32_E |
+				   G1_REG_CONFIG_DEC_INSWAP32_E | G1_REG_CONFIG_DEC_STRSWAP32_E |
+				   G1_REG_CONFIG_DEC_CLK_GATE_E,
 			   G1_REG_CONFIG);
 	vdpu_write(vpu, G1_REG_INTERRUPT_DEC_E, G1_REG_INTERRUPT);
 

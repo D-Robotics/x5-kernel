@@ -69,6 +69,7 @@ modules.order
 /modules.builtin
 /modules.builtin.modinfo
 /modules.nsdeps
+/drivers/media/platform/horizon/camsys/
 
 #
 # RPM spec file (make rpm-pkg)
@@ -100,6 +101,7 @@ modules.order
 !.gitignore
 !.mailmap
 !.rustfmt.toml
+!.hook_opt
 
 #
 # Generated include files

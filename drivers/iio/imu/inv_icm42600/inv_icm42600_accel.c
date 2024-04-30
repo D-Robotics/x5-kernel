@@ -19,6 +19,10 @@
 #include "inv_icm42600_buffer.h"
 #include "inv_icm42600_timestamp.h"
 
+#if defined(CONFIG_IMU_DATA_READY)
+#define USE_IRQ_TIME
+#endif
+
 #define INV_ICM42600_ACCEL_CHAN(_modifier, _index, _ext_info)		\
 	{								\
 		.type = IIO_ACCEL,					\
@@ -267,6 +271,8 @@ static const int inv_icm42600_accel_odr[] = {
 	100, 0,
 	/* 200Hz */
 	200, 0,
+	/* 500Hz */
+	500, 0,
 	/* 1kHz */
 	1000, 0,
 	/* 2kHz */
@@ -281,6 +287,7 @@ static const int inv_icm42600_accel_odr_conv[] = {
 	INV_ICM42600_ODR_50HZ,
 	INV_ICM42600_ODR_100HZ,
 	INV_ICM42600_ODR_200HZ,
+	INV_ICM42600_ODR_500HZ,
 	INV_ICM42600_ODR_1KHZ_LN,
 	INV_ICM42600_ODR_2KHZ_LN,
 	INV_ICM42600_ODR_4KHZ_LN,
@@ -720,6 +727,11 @@ struct iio_dev *inv_icm42600_accel_init(struct inv_icm42600_state *st)
 		return ERR_PTR(-ENOMEM);
 
 	ts = iio_priv(indio_dev);
+#if defined(CONFIG_IMU_DATA_READY)
+	ret = kfifo_alloc(&(ts->irq_time), 2048*8, GFP_KERNEL);
+	if (ret)
+		return ERR_PTR(-ENOMEM);
+#endif
 	inv_icm42600_timestamp_init(ts, inv_icm42600_odr_to_period(st->conf.accel.odr));
 
 	iio_device_set_drvdata(indio_dev, st);
@@ -753,6 +765,9 @@ int inv_icm42600_accel_parse_fifo(struct iio_dev *indio_dev)
 	unsigned int odr;
 	int64_t ts_val;
 	struct inv_icm42600_accel_buffer buffer;
+#if defined(CONFIG_IMU_DATA_READY)
+	int64_t irq_ts;
+#endif
 
 	/* parse all fifo packets */
 	for (i = 0, no = 0; i < st->fifo.count; i += size, ++no) {
@@ -771,12 +786,30 @@ int inv_icm42600_accel_parse_fifo(struct iio_dev *indio_dev)
 			inv_icm42600_timestamp_apply_odr(ts, st->fifo.period,
 							 st->fifo.nb.total, no);
 
+#if defined(CONFIG_IMU_DATA_READY)
+		if (8 != kfifo_out(&(ts->irq_time), (void *)(&irq_ts), 8))
+			printk("%s: %d: kfifo_out accel irq_time error\n", __func__, __LINE__);
+#endif
+
 		/* buffer is copied to userspace, zeroing it to avoid any data leak */
 		memset(&buffer, 0, sizeof(buffer));
 		memcpy(&buffer.accel, accel, sizeof(buffer.accel));
+
+#if defined(USE_IMU_TIMESTAMP) && defined(CONFIG_IMU_DATA_READY)
+		if (timestamp)
+			buffer.temp = *((unsigned short *)timestamp);
+		else
+			buffer.temp = 0;
+#else
 		/* convert 8 bits FIFO temperature in high resolution format */
 		buffer.temp = temp ? (*temp * 64) : 0;
+#endif
+
+#if defined(USE_IRQ_TIME) && defined(CONFIG_IMU_DATA_READY)
+		memcpy(&ts_val, (void *)(&irq_ts), sizeof(ts_val));
+#else
 		ts_val = inv_icm42600_timestamp_pop(ts);
+#endif
 		iio_push_to_buffers_with_timestamp(indio_dev, &buffer, ts_val);
 	}
 

@@ -1,0 +1,20 @@
+# SPDX-License-Identifier: GPL-2.0
+# Makefile for the kernel vsi GPU drivers.
+ARCH_TYPE                         ?= arm64
+VIVANTE_ENABLE_3D                 ?= 1
+VIVANTE_ENABLE_2D                 ?= 1
+VIVANTE_ENABLE_VG                 ?= 1
+VIVANTE_ENABLE_DRM                ?= 0
+NO_DMA_COHERENT                   ?= 0
+USE_PLATFORM_DRIVER               ?= 1
+ENABLE_GPU_CLOCK_BY_DRIVER        ?= 1
+CACHE_FUNCTION_UNIMPLEMENTED      ?= 0
+USE_BANK_ALIGNMENT                ?= 0
+BANK_BIT_START                    ?= 0
+BANK_BIT_END                      ?= 0
+BANK_CHANNEL_BIT                  ?= 0
+FPGA_BUILD                        ?= 0
+SOC_PLATFORM                      ?= default
+DEBUG                             ?= 0
+ENABLE_ION                        ?= 1
+ENABLE_REGULATOR                  ?= 0

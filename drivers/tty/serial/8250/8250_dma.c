@@ -11,6 +11,9 @@
 
 #include "8250.h"
 
+#define RX_DMA_SIZE	(256)
+#define RX_DMA_PERIODS	(16)
+
 static void __dma_tx_complete(void *param)
 {
 	struct uart_8250_port	*p = param;
@@ -46,6 +49,7 @@ static void __dma_rx_complete(void *param)
 	struct dma_tx_state	state;
 	enum dma_status		dma_status;
 	int			count;
+	unsigned char *buf = dma->rx_buf;
 
 	/*
 	 * New DMA Rx can be started during the completion handler before it
@@ -53,14 +57,18 @@ static void __dma_rx_complete(void *param)
 	 * anything in such case.
 	 */
 	dma_status = dmaengine_tx_status(dma->rxchan, dma->rx_cookie, &state);
-	if (dma_status == DMA_IN_PROGRESS)
+
+	if (dma_status == DMA_ERROR)
 		return;
 
-	count = dma->rx_size - state.residue;
+	count = dma->rx_size / RX_DMA_PERIODS;
+	buf += dma->rx_pos;
 
-	tty_insert_flip_string(tty_port, dma->rx_buf, count);
+	tty_insert_flip_string(tty_port, buf, count);
 	p->port.icount.rx += count;
-	dma->rx_running = 0;
+	dma->rx_pos += count;
+	if (dma->rx_pos >= dma->rx_size)
+		dma->rx_pos = 0;
 
 	tty_flip_buffer_push(tty_port);
 }
@@ -143,13 +151,15 @@ int serial8250_rx_dma(struct uart_8250_port *p)
 
 	serial8250_do_prepare_rx_dma(p);
 
-	desc = dmaengine_prep_slave_single(dma->rxchan, dma->rx_addr,
-					   dma->rx_size, DMA_DEV_TO_MEM,
-					   DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
+	desc = dmaengine_prep_dma_cyclic(dma->rxchan, dma->rx_addr,
+					 dma->rx_size, dma->rx_size / RX_DMA_PERIODS,
+					 DMA_DEV_TO_MEM,
+					 DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
 	if (!desc)
 		return -EBUSY;
 
 	dma->rx_running = 1;
+	dma->rx_pos = 0;
 	desc->callback = dma_rx_complete;
 	desc->callback_param = p;
 
@@ -168,6 +178,7 @@ void serial8250_rx_dma_flush(struct uart_8250_port *p)
 		dmaengine_pause(dma->rxchan);
 		__dma_rx_complete(p);
 		dmaengine_terminate_async(dma->rxchan);
+		dma->rx_running = 0;
 	}
 }
 EXPORT_SYMBOL_GPL(serial8250_rx_dma_flush);
@@ -182,15 +193,20 @@ int serial8250_request_dma(struct uart_8250_port *p)
 	dma_cap_mask_t		mask;
 	struct dma_slave_caps	caps;
 	int			ret;
+	struct uart_port	*up = &p->port;
 
 	/* Default slave configuration parameters */
 	dma->rxconf.direction		= DMA_DEV_TO_MEM;
 	dma->rxconf.src_addr_width	= DMA_SLAVE_BUSWIDTH_1_BYTE;
 	dma->rxconf.src_addr		= rx_dma_addr + UART_RX;
+	dma->rxconf.src_msize		= up->fifosize / 2;
+	dma->rxconf.dst_msize		= up->fifosize / 2;
 
 	dma->txconf.direction		= DMA_MEM_TO_DEV;
 	dma->txconf.dst_addr_width	= DMA_SLAVE_BUSWIDTH_1_BYTE;
 	dma->txconf.dst_addr		= tx_dma_addr + UART_TX;
+	dma->txconf.src_msize		= 1;
+	dma->txconf.dst_msize		= 1;
 
 	dma_cap_zero(mask);
 	dma_cap_set(DMA_SLAVE, mask);
@@ -236,7 +252,7 @@ int serial8250_request_dma(struct uart_8250_port *p)
 
 	/* RX buffer */
 	if (!dma->rx_size)
-		dma->rx_size = PAGE_SIZE;
+		dma->rx_size = RX_DMA_SIZE;
 
 	dma->rx_buf = dma_alloc_coherent(dma->rxchan->device->dev, dma->rx_size,
 					&dma->rx_addr, GFP_KERNEL);
@@ -277,6 +293,7 @@ void serial8250_release_dma(struct uart_8250_port *p)
 
 	/* Release RX resources */
 	dmaengine_terminate_sync(dma->rxchan);
+	dma->rx_running = 0;
 	dma_free_coherent(dma->rxchan->device->dev, dma->rx_size, dma->rx_buf,
 			  dma->rx_addr);
 	dma_release_channel(dma->rxchan);

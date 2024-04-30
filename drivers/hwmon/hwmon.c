@@ -458,6 +458,13 @@ static const char * const hwmon_chip_attrs[] = {
 	[hwmon_chip_temp_samples] = "temp_samples",
 };
 
+/*
+ * pvt attributes
+ */
+static const char * const hwmon_pd_attrs[] = {
+	[hwmon_pd_pvt] = "pd",
+};
+
 static const char * const hwmon_temp_attr_templates[] = {
 	[hwmon_temp_enable] = "temp%d_enable",
 	[hwmon_temp_input] = "temp%d_input",
@@ -614,6 +621,7 @@ static const char * const hwmon_intrusion_attr_templates[] = {
 
 static const char * const *__templates[] = {
 	[hwmon_chip] = hwmon_chip_attrs,
+	[hwmon_pd] = hwmon_pd_attrs,
 	[hwmon_temp] = hwmon_temp_attr_templates,
 	[hwmon_in] = hwmon_in_attr_templates,
 	[hwmon_curr] = hwmon_curr_attr_templates,
@@ -627,6 +635,7 @@ static const char * const *__templates[] = {
 
 static const int __templates_size[] = {
 	[hwmon_chip] = ARRAY_SIZE(hwmon_chip_attrs),
+	[hwmon_pd] = ARRAY_SIZE(hwmon_pd_attrs),
 	[hwmon_temp] = ARRAY_SIZE(hwmon_temp_attr_templates),
 	[hwmon_in] = ARRAY_SIZE(hwmon_in_attr_templates),
 	[hwmon_curr] = ARRAY_SIZE(hwmon_curr_attr_templates),

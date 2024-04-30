@@ -108,6 +108,14 @@ config ARM_IMX8M_DDRC_DEVFREQ
 	  This adds the DEVFREQ driver for the i.MX8M DDR Controller. It allows
 	  adjusting DRAM frequency.
 
+config ARM_X5_DDRC_DEVFREQ
+	tristate "Horizon X5 DDRC DEVFREQ Driver"
+	select DEVFREQ_GOV_USERSPACE
+	select DEVFREQ_GOV_SIMPLE_ONDEMAND
+	help
+	  This adds the DEVFREQ driver for the Horizon X5 DDR Controller. It allows
+	  adjusting DRAM frequency.
+
 config ARM_TEGRA_DEVFREQ
 	tristate "NVIDIA Tegra30/114/124/210 DEVFREQ Driver"
 	depends on ARCH_TEGRA_3x_SOC || ARCH_TEGRA_114_SOC || \

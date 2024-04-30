@@ -1259,6 +1259,7 @@ struct dwc3 {
 	u8			speed;
 
 	u8			num_eps;
+	u8			num_ineps;
 
 	struct dwc3_hwparams	hwparams;
 	struct debugfs_regset32	*regset;

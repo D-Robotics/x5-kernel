@@ -147,6 +147,29 @@ const_debug unsigned int sysctl_sched_nr_migrate = SCHED_NR_MIGRATE_BREAK;
 
 __read_mostly int scheduler_running;
 
+#ifdef CONFIG_SCHED_LOGGER
+DEFINE_STATIC_KEY_FALSE(sched_log);
+static int (*log_cb)(bool preempt, struct task_struct *prev, struct task_struct *next);
+
+int register_sched_logger(void *cb)
+{
+	if (cb == NULL)
+		return -EINVAL;
+	log_cb = cb;
+	static_branch_enable(&sched_log);
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(register_sched_logger);
+
+void unregister_sched_logger(void)
+{
+	static_branch_disable(&sched_log);
+	log_cb = NULL;
+}
+EXPORT_SYMBOL_GPL(unregister_sched_logger);
+#endif /* CONFIG_SCHED_LOGGER */
+
 #ifdef CONFIG_SCHED_CORE
 
 DEFINE_STATIC_KEY_FALSE(__sched_core_enabled);
@@ -6663,6 +6686,13 @@ static void __sched notrace __schedule(unsigned int sched_mode)
 		psi_sched_switch(prev, next, !task_on_rq_queued(prev));
 
 		trace_sched_switch(sched_mode & SM_MASK_PREEMPT, prev, next, prev_state);
+
+#ifdef CONFIG_SCHED_LOGGER
+		if (static_branch_unlikely(&sched_log)) {
+			if (likely(log_cb))
+				(*log_cb)(sched_mode & SM_MASK_PREEMPT, prev, next);
+		}
+#endif
 
 		/* Also unlocks the rq: */
 		rq = context_switch(rq, prev, next, &rf);

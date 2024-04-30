@@ -1,0 +1,36 @@
+
+TOP := ../../..
+AQROOT :=../
+
+# include $(TOP)/env.conf
+
+INCLUDE_DIR += -Iinclude
+INCLUDE_DIR += -I$(AQROOT)/inc/
+INCLUDE_DIR += -I$(AQROOT)/arch/XAQ2/cmodel/inc
+CFLAGS += $(INCLUDE)
+
+SOURCES := nano2D.c nano2D_user_hardware.c nano2D_debug.c nano2D_user_hardware_dec.c nano2D_user_buffer.c nano2D_user.c
+SOURCES += nano2D_user_hardware_source.c nano2D_user_hardware_target.c nano2D_user_query.c
+
+TARGET := libnano2d
+MAKE_LIBRARY := Y
+
+include $(TOP)/Makefile.include
+
+
+DIRS = ecos
+
+.PHONY:	all clean dis $(DIRS)
+
+all: $(DIRS)
+
+$(DIRS):
+	@if test -d $@ ; then cd $@ ; if test -f makefile.ecos ; then $(MAKE) -f makefile.ecos all ; fi ;fi
+
+clean:
+	@for dir in $(DIRS) ; do \
+		if test -d $$dir ; then \
+		echo "$$dir: $(MAKE) $@" ; \
+		if (cd $$dir; if test -f makefile.ecos; then $(MAKE) -f makefile.ecos clean;fi) ; then true; else exit 1; fi; \
+		fi \
+	done;

@@ -27,3 +27,8 @@ config INV_ICM42600_SPI
 
 	  This driver can be built as a module. The module will be called
 	  inv-icm42600-spi.
+
+config IMU_DATA_READY
+	tristate "Use DATA_RDY_INT"
+	help
+		Use DATA_RDY_INT interrupt time as timestamp.

@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: GPL-2.0-only
+#
+# Hobot mailbox drivers
+#
+
+comment "Hobot Mailbox Drivers"
+
+config HB_MBOX_PL320
+	tristate "ARM PL320 Mailbox for horizon"
+	help
+	  The mailbox communication driver realized by arm pl320 used by horizon

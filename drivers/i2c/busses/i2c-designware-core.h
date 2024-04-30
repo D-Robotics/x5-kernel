@@ -295,6 +295,9 @@ struct dw_i2c_dev {
 	int			(*set_sda_hold_time)(struct dw_i2c_dev *dev);
 	int			mode;
 	struct i2c_bus_recovery_info rinfo;
+#if IS_ENABLED(CONFIG_ARCH_HOBOT_X5)
+	struct mutex lock;
+#endif
 };
 
 #define ACCESS_INTR_MASK	BIT(0)

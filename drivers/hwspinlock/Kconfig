@@ -63,4 +63,14 @@ config HSEM_U8500
 
 	  If unsure, say N.
 
+config HSEM_DRB
+	tristate "D-Robotics Hardware Semaphore device"
+	depends on HWSPINLOCK
+	  help
+	  Say y here to support the D-Robotics Hardware Semaphore device, which
+	  provides a synchronisation mechanism for the various processor on the
+	  SoC.
+
+	  If unsure, say N.
+
 endif # HWSPINLOCK

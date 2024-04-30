@@ -582,6 +582,28 @@ regulator_get_suspend_state_check(struct regulator_dev *rdev, suspend_state_t st
 	return rstate;
 }
 
+static ssize_t microvolts_store(struct device *dev, struct device_attribute *attr,
+				const char *buf, size_t count)
+{
+	struct regulator_dev *rdev = dev_get_drvdata(dev);
+        int ret;
+	unsigned long uV;
+
+	ret = kstrtoul(buf, 0, &uV);
+	if (ret) {
+		dev_info(dev, "Invalid: %s\n", buf);
+		return 0;
+	}
+
+	dev_info(dev, "Setting regulator to %lu, ret=%d\n", uV, ret);
+	regulator_lock(rdev);
+	ret = _regulator_do_set_voltage(rdev, uV, uV);
+	regulator_unlock(rdev);
+	dev_info(dev, "Regulator set to %lu, ret=%d\n", uV, ret);
+
+        return count;
+}
+
 static ssize_t microvolts_show(struct device *dev,
 			       struct device_attribute *attr, char *buf)
 {
@@ -596,7 +618,7 @@ static ssize_t microvolts_show(struct device *dev,
 		return uV;
 	return sprintf(buf, "%d\n", uV);
 }
-static DEVICE_ATTR_RO(microvolts);
+static DEVICE_ATTR_RW(microvolts);
 
 static ssize_t microamps_show(struct device *dev,
 			      struct device_attribute *attr, char *buf)

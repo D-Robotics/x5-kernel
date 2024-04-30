@@ -354,4 +354,18 @@ config ARCH_ZYNQMP
 	help
 	  This enables support for Xilinx ZynqMP Family
 
+config ARCH_HOBOT
+	bool "Horizon Robotics SOC Family"
+	select DW_APB_TIMER_OF
+	select HAVE_KERNEL_LZ4
+	help
+	  This enables support for Horizon Robotics SOC Family
+
+config ARCH_HOBOT_X5
+	bool "Horizon Robotics Sunrise5 SoC"
+	depends on ARCH_HOBOT
+	help
+	  Say Y if you intend to run the kernel on a Horizon Robotics
+	  ARM64-based Sunrise5 chipset.
+
 endmenu # "Platform selection"

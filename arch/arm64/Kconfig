@@ -2238,6 +2238,12 @@ config DMI
 	  However, even with this option, the resultant kernel should
 	  continue to boot on existing non-UEFI platforms.
 
+config HOBOT_BOOT_LZ4
+	bool "Enable lz4 compressed image install when open ARCH_HOBOT"
+	depends on ARCH_HOBOT
+	help
+	  This enables hobot Image.lz4 install when ARCH_HOBOT eq y
+
 endmenu # "Boot options"
 
 menu "Power management options"
@@ -2268,4 +2274,3 @@ endmenu # "CPU Power Management"
 source "drivers/acpi/Kconfig"
 
 source "arch/arm64/kvm/Kconfig"
-

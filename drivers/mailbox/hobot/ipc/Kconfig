@@ -1,0 +1,7 @@
+comment "Hobot Mailbox Drivers"
+
+config HB_IPC_SHM
+	tristate "IPC base share memory for horizon"
+	select HB_MBOX_PL320
+	help
+	  The ipc communication driver realized by horizon

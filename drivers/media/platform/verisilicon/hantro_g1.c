@@ -18,8 +18,7 @@ irqreturn_t hantro_g1_irq(int irq, void *dev_id)
 	u32 status;
 
 	status = vdpu_read(vpu, G1_REG_INTERRUPT);
-	state = (status & G1_REG_INTERRUPT_DEC_RDY_INT) ?
-		 VB2_BUF_STATE_DONE : VB2_BUF_STATE_ERROR;
+	state  = (status & G1_REG_INTERRUPT_DEC_RDY_INT) ? VB2_BUF_STATE_DONE : VB2_BUF_STATE_ERROR;
 
 	vdpu_write(vpu, 0, G1_REG_INTERRUPT);
 	vdpu_write(vpu, G1_REG_CONFIG_DEC_CLK_GATE_E, G1_REG_CONFIG);

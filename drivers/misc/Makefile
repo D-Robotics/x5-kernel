@@ -62,3 +62,5 @@ obj-$(CONFIG_HI6421V600_IRQ)	+= hi6421v600-irq.o
 obj-$(CONFIG_OPEN_DICE)		+= open-dice.o
 obj-$(CONFIG_GP_PCI1XXXX)	+= mchp_pci1xxxx/
 obj-$(CONFIG_VCPU_STALL_DETECTOR)	+= vcpu_stall_detector.o
+obj-$(CONFIG_HOBOT_VIO_N2D)		+= verisilicon/gc820/
+obj-$(CONFIG_VS_GC8000L)	+= verisilicon/gc8000l/

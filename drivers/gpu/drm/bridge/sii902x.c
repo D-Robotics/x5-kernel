@@ -54,6 +54,12 @@
 #define SII902X_TPI_AVI_INPUT_COLORSPACE_YUV444	(1 << 0)
 #define SII902X_TPI_AVI_INPUT_COLORSPACE_RGB	(0 << 0)
 
+#define SII902X_TPI_AVI_OUT_FORMAT		0xa
+#define SII902X_TPI_AVI_OUTPUT_COLORSPACE_RGB	(0 << 0)
+
+#define SII902X_TPI_AVI_YC_IN_MODE_SELECT	0xb
+#define SII902X_TPI_AVI_CHANNEL_DATA_SWAP	BIT(0)
+
 #define SII902X_TPI_AVI_INFOFRAME		0x0c
 
 #define SII902X_SYS_CTRL_DATA			0x1a
@@ -146,6 +152,12 @@
 #define SII902X_INT_STATUS			0x3d
 #define SII902X_HOTPLUG_EVENT			BIT(0)
 #define SII902X_PLUGGED_STATUS			BIT(2)
+
+#define SII902X_TPI_SYNC_GENERATION_CTRL	0x60
+#define SII902X_TPI_EMBEDDED_SYNC		BIT(7)
+
+#define SII902X_TPI_EMBEDDED_SYNC_EXTRACTION	0x63
+#define SII902X_TPI_EMBEDDED_SYNC_ENBALED	BIT(6)
 
 #define SII902X_REG_TPI_RQB			0xc7
 
@@ -365,7 +377,10 @@ static void sii902x_bridge_mode_set(struct drm_bridge *bridge,
 	struct regmap *regmap = sii902x->regmap;
 	u8 buf[HDMI_INFOFRAME_SIZE(AVI)];
 	struct hdmi_avi_infoframe frame;
+	u8 value, index;
+
 	u16 pixel_clock_10kHz = adj->clock / 10;
+
 	int ret;
 
 	if (sii902x->sink_is_hdmi)
@@ -381,8 +396,12 @@ static void sii902x_bridge_mode_set(struct drm_bridge *bridge,
 	buf[7] = adj->vdisplay >> 8;
 	buf[8] = SII902X_TPI_CLK_RATIO_1X | SII902X_TPI_AVI_PIXEL_REP_NONE |
 		 SII902X_TPI_AVI_PIXEL_REP_BUS_24BIT;
+
 	buf[9] = SII902X_TPI_AVI_INPUT_RANGE_AUTO |
-		 SII902X_TPI_AVI_INPUT_COLORSPACE_RGB;
+		 SII902X_TPI_AVI_INPUT_COLORSPACE_YUV422;
+
+	buf[10] = SII902X_TPI_AVI_OUTPUT_COLORSPACE_RGB;
+	buf[11] = SII902X_TPI_AVI_CHANNEL_DATA_SWAP;
 
 	mutex_lock(&sii902x->mutex);
 
@@ -391,7 +410,33 @@ static void sii902x_bridge_mode_set(struct drm_bridge *bridge,
 	if (ret)
 		goto out;
 
-	ret = regmap_bulk_write(regmap, SII902X_TPI_VIDEO_DATA, buf, 10);
+	ret = regmap_bulk_write(regmap, SII902X_TPI_VIDEO_DATA, buf, 12);
+	if (ret)
+		goto out;
+
+	for (index = 0; index < 10; index++)
+		buf[index] = 0;
+
+	/* timing configuration */
+	if (adj->flags & DRM_MODE_FLAG_INTERLACE) {
+		/* interlaced */
+		buf[0] = SII902X_TPI_EMBEDDED_SYNC;
+		buf[2] = adj->hsync_start - adj->hdisplay;
+		buf[4] = (adj->vtotal / 2 + 1) & 0xFF;
+		buf[5] = (adj->vtotal / 2 + 1) >> 8;
+		buf[6] = adj->hsync_end - adj->hsync_start + 1;
+		buf[8] = (adj->vsync_start - adj->vdisplay) / 2 + 1;
+		buf[9] = (adj->vsync_end - adj->vsync_start) / 2;
+	} else {
+		/* progressive */
+		buf[0] = SII902X_TPI_EMBEDDED_SYNC;
+		buf[2] = adj->htotal - adj->hsync_end;
+		buf[6] = adj->hsync_end - adj->hsync_start + 1;
+		buf[8] = adj->vtotal - adj->vsync_end;
+		buf[9] = adj->vsync_end - adj->vsync_start + 1;
+	}
+
+	ret = regmap_bulk_write(regmap, SII902X_TPI_SYNC_GENERATION_CTRL, buf, 10);
 	if (ret)
 		goto out;
 
@@ -412,6 +457,14 @@ static void sii902x_bridge_mode_set(struct drm_bridge *bridge,
 	regmap_bulk_write(regmap, SII902X_TPI_AVI_INFOFRAME,
 			  buf + HDMI_INFOFRAME_HEADER_SIZE - 1,
 			  HDMI_AVI_INFOFRAME_SIZE + 1);
+
+	/* enable embedded sync extraction in the end*/
+	value = SII902X_TPI_EMBEDDED_SYNC_ENBALED;
+	ret = regmap_write(regmap,
+			   SII902X_TPI_EMBEDDED_SYNC_EXTRACTION,
+			   value);
+	if (ret < 0)
+		goto out;
 
 out:
 	mutex_unlock(&sii902x->mutex);
@@ -453,6 +506,8 @@ static int sii902x_bridge_attach(struct drm_bridge *bridge,
 					       &bus_format, 1);
 	if (ret)
 		return ret;
+
+	sii902x->connector.interlace_allowed = true;
 
 	drm_connector_attach_encoder(&sii902x->connector, bridge->encoder);
 
@@ -1066,6 +1121,34 @@ static int sii902x_init(struct sii902x *sii902x)
 	return i2c_mux_add_adapter(sii902x->i2cmux, 0, 0, 0);
 }
 
+static int sii902x_resume(struct device *dev)
+{
+	struct sii902x *sii902x = dev_get_drvdata(dev);
+	int ret;
+	unsigned int status = 0;
+
+	ret = regmap_write(sii902x->regmap, SII902X_REG_TPI_RQB, 0x0);
+	if (ret)
+		return ret;
+
+	/* Clear all pending interrupts */
+	regmap_read(sii902x->regmap, SII902X_INT_STATUS, &status);
+	regmap_write(sii902x->regmap, SII902X_INT_STATUS, status);
+
+	return 0;
+}
+
+static int sii902x_suspend(struct device *dev)
+{
+	struct sii902x *sii902x = dev_get_drvdata(dev);
+
+	sii902x_reset(sii902x);
+	return 0;
+}
+
+static const struct dev_pm_ops sii902x_pm_ops = {
+	SET_SYSTEM_SLEEP_PM_OPS(sii902x_suspend, sii902x_resume)};
+
 static int sii902x_probe(struct i2c_client *client,
 			 const struct i2c_device_id *id)
 {
@@ -1174,6 +1257,7 @@ static struct i2c_driver sii902x_driver = {
 	.driver = {
 		.name = "sii902x",
 		.of_match_table = sii902x_dt_ids,
+		.pm = &sii902x_pm_ops,
 	},
 	.id_table = sii902x_i2c_ids,
 };

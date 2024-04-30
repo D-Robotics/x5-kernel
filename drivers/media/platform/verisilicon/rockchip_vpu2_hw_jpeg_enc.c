@@ -32,8 +32,7 @@
 
 #define VEPU_JPEG_QUANT_TABLE_COUNT 16
 
-static void rockchip_vpu2_set_src_img_ctrl(struct hantro_dev *vpu,
-					   struct hantro_ctx *ctx)
+static void rockchip_vpu2_set_src_img_ctrl(struct hantro_dev *vpu, struct hantro_ctx *ctx)
 {
 	u32 overfill_r, overfill_b;
 	u32 reg;
@@ -64,12 +63,11 @@ static void rockchip_vpu2_set_src_img_ctrl(struct hantro_dev *vpu,
 	vepu_write_relaxed(vpu, reg, VEPU_REG_ENC_CTRL1);
 }
 
-static void rockchip_vpu2_jpeg_enc_set_buffers(struct hantro_dev *vpu,
-					       struct hantro_ctx *ctx,
+static void rockchip_vpu2_jpeg_enc_set_buffers(struct hantro_dev *vpu, struct hantro_ctx *ctx,
 					       struct vb2_buffer *src_buf,
 					       struct vb2_buffer *dst_buf)
 {
-	struct v4l2_pix_format_mplane *pix_fmt = &ctx->src_fmt;
+	const struct v4l2_pix_format_mplane *pix_fmt = &ctx->src_fmt;
 	dma_addr_t src[3];
 	u32 size_left;
 
@@ -79,9 +77,9 @@ static void rockchip_vpu2_jpeg_enc_set_buffers(struct hantro_dev *vpu,
 
 	WARN_ON(pix_fmt->num_planes > 3);
 
-	vepu_write_relaxed(vpu, vb2_dma_contig_plane_dma_addr(dst_buf, 0) +
-				ctx->vpu_dst_fmt->header_size,
-			   VEPU_REG_ADDR_OUTPUT_STREAM);
+	vepu_write_relaxed(
+		vpu, vb2_dma_contig_plane_dma_addr(dst_buf, 0) + ctx->vpu_dst_fmt->header_size,
+		VEPU_REG_ADDR_OUTPUT_STREAM);
 	vepu_write_relaxed(vpu, size_left, VEPU_REG_STR_BUF_LIMIT);
 
 	if (pix_fmt->num_planes == 1) {
@@ -102,16 +100,14 @@ static void rockchip_vpu2_jpeg_enc_set_buffers(struct hantro_dev *vpu,
 	}
 }
 
-static void
-rockchip_vpu2_jpeg_enc_set_qtable(struct hantro_dev *vpu,
-				  unsigned char *luma_qtable,
-				  unsigned char *chroma_qtable)
+static void rockchip_vpu2_jpeg_enc_set_qtable(struct hantro_dev *vpu, unsigned char *luma_qtable,
+					      unsigned char *chroma_qtable)
 {
 	u32 reg, i;
 	__be32 *luma_qtable_p;
 	__be32 *chroma_qtable_p;
 
-	luma_qtable_p = (__be32 *)luma_qtable;
+	luma_qtable_p	= (__be32 *)luma_qtable;
 	chroma_qtable_p = (__be32 *)chroma_qtable;
 
 	/*
@@ -146,38 +142,29 @@ int rockchip_vpu2_jpeg_enc_run(struct hantro_ctx *ctx)
 	if (!jpeg_ctx.buffer)
 		return -ENOMEM;
 
-	jpeg_ctx.width = ctx->dst_fmt.width;
-	jpeg_ctx.height = ctx->dst_fmt.height;
+	jpeg_ctx.width	 = ctx->dst_fmt.width;
+	jpeg_ctx.height	 = ctx->dst_fmt.height;
 	jpeg_ctx.quality = ctx->jpeg_quality;
 	hantro_jpeg_header_assemble(&jpeg_ctx);
 
 	/* Switch to JPEG encoder mode before writing registers */
-	vepu_write_relaxed(vpu, VEPU_REG_ENCODE_FORMAT_JPEG,
-			   VEPU_REG_ENCODE_START);
+	vepu_write_relaxed(vpu, VEPU_REG_ENCODE_FORMAT_JPEG, VEPU_REG_ENCODE_START);
 
 	rockchip_vpu2_set_src_img_ctrl(vpu, ctx);
-	rockchip_vpu2_jpeg_enc_set_buffers(vpu, ctx, &src_buf->vb2_buf,
-					   &dst_buf->vb2_buf);
-	rockchip_vpu2_jpeg_enc_set_qtable(vpu, jpeg_ctx.hw_luma_qtable,
-					  jpeg_ctx.hw_chroma_qtable);
+	rockchip_vpu2_jpeg_enc_set_buffers(vpu, ctx, &src_buf->vb2_buf, &dst_buf->vb2_buf);
+	rockchip_vpu2_jpeg_enc_set_qtable(vpu, jpeg_ctx.hw_luma_qtable, jpeg_ctx.hw_chroma_qtable);
 
-	reg = VEPU_REG_OUTPUT_SWAP32
-		| VEPU_REG_OUTPUT_SWAP16
-		| VEPU_REG_OUTPUT_SWAP8
-		| VEPU_REG_INPUT_SWAP8
-		| VEPU_REG_INPUT_SWAP16
-		| VEPU_REG_INPUT_SWAP32;
+	reg = VEPU_REG_OUTPUT_SWAP32 | VEPU_REG_OUTPUT_SWAP16 | VEPU_REG_OUTPUT_SWAP8 |
+	      VEPU_REG_INPUT_SWAP8 | VEPU_REG_INPUT_SWAP16 | VEPU_REG_INPUT_SWAP32;
 	/* Make sure that all registers are written at this point. */
 	vepu_write(vpu, reg, VEPU_REG_DATA_ENDIAN);
 
 	reg = VEPU_REG_AXI_CTRL_BURST_LEN(16);
 	vepu_write_relaxed(vpu, reg, VEPU_REG_AXI_CTRL);
 
-	reg = VEPU_REG_MB_WIDTH(MB_WIDTH(ctx->src_fmt.width))
-		| VEPU_REG_MB_HEIGHT(MB_HEIGHT(ctx->src_fmt.height))
-		| VEPU_REG_FRAME_TYPE_INTRA
-		| VEPU_REG_ENCODE_FORMAT_JPEG
-		| VEPU_REG_ENCODE_ENABLE;
+	reg = VEPU_REG_MB_WIDTH(MB_WIDTH(ctx->src_fmt.width)) |
+	      VEPU_REG_MB_HEIGHT(MB_HEIGHT(ctx->src_fmt.height)) | VEPU_REG_FRAME_TYPE_INTRA |
+	      VEPU_REG_ENCODE_FORMAT_JPEG | VEPU_REG_ENCODE_ENABLE;
 
 	/* Kick the watchdog and start encoding */
 	hantro_end_prepare_run(ctx);
@@ -188,10 +175,9 @@ int rockchip_vpu2_jpeg_enc_run(struct hantro_ctx *ctx)
 
 void rockchip_vpu2_jpeg_enc_done(struct hantro_ctx *ctx)
 {
-	struct hantro_dev *vpu = ctx->dev;
-	u32 bytesused = vepu_read(vpu, VEPU_REG_STR_BUF_LIMIT) / 8;
+	struct hantro_dev *vpu		= ctx->dev;
+	u32 bytesused			= vepu_read(vpu, VEPU_REG_STR_BUF_LIMIT) / 8;
 	struct vb2_v4l2_buffer *dst_buf = hantro_get_dst_buf(ctx);
 
-	vb2_set_plane_payload(&dst_buf->vb2_buf, 0,
-			      ctx->vpu_dst_fmt->header_size + bytesused);
+	vb2_set_plane_payload(&dst_buf->vb2_buf, 0, ctx->vpu_dst_fmt->header_size + bytesused);
 }

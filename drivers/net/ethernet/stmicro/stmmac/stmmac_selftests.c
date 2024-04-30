@@ -1873,6 +1873,10 @@ static const struct stmmac_test {
 		.lb = STMMAC_LOOPBACK_PHY,
 		.fn = stmmac_test_vlanfilt_perfect,
 	}, {
+		.name = "VLAN TX Insertion          ",
+		.lb = STMMAC_LOOPBACK_PHY,
+		.fn = stmmac_test_vlanoff,
+	}, {
 		.name = "Double VLAN Filter         ",
 		.lb = STMMAC_LOOPBACK_PHY,
 		.fn = stmmac_test_dvlanfilt,
@@ -1900,10 +1904,6 @@ static const struct stmmac_test {
 		.name = "SA Replacement (reg)       ",
 		.lb = STMMAC_LOOPBACK_PHY,
 		.fn = stmmac_test_reg_sar,
-	}, {
-		.name = "VLAN TX Insertion          ",
-		.lb = STMMAC_LOOPBACK_PHY,
-		.fn = stmmac_test_vlanoff,
 	}, {
 		.name = "SVLAN TX Insertion         ",
 		.lb = STMMAC_LOOPBACK_PHY,

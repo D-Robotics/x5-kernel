@@ -1,0 +1,907 @@
+// SPDX-License-Identifier: GPL-2.0
+/*
+ * dts for Sunrise5 fpga platform
+ *
+ * Copyright(C) 2024, D-Robotics Co., Ltd. All rights reserved
+ *
+ */
+
+/dts-v1/;
+#include "x5.dtsi"
+#include "pinmux-func.dtsi"
+#include "pinmux-gpio.dtsi"
+
+/ {
+	model = "Horizon X5 FPGA board";
+	compatible = "Horizon, x5";
+
+	#address-cells = <2>;
+	#size-cells = <2>;
+
+	/*
+	 * We have one DDR memory range:
+	 * 0x0_87000000 - 0x0_79000000
+	 * 0x1_00000000 - 0x0_80000000
+	 */
+	memory@87000000 {
+		device_type = "memory";
+		reg = <0x0 0x87000000 0x0 0x79000000>,  /* 2GB - 112M */
+		      <0x1 0x00000000 0x0 0x80000000>;  /* 2GB */
+	};
+
+	reserved-memory {
+		#address-cells = <2>;
+		#size-cells = <2>;
+		ranges;
+
+		linux,cma@a0000000 {
+			compatible = "shared-dma-pool";
+			reg = <0x0 0x90000000 0x0 0x20000000>; /* 512MB */
+			reusable;
+			linux,cma-default;
+		};
+
+		ion_cma: ion_cma {
+			compatible = "shared-dma-pool";
+			alignment = <0x0 0x2000>;
+			reusable;
+			size = <0x0 0x20000000>;
+			status = "okay";
+		};
+
+		ion_reserved: ion_reserved@b0000000 {
+			compatible = "ion-pool";
+			reg = <0x0 0xb0000000 0x0 0x8000000>;
+			status = "okay";
+		};
+
+		ion_carveout: ion_carveout@b8000000 {
+			compatible = "ion-carveout";
+			reg = <0x0 0xb8000000 0x0 0x8000000>;
+			status = "okay";
+		};
+
+		ion_sram: ion_sram@c0000000 {
+			compatible = "ion-sram";
+			reg = <0x0 0xc0000000 0x0 0x800000>;
+			status = "okay";
+		};
+
+		adsp_ddr: adsp_ddr@cfe00000 {
+			reg = <0x0 0xcfe00000 0x0 0x2200000>;
+			no-map;
+		};
+
+		audio_reserved: audio@d2000000 {
+			compatible = "shared-dma-pool";
+			no-map;
+			reg = <0x0 0xd2000000 0x0 0x1000000>;
+			status = "okay";
+		};
+
+		adsp_ipc_reserved: audio@d3000000 {
+			compatible = "shared-dma-pool";
+			no-map;
+			reg = <0x0 0xd3000000 0x0 0x800000>;
+			status = "okay";
+		};
+
+		adsp_bsp_reserved: audio@d3800000 {
+			compatible = "shared-dma-pool";
+			no-map;
+			reg = <0x0 0xd3800000 0x0 0x800000>;
+			status = "okay";
+		};
+
+	};
+
+	gua_audio_rpc_wrapper:audio-rpc-wrapper {
+		compatible = "gua,audio-rpc-wrapper";
+		rpmsg-enable;
+		status = "okay";
+	};
+
+	ipc_wrapper:ipc-wrapper {
+		compatible = "gua,ipc-wrapper";
+		rpmsg-enable;
+		status = "okay";
+	};
+
+	sound_misc_0:misc-hifi {
+		compatible = "gua,misc-hifi-core";
+										// core channel
+		control-rpmsg-channel-mapping = <0x00 0x00	// a core to hifi 0
+										>;
+		msg-wrapper = <&ipc_wrapper>;
+		memory-region = <&adsp_bsp_reserved>;
+		status = "okay";
+	};
+
+	sound_cpu:cpu-dai {
+		compatible = "gua,cpu-dai";
+		msg-wrapper = <&ipc_wrapper>;
+		gua,pcm-buffer-size = <0x1E000>;
+		pcm-rpmsg-channel-mapping = <0x00>, <0x00>;
+		status = "okay";
+	};
+
+	sound-machine {
+		compatible = "gua,sound-card";
+		model = "gua-audio";
+		cpu-dai = <&sound_cpu>;
+		memory-region = <&audio_reserved>;
+		status = "okay";
+	};
+
+	apb_clk: apb-clk {
+		compatible = "fixed-clock";
+		#clock-cells = <0>;
+		clock-frequency = <24000000>;
+	};
+
+	lpwm_clk: lpwm-clk {
+		compatible = "fixed-clock";
+		#clock-cells = <0>;
+		clock-frequency = <10000000>;
+	};
+
+	axi_clk: axi-clk {
+		compatible = "fixed-clock";
+		#clock-cells = <0>;
+		clock-frequency = <24000000>;
+	};
+
+	uart_clk: uart_clk {
+		compatible = "fixed-clock";
+		#clock-cells = <0>;
+		clock-frequency = <24000000>;
+	};
+
+	dphy_clk: dphy_clk {
+		compatible = "fixed-clock";
+		#clock-cells = <0>;
+		clock-frequency = <24000000>;
+	};
+
+	cpu_clk: cpu-clk {
+		compatible = "fixed-clock";
+		#clock-cells = <0>;
+		clock-frequency = <1500000000>;
+	};
+	vdd08_gpu_reg: vdd08_gpu_reg {
+		regulator-name = "VDD08_GPU";
+		regulator-min-microvolt = <800000>;
+		regulator-max-microvolt = <800000>;
+		regulator-ramp-delay = <3000>;
+		regulator-always-on;
+		regulator-boot-on;
+	};
+
+	vdd08_bpu_1_reg: vdd08_bpu_1_reg {
+		regulator-name = "VDD08_BPU_1";
+		regulator-min-microvolt = <800000>;
+		regulator-max-microvolt = <800000>;
+		regulator-ramp-delay = <3000>;
+		regulator-always-on;
+		regulator-boot-on;
+	};
+
+	vdd08_cpu_reg: vdd08_cpu_reg {
+		regulator-name = "VDD08_CPU";
+		regulator-min-microvolt = <800000>;
+		regulator-max-microvolt = <800000>;
+		regulator-always-on;
+		regulator-boot-on;
+	};
+};
+
+&remoteproc_hifi5 {
+	status = "disabled";
+	hifi5-rpmsg-channel-mapping = <0x00>, <0x00>;
+	msg-wrapper = <&ipc_wrapper>;
+};
+
+&optee {
+	status = "okay";
+};
+
+&te600 {
+	status = "okay";
+};
+
+&uart0 {
+	status = "okay";
+};
+
+&pmu {
+	status = "okay";
+};
+
+&dsu_pmu {
+	status = "okay";
+};
+
+&dsu_ctrl {
+	status = "okay";
+};
+
+&uart1 {
+	status = "okay";
+	uart-has-rtscts;
+
+	bluetooth {
+		compatible = "realtek,rtl8723bs-bt";
+		max-speed = <115200>;
+	};
+};
+
+&uart2 {
+	status = "okay";
+};
+
+&uart3 {
+	status = "okay";
+};
+
+&uart4 {
+	status = "okay";
+};
+
+&uart5 {
+	status = "okay";
+};
+
+&uart6 {
+	status = "okay";
+};
+
+&uart7{
+	status = "okay";
+};
+
+&axi_dmac {
+	status = "okay";
+};
+
+&watchdog {
+	status = "okay";
+};
+
+&ls_gpio0 {
+	status = "okay";
+};
+
+
+
+&ls_gpio1 {
+	status = "okay";
+};
+
+&aon_gpio {
+	status = "okay";
+};
+
+&rtc {
+	status = "okay";
+};
+
+&i2c0 {
+	status = "okay";
+
+	eeprom: 24c16@50 {
+		compatible = "atmel,24c16";
+		reg = <0x50>;
+		address-width = <16>;
+		pagesize = <16>;
+	};
+};
+
+&i2c1 {
+	status = "okay";
+};
+
+&i2c2 {
+	status = "okay";
+};
+
+&i2c3 {
+	status = "okay";
+};
+
+&i2c4 {
+	status = "okay";
+
+	hdmi_bridge@3b {
+		compatible = "sil,sii9022";
+		reg = <0x3b>;
+		reset-gpios = <&ls_gpio0_porta 8 GPIO_ACTIVE_LOW>;
+		status = "okay";
+
+		ports {
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			port@0 {
+				reg = <0>;
+				hdmi_bridge_in: endpoint {
+					remote-endpoint =
+						<&bt1120_bridge_out>;
+				};
+			};
+		};
+	};
+};
+
+&i2c5 {
+	status = "okay";
+};
+
+&i2c6 {
+	status = "okay";
+};
+
+&lpwm0 {
+	status = "okay";
+};
+
+&lpwm1 {
+	status = "okay";
+};
+
+&pwm0 {
+	status = "okay";
+};
+
+&pwm1 {
+	status = "okay";
+};
+
+&pwm2 {
+	status = "okay";
+};
+
+&pwm3 {
+	status = "okay";
+};
+
+&hs_gpio0 {
+	status = "okay";
+};
+
+&hs_gpio1 {
+	status = "okay";
+};
+
+&sdio_0 {
+	status = "okay";
+	non-removable;
+	max-frequency = <5000000>;
+};
+
+&sdio_1 {
+	status = "okay";
+	max-frequency = <5000000>;
+};
+
+&emmc {
+	status = "okay";
+	max-frequency = <5000000>;
+};
+
+&spi0 {
+	status = "okay";
+
+	spi-nor@0 {
+		compatible = "jedec,spi-nor";
+		spi-max-frequency = <500000>;
+		reg = <0>;
+	};
+};
+
+&spi1 {
+	status = "okay";
+
+	spi-nor@0 {
+		compatible = "jedec,spi-nor";
+		spi-max-frequency = <5000000>;
+		reg = <0>;
+	};
+};
+
+&spi2 {
+	status = "okay";
+
+	spi-nor@0 {
+		compatible = "jedec,spi-nor";
+		spi-max-frequency = <5000000>;
+		reg = <0>;
+	};
+};
+
+&spi3 {
+	status = "okay";
+
+	spi-nor@0 {
+		compatible = "jedec,spi-nor";
+		spi-max-frequency = <5000000>;
+		reg = <0>;
+	};
+};
+
+&spi4 {
+	status = "okay";
+
+	spi-nor@0 {
+		compatible = "jedec,spi-nor";
+		spi-max-frequency = <5000000>;
+		reg = <0>;
+	};
+};
+
+&spi5 {
+	status = "okay";
+
+	spi-nor@0 {
+		compatible = "jedec,spi-nor";
+		spi-max-frequency = <5000000>;
+		reg = <0>;
+	};
+};
+
+&ethphy0 {
+	max-speed = <100>;
+	max-frequency = <25000000>;
+};
+
+&gmac_tsn {
+	status = "okay";
+	phy-mode = "rgmii-txid";
+
+	snps,mtl-tx-config = <&txnode>;
+	snps,mtl-rx-config = <&rxnode>;
+
+	txnode:txnode@1 {
+		snps,tx-queues-to-use = <4>;
+		txqueue0: txqueue@1 {
+			snps,dcb-algorithm;
+		};
+		txqueue1: txqueue@2 {
+			snps,dcb-algorithm;
+		};
+		txqueue2: txqueue@3 {
+			snps,dcb-algorithm;
+		};
+		txqueue3: txqueue@4 {
+			snps,dcb-algorithm;
+		};
+		txqueue4: txqueue@5 {
+			snps,dcb-algorithm;
+		};
+		txqueue5: txqueue@6 {
+			snps,dcb-algorithm;
+		};
+		txqueue6: txqueue@7 {
+			snps,dcb-algorithm;
+		};
+		txqueue7: txqueue@8 {
+			snps,dcb-algorithm;
+		};
+	};
+
+	rxnode:rxnode@1 {
+		snps,rx-queues-to-use = <4>;
+		rxqueue0: rxqueue@1 {
+			snps,dcb-algorithm;
+		};
+		rxqueue1: rxqueue@2 {
+			snps,dcb-algorithm;
+		};
+		rxqueue2: rxqueue@3 {
+			snps,dcb-algorithm;
+		};
+		rxqueue3: rxqueue@4 {
+			snps,dcb-algorithm;
+		};
+		rxqueue4: rxqueue@5 {
+			snps,dcb-algorithm;
+		};
+		rxqueue5: rxqueue@6 {
+			snps,dcb-algorithm;
+		};
+		rxqueue6: rxqueue@7 {
+			snps,dcb-algorithm;
+		};
+		rxqueue7: rxqueue@8 {
+			snps,dcb-algorithm;
+		};
+	};
+};
+
+&isp {
+	cam-ctrl = <&cam_ctrl>;
+	status = "okay";
+};
+
+&vse {
+	cam-ctrl = <&cam_ctrl>;
+	status = "okay";
+};
+
+&sif0 {
+	cam-ctrl = <&cam_ctrl>;
+	status = "okay";
+};
+
+&sif1 {
+	cam-ctrl = <&cam_ctrl>;
+	status = "okay";
+};
+
+&sif2 {
+	cam-ctrl = <&cam_ctrl>;
+	status = "okay";
+};
+
+&sif3 {
+	cam-ctrl = <&cam_ctrl>;
+	status = "okay";
+};
+
+&csi0 {
+	csi-wrapper = <&csi_wrapper>;
+	cam-ctrl = <&cam_ctrl>;
+	status = "okay";
+};
+
+&csi1 {
+	csi-wrapper = <&csi_wrapper>;
+	cam-ctrl = <&cam_ctrl>;
+	status = "okay";
+};
+
+&csi2 {
+	csi-wrapper = <&csi_wrapper>;
+	cam-ctrl = <&cam_ctrl>;
+	status = "okay";
+};
+
+&csi3 {
+	csi-wrapper = <&csi_wrapper>;
+	cam-ctrl = <&cam_ctrl>;
+	status = "okay";
+};
+
+&csi_wrapper {
+	status = "okay";
+};
+
+&cam_ctrl {
+	status = "okay";
+};
+
+&gdc {
+	cam-ctrl = <&cam_ctrl>;
+	status = "okay";
+};
+
+&vin_node0 {
+	status = "okay";
+};
+
+&vin_node1 {
+	status = "okay";
+};
+
+&vin_node2 {
+	status = "okay";
+};
+
+&vin_node3 {
+	status = "okay";
+};
+
+&gc8000 {
+	status = "okay";
+};
+
+&gc820 {
+	status = "okay";
+};
+
+&vin_vcon0 {
+	status = "okay";
+};
+
+&vin_vcon1 {
+	status = "okay";
+};
+
+&vin_vcon2 {
+	status = "okay";
+};
+
+&vin_vcon3 {
+	status = "okay";
+};
+
+&mipi_dphy {
+	status = "okay";
+};
+
+&mipi_host0 {
+	status = "okay";
+};
+
+&mipi_host1 {
+	status = "okay";
+};
+
+&mipi_host2 {
+	status = "okay";
+};
+
+&mipi_host3 {
+	status = "okay";
+};
+
+&bpu {
+	status = "okay";
+};
+
+&qspi {
+	status = "okay";
+	spi-flash@0 {
+		compatible = "jedec,spi-nor";
+		spi-max-frequency = <5000000>;
+		reg = <0>;
+	};
+};
+
+&vpu {
+	status = "okay";
+};
+
+&jpu {
+	status = "okay";
+};
+
+&dphy0 {
+	status = "okay";
+
+	clocks = <&dphy_clk>;
+	clock-names = "ref-clk";
+};
+
+&mipi_dsi0 {
+	status = "okay";
+
+
+	ports {
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		port@0 {
+			reg = <0>;
+			mipi_dsi_in: endpoint {
+				remote-endpoint =
+					<&dsi_syscon_bridge_out>;
+			};
+		};
+
+		port@1 {
+			reg = <1>;
+			mipi_dsi_out: endpoint {
+				remote-endpoint = <&panel_in>;
+			};
+		};
+	};
+
+	dsi_panel0@0 {
+		compatible = "atk,md0550";
+		reg = <0>;
+
+		reset-gpios = <&ls_gpio0_porta 10 GPIO_ACTIVE_LOW>;
+		backlight = <&dsi_backlight>;
+
+		port {
+			panel_in: endpoint {
+				remote-endpoint =
+					<&mipi_dsi_out>;
+			};
+		};
+	};
+
+};
+
+&dsi_encoder {
+	status = "okay";
+	ports {
+		#address-cells = <1>;
+		#size-cells = <0>;
+		/* input */
+		port@0 {
+			reg = <0>;
+			dsi_encoder_in:endpoint {
+				remote-endpoint =
+					<&dc_out_dpi0>;
+			};
+		};
+		/* output */
+		port@1 {
+			reg = <1>;
+			dsi_encoder_out:endpoint {
+				remote-endpoint =
+					<&dsi_syscon_bridge_in>;
+			};
+		};
+	};
+};
+
+&vs_sif {
+	status = "okay";
+};
+
+&dsi_syscon_bridge {
+	status = "okay";
+	ports {
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		/* input */
+		port@0 {
+			reg = <0>;
+			dsi_syscon_bridge_in:endpoint {
+				remote-endpoint =
+					<&dsi_encoder_out>;
+			};
+		};
+
+		/* output */
+		port@1 {
+			reg = <1>;
+			dsi_syscon_bridge_out:endpoint {
+				remote-endpoint = <&mipi_dsi_in>;
+			};
+		};
+	};
+};
+
+&dsi_backlight {
+	status = "okay";
+};
+
+&dc_wb_syscon_bridge {
+	status = "okay";
+};
+
+&dc8000_nano {
+	status = "okay";
+	ports {
+		#address-cells = <1>;
+		#size-cells = <0>;
+		dc_out_0: port@0 {
+			reg = <0>;
+			dc_out_dpi0: endpoint@0 {
+				remote-endpoint = <&dsi_encoder_in>;
+			};
+			dc_out_dpi1: endpoint@1 {
+				remote-endpoint = <&hdmi_encoder_in1>;
+			};
+		};
+	};
+};
+
+&bt1120_syscon_bridge {
+	status = "okay";
+	ports {
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		/* input */
+		port@0 {
+			reg = <0>;
+			bt1120_syscon_bridge_in:endpoint {
+				remote-endpoint =
+					<&hdmi_encoder_out>;
+			};
+		};
+
+		/* output */
+		port@1 {
+			reg = <1>;
+			bt1120_syscon_bridge_out:endpoint {
+				remote-endpoint = <&bt1120_bridge_in>;
+			};
+		};
+	};
+};
+
+&bt1120 {
+	status = "okay";
+
+};
+
+&hdmi_encoder {
+	status = "okay";
+	ports {
+		#address-cells = <1>;
+		#size-cells = <0>;
+		/* input */
+		port@0 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <0>;
+
+			hdmi_encoder_in0: endpoint@0 {
+				reg = <0>;
+				remote-endpoint = <&bt1120_out>;
+			};
+			hdmi_encoder_in1: endpoint@1 {
+				reg = <1>;
+				remote-endpoint = <&dc_out_dpi1>;
+			};
+		};
+
+		/* output */
+		port@1 {
+			reg = <1>;
+			hdmi_encoder_out: endpoint {
+				remote-endpoint =
+					<&bt1120_syscon_bridge_in>;
+			};
+		};
+	};
+};
+
+&display_subsystem {
+	status = "okay";
+	ports = <&dc_out_0>;
+};
+
+&dwc3_usb2 {
+	status = "disabled";
+};
+
+&usb2 {
+	status = "disabled";
+};
+
+&dwc3_usb3 {
+	status = "disabled";
+};
+
+&usb3 {
+	status = "disabled";
+};
+
+&dsp_crm_syscon {
+	status = "okay";
+};
+
+&i2c7 {
+	status = "okay";
+};
+
+&dsp_axi_dma {
+	status = "okay";
+};
+
+&dw_i2s0 {
+	status = "okay";
+};
+
+&dw_i2s1 {
+	status = "okay";
+};
+
+&archband_pdm {
+	status = "okay";
+};
+
+&vs_hsem {
+	status = "okay";
+};
+
+&virt_codec {
+	status = "okay";
+};

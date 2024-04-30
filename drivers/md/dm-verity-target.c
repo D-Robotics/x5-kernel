@@ -21,6 +21,7 @@
 #include <linux/scatterlist.h>
 #include <linux/string.h>
 #include <linux/jump_label.h>
+#include <linux/delay.h>
 
 #define DM_MSG_PREFIX			"verity"
 
@@ -1211,11 +1212,33 @@ static int verity_ctr(struct dm_target *ti, unsigned argc, char **argv)
 	}
 	v->version = num;
 
+#ifdef CONFIG_ARCH_HOBOT_X5
+	{
+		#define WAIT_TOTAL 10000
+		#define WAIT_STEP 10
+		int wait_ms = WAIT_TOTAL;
+		do {
+			r = dm_get_device(ti, argv[1], FMODE_READ, &v->data_dev);
+			if (!r) {
+				if (WAIT_TOTAL - wait_ms > 0)
+					pr_info("%s: waited %dms for root device ready.\n",
+						__func__, WAIT_TOTAL - wait_ms);
+				break;
+			}
+			wait_ms -= WAIT_STEP;
+			if (wait_ms < WAIT_TOTAL / 2)
+				pr_err_ratelimited("%s: waiting root device overtime %dms.\n",
+					__func__, WAIT_TOTAL - wait_ms);
+			msleep(WAIT_STEP);
+		} while (wait_ms > 0);
+	}
+#else
 	r = dm_get_device(ti, argv[1], FMODE_READ, &v->data_dev);
 	if (r) {
 		ti->error = "Data device lookup failed";
 		goto bad;
 	}
+#endif
 
 	r = dm_get_device(ti, argv[2], FMODE_READ, &v->hash_dev);
 	if (r) {

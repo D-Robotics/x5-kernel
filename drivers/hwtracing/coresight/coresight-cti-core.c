@@ -962,6 +962,7 @@ static const struct amba_id cti_ids[] = {
 	CS_AMBA_ID(0x000bb9a8), /* CTI - C-A53 */
 	CS_AMBA_ID(0x000bb9aa), /* CTI - C-A73 */
 	CS_AMBA_UCI_ID(0x000bb9da, uci_id_cti), /* CTI - C-A35 */
+	CS_AMBA_UCI_ID(0x000bbd05, uci_id_cti), /* CTI - C-A55 */
 	CS_AMBA_UCI_ID(0x000bb9ed, uci_id_cti), /* Coresight CTI (SoC 600) */
 	{ 0, 0},
 };

@@ -1,0 +1,5 @@
+bin_d/
+bin_r/
+*.vcxproj
+*.vcxproj.filters
+*.vcproj

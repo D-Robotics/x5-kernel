@@ -54,7 +54,7 @@ struct iommu_dma_cookie {
 			atomic64_t		fq_flush_start_cnt;
 			/* Number of TLB flushes that have been finished */
 			atomic64_t		fq_flush_finish_cnt;
-			/* Timer to regularily empty the flush queues */
+			/* Timer to regularly empty the flush queues */
 			struct timer_list	fq_timer;
 			/* 1 when timer is active, 0 when not */
 			atomic_t		fq_timer_on;

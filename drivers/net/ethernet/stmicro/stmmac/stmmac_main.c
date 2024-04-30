@@ -76,7 +76,8 @@ MODULE_PARM_DESC(phyaddr, "Physical device address");
 
 #define STMMAC_TX_THRESH(x)	((x)->dma_conf.dma_tx_size / 4)
 #define STMMAC_RX_THRESH(x)	((x)->dma_conf.dma_rx_size / 4)
-
+#define STMMAC_TX_QO_FIFOSZ_MIN	3072
+#define STMMAC_RX_QO_FIFOSZ_MIN	3072
 /* Limit to make sure XDP TX and slow path can coexist */
 #define STMMAC_XSK_TX_BUDGET_MAX	256
 #define STMMAC_TX_XSK_AVAIL		16
@@ -2378,6 +2379,12 @@ static void stmmac_dma_operation_mode(struct stmmac_priv *priv)
 
 		qmode = priv->plat->rx_queues_cfg[chan].mode_to_use;
 
+		if (chan == 0)
+			rxfifosz = max(rxfifosz, STMMAC_RX_QO_FIFOSZ_MIN);
+		else
+			rxfifosz = (priv->plat->rx_fifo_size - STMMAC_RX_QO_FIFOSZ_MIN) /
+					(rx_channels_count - 1);
+
 		stmmac_dma_rx_mode(priv, priv->ioaddr, rxmode, chan,
 				rxfifosz, qmode);
 
@@ -2395,6 +2402,12 @@ static void stmmac_dma_operation_mode(struct stmmac_priv *priv)
 
 	for (chan = 0; chan < tx_channels_count; chan++) {
 		qmode = priv->plat->tx_queues_cfg[chan].mode_to_use;
+
+		if (chan == 0)
+			txfifosz = max(txfifosz, STMMAC_TX_QO_FIFOSZ_MIN);
+		else
+			txfifosz = (priv->plat->tx_fifo_size - STMMAC_TX_QO_FIFOSZ_MIN) /
+					(tx_channels_count - 1);
 
 		stmmac_dma_tx_mode(priv, priv->ioaddr, txmode, chan,
 				txfifosz, qmode);
@@ -7439,6 +7452,7 @@ int stmmac_suspend(struct device *dev)
 		if (device_may_wakeup(priv->device))
 			phylink_speed_down(priv->phylink, false);
 		phylink_suspend(priv->phylink, false);
+		phylink_disconnect_phy(priv->phylink);
 	}
 	rtnl_unlock();
 
@@ -7538,6 +7552,7 @@ int stmmac_resume(struct device *dev)
 	if (device_may_wakeup(priv->device) && priv->plat->pmt) {
 		phylink_resume(priv->phylink);
 	} else {
+		stmmac_init_phy(ndev);
 		phylink_resume(priv->phylink);
 		if (device_may_wakeup(priv->device))
 			phylink_speed_up(priv->phylink);

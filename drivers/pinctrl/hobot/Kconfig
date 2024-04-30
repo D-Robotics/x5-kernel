@@ -1,0 +1,9 @@
+# SPDX-License-Identifier: GPL-2.0
+config PINCTRL_HORIZON
+	bool "horizon pinctrl driver"
+	select GENERIC_PINCTRL_GROUPS
+	select GENERIC_PINMUX_FUNCTIONS
+	select GENERIC_PINCONF
+	select REGMAP
+	help
+	  Say Y here to enable the horizon pinctrl driver

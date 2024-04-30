@@ -40,6 +40,9 @@ const struct regmap_config inv_icm42600_regmap_config = {
 	.max_register = 0x4FFF,
 	.ranges = inv_icm42600_regmap_ranges,
 	.num_ranges = ARRAY_SIZE(inv_icm42600_regmap_ranges),
+#if defined(CONFIG_IMU_DATA_READY)
+	.use_single_write = true,
+#endif
 };
 EXPORT_SYMBOL_GPL(inv_icm42600_regmap_config);
 
@@ -85,6 +88,21 @@ static const struct inv_icm42600_hw inv_icm42600_hw[INV_CHIP_NB] = {
 	[INV_CHIP_ICM42622] = {
 		.whoami = INV_ICM42600_WHOAMI_ICM42622,
 		.name = "icm42622",
+		.conf = &inv_icm42600_default_conf,
+	},
+	[INV_CHIP_ICM40608] = {
+		.whoami = INV_ICM42600_WHOAMI_ICM40608,
+		.name = "icm40608",
+		.conf = &inv_icm42600_default_conf,
+	},
+	[INV_CHIP_ICM42688] = {
+		.whoami = INV_ICM42600_WHOAMI_ICM42688,
+		.name = "icm42688",
+		.conf = &inv_icm42600_default_conf,
+	},
+	[INV_CHIP_ICM42652] = {
+		.whoami = INV_ICM42600_WHOAMI_ICM42652,
+		.name = "icm42652",
 		.conf = &inv_icm42600_default_conf,
 	},
 };
@@ -420,6 +438,17 @@ static irqreturn_t inv_icm42600_irq_timestamp(int irq, void *_data)
 	st->timestamp.gyro = iio_get_time_ns(st->indio_gyro);
 	st->timestamp.accel = iio_get_time_ns(st->indio_accel);
 
+#if defined(CONFIG_IMU_DATA_READY)
+	struct inv_icm42600_timestamp *ts_accel;
+	struct inv_icm42600_timestamp *ts_gyro;
+#endif
+
+#if defined(CONFIG_IMU_DATA_READY)
+	ts_gyro = iio_priv(st->indio_gyro);
+	ts_accel = iio_priv(st->indio_accel);
+	kfifo_in(&(ts_gyro->irq_time), (void *)(&(st->timestamp.gyro)), sizeof(st->timestamp.gyro));
+	kfifo_in(&(ts_accel->irq_time), (void *)(&(st->timestamp.accel)), sizeof(st->timestamp.accel));
+#endif
 	return IRQ_WAKE_THREAD;
 }
 
@@ -470,7 +499,7 @@ static int inv_icm42600_irq_init(struct inv_icm42600_state *st, int irq,
 				 int irq_type, bool open_drain)
 {
 	struct device *dev = regmap_get_device(st->map);
-	unsigned int val;
+	unsigned int val = 0;
 	int ret;
 
 	/* configure INT1 interrupt: default is active low on edge */
@@ -643,6 +672,12 @@ int inv_icm42600_core_probe(struct regmap *regmap, int chip, int irq,
 	st->indio_accel = inv_icm42600_accel_init(st);
 	if (IS_ERR(st->indio_accel))
 		return PTR_ERR(st->indio_accel);
+
+#if defined(CONFIG_IMU_DATA_READY)
+	dev_info(dev, "timestamp is DATA_RDY_INT time\n");
+#else
+	dev_info(dev, "timestamp is DATA_THS_INT time\n");
+#endif
 
 	ret = inv_icm42600_irq_init(st, irq, irq_type, open_drain);
 	if (ret)

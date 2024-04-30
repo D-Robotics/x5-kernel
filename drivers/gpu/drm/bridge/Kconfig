@@ -250,6 +250,16 @@ config DRM_SII902X
 	help
 	  Silicon Image sii902x bridge chip driver.
 
+config DRM_LT8618
+	tristate "Lontium LT8618 RGB/HDMI bridge"
+	depends on OF
+	select DRM_KMS_HELPER
+	select REGMAP_I2C
+	select I2C_MUX
+	select SND_SOC_HDMI_CODEC if SND_SOC
+	help
+	  Lontium LT8618 bridge chip driver.
+
 config DRM_SII9234
 	tristate "Silicon Image SII9234 HDMI/MHL bridge"
 	depends on OF
@@ -388,5 +398,7 @@ source "drivers/gpu/drm/bridge/cadence/Kconfig"
 source "drivers/gpu/drm/bridge/imx/Kconfig"
 
 source "drivers/gpu/drm/bridge/synopsys/Kconfig"
+
+source "drivers/gpu/drm/bridge/verisilicon/Kconfig"
 
 endmenu

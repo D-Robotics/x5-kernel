@@ -35,19 +35,12 @@ struct vp8_prob_tbl_packed {
  * filter taps taken to 7-bit precision,
  * reference RFC6386#Page-16, filters[8][6]
  */
-const u32 hantro_vp8_dec_mc_filter[8][6] = {
-	{ 0, 0, 128, 0, 0, 0 },
-	{ 0, -6, 123, 12, -1, 0 },
-	{ 2, -11, 108, 36, -8, 1 },
-	{ 0, -9, 93, 50, -6, 0 },
-	{ 3, -16, 77, 77, -16, 3 },
-	{ 0, -6, 50, 93, -9, 0 },
-	{ 1, -8, 36, 108, -11, 2 },
-	{ 0, -1, 12, 123, -6, 0 }
-};
+const u32 hantro_vp8_dec_mc_filter[8][6] = {{0, 0, 128, 0, 0, 0},     {0, -6, 123, 12, -1, 0},
+					    {2, -11, 108, 36, -8, 1}, {0, -9, 93, 50, -6, 0},
+					    {3, -16, 77, 77, -16, 3}, {0, -6, 50, 93, -9, 0},
+					    {1, -8, 36, 108, -11, 2}, {0, -1, 12, 123, -6, 0}};
 
-void hantro_vp8_prob_update(struct hantro_ctx *ctx,
-			    const struct v4l2_ctrl_vp8_frame *hdr)
+void hantro_vp8_prob_update(struct hantro_ctx *ctx, const struct v4l2_ctrl_vp8_frame *hdr)
 {
 	const struct v4l2_vp8_entropy *entropy = &hdr->entropy;
 	u32 i, j, k;
@@ -103,7 +96,7 @@ void hantro_vp8_prob_update(struct hantro_ctx *ctx,
 		dst[4] = entropy->mv_probs[i][4 + 2];
 		dst[5] = entropy->mv_probs[i][5 + 2];
 		dst[6] = entropy->mv_probs[i][6 + 2];
-		dst[7] = 0;	/*unused */
+		dst[7] = 0; /*unused */
 		dst += 8;
 	}
 
@@ -135,7 +128,7 @@ void hantro_vp8_prob_update(struct hantro_ctx *ctx,
 				dst[4] = entropy->coeff_probs[i][j][k][8];
 				dst[5] = entropy->coeff_probs[i][j][k][9];
 				dst[6] = entropy->coeff_probs[i][j][k][10];
-				dst[7] = 0;	/*unused */
+				dst[7] = 0; /*unused */
 				dst += 8;
 			}
 		}
@@ -151,18 +144,17 @@ int hantro_vp8_dec_init(struct hantro_ctx *ctx)
 	int ret;
 
 	/* segment map table size calculation */
-	mb_width = DIV_ROUND_UP(ctx->dst_fmt.width, 16);
-	mb_height = DIV_ROUND_UP(ctx->dst_fmt.height, 16);
+	mb_width	 = DIV_ROUND_UP(ctx->dst_fmt.width, 16);
+	mb_height	 = DIV_ROUND_UP(ctx->dst_fmt.height, 16);
 	segment_map_size = round_up(DIV_ROUND_UP(mb_width * mb_height, 4), 64);
 
 	/*
 	 * In context init the dma buffer for segment map must be allocated.
 	 * And the data in segment map buffer must be set to all zero.
 	 */
-	aux_buf = &ctx->vp8_dec.segment_map;
+	aux_buf	      = &ctx->vp8_dec.segment_map;
 	aux_buf->size = segment_map_size;
-	aux_buf->cpu = dma_alloc_coherent(vpu->dev, aux_buf->size,
-					  &aux_buf->dma, GFP_KERNEL);
+	aux_buf->cpu  = dma_alloc_coherent(vpu->dev, aux_buf->size, &aux_buf->dma, GFP_KERNEL);
 	if (!aux_buf->cpu)
 		return -ENOMEM;
 
@@ -170,10 +162,9 @@ int hantro_vp8_dec_init(struct hantro_ctx *ctx)
 	 * Allocate probability table buffer,
 	 * total 1208 bytes, 4K page is far enough.
 	 */
-	aux_buf = &ctx->vp8_dec.prob_tbl;
+	aux_buf	      = &ctx->vp8_dec.prob_tbl;
 	aux_buf->size = sizeof(struct vp8_prob_tbl_packed);
-	aux_buf->cpu = dma_alloc_coherent(vpu->dev, aux_buf->size,
-					  &aux_buf->dma, GFP_KERNEL);
+	aux_buf->cpu  = dma_alloc_coherent(vpu->dev, aux_buf->size, &aux_buf->dma, GFP_KERNEL);
 	if (!aux_buf->cpu) {
 		ret = -ENOMEM;
 		goto err_free_seg_map;
@@ -182,8 +173,7 @@ int hantro_vp8_dec_init(struct hantro_ctx *ctx)
 	return 0;
 
 err_free_seg_map:
-	dma_free_coherent(vpu->dev, ctx->vp8_dec.segment_map.size,
-			  ctx->vp8_dec.segment_map.cpu,
+	dma_free_coherent(vpu->dev, ctx->vp8_dec.segment_map.size, ctx->vp8_dec.segment_map.cpu,
 			  ctx->vp8_dec.segment_map.dma);
 
 	return ret;
@@ -192,10 +182,10 @@ err_free_seg_map:
 void hantro_vp8_dec_exit(struct hantro_ctx *ctx)
 {
 	struct hantro_vp8_dec_hw_ctx *vp8_dec = &ctx->vp8_dec;
-	struct hantro_dev *vpu = ctx->dev;
+	struct hantro_dev *vpu		      = ctx->dev;
 
-	dma_free_coherent(vpu->dev, vp8_dec->segment_map.size,
-			  vp8_dec->segment_map.cpu, vp8_dec->segment_map.dma);
-	dma_free_coherent(vpu->dev, vp8_dec->prob_tbl.size,
-			  vp8_dec->prob_tbl.cpu, vp8_dec->prob_tbl.dma);
+	dma_free_coherent(vpu->dev, vp8_dec->segment_map.size, vp8_dec->segment_map.cpu,
+			  vp8_dec->segment_map.dma);
+	dma_free_coherent(vpu->dev, vp8_dec->prob_tbl.size, vp8_dec->prob_tbl.cpu,
+			  vp8_dec->prob_tbl.dma);
 }

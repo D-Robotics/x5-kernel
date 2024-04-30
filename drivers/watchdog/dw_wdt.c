@@ -91,6 +91,10 @@ struct dw_wdt {
 	/* Save/restore */
 	u32			control;
 	u32			timeout;
+#if IS_ENABLED(CONFIG_ARCH_HOBOT_X5)
+	u32			clk_rate_div;
+	u32			wdt_disable;
+#endif
 
 #ifdef CONFIG_DEBUG_FS
 	struct dentry		*dbgfs_dir;
@@ -275,10 +279,16 @@ static int dw_wdt_start(struct watchdog_device *wdd)
 {
 	struct dw_wdt *dw_wdt = to_dw_wdt(wdd);
 
+#if IS_ENABLED(CONFIG_ARCH_HOBOT_X5)
+	reset_control_deassert(dw_wdt->rst);
+	dw_wdt_update_mode(dw_wdt, DW_WDT_RMOD_RESET);
+#endif
 	dw_wdt_set_timeout(wdd, wdd->timeout);
 	dw_wdt_ping(&dw_wdt->wdd);
 	dw_wdt_arm_system_reset(dw_wdt);
-
+#if IS_ENABLED(CONFIG_ARCH_HOBOT_X5)
+	set_bit(WDOG_HW_RUNNING, &wdd->status);
+#endif
 	return 0;
 }
 
@@ -292,7 +302,9 @@ static int dw_wdt_stop(struct watchdog_device *wdd)
 	}
 
 	reset_control_assert(dw_wdt->rst);
+#if !IS_ENABLED(CONFIG_ARCH_HOBOT_X5)
 	reset_control_deassert(dw_wdt->rst);
+#endif
 
 	return 0;
 }
@@ -556,6 +568,12 @@ static int dw_wdt_drv_probe(struct platform_device *pdev)
 	if (!dw_wdt)
 		return -ENOMEM;
 
+#ifdef CONFIG_HORIZON_WATCHDOG_ENABLE
+	dw_wdt->wdt_disable = 0;
+#else
+	dw_wdt->wdt_disable = 1;
+#endif
+
 	dw_wdt->regs = devm_platform_ioremap_resource(pdev, 0);
 	if (IS_ERR(dw_wdt->regs))
 		return PTR_ERR(dw_wdt->regs);
@@ -577,7 +595,14 @@ static int dw_wdt_drv_probe(struct platform_device *pdev)
 	if (ret)
 		return ret;
 
+#if IS_ENABLED(CONFIG_ARCH_HOBOT_X5)
+	ret = device_property_read_u32(&pdev->dev, "clk-rate-div", &dw_wdt->clk_rate_div);
+	if (!ret)
+		dw_wdt->rate = clk_get_rate(dw_wdt->clk) / dw_wdt->clk_rate_div;
+#else
 	dw_wdt->rate = clk_get_rate(dw_wdt->clk);
+#endif
+
 	if (dw_wdt->rate == 0) {
 		ret = -EINVAL;
 		goto out_disable_clk;
@@ -606,6 +631,12 @@ static int dw_wdt_drv_probe(struct platform_device *pdev)
 		goto out_disable_pclk;
 	}
 
+#if IS_ENABLED(CONFIG_ARCH_HOBOT_X5)
+	/*reset wdt*/
+	reset_control_deassert(dw_wdt->rst);
+	reset_control_assert(dw_wdt->rst);
+#endif
+
 	/* Enable normal reset without pre-timeout by default. */
 	dw_wdt_update_mode(dw_wdt, DW_WDT_RMOD_RESET);
 
@@ -631,7 +662,6 @@ static int dw_wdt_drv_probe(struct platform_device *pdev)
 		dw_wdt->wdd.info = &dw_wdt_ident;
 	}
 
-	reset_control_deassert(dw_wdt->rst);
 
 	ret = dw_wdt_init_timeouts(dw_wdt, dev);
 	if (ret)
@@ -659,6 +689,16 @@ static int dw_wdt_drv_probe(struct platform_device *pdev)
 		wdd->timeout = DW_WDT_DEFAULT_SECONDS;
 		watchdog_init_timeout(wdd, 0, dev);
 	}
+
+#if IS_ENABLED(CONFIG_ARCH_HOBOT_X5)
+	/* Reset timeout value according to dts regardless
+	 * of initial state of wdt, kernel watchdog should be
+	 * decoupled from previous stages
+	 */
+	if (dw_wdt->wdt_disable == 0) {
+		dw_wdt_start(wdd);
+	}
+#endif
 
 	platform_set_drvdata(pdev, dw_wdt);
 

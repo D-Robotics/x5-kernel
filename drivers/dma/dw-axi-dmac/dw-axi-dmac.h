@@ -18,7 +18,7 @@
 
 #include "../virt-dma.h"
 
-#define DMAC_MAX_CHANNELS	16
+#define DMAC_MAX_CHANNELS	32
 #define DMAC_MAX_MASTERS	2
 #define DMAC_MAX_BLK_SIZE	0x200000
 
@@ -31,8 +31,10 @@ struct dw_axi_dma_hcfg {
 	/* maximum supported axi burst length */
 	u32	axi_rw_burst_len;
 	/* Register map for DMAX_NUM_CHANNELS <= 8 */
+	u32	handshake_num;
 	bool	reg_map_8_channels;
 	bool	restrict_axi_burst_len;
+	bool	unaligned_xfer;
 };
 
 struct axi_dma_chan {
@@ -221,6 +223,10 @@ static inline struct axi_dma_chan *dchan_to_axi_dma_chan(struct dma_chan *dchan)
 /* DMAC_CHEN2 */
 #define DMAC_CHAN_EN2_WE_SHIFT		16
 
+/* DMAC CHAN BLOCKS */
+#define DMAC_CHAN_BLOCK_SHIFT		32
+#define DMAC_CHAN_16			16
+
 /* DMAC_CHSUSP */
 #define DMAC_CHAN_SUSP2_SHIFT		0
 #define DMAC_CHAN_SUSP2_WE_SHIFT	16
@@ -320,7 +326,11 @@ enum {
 #define CH_CFG2_H_TT_FC_POS		0
 #define CH_CFG2_H_HS_SEL_SRC_POS	3
 #define CH_CFG2_H_HS_SEL_DST_POS	4
+#ifdef CONFIG_ARCH_HOBOT
+#define CH_CFG2_H_PRIORITY_POS		15
+#else
 #define CH_CFG2_H_PRIORITY_POS		20
+#endif /* CONFIG_ARCH_HOBOT */
 
 /**
  * DW AXI DMA channel interrupts

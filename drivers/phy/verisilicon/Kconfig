@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: GPL-2.0-only
+#
+# Phy drivers for VeriSilicon platforms
+#
+
+config PHY_SNPS_MIPI_DPHY
+	tristate "Synopsys MIPI DPHY Driver"
+	select GENERIC_PHY
+	help
+	  Enable this to support Synopsys MIPI DPHY

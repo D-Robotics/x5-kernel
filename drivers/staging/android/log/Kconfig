@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: GPL-2.0-only
+#
+# log driver
+#
+
+config ANDROID_LOGGER
+	tristate "Android log driver"
+
+config BOOTLOADER_LOG
+	tristate "Bootloader log driver"

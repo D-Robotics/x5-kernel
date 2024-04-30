@@ -1447,6 +1447,342 @@ static inline int tcrypt_test(const char *alg)
 	return ret;
 }
 
+#include <linux/kthread.h>
+
+static int test_thread1_hash(void *data)
+{
+	int ret = 0, i = 0;
+
+	do {
+		ret += tcrypt_test("md5");
+		ret += tcrypt_test("sha1");
+		ret += tcrypt_test("sha224");
+		ret += tcrypt_test("sha256");
+		ret += tcrypt_test("sha384");
+		ret += tcrypt_test("sha512");
+		ret += tcrypt_test("sm3");
+		schedule();
+		i++;
+		if((i%100) == 0)
+			printk("%s loop:%d ret:0x%x\n",__func__,i,ret);
+		if(ret)
+			printk("%s loop:%d failed ret:0x%x\n", __func__, i, ret);
+	} while (!ret);
+
+	return ret;
+}
+
+static int test_thread2_hash(void *data)
+{
+	int ret = 0, i = 0;
+
+	do {
+		ret += tcrypt_test("sm3");
+		ret += tcrypt_test("sha512");
+		ret += tcrypt_test("sha384");
+		ret += tcrypt_test("sha256");
+		ret += tcrypt_test("sha224");
+		ret += tcrypt_test("sha1");
+		ret += tcrypt_test("md5");
+		schedule();
+		i++;
+		if((i%100) == 0)
+			printk("%s loop:%d ret:0x%x\n",__func__,i,ret);
+		if(ret)
+			printk("%s loop:%d failed ret:0x%x\n", __func__, i, ret);
+	} while (!ret);
+	return ret;
+}
+
+static int test_thread1_cipher(void *data)
+{
+	int ret = 0, i = 0;
+
+	do {
+		ret += tcrypt_test("ecb(des3_ede)");
+		ret += tcrypt_test("cbc(des3_ede)");
+		ret += tcrypt_test("ecb(des)");
+		ret += tcrypt_test("cbc(des)");
+		ret += tcrypt_test("ecb(aes)");
+		ret += tcrypt_test("cbc(aes)");
+		ret += tcrypt_test("ctr(aes)");
+		ret += tcrypt_test("xts(aes)");
+		ret += tcrypt_test("ofb(aes)");
+		schedule();
+		i++;
+		if((i%100) == 0)
+			printk("%s loop:%d ret:0x%x\n",__func__,i,ret);
+		if(ret)
+			printk("%s loop:%d failed ret:0x%x\n", __func__, i, ret);
+	} while (!ret);
+
+	return ret;
+}
+
+static int test_thread2_cipher(void *data)
+{
+	int ret = 0, i = 0;
+
+	do {
+		ret += tcrypt_test("ecb(des3_ede)");
+		ret += tcrypt_test("cbc(des3_ede)");
+		ret += tcrypt_test("ecb(des)");
+		ret += tcrypt_test("cbc(des)");
+		ret += tcrypt_test("ecb(aes)");
+		ret += tcrypt_test("cbc(aes)");
+		ret += tcrypt_test("ctr(aes)");
+		ret += tcrypt_test("xts(aes)");
+		ret += tcrypt_test("ofb(aes)");
+		schedule();
+		i++;
+		if((i%100) == 0)
+			printk("%s loop:%d ret:0x%x\n",__func__,i,ret);
+		if(ret)
+			printk("%s loop:%d failed ret:0x%x\n", __func__, i, ret);
+	} while (!ret);
+
+	return ret;
+}
+
+static int test_thread3_cipher(void *data)
+{
+	int ret = 0, i = 0;
+
+	do {
+		ret += tcrypt_test("ecb(sm4)");
+		ret += tcrypt_test("cbc(sm4)");
+		ret += tcrypt_test("ctr(sm4)");
+		ret += tcrypt_test("xts(sm4)");
+		ret += tcrypt_test("ofb(sm4)");
+		schedule();
+		i++;
+		if((i%100) == 0)
+			printk("%s loop:%d ret:0x%x\n",__func__,i,ret);
+		if(ret)
+			printk("%s loop:%d failed ret:0x%x\n", __func__, i, ret);
+	} while (!ret);
+
+	return ret;
+}
+
+static int test_thread1_aead(void *data)
+{
+	int ret = 0, i = 0;
+
+	do {
+		ret += tcrypt_test("gcm(aes)");
+		ret += tcrypt_test("ccm(aes)");
+		ret += tcrypt_test("gcm(sm4)");
+		ret += tcrypt_test("ccm(sm4)");
+		schedule();
+		i++;
+		if((i%100) == 0)
+			printk("%s loop:%d ret:0x%x\n",__func__,i,ret);
+		if(ret)
+			printk("%s loop:%d failed ret:0x%x\n", __func__, i, ret);
+	} while (!ret);
+
+	return ret;
+}
+
+static int test_thread1_mac(void *data)
+{
+	int ret = 0, i = 0;
+
+	do {
+		ret += tcrypt_test("hmac(sm3)");
+		ret += tcrypt_test("hmac(sha512)");
+		ret += tcrypt_test("hmac(sha384)");
+		ret += tcrypt_test("hmac(sha256)");
+		ret += tcrypt_test("hmac(sha224)");
+		ret += tcrypt_test("hmac(sha1)");
+		ret += tcrypt_test("hmac(md5)");
+		ret += tcrypt_test("cmac(aes)");
+		ret += tcrypt_test("cmac(sm4)");
+		ret += tcrypt_test("cbcmac(aes)");
+		ret += tcrypt_test("cbcmac(sm4)");
+
+		schedule();
+		i++;
+		if((i%100) == 0)
+			printk("%s loop:%d ret:0x%x\n",__func__,i,ret);
+		if(ret)
+			printk("%s loop:%d failed ret:0x%x\n", __func__, i, ret);
+	} while (!ret);
+
+	return ret;
+}
+
+static int test_thread1_akcipher(void *data)
+{
+	int ret = 0, i = 0;
+
+	do {
+		ret += tcrypt_test("rsa");
+		ret += tcrypt_test("dh");
+		ret += tcrypt_test("ecdh-nist-p192");
+		ret += tcrypt_test("ecdh-nist-p256");
+		schedule();
+		i++;
+		if((i%100) == 0)
+			printk("%s loop:%d ret:0x%x\n",__func__,i,ret);
+		if(ret)
+			printk("%s loop:%d failed ret:0x%x\n", __func__, i, ret);
+	} while (!ret);
+
+	return ret;
+}
+
+static int test_thread1_composite(void *data)
+{
+	int ret = 0, i = 0;
+
+	do {
+		ret += tcrypt_test("md5");
+		ret += tcrypt_test("sha1");
+		ret += tcrypt_test("sha224");
+		ret += tcrypt_test("sha256");
+		ret += tcrypt_test("sha384");
+		ret += tcrypt_test("sha512");
+		ret += tcrypt_test("sm3");
+		ret += tcrypt_test("ecb(des3_ede)");
+		ret += tcrypt_test("cbc(des3_ede)");
+		ret += tcrypt_test("ecb(des)");
+		ret += tcrypt_test("cbc(des)");
+		ret += tcrypt_test("ecb(aes)");
+		ret += tcrypt_test("cbc(aes)");
+		ret += tcrypt_test("ctr(aes)");
+		ret += tcrypt_test("xts(aes)");
+		ret += tcrypt_test("ofb(aes)");
+		ret += tcrypt_test("ecb(sm4)");
+		ret += tcrypt_test("cbc(sm4)");
+		ret += tcrypt_test("ctr(sm4)");
+		ret += tcrypt_test("xts(sm4)");
+		ret += tcrypt_test("ofb(sm4)");
+		ret += tcrypt_test("gcm(aes)");
+		ret += tcrypt_test("ccm(aes)");
+		ret += tcrypt_test("gcm(sm4)");
+		ret += tcrypt_test("ccm(sm4)");
+		ret += tcrypt_test("hmac(sm3)");
+		ret += tcrypt_test("hmac(sha512)");
+		ret += tcrypt_test("hmac(sha384)");
+		ret += tcrypt_test("hmac(sha256)");
+		ret += tcrypt_test("hmac(sha224)");
+		ret += tcrypt_test("hmac(sha1)");
+		ret += tcrypt_test("hmac(md5)");
+		ret += tcrypt_test("cmac(aes)");
+		ret += tcrypt_test("cmac(sm4)");
+		ret += tcrypt_test("cbcmac(aes)");
+		ret += tcrypt_test("cbcmac(sm4)");
+		ret += tcrypt_test("rsa");
+		ret += tcrypt_test("dh");
+		ret += tcrypt_test("ecdh-nist-p192");
+		ret += tcrypt_test("ecdh-nist-p256");
+		schedule();
+		i++;
+		if((i%100) == 0)
+			printk("%s loop:%d ret:0x%x\n",__func__,i,ret);
+		if(ret)
+			printk("%s loop:%d failed ret:0x%x\n", __func__, i, ret);
+	} while (!ret);
+
+	return ret;
+}
+
+static int multi_thread_test(void)
+{
+	int ret = 0;
+	struct task_struct		*hash1,*hash2;
+	struct task_struct		*cipher1,*cipher2,*cipher3;
+	struct task_struct		*aead,*mac,*akcipher;
+	struct task_struct		*comps;
+
+	hash1 = kthread_run(test_thread1_hash,
+						      NULL, "hash1");
+	if (IS_ERR(hash1)){
+		pr_err("Error starting hash1 thread!\n");
+		return PTR_ERR(hash1);
+	}
+	hash2 = kthread_run(test_thread2_hash,
+						      NULL, "hash2");
+	if (IS_ERR(hash2)) {
+		pr_err("Error starting hash2 thread!\n");
+		ret = PTR_ERR(hash2);
+		goto err_hash1_thread;
+	}
+	cipher1 = kthread_run(test_thread1_cipher,
+							  NULL, "cipher1");
+	if (IS_ERR(cipher1)) {
+		pr_err("Error starting cipher1 thread!\n");
+		ret = PTR_ERR(cipher1);
+		goto err_hash2_thread;
+	}
+	cipher2 = kthread_run(test_thread2_cipher,
+							  NULL, "cipher2");
+	if (IS_ERR(cipher2)) {
+		pr_err("Error starting cipher2 thread!\n");
+		ret = PTR_ERR(cipher2);
+		goto err_cipher1_thread;
+	}
+	cipher3 = kthread_run(test_thread3_cipher,
+							  NULL, "cipher3");
+	if (IS_ERR(cipher3)) {
+		pr_err("Error starting cipher3 thread!\n");
+		ret = PTR_ERR(cipher3);
+		goto err_cipher2_thread;
+	}
+
+	aead = kthread_run(test_thread1_aead,
+							  NULL, "aead");
+	if (IS_ERR(aead)) {
+		pr_err("Error starting aead thread!\n");
+		ret = PTR_ERR(aead);
+		goto err_cipher3_thread;
+	}
+	mac = kthread_run(test_thread1_mac,
+							  NULL, "mac");
+	if (IS_ERR(mac)) {
+		pr_err("Error starting mac thread!\n");
+		ret = PTR_ERR(mac);
+		goto err_aead_thread;
+	}
+	akcipher = kthread_run(test_thread1_akcipher,
+							  NULL, "akcipher");
+	if (IS_ERR(akcipher)) {
+		pr_err("Error starting akcipher thread!\n");
+		ret = PTR_ERR(akcipher);
+		goto err_mac_thread;
+	}
+
+	comps = kthread_run(test_thread1_composite,
+							  NULL, "comps");
+	if (IS_ERR(akcipher)) {
+		pr_err("Error starting comps thread!\n");
+		ret = PTR_ERR(comps);
+		goto err_akcipher_thread;
+	}
+	while(1){
+		schedule();
+	}
+err_akcipher_thread:
+	kthread_stop(akcipher);
+err_mac_thread:
+	kthread_stop(mac);
+err_aead_thread:
+	kthread_stop(aead);
+err_cipher3_thread:
+	kthread_stop(cipher3);
+err_cipher2_thread:
+	kthread_stop(cipher2);
+err_cipher1_thread:
+	kthread_stop(cipher1);
+err_hash2_thread:
+	kthread_stop(hash2);
+err_hash1_thread:
+	kthread_stop(hash1);
+	return ret;
+}
+
 static int do_test(const char *alg, u32 type, u32 mask, int m, u32 num_mb)
 {
 	int i;
@@ -1700,6 +2036,19 @@ static int do_test(const char *alg, u32 type, u32 mask, int m, u32 num_mb)
 
 	case 58:
 		ret = min(ret, tcrypt_test("gcm(aria)"));
+		break;
+
+	case 70:
+		ret = min(ret, tcrypt_test("rsa"));
+		break;
+	case 71:
+		ret = min(ret, tcrypt_test("dh"));
+		break;
+	case 72:
+		ret = min(ret, tcrypt_test("ecdh-nist-p192"));
+		break;
+	case 73:
+		ret = min(ret, tcrypt_test("ecdh-nist-p256"));
 		break;
 
 	case 100:
@@ -2857,6 +3206,56 @@ static int do_test(const char *alg, u32 type, u32 mask, int m, u32 num_mb)
 				       speed_template_16_32, num_mb);
 		break;
 
+	case 800:
+		multi_thread_test();
+		break;
+
+	case 801:
+		ret = min(ret, tcrypt_test("md5"));
+		ret = min(ret, tcrypt_test("sha1"));
+		ret = min(ret, tcrypt_test("sha224"));
+		ret = min(ret, tcrypt_test("sha256"));
+		ret = min(ret, tcrypt_test("sha384"));
+		ret = min(ret, tcrypt_test("sha512"));
+		ret = min(ret, tcrypt_test("sm3"));
+		ret = min(ret, tcrypt_test("ecb(des3_ede)"));
+		ret = min(ret, tcrypt_test("cbc(des3_ede)"));
+		ret = min(ret, tcrypt_test("ecb(des)"));
+		ret = min(ret, tcrypt_test("cbc(des)"));
+		ret = min(ret, tcrypt_test("ecb(aes)"));
+		ret = min(ret, tcrypt_test("cbc(aes)"));
+		ret = min(ret, tcrypt_test("ctr(aes)"));
+		ret = min(ret, tcrypt_test("xts(aes)"));
+		ret = min(ret, tcrypt_test("ofb(aes)"));
+		ret = min(ret, tcrypt_test("ecb(sm4)"));
+		ret = min(ret, tcrypt_test("cbc(sm4)"));
+		ret = min(ret, tcrypt_test("ctr(sm4)"));
+		ret = min(ret, tcrypt_test("xts(sm4)"));
+		ret = min(ret, tcrypt_test("ofb(sm4)"));
+		ret = min(ret, tcrypt_test("gcm(aes)"));
+		ret = min(ret, tcrypt_test("ccm(aes)"));
+		ret = min(ret, tcrypt_test("gcm(sm4)"));
+		ret = min(ret, tcrypt_test("ccm(sm4)"));
+		ret = min(ret, tcrypt_test("hmac(sm3)"));
+		ret = min(ret, tcrypt_test("hmac(sha512)"));
+		ret = min(ret, tcrypt_test("hmac(sha384)"));
+		ret = min(ret, tcrypt_test("hmac(sha256)"));
+		ret = min(ret, tcrypt_test("hmac(sha224)"));
+		ret = min(ret, tcrypt_test("hmac(sha1)"));
+		ret = min(ret, tcrypt_test("hmac(md5)"));
+		ret = min(ret, tcrypt_test("cmac(aes)"));
+		ret = min(ret, tcrypt_test("cmac(sm4)"));
+		ret = min(ret, tcrypt_test("cbcmac(aes)"));
+		ret = min(ret, tcrypt_test("cbcmac(sm4)"));
+		ret = min(ret, tcrypt_test("rsa"));
+		ret = min(ret, tcrypt_test("dh"));
+		ret = min(ret, tcrypt_test("ecdh-nist-p192"));
+		ret = min(ret, tcrypt_test("ecdh-nist-p256"));
+		if(ret)
+			printk("composite test failed ret:0x%x\n", ret);
+		else
+			printk("composite test ok\n");
+		break;
 	}
 
 	return ret;

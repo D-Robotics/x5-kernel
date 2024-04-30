@@ -352,6 +352,14 @@ config TI_K3_R5_REMOTEPROC
 	  It's safe to say N here if you're not interested in utilizing
 	  a slave processor.
 
+config HOBOT_REMOTEPROC
+	tristate "Remoteproc driver on HOBOT SoCs"
+	select RPMSG_VIRTIO
+	select HB_IPC_SHM
+	select SND_SOC_GUA
+	help
+	  Hobot ADSP Acore Drivers
+
 endif # REMOTEPROC
 
 endmenu

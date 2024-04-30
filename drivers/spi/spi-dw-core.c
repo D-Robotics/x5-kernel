@@ -308,8 +308,13 @@ static u32 dw_spi_prepare_cr0(struct dw_spi *dws, struct spi_device *spi)
 			cr0 |= DW_HSSI_CTRLR0_SRL;
 
 		/* CTRLR0[31] MST */
-		if (dw_spi_ver_is_ge(dws, HSSI, 102A))
-			cr0 |= DW_HSSI_CTRLR0_MST;
+		if (dw_spi_ver_is_ge(dws, HSSI, 102A)) {
+			if (spi_controller_is_slave(dws->master)) {
+				cr0 &= ~DW_HSSI_CTRLR0_MST;
+			} else {
+				cr0 |= DW_HSSI_CTRLR0_MST;
+			}
+		}
 	}
 
 	return cr0;
@@ -349,7 +354,8 @@ void dw_spi_update_config(struct dw_spi *dws, struct spi_device *spi,
 	}
 
 	/* Update RX sample delay if required */
-	if (dws->cur_rx_sample_dly != chip->rx_sample_dly) {
+	if ((dws->cur_rx_sample_dly != chip->rx_sample_dly) ||
+	    (dw_readl(dws, DW_SPI_RX_SAMPLE_DLY) != chip->rx_sample_dly)) {
 		dw_writel(dws, DW_SPI_RX_SAMPLE_DLY, chip->rx_sample_dly);
 		dws->cur_rx_sample_dly = chip->rx_sample_dly;
 	}
@@ -799,6 +805,8 @@ static int dw_spi_setup(struct spi_device *spi)
 		chip->rx_sample_dly = DIV_ROUND_CLOSEST(rx_sample_dly_ns,
 							NSEC_PER_SEC /
 							dws->max_freq);
+
+		dws->tx_dma_use_burst = device_property_read_bool(&spi->dev, "tx-dma-use-burst");
 	}
 
 	/*
@@ -887,14 +895,20 @@ static void dw_spi_hw_init(struct device *dev, struct dw_spi *dws)
 int dw_spi_add_host(struct device *dev, struct dw_spi *dws)
 {
 	struct spi_controller *master;
+	const char* device_name;
 	int ret;
 
 	if (!dws)
 		return -EINVAL;
 
-	master = spi_alloc_master(dev, 0);
-	if (!master)
+	if (of_property_read_bool(dev->of_node, "spi-slave")) {
+		master = spi_alloc_slave(dev, 0);
+	} else {
+		master = spi_alloc_master(dev, 0);
+	}
+	if (master == NULL) {
 		return -ENOMEM;
+	}
 
 	device_set_node(&master->dev, dev_fwnode(dev));
 
@@ -914,6 +928,10 @@ int dw_spi_add_host(struct device *dev, struct dw_spi *dws)
 	}
 
 	dw_spi_init_mem_ops(dws);
+
+	if (! of_property_read_string(dev->of_node, "device-name", &device_name)) {
+		master->dev.init_name = device_name;
+	}
 
 	master->use_gpio_descriptors = true;
 	master->mode_bits = SPI_CPOL | SPI_CPHA | SPI_LOOP;
@@ -940,6 +958,8 @@ int dw_spi_add_host(struct device *dev, struct dw_spi *dws)
 	/* Get default rx sample delay */
 	device_property_read_u32(dev, "rx-sample-delay-ns",
 				 &dws->def_rx_sample_dly_ns);
+
+	dws->tx_dma_use_burst = device_property_read_bool(dev, "tx-dma-use-burst");
 
 	if (dws->dma_ops && dws->dma_ops->dma_init) {
 		ret = dws->dma_ops->dma_init(dev, dws);
@@ -1005,6 +1025,10 @@ EXPORT_SYMBOL_NS_GPL(dw_spi_suspend_host, SPI_DW_CORE);
 int dw_spi_resume_host(struct dw_spi *dws)
 {
 	dw_spi_hw_init(&dws->master->dev, dws);
+	if (dws->rxburst)
+		dw_writel(dws, DW_SPI_DMARDLR, dws->rxburst - 1);
+	if (dws->txburst)
+		dw_writel(dws, DW_SPI_DMATDLR, dws->txburst);
 	return spi_controller_resume(dws->master);
 }
 EXPORT_SYMBOL_NS_GPL(dw_spi_resume_host, SPI_DW_CORE);

@@ -31,14 +31,14 @@ struct hantro_ctx;
 struct hantro_codec_ops;
 struct hantro_postproc_ops;
 
-#define HANTRO_JPEG_ENCODER	BIT(0)
-#define HANTRO_ENCODERS		0x0000ffff
-#define HANTRO_MPEG2_DECODER	BIT(16)
-#define HANTRO_VP8_DECODER	BIT(17)
-#define HANTRO_H264_DECODER	BIT(18)
-#define HANTRO_HEVC_DECODER	BIT(19)
-#define HANTRO_VP9_DECODER	BIT(20)
-#define HANTRO_DECODERS		0xffff0000
+#define HANTRO_JPEG_ENCODER  BIT(0)
+#define HANTRO_ENCODERS	     0x0000ffff
+#define HANTRO_MPEG2_DECODER BIT(16)
+#define HANTRO_VP8_DECODER   BIT(17)
+#define HANTRO_H264_DECODER  BIT(18)
+#define HANTRO_HEVC_DECODER  BIT(19)
+#define HANTRO_VP9_DECODER   BIT(20)
+#define HANTRO_DECODERS	     0xffff0000
 
 /**
  * struct hantro_irq - irq handler and name
@@ -66,7 +66,7 @@ struct hantro_irq {
  * @codec:			Supported codecs
  * @codec_ops:			Codec ops.
  * @init:			Initialize hardware, optional.
- * @runtime_resume:		reenable hardware after power gating, optional.
+ * @runtime_resume:		re-enable hardware after power gating, optional.
  * @irqs:			array of irq names and interrupt handlers
  * @num_irqs:			number of irqs in the array
  * @clk_names:			array of clock names
@@ -93,9 +93,9 @@ struct hantro_variant {
 	int (*runtime_resume)(struct hantro_dev *vpu);
 	const struct hantro_irq *irqs;
 	int num_irqs;
-	const char * const *clk_names;
+	const char *const *clk_names;
 	int num_clocks;
-	const char * const *reg_names;
+	const char *const *reg_names;
 	int num_regs;
 	unsigned int double_buffer : 1;
 	unsigned int legacy_regs : 1;
@@ -161,8 +161,7 @@ struct hantro_func {
 	struct media_intf_devnode *intf_devnode;
 };
 
-static inline struct hantro_func *
-hantro_vdev_to_func(struct video_device *vdev)
+static inline struct hantro_func *hantro_vdev_to_func(struct video_device *vdev)
 {
 	return container_of(vdev, struct hantro_func, vdev);
 }
@@ -204,7 +203,7 @@ struct hantro_dev {
 	void __iomem *dec_base;
 	void __iomem *ctrl_base;
 
-	struct mutex vpu_mutex;	/* video_device lock */
+	struct mutex vpu_mutex; /* video_device lock */
 	spinlock_t irqlock;
 	const struct hantro_variant *variant;
 	struct delayed_work watchdog_work;
@@ -351,15 +350,13 @@ struct hantro_decoded_buffer {
  */
 extern int hantro_debug;
 
-#define vpu_debug(level, fmt, args...)				\
-	do {							\
-		if (hantro_debug & BIT(level))		\
-			pr_info("%s:%d: " fmt,	                \
-				 __func__, __LINE__, ##args);	\
+#define vpu_debug(level, fmt, args...)                                      \
+	do {                                                                \
+		if (hantro_debug & BIT(level))                              \
+			pr_info("%s:%d: " fmt, __func__, __LINE__, ##args); \
 	} while (0)
 
-#define vpu_err(fmt, args...)					\
-	pr_err("%s:%d: " fmt, __func__, __LINE__, ##args)
+#define vpu_err(fmt, args...) pr_err("%s:%d: " fmt, __func__, __LINE__, ##args)
 
 /* Structure access helpers. */
 static inline struct hantro_ctx *fh_to_ctx(struct v4l2_fh *fh)
@@ -368,8 +365,7 @@ static inline struct hantro_ctx *fh_to_ctx(struct v4l2_fh *fh)
 }
 
 /* Register accessors. */
-static inline void vepu_write_relaxed(struct hantro_dev *vpu,
-				      u32 val, u32 reg)
+static inline void vepu_write_relaxed(struct hantro_dev *vpu, u32 val, u32 reg)
 {
 	vpu_debug(6, "0x%04x = 0x%08x\n", reg / 4, val);
 	writel_relaxed(val, vpu->enc_base + reg);
@@ -389,8 +385,7 @@ static inline u32 vepu_read(struct hantro_dev *vpu, u32 reg)
 	return val;
 }
 
-static inline void vdpu_write_relaxed(struct hantro_dev *vpu,
-				      u32 val, u32 reg)
+static inline void vdpu_write_relaxed(struct hantro_dev *vpu, u32 val, u32 reg)
 {
 	vpu_debug(6, "0x%04x = 0x%08x\n", reg / 4, val);
 	writel_relaxed(val, vpu->dec_base + reg);
@@ -402,9 +397,7 @@ static inline void vdpu_write(struct hantro_dev *vpu, u32 val, u32 reg)
 	writel(val, vpu->dec_base + reg);
 }
 
-static inline void hantro_write_addr(struct hantro_dev *vpu,
-				     unsigned long offset,
-				     dma_addr_t addr)
+static inline void hantro_write_addr(struct hantro_dev *vpu, unsigned long offset, dma_addr_t addr)
 {
 	vdpu_write(vpu, addr & 0xffffffff, offset);
 }
@@ -417,9 +410,7 @@ static inline u32 vdpu_read(struct hantro_dev *vpu, u32 reg)
 	return val;
 }
 
-static inline u32 vdpu_read_mask(struct hantro_dev *vpu,
-				 const struct hantro_reg *reg,
-				 u32 val)
+static inline u32 vdpu_read_mask(struct hantro_dev *vpu, const struct hantro_reg *reg, u32 val)
 {
 	u32 v;
 
@@ -429,16 +420,12 @@ static inline u32 vdpu_read_mask(struct hantro_dev *vpu,
 	return v;
 }
 
-static inline void hantro_reg_write(struct hantro_dev *vpu,
-				    const struct hantro_reg *reg,
-				    u32 val)
+static inline void hantro_reg_write(struct hantro_dev *vpu, const struct hantro_reg *reg, u32 val)
 {
 	vdpu_write_relaxed(vpu, vdpu_read_mask(vpu, reg, val), reg->base);
 }
 
-static inline void hantro_reg_write_s(struct hantro_dev *vpu,
-				      const struct hantro_reg *reg,
-				      u32 val)
+static inline void hantro_reg_write_s(struct hantro_dev *vpu, const struct hantro_reg *reg, u32 val)
 {
 	vdpu_write(vpu, vdpu_read_mask(vpu, reg, val), reg->base);
 }
@@ -446,31 +433,26 @@ static inline void hantro_reg_write_s(struct hantro_dev *vpu,
 void *hantro_get_ctrl(struct hantro_ctx *ctx, u32 id);
 dma_addr_t hantro_get_ref(struct hantro_ctx *ctx, u64 ts);
 
-static inline struct vb2_v4l2_buffer *
-hantro_get_src_buf(struct hantro_ctx *ctx)
+static inline struct vb2_v4l2_buffer *hantro_get_src_buf(struct hantro_ctx *ctx)
 {
 	return v4l2_m2m_next_src_buf(ctx->fh.m2m_ctx);
 }
 
-static inline struct vb2_v4l2_buffer *
-hantro_get_dst_buf(struct hantro_ctx *ctx)
+static inline struct vb2_v4l2_buffer *hantro_get_dst_buf(struct hantro_ctx *ctx)
 {
 	return v4l2_m2m_next_dst_buf(ctx->fh.m2m_ctx);
 }
 
-bool hantro_needs_postproc(const struct hantro_ctx *ctx,
-			   const struct hantro_fmt *fmt);
+bool hantro_needs_postproc(const struct hantro_ctx *ctx, const struct hantro_fmt *fmt);
 
-static inline dma_addr_t
-hantro_get_dec_buf_addr(struct hantro_ctx *ctx, struct vb2_buffer *vb)
+static inline dma_addr_t hantro_get_dec_buf_addr(struct hantro_ctx *ctx, struct vb2_buffer *vb)
 {
 	if (hantro_needs_postproc(ctx, ctx->vpu_dst_fmt))
 		return ctx->postproc.dec_q[vb->index].dma;
 	return vb2_dma_contig_plane_dma_addr(vb, 0);
 }
 
-static inline struct hantro_decoded_buffer *
-vb2_to_hantro_decoded_buf(struct vb2_buffer *buf)
+static inline struct hantro_decoded_buffer *vb2_to_hantro_decoded_buf(struct vb2_buffer *buf)
 {
 	return container_of(buf, struct hantro_decoded_buffer, base.vb.vb2_buf);
 }
@@ -479,7 +461,6 @@ void hantro_postproc_disable(struct hantro_ctx *ctx);
 void hantro_postproc_enable(struct hantro_ctx *ctx);
 void hantro_postproc_free(struct hantro_ctx *ctx);
 int hantro_postproc_alloc(struct hantro_ctx *ctx);
-int hanto_postproc_enum_framesizes(struct hantro_ctx *ctx,
-				   struct v4l2_frmsizeenum *fsize);
+int hanto_postproc_enum_framesizes(struct hantro_ctx *ctx, struct v4l2_frmsizeenum *fsize);
 
 #endif /* HANTRO_H_ */

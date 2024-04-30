@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: GPL-2.0-only
+config SND_ARCHBAND_PDM
+	tristate "Archband PDM Device Driver"
+	help
+	 Say Y or M if you want to add support for PDM driver for
+	 Archband PDM device. The device supports up to
+	 a maximum of 8 channels each for play and record.
+
+config SND_VIRT_CODEC
+	tristate "Virtual Codec for archband PDM Driver"
+	help
+	 Say Y or M if you want to add virt codec

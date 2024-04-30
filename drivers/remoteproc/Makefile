@@ -38,3 +38,32 @@ obj-$(CONFIG_ST_SLIM_REMOTEPROC)	+= st_slim_rproc.o
 obj-$(CONFIG_STM32_RPROC)		+= stm32_rproc.o
 obj-$(CONFIG_TI_K3_DSP_REMOTEPROC)	+= ti_k3_dsp_remoteproc.o
 obj-$(CONFIG_TI_K3_R5_REMOTEPROC)	+= ti_k3_r5_remoteproc.o
+
+ccflags-y += -I${srctree}/drivers/remoteproc
+HBIPC_PATH = ${srctree}/drivers/mailbox/hobot/ipc/
+HBMOX_PATH = ${srctree}/drivers/mailbox/hobot/mbox/
+
+ccflags-y += -I${srctree}/include/
+ccflags-y += -I${srctree}/drivers/mailbox
+
+ccflags-y += -I${HBIPC_PATH}/common/
+ccflags-y += -I${HBIPC_PATH}/os/kernel/
+ccflags-y += -I${HBIPC_PATH}/platform/cpusys/
+ccflags-y += -I${HBMBOX_PATH}/platform/cpusys/
+ccflags-y += -I${HBMOX_PATH}/common/
+ccflags-y += -I${HBMOX_PATH}/os/kernel/
+ccflags-y += -I${HBMOX_PATH}/platform/cpusys/
+#subdir-ccflags-y += -I$(srctree)/drivers/hobot/rpmsg
+subdir-ccflags-y += -I$(srctree)/drivers/mailbox/hobot/mbox/platform/cpusys/
+
+ccflags-y += -I${srctree}/sound/soc/gua/
+
+obj-$(CONFIG_HOBOT_REMOTEPROC) += hobot_remoteproc.o
+
+all: FORCE
+	make -C ${OUTPUT_BUILD_DIR}/kernel M=$(PWD) modules
+
+clean:
+	make -C ${OUTPUT_BUILD_DIR}/kernel M=$(PWD) clean
+
+FORCE:

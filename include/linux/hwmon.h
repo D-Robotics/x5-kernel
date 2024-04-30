@@ -19,6 +19,7 @@ struct attribute_group;
 
 enum hwmon_sensor_types {
 	hwmon_chip,
+	hwmon_pd,
 	hwmon_temp,
 	hwmon_in,
 	hwmon_curr,
@@ -58,6 +59,12 @@ enum hwmon_chip_attributes {
 #define HWMON_C_IN_SAMPLES		BIT(hwmon_chip_in_samples)
 #define HWMON_C_POWER_SAMPLES		BIT(hwmon_chip_power_samples)
 #define HWMON_C_TEMP_SAMPLES		BIT(hwmon_chip_temp_samples)
+
+enum hwmon_pd_attributes {
+	hwmon_pd_pvt,
+};
+
+#define HWMON_PD_PVT	BIT(hwmon_pd_pvt)
 
 enum hwmon_temp_attributes {
 	hwmon_temp_enable,

@@ -58,6 +58,7 @@ static const char * const pstore_type_names[] = {
 	"powerpc-common",
 	"pmsg",
 	"powerpc-opal",
+	"sched"
 };
 
 static int pstore_new_entry;
@@ -529,6 +530,14 @@ static void pstore_register_console(void) {}
 static void pstore_unregister_console(void) {}
 #endif
 
+#ifdef CONFIG_PSTORE_SCHED
+static void pstore_register_sched(void) {}
+static void pstore_unregister_sched(void) {}
+#else
+static void pstore_register_sched(void) {}
+static void pstore_unregister_sched(void) {}
+#endif
+
 static int pstore_write_user_compat(struct pstore_record *record,
 				    const char __user *buf)
 {
@@ -609,6 +618,8 @@ int pstore_register(struct pstore_info *psi)
 		pstore_register_ftrace();
 	if (psi->flags & PSTORE_FLAGS_PMSG)
 		pstore_register_pmsg();
+	if (psi->flags & PSTORE_FLAGS_SCHED)
+		pstore_register_sched();
 
 	/* Start watching for new records, if desired. */
 	pstore_timer_kick();
@@ -641,6 +652,8 @@ void pstore_unregister(struct pstore_info *psi)
 	}
 
 	/* Unregister all callbacks. */
+	if (psi->flags & PSTORE_FLAGS_SCHED)
+		pstore_unregister_sched();
 	if (psi->flags & PSTORE_FLAGS_PMSG)
 		pstore_unregister_pmsg();
 	if (psi->flags & PSTORE_FLAGS_FTRACE)

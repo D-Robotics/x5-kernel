@@ -18,3 +18,5 @@ obj-$(CONFIG_PSTORE_ZONE)	+= pstore_zone.o
 
 pstore_blk-objs += blk.o
 obj-$(CONFIG_PSTORE_BLK)	+= pstore_blk.o
+
+pstore-$(CONFIG_SCHED_LOGGER)	+= hobot_sched_logger.o

@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0+ */
 
-#define JPEG_HEADER_SIZE	624
-#define JPEG_QUANT_SIZE		64
+#define JPEG_HEADER_SIZE 624
+#define JPEG_QUANT_SIZE	 64
 
 struct hantro_jpeg_ctx {
 	int width;

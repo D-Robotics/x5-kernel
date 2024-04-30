@@ -3079,7 +3079,7 @@ static int dwc3_gadget_init_out_endpoint(struct dwc3_ep *dep)
 	if (size < 0)
 		size = 0;
 	else
-		size /= 3;
+		size = size >= 1024 ? max(1024, size / 3) : (size / 3);
 
 	usb_ep_set_maxpacket_limit(&dep->endpoint, size);
 	dep->endpoint.max_streams = 16;
@@ -3099,15 +3099,24 @@ static int dwc3_gadget_init_endpoint(struct dwc3 *dwc, u8 epnum)
 	bool				direction = epnum & 1;
 	int				ret;
 	u8				num = epnum >> 1;
+	u8				epoutnum = dwc->num_eps - dwc->num_ineps;
 
 	dep = kzalloc(sizeof(*dep), GFP_KERNEL);
 	if (!dep)
 		return -ENOMEM;
 
 	dep->dwc = dwc;
-	dep->number = epnum;
-	dep->direction = direction;
+	if (epnum >= 2 * min(epoutnum, dwc->num_ineps)) {
+		direction = dwc->num_ineps > epoutnum ? true : false;
+		dep->number = 2 * min(epoutnum, dwc->num_ineps) +
+				2 * (epnum - 2 * min(epoutnum, dwc->num_ineps)) +
+				(direction ? 1 : 0);
+		num = dep->number >> 1;
+	} else {
+		dep->number = epnum;
+	}
 	dep->regs = dwc->regs + DWC3_DEP_BASE(epnum);
+	dep->direction = direction;
 	dwc->eps[epnum] = dep;
 	dep->combo_num = 0;
 	dep->start_cmd_status = 0;

@@ -1,0 +1,18 @@
+# SPDX-License-Identifier: GPL-2.0-only
+
+config SYSCON_REBOOT_REASON
+	tristate "Generic SYSCON regmap reboot reason driver"
+	depends on OF
+	depends on MFD_SYSCON
+	default y
+	help
+	  Say y here will enable reboot reason driver. This will
+	  get reboot reason arguments and store it in SYSCON mapped
+	  register, then the user can read it to know it's reboot
+	  reason.
+
+config DR_PANIC_ACTION
+	bool "D-Robotics panic action driver"
+	default y
+	help
+	  Panic action support for D-Robotics SoCs.

@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: GPL-2.0-only
+
+config HOBOT_VIO_N2D
+	tristate "Support for GC820 basic features"
+	help
+	  Select this option to enable driver support for verislicon gc820
+	  drivers.  GC820 is a 2D gpu. This driver enables
+	  userspace programs to access these gpu hardware to configure.
+
+	  If unsure, say N.

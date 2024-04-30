@@ -13,6 +13,8 @@
 #include <linux/clk.h>
 #include <linux/reset.h>
 #include <linux/sched_clock.h>
+#include <linux/platform_device.h>
+#include <linux/pm_runtime.h>
 
 static int __init timer_get_base_and_rate(struct device_node *np,
 				    void __iomem **base, u32 *rate)
@@ -203,7 +205,52 @@ static int __init dw_apb_timer_init(struct device_node *timer)
 
 	return 0;
 }
+
+static int dw_timer_probe(struct platform_device *pdev)
+{
+	struct device *dev = &pdev->dev;
+
+	pm_runtime_enable(&pdev->dev);
+	return dw_apb_timer_init(dev->of_node);
+}
+
+#ifdef CONFIG_PM_SLEEP
+static __maybe_unused int dw_apb_timer_suspend(struct device *dev)
+{
+	return pm_runtime_force_suspend(dev);
+}
+
+static __maybe_unused int dw_apb_timer_resume(struct device *dev)
+{
+	int ret;
+	ret = pm_runtime_force_resume(dev);
+	if (ret)
+		return ret;
+
+	return 0;
+}
+#endif
+
+static const struct dev_pm_ops dw_apb_timer_pm_ops = {
+	SET_SYSTEM_SLEEP_PM_OPS(dw_apb_timer_suspend, dw_apb_timer_resume)
+};
+
+static const struct of_device_id dw_timer_id[] = {
+	{ .compatible = "snps,dw-apb-timer", },
+	{ /* sentinel */ },
+};
+
+static struct platform_driver dw_timer_driver = {
+	.probe  = dw_timer_probe,
+	.driver = {
+		.name = "dw-apb-timer",
+		.of_match_table = dw_timer_id,
+		.suppress_bind_attrs = true,
+		.pm = &dw_apb_timer_pm_ops,
+	},
+};
+builtin_platform_driver(dw_timer_driver);
+
 TIMER_OF_DECLARE(pc3x2_timer, "picochip,pc3x2-timer", dw_apb_timer_init);
 TIMER_OF_DECLARE(apb_timer_osc, "snps,dw-apb-timer-osc", dw_apb_timer_init);
 TIMER_OF_DECLARE(apb_timer_sp, "snps,dw-apb-timer-sp", dw_apb_timer_init);
-TIMER_OF_DECLARE(apb_timer, "snps,dw-apb-timer", dw_apb_timer_init);

@@ -10,6 +10,59 @@
 
 #define to_rproc(d) container_of(d, struct rproc, dev)
 
+static ssize_t timesync_show(struct device *dev, struct device_attribute *attr,
+			  char *buf)
+{
+	return 0;
+}
+
+/* Change firmware name via sysfs */
+static ssize_t timesync_store(struct device *dev,
+			      struct device_attribute *attr,
+			      const char *buf, size_t count)
+{
+	struct rproc *rproc = to_rproc(dev);
+	uint32_t *p=(uint32_t *)buf;
+	if (rproc == NULL || rproc->ops == NULL || rproc->ops->timesync == NULL) {
+		pr_info("not support timesync store\n");
+	} else {
+		rproc->ops->timesync(dev,*p,*(p+1),*(p+2));
+	}
+	return count;
+}
+static DEVICE_ATTR_RW(timesync);
+
+static ssize_t log_show(struct device *dev, struct device_attribute *attr,
+			  char *buf)
+{
+	struct rproc *rproc = to_rproc(dev);
+	int ret = 0;
+	if (rproc == NULL || rproc->ops == NULL || rproc->ops->log == NULL) {
+		pr_info("not support log show\n");
+	} else {
+		ret = rproc->ops->log(dev, attr, buf);
+	}
+	return ret;
+}
+
+static ssize_t log_store(struct device *dev,
+			      struct device_attribute *attr,
+			      const char *buf, size_t count)
+{
+	return 0;
+#if 0
+	struct rproc *rproc = to_rproc(dev);
+	int ret = 0;
+	if (rproc == NULL || rproc->ops == NULL || rproc->ops->debug == NULL) {
+		pr_info("not support log store\n");
+	} else {
+		ret = rproc->ops->debug(dev, attr, buf);
+	}
+	return ret;
+#endif
+}
+static DEVICE_ATTR_RW(log);
+
 static ssize_t recovery_show(struct device *dev,
 			     struct device_attribute *attr, char *buf)
 {
@@ -241,6 +294,8 @@ static struct attribute *rproc_attrs[] = {
 	&dev_attr_firmware.attr,
 	&dev_attr_state.attr,
 	&dev_attr_name.attr,
+	&dev_attr_log.attr,
+	&dev_attr_timesync.attr,
 	NULL
 };
 

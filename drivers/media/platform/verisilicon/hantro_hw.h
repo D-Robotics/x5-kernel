@@ -15,25 +15,25 @@
 #include <media/v4l2-vp9.h>
 #include <media/videobuf2-core.h>
 
-#define DEC_8190_ALIGN_MASK	0x07U
+#define DEC_8190_ALIGN_MASK 0x07U
 
-#define MB_DIM			16
-#define TILE_MB_DIM		4
-#define MB_WIDTH(w)		DIV_ROUND_UP(w, MB_DIM)
-#define MB_HEIGHT(h)		DIV_ROUND_UP(h, MB_DIM)
+#define MB_DIM	     16
+#define TILE_MB_DIM  4
+#define MB_WIDTH(w)  DIV_ROUND_UP(w, MB_DIM)
+#define MB_HEIGHT(h) DIV_ROUND_UP(h, MB_DIM)
 
-#define FMT_MIN_WIDTH		48
-#define FMT_MIN_HEIGHT		48
-#define FMT_HD_WIDTH		1280
-#define FMT_HD_HEIGHT		720
-#define FMT_FHD_WIDTH		1920
-#define FMT_FHD_HEIGHT		1088
-#define FMT_UHD_WIDTH		3840
-#define FMT_UHD_HEIGHT		2160
-#define FMT_4K_WIDTH		4096
-#define FMT_4K_HEIGHT		2304
+#define FMT_MIN_WIDTH  48
+#define FMT_MIN_HEIGHT 48
+#define FMT_HD_WIDTH   1280
+#define FMT_HD_HEIGHT  720
+#define FMT_FHD_WIDTH  1920
+#define FMT_FHD_HEIGHT 1088
+#define FMT_UHD_WIDTH  3840
+#define FMT_UHD_HEIGHT 2160
+#define FMT_4K_WIDTH   4096
+#define FMT_4K_HEIGHT  2304
 
-#define NUM_REF_PICTURES	(V4L2_HEVC_DPB_ENTRIES_NUM_MAX + 1)
+#define NUM_REF_PICTURES (V4L2_HEVC_DPB_ENTRIES_NUM_MAX + 1)
 
 struct hantro_dev;
 struct hantro_ctx;
@@ -56,7 +56,7 @@ struct hantro_aux_buf {
 };
 
 /* Max. number of entries in the DPB (HW limitation). */
-#define HANTRO_H264_DPB_SIZE		16
+#define HANTRO_H264_DPB_SIZE 16
 
 /**
  * struct hantro_h264_dec_ctrls
@@ -192,8 +192,8 @@ struct hantro_vp9_frame_info {
 	u64 timestamp;
 };
 
-#define MAX_SB_COLS	64
-#define MAX_SB_ROWS	34
+#define MAX_SB_COLS 64
+#define MAX_SB_ROWS 34
 
 /**
  * struct hantro_vp9_dec_hw_ctx
@@ -302,10 +302,10 @@ struct hantro_codec_ops {
  * @ROCKCHIP_VPU_ENC_FMT_UYVY422: YUV 4:2:2 packed format (UYVY)
  */
 enum hantro_enc_fmt {
-	ROCKCHIP_VPU_ENC_FMT_YUV420P = 0,
+	ROCKCHIP_VPU_ENC_FMT_YUV420P  = 0,
 	ROCKCHIP_VPU_ENC_FMT_YUV420SP = 1,
-	ROCKCHIP_VPU_ENC_FMT_YUYV422 = 2,
-	ROCKCHIP_VPU_ENC_FMT_UYVY422 = 3,
+	ROCKCHIP_VPU_ENC_FMT_YUYV422  = 2,
+	ROCKCHIP_VPU_ENC_FMT_UYVY422  = 3,
 };
 
 extern const struct hantro_variant imx8mm_vpu_g1_variant;
@@ -330,8 +330,7 @@ extern const u32 hantro_vp8_dec_mc_filter[8][6];
 
 void hantro_watchdog(struct work_struct *work);
 void hantro_run(struct hantro_ctx *ctx);
-void hantro_irq_done(struct hantro_dev *vpu,
-		     enum vb2_buffer_state result);
+void hantro_irq_done(struct hantro_dev *vpu, enum vb2_buffer_state result);
 void hantro_start_prepare_run(struct hantro_ctx *ctx);
 void hantro_end_prepare_run(struct hantro_ctx *ctx);
 
@@ -343,10 +342,8 @@ int rockchip_vpu2_jpeg_enc_run(struct hantro_ctx *ctx);
 void hantro_h1_jpeg_enc_done(struct hantro_ctx *ctx);
 void rockchip_vpu2_jpeg_enc_done(struct hantro_ctx *ctx);
 
-dma_addr_t hantro_h264_get_ref_buf(struct hantro_ctx *ctx,
-				   unsigned int dpb_idx);
-u16 hantro_h264_get_ref_nbr(struct hantro_ctx *ctx,
-			    unsigned int dpb_idx);
+dma_addr_t hantro_h264_get_ref_buf(struct hantro_ctx *ctx, unsigned int dpb_idx);
+u16 hantro_h264_get_ref_nbr(struct hantro_ctx *ctx, unsigned int dpb_idx);
 int hantro_h264_dec_prepare_run(struct hantro_ctx *ctx);
 int rockchip_vpu2_h264_dec_run(struct hantro_ctx *ctx);
 int hantro_g1_h264_dec_run(struct hantro_ctx *ctx);
@@ -361,14 +358,12 @@ void hantro_hevc_ref_init(struct hantro_ctx *ctx);
 dma_addr_t hantro_hevc_get_ref_buf(struct hantro_ctx *ctx, s32 poc);
 int hantro_hevc_add_ref_buf(struct hantro_ctx *ctx, int poc, dma_addr_t addr);
 
-
 static inline unsigned short hantro_vp9_num_sbs(unsigned short dimension)
 {
 	return (dimension + 63) / 64;
 }
 
-static inline size_t
-hantro_vp9_mv_size(unsigned int width, unsigned int height)
+static inline size_t hantro_vp9_mv_size(unsigned int width, unsigned int height)
 {
 	int num_ctbs;
 
@@ -380,8 +375,7 @@ hantro_vp9_mv_size(unsigned int width, unsigned int height)
 	return (num_ctbs * 64) * 16;
 }
 
-static inline size_t
-hantro_h264_mv_size(unsigned int width, unsigned int height)
+static inline size_t hantro_h264_mv_size(unsigned int width, unsigned int height)
 {
 	/*
 	 * A decoded 8-bit 4:2:0 NV12 frame may need memory for up to
@@ -407,8 +401,7 @@ hantro_h264_mv_size(unsigned int width, unsigned int height)
 	return 64 * MB_WIDTH(width) * MB_WIDTH(height) + 32;
 }
 
-static inline size_t
-hantro_hevc_mv_size(unsigned int width, unsigned int height)
+static inline size_t hantro_hevc_mv_size(unsigned int width, unsigned int height)
 {
 	/*
 	 * A CTB can be 64x64, 32x32 or 16x16.
@@ -419,8 +412,7 @@ hantro_hevc_mv_size(unsigned int width, unsigned int height)
 
 int hantro_g1_mpeg2_dec_run(struct hantro_ctx *ctx);
 int rockchip_vpu2_mpeg2_dec_run(struct hantro_ctx *ctx);
-void hantro_mpeg2_dec_copy_qtable(u8 *qtable,
-				  const struct v4l2_ctrl_mpeg2_quantisation *ctrl);
+void hantro_mpeg2_dec_copy_qtable(u8 *qtable, const struct v4l2_ctrl_mpeg2_quantisation *ctrl);
 int hantro_mpeg2_dec_init(struct hantro_ctx *ctx);
 void hantro_mpeg2_dec_exit(struct hantro_ctx *ctx);
 
@@ -428,8 +420,7 @@ int hantro_g1_vp8_dec_run(struct hantro_ctx *ctx);
 int rockchip_vpu2_vp8_dec_run(struct hantro_ctx *ctx);
 int hantro_vp8_dec_init(struct hantro_ctx *ctx);
 void hantro_vp8_dec_exit(struct hantro_ctx *ctx);
-void hantro_vp8_prob_update(struct hantro_ctx *ctx,
-			    const struct v4l2_ctrl_vp8_frame *hdr);
+void hantro_vp8_prob_update(struct hantro_ctx *ctx, const struct v4l2_ctrl_vp8_frame *hdr);
 
 int hantro_g2_vp9_dec_run(struct hantro_ctx *ctx);
 void hantro_g2_vp9_dec_done(struct hantro_ctx *ctx);

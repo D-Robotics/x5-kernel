@@ -1,0 +1,30 @@
+# SPDX-License-Identifier: GPL-2.0-only
+# Helper to resolve issues with configs that have SPI enabled but I2C
+# modular, meaning we can't build the codec driver in with I2C support.
+# We use an ordered list of conditional defaults to pick the appropriate
+# setting - SPI can't be modular so that case doesn't need to be covered.
+
+menu "SoundCard drivers"
+
+config SND_SOC_HOBOT_SIMPLE_CARD
+	tristate "Hobot simple card"
+
+config SND_DUPLEX_CARD
+	tristate "ASoC Duplex sound card support"
+	select SND_SIMPLE_CARD_UTILS
+	help
+		This option enables generic simple sound card support
+
+config SND_HOBOT_SOUND_MACHINE
+	tristate "ASoC Hobot sound machine support"
+	select SND_SIMPLE_CARD_UTILS
+	help
+		This option enables generic simple sound card support
+
+config SND_HOBOT_SOUND_DUPLEX_HOST
+	tristate "ASoC Hobot sound duplex host support"
+	select SND_SIMPLE_CARD_UTILS
+	help
+		This option enables generic simple sound card support
+
+endmenu

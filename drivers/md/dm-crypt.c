@@ -39,6 +39,7 @@
 #include <keys/user-type.h>
 #include <keys/encrypted-type.h>
 #include <keys/trusted-type.h>
+#include <linux/delay.h>
 
 #include <linux/device-mapper.h>
 
@@ -3274,11 +3275,33 @@ static int crypt_ctr(struct dm_target *ti, unsigned int argc, char **argv)
 	}
 	cc->iv_offset = tmpll;
 
+#ifdef CONFIG_ARCH_HOBOT_X5
+	{
+		#define WAIT_TOTAL 10000
+		#define WAIT_STEP 10
+		int wait_ms = WAIT_TOTAL;
+		do {
+			ret = dm_get_device(ti, argv[3], dm_table_get_mode(ti->table), &cc->dev);
+			if (!ret) {
+				if (WAIT_TOTAL - wait_ms > 0)
+					pr_info("%s: waited %dms for root device ready.\n",
+						__func__, WAIT_TOTAL - wait_ms);
+				break;
+			}
+			wait_ms -= WAIT_STEP;
+			if (wait_ms < WAIT_TOTAL / 2)
+				pr_err_ratelimited("%s: waiting root device overtime %dms.\n",
+					__func__, WAIT_TOTAL - wait_ms);
+			msleep(WAIT_STEP);
+		} while (wait_ms > 0);
+	}
+#else
 	ret = dm_get_device(ti, argv[3], dm_table_get_mode(ti->table), &cc->dev);
 	if (ret) {
 		ti->error = "Device lookup failed";
 		goto bad;
 	}
+#endif
 
 	ret = -EINVAL;
 	if (sscanf(argv[4], "%llu%c", &tmpll, &dummy) != 1 || tmpll != (sector_t)tmpll) {

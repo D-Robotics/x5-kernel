@@ -1500,7 +1500,11 @@ static int mmc_select_hs200(struct mmc_card *card)
 		old_timing = host->ios.timing;
 		old_clock = host->ios.clock;
 		mmc_set_timing(host, MMC_TIMING_MMC_HS200);
+#ifdef CONFIG_ARCH_HOBOT_X5
+		mmc_set_clock(card->host, card->ext_csd.hs200_max_dtr);
+#else
 		mmc_set_clock(card->host, card->ext_csd.hs_max_dtr);
+#endif
 
 		/*
 		 * For HS200, CRC errors are not a reliable way to know the

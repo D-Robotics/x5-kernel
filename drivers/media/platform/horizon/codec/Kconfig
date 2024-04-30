@@ -1,0 +1,14 @@
+# HOBOT videosys configuration
+
+config VIDEO_HOBOTC_JPU
+    tristate "HOBOT C-series JPEG encoder & decoder driver"
+    default n
+    help
+      Say Y here to enable support for HOBOT C-series JPEG driver.
+
+config VIDEO_HOBOTC_VPU
+    tristate "HOBOT C-series VPU encoder & decoder driver"
+    default n
+    help
+      Say Y here to enable support for HOBOT C-series VSP driver.
+

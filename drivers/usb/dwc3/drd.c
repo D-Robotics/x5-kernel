@@ -510,6 +510,7 @@ static int dwc3_setup_role_switch(struct dwc3 *dwc)
 	dwc3_role_switch.set = dwc3_usb_role_switch_set;
 	dwc3_role_switch.get = dwc3_usb_role_switch_get;
 	dwc3_role_switch.driver_data = dwc;
+	dwc3_role_switch.allow_userspace_control = true;
 	dwc->role_sw = usb_role_switch_register(dwc->dev, &dwc3_role_switch);
 	if (IS_ERR(dwc->role_sw))
 		return PTR_ERR(dwc->role_sw);
@@ -538,10 +539,16 @@ int dwc3_drd_init(struct dwc3 *dwc)
 {
 	int ret, irq;
 
+	/* init usb-role-switch mechanism first */
 	if (ROLE_SWITCH &&
-	    device_property_read_bool(dwc->dev, "usb-role-switch"))
-		return dwc3_setup_role_switch(dwc);
+	    device_property_read_bool(dwc->dev, "usb-role-switch")) {
+		ret = dwc3_setup_role_switch(dwc);
 
+		if (ret < 0)
+			dev_err(dwc->dev, "couldn't find usb-role-switch property\n");
+	}
+
+	/* init extcon-gpio, no matter above usb-role-switch support or not */
 	if (dwc->edev) {
 		dwc->edev_nb.notifier_call = dwc3_drd_notifier;
 		ret = extcon_register_notifier(dwc->edev, EXTCON_USB_HOST,
@@ -553,6 +560,10 @@ int dwc3_drd_init(struct dwc3 *dwc)
 
 		dwc3_drd_update(dwc);
 	} else {
+		/* FIXME: if no extcon but has usb-role-switch, we still use usb-role-switch but not phy-otg */
+		if (ROLE_SWITCH && device_property_read_bool(dwc->dev, "usb-role-switch"))
+			return 0;
+
 		dwc3_set_prtcap(dwc, DWC3_GCTL_PRTCAP_OTG);
 
 		/* use OTG block to get ID event */

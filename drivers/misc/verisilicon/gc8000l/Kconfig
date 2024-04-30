@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: GPL-2.0
+
+config VS_GC8000L
+        tristate "Support for GC8000L basic features"
+        help
+          Select this option to enable driver support for verislicon gc8000l
+          drivers.  GC8000L is a 3D gpu. This driver enables
+          userspace programs to access these gpu hardware to configure.
+
+          If unsure, say N.

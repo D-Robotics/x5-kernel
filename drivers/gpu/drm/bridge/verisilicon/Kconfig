@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: GPL-2.0-only
+
+config VERISILICON_X5_SYSCON_BRIDGE
+	tristate "Verisilicon Syscon X5 bridge support"
+	depends on DRM_VERISILICON
+	select MFD_SYSCON
+	help
+	  This bridge aims to support for subsystem level register access.
+	  In display pipeline, there are always needs to access subsystem
+	  level register, such as display mux to select which pipe is enabled.
+	  Enable this option if you are using Verisilicon X5 SOC.

@@ -9,3 +9,5 @@ obj-$(CONFIG_PPS)		:= pps_core.o
 obj-y				+= clients/ generators/
 
 ccflags-$(CONFIG_PPS_DEBUG) := -DDEBUG
+
+obj-$(CONFIG_HOBOT_PPS_CLIENT)	+= hobot-pps.o

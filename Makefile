@@ -492,7 +492,7 @@ OBJDUMP		= $(LLVM_PREFIX)llvm-objdump$(LLVM_SUFFIX)
 READELF		= $(LLVM_PREFIX)llvm-readelf$(LLVM_SUFFIX)
 STRIP		= $(LLVM_PREFIX)llvm-strip$(LLVM_SUFFIX)
 else
-CC		= $(CROSS_COMPILE)gcc
+CC		= ${CCACHE_COMMAND} $(CROSS_COMPILE)gcc
 LD		= $(CROSS_COMPILE)ld
 AR		= $(CROSS_COMPILE)ar
 NM		= $(CROSS_COMPILE)nm
@@ -1908,7 +1908,7 @@ endif # KBUILD_EXTMOD
 # ---------------------------------------------------------------------------
 # Modules
 
-PHONY += modules modules_install modules_prepare
+PHONY += modules modules_install modules_prepare modules_depmod
 
 ifdef CONFIG_MODULES
 
@@ -1932,6 +1932,9 @@ quiet_cmd_depmod = DEPMOD  $(MODLIB)
 
 modules_install:
 	$(Q)$(MAKE) -f $(srctree)/scripts/Makefile.modinst
+	$(call cmd,depmod)
+
+modules_depmod:
 	$(call cmd,depmod)
 
 else # CONFIG_MODULES
@@ -2011,7 +2014,7 @@ $(clean-dirs):
 
 clean: $(clean-dirs)
 	$(call cmd,rmfiles)
-	@find $(or $(KBUILD_EXTMOD), .) $(RCS_FIND_IGNORE) \
+	@set -x; find $(or $(KBUILD_EXTMOD), .) ../hobot-drivers $(RCS_FIND_IGNORE) \
 		\( -name '*.[aios]' -o -name '*.rsi' -o -name '*.ko' -o -name '.*.cmd' \
 		-o -name '*.ko.*' \
 		-o -name '*.dtb' -o -name '*.dtbo' -o -name '*.dtb.S' -o -name '*.dt.yaml' \

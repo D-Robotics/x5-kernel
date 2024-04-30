@@ -17,6 +17,7 @@
 #include <linux/of_device.h>
 #include <linux/reset.h>
 #include <linux/sizes.h>
+#include <linux/gpio/consumer.h>
 
 #include "sdhci-pltfm.h"
 
@@ -72,6 +73,18 @@
 #define BOUNDARY_OK(addr, len) \
 	((addr | (SZ_128M - 1)) == ((addr + len - 1) | (SZ_128M - 1)))
 
+/* D-Robotics Sunrise5 specific macros */
+#define X5_MAX_CLKS 2
+#define X5_MST_DLL_OFFSET 0x0
+#define X5_SLV_DLL_OFFSET 0x4
+#define X5_DLL_OBS0_OFFSET 0xC
+#define X5_DLL_PHASE_OFFSET (8u)
+
+#define X5_EMMC_MST_DLL_DEFAULT 0x3AA40004
+#define X5_EMMC_SLV_DLL_DEFAULT 0x00808080
+#define X5_SD_DLL_DEFAULT 0x3AA40004
+
+
 enum dwcmshc_rk_type {
 	DWCMSHC_RK3568,
 	DWCMSHC_RK3588,
@@ -83,6 +96,23 @@ struct rk35xx_priv {
 	struct reset_control *reset;
 	enum dwcmshc_rk_type devtype;
 	u8 txclk_tapnum;
+};
+
+enum dwcmshc_x5_card_type {
+	DWCMSCH_X5_EMMC,
+	DWCMSCH_X5_SD
+};
+
+struct x5_priv {
+	int mmc_fixed_voltage;
+	struct clk	*card_clk;
+	struct clk_bulk_data x5_clks[X5_MAX_CLKS];
+	struct gpio_desc *voltage_gpio;
+	struct reset_control *reset;
+	u8 mshc_ctrl_val;
+	enum dwcmshc_x5_card_type card_type;
+	void __iomem *dll_ctrl_base;
+	int current_dll;
 };
 
 struct dwcmshc_priv {
@@ -198,6 +228,262 @@ static void dwcmshc_hs400_enhanced_strobe(struct mmc_host *mmc,
 		vendor &= ~DWCMSHC_ENHANCED_STROBE;
 
 	sdhci_writel(host, vendor, reg);
+}
+
+static void x5_sdhci_sys_reset(struct sdhci_host *host)
+{
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+	struct dwcmshc_priv *dwc_priv = sdhci_pltfm_priv(pltfm_host);
+	struct x5_priv *priv = dwc_priv->priv;
+
+	reset_control_assert(priv->reset);
+	udelay(10);
+	reset_control_deassert(priv->reset);
+}
+
+static unsigned int x5_get_max_clock(struct sdhci_host *host)
+{
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+	struct dwcmshc_priv *dwc_priv = sdhci_pltfm_priv(pltfm_host);
+	struct x5_priv *x5_priv = dwc_priv->priv;
+
+	return clk_get_rate(x5_priv->card_clk);
+}
+
+static void x5_sdhci_reset(struct sdhci_host *host, u8 mask)
+{
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+	struct dwcmshc_priv *dwc_priv = sdhci_pltfm_priv(pltfm_host);
+	struct x5_priv *priv = dwc_priv->priv;
+
+	if (mask & SDHCI_RESET_ALL && priv->reset) {
+		x5_sdhci_sys_reset(host);
+	}
+
+	sdhci_reset(host, mask);
+}
+
+static int x5_send_tuning(struct sdhci_host *host, u32 opcode)
+{
+	unsigned int ctrl;
+	unsigned long flags;
+
+	spin_lock_irqsave(&host->lock, flags);
+	if (host->mmc->ios.bus_width == MMC_BUS_WIDTH_8)
+		sdhci_writew(host, SDHCI_MAKE_BLKSZ(host->sdma_boundary, 128),
+			     SDHCI_BLOCK_SIZE);
+	else
+		sdhci_writew(host, SDHCI_MAKE_BLKSZ(host->sdma_boundary, 64),
+			     SDHCI_BLOCK_SIZE);
+
+	sdhci_writew(host, 1, SDHCI_BLOCK_COUNT);
+	ctrl = sdhci_readw(host, SDHCI_TRANSFER_MODE);
+	ctrl |= SDHCI_TRNS_READ;
+	sdhci_writew(host, ctrl, SDHCI_TRANSFER_MODE);
+
+	spin_unlock_irqrestore(&host->lock, flags);
+
+	return mmc_send_tuning(host->mmc, opcode, NULL);
+}
+
+#define X5_TUNING_MAX 128
+#define TUNING_ITERATION_TO_PHASE(i)	(i)
+static int x5_set_dll(struct sdhci_host *host, int degrees)
+{
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+	struct dwcmshc_priv *dwc_priv = sdhci_pltfm_priv(pltfm_host);
+	struct x5_priv *priv = dwc_priv->priv;
+	u32 dll_reg_val;
+	u16 sdhci_clk_reg_val;
+	ktime_t timeout;
+	unsigned long flags;
+
+	spin_lock_irqsave(&host->lock, flags);
+	sdhci_clk_reg_val = sdhci_readw(host, SDHCI_CLOCK_CONTROL);
+	sdhci_clk_reg_val &= ~SDHCI_CLOCK_CARD_EN;
+	sdhci_writew(host, sdhci_clk_reg_val, SDHCI_CLOCK_CONTROL);
+
+	dll_reg_val = ioread32(priv->dll_ctrl_base + X5_SLV_DLL_OFFSET);
+	dll_reg_val &= 0xFFFF80FF;
+	dll_reg_val |= (degrees << X5_DLL_PHASE_OFFSET);
+	iowrite32(dll_reg_val, priv->dll_ctrl_base + X5_SLV_DLL_OFFSET);
+
+	timeout = ktime_add_ms(ktime_get(), 150);
+	while (1) {
+		bool timedout = ktime_after(ktime_get(), timeout);
+
+		dll_reg_val = ioread32(priv->dll_ctrl_base + X5_DLL_OBS0_OFFSET);
+		if (((dll_reg_val & 0x7F00) >> X5_DLL_PHASE_OFFSET) == degrees)
+			break;
+		if (timedout) {
+			pr_err("%s: execute tuning dll obs never stabilized.\n",
+			       mmc_hostname(host->mmc));
+			return -1;
+		}
+		udelay(10);
+	}
+
+	sdhci_clk_reg_val |= SDHCI_CLOCK_CARD_EN;
+	sdhci_writew(host, sdhci_clk_reg_val, SDHCI_CLOCK_CONTROL);
+	priv->current_dll = degrees;
+
+	spin_unlock_irqrestore(&host->lock, flags);
+	return 0;
+}
+
+static int dwcmshc_x5_execute_tuning(struct sdhci_host *host, u32 opcode)
+{
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+	struct dwcmshc_priv *dwc_priv = sdhci_pltfm_priv(pltfm_host);
+	struct x5_priv *priv = dwc_priv->priv;
+	struct mmc_host *mmc = host->mmc;
+	int ret = 0;
+	int i;
+	bool v, prev_v = 0, first_v;
+	struct range_t {
+		int start;
+		int end;	/* inclusive */
+	};
+	struct range_t *ranges;
+	unsigned int range_count = 0;
+	int longest_range_len = -1;
+	int longest_range = -1;
+	int middle_phase;
+
+	dev_dbg(mmc_dev(mmc), "do dwcmshc_x5_execute_tuning\n");
+	ranges = kmalloc_array(X5_TUNING_MAX / 2 + 1, sizeof(*ranges), GFP_KERNEL);
+	if (!ranges)
+		return -ENOMEM;
+
+	/* Try each phase and extract good ranges */
+	for (i = 0; i < X5_TUNING_MAX; i++) {
+		x5_set_dll(host, TUNING_ITERATION_TO_PHASE(i));
+
+		v = !x5_send_tuning(host, opcode);
+
+		if (i == 0)
+			first_v = v;
+
+		if ((!prev_v) && v) {
+			range_count++;
+			ranges[range_count - 1].start = i;
+		}
+
+		if (v) {
+			ranges[range_count - 1].end = i;
+		} else if (i < X5_TUNING_MAX - 2) {
+			/*
+			 * No need to check too close to an invalid
+			 * one since testing bad phases is slow. Skip
+			 * the adjacent phase but always test the last phase.
+			 */
+			i++;
+		}
+
+		prev_v = v;
+	}
+
+	if (range_count == 0) {
+		dev_err(mmc_dev(mmc), "All sample phases bad!");
+		ret = -EIO;
+		goto free;
+	}
+
+	/* wrap around case, merge the end points */
+	if ((range_count > 1) && first_v && v) {
+		ranges[0].start = ranges[range_count - 1].start;
+		range_count--;
+	}
+
+	/* Find the longest range */
+	for (i = 0; i < range_count; i++) {
+		int len = (ranges[i].end - ranges[i].start + 1);
+
+		if (len < 0)
+			len += X5_TUNING_MAX;
+
+		if (longest_range_len < len) {
+			longest_range_len = len;
+			longest_range = i;
+		}
+	}
+
+	middle_phase = ranges[longest_range].start + longest_range_len / 2;
+	middle_phase %= X5_TUNING_MAX;
+
+	x5_set_dll(host, TUNING_ITERATION_TO_PHASE(middle_phase));
+	dev_dbg(mmc_dev(mmc),
+		"Got longest(%d) sample range[%d,%d], current phase:%d\n",
+		longest_range_len,
+		TUNING_ITERATION_TO_PHASE(ranges[longest_range].start),
+		TUNING_ITERATION_TO_PHASE(ranges[longest_range].end),
+		priv->current_dll);
+
+free:
+	kfree(ranges);
+	/* set retuning period to enable retuning*/
+	mmc->retune_period = 5;
+	return ret;
+}
+
+static void dwcmshc_x5_set_clock(struct sdhci_host *host, unsigned int clock)
+{
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+	struct dwcmshc_priv *dwc_priv = sdhci_pltfm_priv(pltfm_host);
+	struct x5_priv *x5_priv = dwc_priv->priv;
+	u16 sdhci_clk_reg_val;
+
+	host->mmc->actual_clock = 0;
+	sdhci_writew(host, 0, SDHCI_CLOCK_CONTROL);
+	if (clock == 0)
+		return;
+
+	clk_disable_unprepare(x5_priv->card_clk);
+	sdhci_clk_reg_val = sdhci_calc_clk(host, clock, &host->mmc->actual_clock);
+	sdhci_writew(host, sdhci_clk_reg_val, SDHCI_CLOCK_CONTROL);
+	clk_prepare_enable(x5_priv->card_clk);
+	sdhci_enable_clk(host, sdhci_clk_reg_val);
+
+	sdhci_writeb(host, x5_priv->mshc_ctrl_val,
+				 dwc_priv->vendor_specific_area1 + DWCMSHC_HOST_CTRL3);
+
+	/* Make sure if dts configured fixed-emmc-drive-type,
+	 * sdhci controller will also be configured for the same
+	 * fixed-emmc-drive-type on Sunrise5 SoC.
+	 */
+	dev_dbg(mmc_dev(host->mmc), "Get fixed-drv-type: %d\n", host->mmc->fixed_drv_type);
+	if (host->mmc->fixed_drv_type >= MMC_SET_DRIVER_TYPE_B
+		&& host->mmc->fixed_drv_type <= MMC_SET_DRIVER_TYPE_D) {
+		host->mmc->ios.drv_type = host->mmc->fixed_drv_type;
+		dev_dbg(mmc_dev(host->mmc), "Set ios.drv_type:%d\n", host->mmc->ios.drv_type);
+	}
+}
+
+static int dwcmshc_x5_clk_init(struct sdhci_host *host, struct dwcmshc_priv *dwc_priv)
+{
+	struct x5_priv *priv = dwc_priv->priv;
+	int err;
+
+	priv->x5_clks[0].id = "axi";
+	priv->x5_clks[1].id = "timer";
+	err = devm_clk_bulk_get_optional(mmc_dev(host->mmc), X5_MAX_CLKS,
+					 priv->x5_clks);
+	if (err) {
+		dev_err(mmc_dev(host->mmc), "failed to get clocks %d\n", err);
+		return err;
+	}
+
+	err = clk_bulk_prepare_enable(X5_MAX_CLKS, priv->x5_clks);
+	if (err) {
+		dev_err(mmc_dev(host->mmc), "failed to enable clocks %d\n", err);
+		return err;
+	}
+
+	priv->card_clk = devm_clk_get(mmc_dev(host->mmc), "card");
+	if (!IS_ERR(priv->card_clk))
+		clk_prepare_enable(priv->card_clk);
+
+	return 0;
 }
 
 static void dwcmshc_rk3568_set_clock(struct sdhci_host *host, unsigned int clock)
@@ -343,8 +629,40 @@ static const struct sdhci_ops sdhci_dwcmshc_rk35xx_ops = {
 	.adma_write_desc	= dwcmshc_adma_write_desc,
 };
 
+static const struct sdhci_ops sdhci_dwcmshc_x5_sd_ops = {
+	.set_clock		= dwcmshc_x5_set_clock,
+	.set_bus_width		= sdhci_set_bus_width,
+	.set_uhs_signaling	= dwcmshc_set_uhs_signaling,
+	.get_max_clock		= x5_get_max_clock,
+	.reset			= sdhci_reset,
+	.adma_write_desc	= dwcmshc_adma_write_desc,
+	.platform_execute_tuning = dwcmshc_x5_execute_tuning,
+};
+
+static const struct sdhci_ops sdhci_dwcmshc_x5_emmc_ops = {
+	.set_clock		= dwcmshc_x5_set_clock,
+	.set_bus_width		= sdhci_set_bus_width,
+	.set_uhs_signaling	= dwcmshc_set_uhs_signaling,
+	.get_max_clock		= x5_get_max_clock,
+	.reset			= x5_sdhci_reset,
+	.adma_write_desc	= dwcmshc_adma_write_desc,
+	.platform_execute_tuning = dwcmshc_x5_execute_tuning,
+};
+
 static const struct sdhci_pltfm_data sdhci_dwcmshc_pdata = {
 	.ops = &sdhci_dwcmshc_ops,
+	.quirks = SDHCI_QUIRK_CAP_CLOCK_BASE_BROKEN,
+	.quirks2 = SDHCI_QUIRK2_PRESET_VALUE_BROKEN,
+};
+
+static const struct sdhci_pltfm_data sdhci_dwcmshc_x5_sd_pdata = {
+	.ops = &sdhci_dwcmshc_x5_sd_ops,
+	.quirks = SDHCI_QUIRK_CAP_CLOCK_BASE_BROKEN,
+	.quirks2 = SDHCI_QUIRK2_PRESET_VALUE_BROKEN,
+};
+
+static const struct sdhci_pltfm_data sdhci_dwcmshc_x5_emmc_pdata = {
+	.ops = &sdhci_dwcmshc_x5_emmc_ops,
 	.quirks = SDHCI_QUIRK_CAP_CLOCK_BASE_BROKEN,
 	.quirks2 = SDHCI_QUIRK2_PRESET_VALUE_BROKEN,
 };
@@ -365,6 +683,33 @@ static const struct sdhci_pltfm_data sdhci_dwcmshc_rk35xx_pdata = {
 	.quirks2 = SDHCI_QUIRK2_PRESET_VALUE_BROKEN |
 		   SDHCI_QUIRK2_CLOCK_DIV_ZERO_BROKEN,
 };
+
+static int dwcmshc_x5_start_signal_voltage_switch(struct mmc_host *mmc,
+						  struct mmc_ios *ios)
+{
+	struct sdhci_host *host = mmc_priv(mmc);
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+	struct dwcmshc_priv *priv = sdhci_pltfm_priv(pltfm_host);
+	struct x5_priv *x5_priv = priv->priv;
+	int state = 0;
+
+	if (x5_priv->mmc_fixed_voltage == 3300)
+		ios->signal_voltage = MMC_SIGNAL_VOLTAGE_330;
+	else if (x5_priv->mmc_fixed_voltage == 1800)
+		ios->signal_voltage = MMC_SIGNAL_VOLTAGE_180;
+
+	if(!IS_ERR_OR_NULL(x5_priv->voltage_gpio)) {
+		if (ios->signal_voltage == MMC_SIGNAL_VOLTAGE_330)
+			state = 0;
+		else if (ios->signal_voltage == MMC_SIGNAL_VOLTAGE_180)
+			state = 1;
+
+		dev_info(mmc_dev(host->mmc), "Set io-voltage gpio %s\n", state ? "Active" : "Inactive");
+		gpiod_set_value_cansleep(x5_priv->voltage_gpio, state);
+	}
+
+	return sdhci_start_signal_voltage_switch(mmc, ios);
+}
 
 static int dwcmshc_rk35xx_init(struct sdhci_host *host, struct dwcmshc_priv *dwc_priv)
 {
@@ -431,6 +776,14 @@ static const struct of_device_id sdhci_dwcmshc_dt_ids[] = {
 		.data = &sdhci_dwcmshc_rk35xx_pdata,
 	},
 	{
+		.compatible = "horizon,x5-dwcmshc-sd",
+		.data = &sdhci_dwcmshc_x5_sd_pdata,
+	},
+	{
+		.compatible = "horizon,x5-dwcmshc-emmc",
+		.data = &sdhci_dwcmshc_x5_emmc_pdata,
+	},
+	{
 		.compatible = "snps,dwcmshc-sdhci",
 		.data = &sdhci_dwcmshc_pdata,
 	},
@@ -455,8 +808,10 @@ static int dwcmshc_probe(struct platform_device *pdev)
 	struct sdhci_host *host;
 	struct dwcmshc_priv *priv;
 	struct rk35xx_priv *rk_priv = NULL;
+	struct x5_priv *x5_priv = NULL;
 	const struct sdhci_pltfm_data *pltfm_data;
 	int err;
+	struct resource *res;
 	u32 extra;
 
 	pltfm_data = device_get_match_data(&pdev->dev);
@@ -480,6 +835,21 @@ static int dwcmshc_probe(struct platform_device *pdev)
 
 	pltfm_host = sdhci_priv(host);
 	priv = sdhci_pltfm_priv(pltfm_host);
+
+	/* X5 soc axi clk need open first */
+	if (pltfm_data == &sdhci_dwcmshc_x5_sd_pdata || pltfm_data == &sdhci_dwcmshc_x5_emmc_pdata) {
+		x5_priv = devm_kzalloc(&pdev->dev, sizeof(struct x5_priv), GFP_KERNEL);
+		if (!x5_priv) {
+			err = -ENOMEM;
+			goto free_pltfm;
+		}
+
+		priv->priv = x5_priv;
+
+		err = dwcmshc_x5_clk_init(host, priv);
+		if (err)
+			goto free_pltfm;
+	}
 
 	if (dev->of_node) {
 		pltfm_host->clk = devm_clk_get(dev, "core");
@@ -528,6 +898,67 @@ static int dwcmshc_probe(struct platform_device *pdev)
 			goto err_clk;
 	}
 
+	if (pltfm_data == &sdhci_dwcmshc_x5_sd_pdata || pltfm_data == &sdhci_dwcmshc_x5_emmc_pdata) {
+		if (of_device_is_compatible(dev->of_node, "horizon,x5-dwcmshc-emmc"))
+			x5_priv->card_type = DWCMSCH_X5_EMMC;
+		else
+			x5_priv->card_type = DWCMSCH_X5_SD;
+
+		res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+		x5_priv->dll_ctrl_base = devm_ioremap(dev, res->start, resource_size(res));
+		if (IS_ERR(x5_priv->dll_ctrl_base)) {
+			dev_err(dev, "Failed to get mmc/sd/sdio dll ctrl regbase!\n");
+			goto err_clk;
+		}
+
+		if (x5_priv->card_type == DWCMSCH_X5_SD) {
+			if (!device_property_read_u32
+				(dev, "mmc-fixed-voltage", &x5_priv->mmc_fixed_voltage))
+				dev_info(dev, "mmc set to fixed voltage %d\n", x5_priv->mmc_fixed_voltage);
+			else
+				x5_priv->mmc_fixed_voltage = 0;
+
+			x5_priv->voltage_gpio = devm_gpiod_get_optional(&pdev->dev, "voltage", GPIOD_OUT_LOW);
+			if (IS_ERR(x5_priv->voltage_gpio))
+				dev_warn(dev, "can not parse voltage gpio\n");
+
+			host->mmc_host_ops.start_signal_voltage_switch = dwcmshc_x5_start_signal_voltage_switch;
+			/* TODO: Add power for reboot reset SD card slot */
+			x5_priv->reset = devm_reset_control_get_optional(mmc_dev(host->mmc), "sd_rst");
+			if (IS_ERR(x5_priv->reset)) {
+				err = PTR_ERR(x5_priv->reset);
+				dev_err(mmc_dev(host->mmc), "failed to get reset control %d\n", err);
+				return err;
+			}
+		} else {
+			/* x5_priv->card_type == DWCMSCH_X5_EMMC */
+			x5_priv->reset = devm_reset_control_get_optional(mmc_dev(host->mmc), "emmc_rst");
+			if (IS_ERR(x5_priv->reset)) {
+				err = PTR_ERR(x5_priv->reset);
+				dev_err(mmc_dev(host->mmc), "failed to get reset control %d\n", err);
+				return err;
+			}
+		}
+		x5_sdhci_sys_reset(host);
+
+		/* Configure default dll value */
+		iowrite32(X5_EMMC_MST_DLL_DEFAULT, x5_priv->dll_ctrl_base + X5_MST_DLL_OFFSET);
+		iowrite32(X5_EMMC_SLV_DLL_DEFAULT, x5_priv->dll_ctrl_base + X5_SLV_DLL_OFFSET);
+		/* Handle DWC MSHC_CTRL */
+		x5_priv->mshc_ctrl_val = 0x0;
+		if (device_property_read_bool(dev, "dwcmshc,no-cmd-conflict-check")) {
+			x5_priv->mshc_ctrl_val &= ~BIT(0);
+		}
+		if (device_property_read_bool(dev, "dwcmshc,positive-edge-drive")) {
+			x5_priv->mshc_ctrl_val |= BIT(6);
+		}
+		if (device_property_read_bool(dev, "dwcmshc,negative-edge-sample")) {
+			x5_priv->mshc_ctrl_val |= BIT(7);
+		}
+		sdhci_writeb(host, x5_priv->mshc_ctrl_val, priv->vendor_specific_area1 + DWCMSHC_HOST_CTRL3);
+		dev_info(dev, "MSHC_CTRL:%#x", x5_priv->mshc_ctrl_val);
+	}
+
 	host->mmc->caps |= MMC_CAP_WAIT_WHILE_BUSY;
 
 	err = sdhci_setup_host(host);
@@ -548,6 +979,9 @@ err_setup_host:
 err_clk:
 	clk_disable_unprepare(pltfm_host->clk);
 	clk_disable_unprepare(priv->bus_clk);
+	if (x5_priv)
+		clk_bulk_disable_unprepare(X5_MAX_CLKS,
+					   x5_priv->x5_clks);
 	if (rk_priv)
 		clk_bulk_disable_unprepare(RK35xx_MAX_CLKS,
 					   rk_priv->rockchip_clks);
@@ -562,14 +996,25 @@ static int dwcmshc_remove(struct platform_device *pdev)
 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
 	struct dwcmshc_priv *priv = sdhci_pltfm_priv(pltfm_host);
 	struct rk35xx_priv *rk_priv = priv->priv;
+	struct x5_priv *x5_priv = priv->priv;
+	const struct sdhci_pltfm_data *pltfm_data = device_get_match_data(&pdev->dev);
 
 	sdhci_remove_host(host, 0);
 
 	clk_disable_unprepare(pltfm_host->clk);
 	clk_disable_unprepare(priv->bus_clk);
-	if (rk_priv)
-		clk_bulk_disable_unprepare(RK35xx_MAX_CLKS,
-					   rk_priv->rockchip_clks);
+	if (pltfm_data == &sdhci_dwcmshc_rk35xx_pdata) {
+		if (rk_priv)
+			clk_bulk_disable_unprepare(RK35xx_MAX_CLKS,
+						rk_priv->rockchip_clks);
+	}
+
+	if (pltfm_data == &sdhci_dwcmshc_x5_sd_pdata ||
+	    pltfm_data == &sdhci_dwcmshc_x5_emmc_pdata) {
+		if (x5_priv)
+			clk_bulk_disable_unprepare(X5_MAX_CLKS,
+						x5_priv->x5_clks);
+	}
 	sdhci_pltfm_free(pdev);
 
 	return 0;
@@ -581,7 +1026,9 @@ static int dwcmshc_suspend(struct device *dev)
 	struct sdhci_host *host = dev_get_drvdata(dev);
 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
 	struct dwcmshc_priv *priv = sdhci_pltfm_priv(pltfm_host);
+	const struct sdhci_pltfm_data *pltfm_data = device_get_match_data(dev);
 	struct rk35xx_priv *rk_priv = priv->priv;
+	struct x5_priv *x5_priv = priv->priv;
 	int ret;
 
 	ret = sdhci_suspend_host(host);
@@ -592,9 +1039,20 @@ static int dwcmshc_suspend(struct device *dev)
 	if (!IS_ERR(priv->bus_clk))
 		clk_disable_unprepare(priv->bus_clk);
 
-	if (rk_priv)
-		clk_bulk_disable_unprepare(RK35xx_MAX_CLKS,
-					   rk_priv->rockchip_clks);
+	if (pltfm_data == &sdhci_dwcmshc_rk35xx_pdata) {
+		if (rk_priv)
+			clk_bulk_disable_unprepare(RK35xx_MAX_CLKS,
+						rk_priv->rockchip_clks);
+	}
+
+	if (pltfm_data == &sdhci_dwcmshc_x5_sd_pdata ||
+	    pltfm_data == &sdhci_dwcmshc_x5_emmc_pdata) {
+		if (x5_priv) {
+			clk_disable_unprepare(x5_priv->card_clk);
+			clk_bulk_disable_unprepare(X5_MAX_CLKS,
+						x5_priv->x5_clks);
+		}
+	}
 
 	return ret;
 }
@@ -605,7 +1063,24 @@ static int dwcmshc_resume(struct device *dev)
 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
 	struct dwcmshc_priv *priv = sdhci_pltfm_priv(pltfm_host);
 	struct rk35xx_priv *rk_priv = priv->priv;
+	struct x5_priv *x5_priv = priv->priv;
+	const struct sdhci_pltfm_data *pltfm_data = device_get_match_data(dev);
 	int ret;
+
+	/* Make sure axi clock enable first */
+	if (pltfm_data == &sdhci_dwcmshc_x5_sd_pdata ||
+	    pltfm_data == &sdhci_dwcmshc_x5_emmc_pdata) {
+		if (x5_priv) {
+			ret = clk_bulk_prepare_enable(X5_MAX_CLKS,
+						x5_priv->x5_clks);
+			if (ret)
+				return ret;
+
+			ret = clk_prepare_enable(x5_priv->card_clk);
+			if (ret)
+				return ret;
+		}
+	}
 
 	ret = clk_prepare_enable(pltfm_host->clk);
 	if (ret)
@@ -617,11 +1092,13 @@ static int dwcmshc_resume(struct device *dev)
 			return ret;
 	}
 
-	if (rk_priv) {
-		ret = clk_bulk_prepare_enable(RK35xx_MAX_CLKS,
-					      rk_priv->rockchip_clks);
-		if (ret)
-			return ret;
+	if (pltfm_data == &sdhci_dwcmshc_rk35xx_pdata) {
+		if (rk_priv) {
+			ret = clk_bulk_prepare_enable(RK35xx_MAX_CLKS,
+						rk_priv->rockchip_clks);
+			if (ret)
+				return ret;
+		}
 	}
 
 	return sdhci_resume_host(host);

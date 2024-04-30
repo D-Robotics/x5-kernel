@@ -60,5 +60,6 @@ struct i2s_dma_data {
 #define FOUR_CHANNEL_SUPPORT	4	/* up to 3.1 */
 #define SIX_CHANNEL_SUPPORT	6	/* up to 5.1 */
 #define EIGHT_CHANNEL_SUPPORT	8	/* up to 7.1 */
+#define SIXTEEN_CHANNEL_SUPPORT	16
 
 #endif /*  __SOUND_DESIGNWARE_I2S_H */

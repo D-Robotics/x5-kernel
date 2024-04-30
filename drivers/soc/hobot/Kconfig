@@ -1,0 +1,11 @@
+#
+# Hobot MPSoC configuration
+#
+menuconfig HOBOT_SOC_DRIVERS
+        bool "HOBOT SOC drivers support"
+        depends on ARCH_HOBOT
+
+source "drivers/soc/hobot/bpu/Kconfig"
+source "drivers/soc/hobot/socinfo/Kconfig"
+source "drivers/soc/hobot/reboot_reason/Kconfig"
+source "drivers/soc/hobot/ddr_monitor/Kconfig"

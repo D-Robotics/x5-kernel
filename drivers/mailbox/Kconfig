@@ -294,4 +294,6 @@ config QCOM_IPCC
 	  acts as an interrupt controller for receiving interrupts from clients.
 	  Say Y here if you want to build this driver.
 
+source "drivers/mailbox/hobot/Kconfig"
+
 endif

@@ -40,7 +40,7 @@
 	pr_debug("%s: " DRIVER_NAME ": " f, mmc_hostname(host->mmc), ## x)
 
 #define SDHCI_DUMP(f, x...) \
-	pr_err("%s: " DRIVER_NAME ": " f, mmc_hostname(host->mmc), ## x)
+	pr_debug("%s: " DRIVER_NAME ": " f, mmc_hostname(host->mmc), ## x)
 
 #define MAX_TUNING_LOOP 40
 
@@ -3327,8 +3327,8 @@ static void sdhci_cmd_irq(struct sdhci_host *host, u32 intmask, u32 *intmask_p)
 		}
 		/* Treat data command CRC error the same as data CRC error */
 		if (host->cmd->data &&
-		    (intmask & (SDHCI_INT_CRC | SDHCI_INT_TIMEOUT)) ==
-		     SDHCI_INT_CRC) {
+		    (((intmask & (SDHCI_INT_CRC | SDHCI_INT_TIMEOUT)) ==
+		     SDHCI_INT_CRC) || mmc_op_tuning(host->cmd->opcode))) {
 			host->cmd = NULL;
 			*intmask_p |= SDHCI_INT_DATA_CRC;
 			return;
@@ -3451,8 +3451,16 @@ static void sdhci_data_irq(struct sdhci_host *host, u32 intmask)
 		if (host->pending_reset)
 			return;
 
+		/* Skip reporting tuning command unexpected data irq
+		 */
+		command = SDHCI_GET_CMD(sdhci_readw(host, SDHCI_COMMAND));
+		if (command == MMC_SEND_TUNING_BLOCK ||
+			command == MMC_SEND_TUNING_BLOCK_HS200) {
+			return;
+		}
+
 		pr_err("%s: Got data interrupt 0x%08x even though no data operation was in progress.\n",
-		       mmc_hostname(host->mmc), (unsigned)intmask);
+					mmc_hostname(host->mmc), (unsigned)intmask);
 		sdhci_err_stats_inc(host, UNEXPECTED_IRQ);
 		sdhci_dumpregs(host);
 

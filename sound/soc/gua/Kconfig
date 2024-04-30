@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: GPL-2.0-only
+#
+# GUA SoC audio configuration
+#
+
+config SND_SOC_GUA
+	tristate "SoC Audio support for GUA System-On-Chip"
+	select HB_IPC_SHM
+	help
+		Say Y if you want to enable ASoC-support for
+		any of the GUA platforms.

@@ -1,0 +1,5 @@
+# SPDX-License-Identifier: GPL-2.0-only
+
+config X5_CLK
+	tristate "Horizon X5 clock support"
+	default y

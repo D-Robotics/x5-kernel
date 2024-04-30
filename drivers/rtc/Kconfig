@@ -1134,6 +1134,15 @@ config RTC_DRV_DA9063
 	  This driver can also be built as a module. If so, the module
 	  will be called "rtc-da9063".
 
+config RTC_DRV_DWAPB
+	tristate "DesignWare APB RTC"
+	depends on HAS_IOMEM
+	help
+	  If you say yes here you get support for the DesignWare APB real time
+	  clock.
+
+	  This driver can also be built as a module, if so, the module
+	  will be called "rtc-dwapb".
 config RTC_DRV_EFI
 	tristate "EFI RTC"
 	depends on EFI && !X86
@@ -1994,5 +2003,13 @@ config RTC_DRV_POLARFIRE_SOC
 
 	  This driver can also be built as a module, if so, the module
 	  will be called "rtc-mpfs".
+
+config RTC_DRV_HPU3501
+	tristate "Hobot Hpu3501 RTC driver"
+	depends on MFD_HPU3501
+	help
+	  Hobot Power Management IC HPU3501 supports RTC functionality
+	  along with alarm. This driver supports the RTC driver for
+	  the HPU3501 RTC module.
 
 endif # RTC_CLASS

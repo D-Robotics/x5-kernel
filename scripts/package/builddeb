@@ -147,7 +147,10 @@ else
 	cp System.map "$tmpdir/boot/System.map-$version"
 	cp $KCONFIG_CONFIG "$tmpdir/boot/config-$version"
 fi
+
 cp "$($MAKE -s -f $srctree/Makefile image_name)" "$tmpdir/$installed_image_path"
+
+$MAKE -f $srctree/Makefile INSTALL_DTBS_PATH="$tmpdir/boot/" dtbs_install
 
 if is_enabled CONFIG_OF_EARLY_FLATTREE; then
 	# Only some architectures with OF support have this target
@@ -210,12 +213,13 @@ done
 
 if [ "$ARCH" != "um" ]; then
 	if is_enabled CONFIG_MODULES; then
-		deploy_kernel_headers debian/linux-headers
-		create_package linux-headers-$version debian/linux-headers
+		:
+		# deploy_kernel_headers debian/linux-headers
+		# create_package linux-headers-$version debian/linux-headers
 	fi
 
-	deploy_libc_headers debian/linux-libc-dev
-	create_package linux-libc-dev debian/linux-libc-dev
+	# deploy_libc_headers debian/linux-libc-dev
+	# create_package linux-libc-dev debian/linux-libc-dev
 fi
 
 create_package "$packagename" "$tmpdir"
@@ -231,7 +235,7 @@ if [ -n "$BUILD_DEBUG" ] ; then
 	ln -s ../lib/modules/$version/vmlinux $dbg_dir/usr/lib/debug/boot/vmlinux-$version
 	# kdump-tools
 	ln -s lib/modules/$version/vmlinux $dbg_dir/usr/lib/debug/vmlinux-$version
-	create_package "$dbg_packagename" "$dbg_dir"
+	# create_package "$dbg_packagename" "$dbg_dir"
 fi
 
 exit 0

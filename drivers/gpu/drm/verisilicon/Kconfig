@@ -1,0 +1,116 @@
+# SPDX-License-Identifier: GPL-2.0
+
+config DRM_VERISILICON
+	tristate "DRM Support for VeriSilicon"
+	depends on DRM
+	select DRM_KMS_HELPER
+	help
+	  Choose this option if you have a VeriSilicon soc chipset.
+	  This driver provides VeriSilicon kernel mode
+	  setting and buffer management. It does not
+	  provide 2D or 3D acceleration.
+
+config VERISILICON_DC8000_NANO
+	bool "VeriSilicon DC8000 NANO driver support"
+	depends on DRM_VERISILICON
+	help
+	  DC8000 NANO is a display controller supporting 1 video layer,
+	  2 overlay layer and 1 cursor layer.
+	  Say Y if you want to support DC8000 NANO serial display
+	  controller.
+
+config VERISILICON_BT1120
+	bool "VeriSilicon BT1120 driver support"
+	depends on DRM_VERISILICON
+	help
+	  BT1120 controller is compliant with ITU-R BT.1120 standards
+	  which can be used to drive external HDMI device for 4K display.
+	  Say Y if you want to support Verisilicon BT1120 display
+	  controller.
+
+config VERISILICON_SIMPLE_ENCODER
+	bool "VeriSilicon simple encoder driver"
+	depends on DRM_VERISILICON
+	help
+	  VeriSilicon simple encoder driver. This driver implements
+	  basic function need by a encoder in display pipeline.
+	  Say Y if you want to use drm_bridge drivers with
+	  VeriSilicon DRM drivers.
+
+config VERISILICON_DW_MIPI_DSI
+	bool "VeriSilicon specific driver for Synopsys DW MIPI DSI"
+	depends on DRM_VERISILICON
+	select DRM_MIPI_DSI
+	select GENERIC_PHY
+	select GENERIC_PHY_MIPI_DPHY
+	select VERISILICON_SIMPLE_ENCODER
+	help
+	  VeriSilicon specific driver for Synopsys DW MIPI DSI.
+	  This driver supports Synopsys DW MIPI DSI controller.
+	  MIPI DSI controller is a bridge between encoder
+	  and panel. Also it is a MIPI DSI host and can work
+	  in dual mode.
+
+config VERISILICON_WRITEBACK
+	bool
+	depends on DRM_VERISILICON
+
+config DC8000_NANO_WRITEBACK_DEBUG
+	bool "Writeback debug function for DC8000 Nano"
+	select VERISILICON_WRITEBACK
+	depends on VERISILICON_DC8000_NANO
+	help
+	  This is a debug feature when DC8000 nano has writeback function
+	  integrated.
+	  Say Y if your hardware support this function and you want to use
+	  writeback function.
+
+config VERISILICON_WRITEBACK_SIF
+	bool "Writeback function by SIF"
+	select VERISILICON_WRITEBACK
+	depends on VERISILICON_DC8000_NANO
+	help
+	  Writeback function supported by SIF. SIF is an external IP from
+	  DC8000 nano. Using SIF, you have the capbility to use drm writeback
+	  function. Note this option should not be enabled simultaneously with
+	  DC8000_NANO_WRITEBACK_DEBUG.
+
+config VERISILICON_GEM_ION
+	bool "GEM support ion interfaces"
+	depends on ION
+	help
+	  VS GEM is able to using ION interfaces when ION is enabled. ION is a
+	  generalized memory manager to address the issue of fragmented memory
+	  management interfaces across different Android devices. ION also enables
+	  its clients to share buffers, hence it treads the same ground as the DMA
+	  buffer sharing framework (DMABUF).
+
+config VERISILICON_GC_PROC_SUPPORT
+	bool "VeriSilicon GC820 driver support"
+	depends on DRM_VERISILICON
+	help
+	  GC820 is a 2D GPU which can extend the functionalities of DC8000 Nano,
+	  such as multiple planes blending (max 8 planes), rotation, scaling.
+	  Say Y if you want to support GC820 integration to Verisilicon drm
+	  framework.
+
+config VERISILICON_PRIMARY_OVERLAY_CNT
+	int "primary/overlay plane count" if VERISILICON_GC_PROC_SUPPORT
+	range 3 10
+	default 3 if !VERISILICON_GC_PROC_SUPPORT
+	default 10 if VERISILICON_GC_PROC_SUPPORT
+	help
+	  Specifies the default primary/overlay plane count supported by DC8000
+	  Nano. With help of 2D GPU, 8 more planes are supported. And original
+	  overlay plane 2 is dedicated only to display GPU result. With the help
+	  of 2D GPU, scaling and rotation are supported.
+
+config VERISILICON_DEV_LINK_CNT
+	int "max supplier devices count for drm device"
+	default 32
+	help
+	  Specifies the max supplier devices that this driver support. Device
+	  links are added between vs_drm device and other devices, such as
+	  display controller, mipi dsi host, etc. In this way, specific
+	  suspend/resume order can be promised. Because suspending vs_drm device
+	  before other related devices is always desired.

@@ -442,6 +442,8 @@ struct dma_slave_config {
 	enum dma_slave_buswidth dst_addr_width;
 	u32 src_maxburst;
 	u32 dst_maxburst;
+	u32 src_msize;
+	u32 dst_msize;
 	u32 src_port_window_size;
 	u32 dst_port_window_size;
 	bool device_fc;

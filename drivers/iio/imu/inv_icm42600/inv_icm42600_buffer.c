@@ -275,8 +275,13 @@ static int inv_icm42600_buffer_preenable(struct iio_dev *indio_dev)
 {
 	struct inv_icm42600_state *st = iio_device_get_drvdata(indio_dev);
 	struct device *dev = regmap_get_device(st->map);
+	struct inv_icm42600_timestamp *ts = iio_priv(indio_dev);
 
 	pm_runtime_get_sync(dev);
+
+	mutex_lock(&st->lock);
+	inv_icm42600_timestamp_reset(ts);
+	mutex_unlock(&st->lock);
 
 	return 0;
 }
@@ -289,6 +294,10 @@ static int inv_icm42600_buffer_postenable(struct iio_dev *indio_dev)
 {
 	struct inv_icm42600_state *st = iio_device_get_drvdata(indio_dev);
 	int ret;
+#if defined(CONFIG_IMU_DATA_READY)
+	struct inv_icm42600_timestamp *ts_accel;
+	struct inv_icm42600_timestamp *ts_gyro;
+#endif
 
 	mutex_lock(&st->lock);
 
@@ -298,10 +307,17 @@ static int inv_icm42600_buffer_postenable(struct iio_dev *indio_dev)
 		goto out_on;
 	}
 
+#if defined(CONFIG_IMU_DATA_READY)
+	/* set data ready interrupt */
+	ret = regmap_update_bits(st->map, INV_ICM42600_REG_INT_SOURCE0,
+				 INV_ICM42600_INT_SOURCE0_UI_DRDY_INT1_EN,
+				 INV_ICM42600_INT_SOURCE0_UI_DRDY_INT1_EN);
+#else
 	/* set FIFO threshold interrupt */
 	ret = regmap_update_bits(st->map, INV_ICM42600_REG_INT_SOURCE0,
 				 INV_ICM42600_INT_SOURCE0_FIFO_THS_INT1_EN,
 				 INV_ICM42600_INT_SOURCE0_FIFO_THS_INT1_EN);
+#endif
 	if (ret)
 		goto out_unlock;
 
@@ -311,6 +327,12 @@ static int inv_icm42600_buffer_postenable(struct iio_dev *indio_dev)
 	if (ret)
 		goto out_unlock;
 
+#if defined(CONFIG_IMU_DATA_READY)
+	ts_gyro = iio_priv(st->indio_gyro);
+	ts_accel = iio_priv(st->indio_accel);
+	kfifo_reset(&(ts_gyro->irq_time));
+	kfifo_reset(&(ts_accel->irq_time));
+#endif
 	/* set FIFO in streaming mode */
 	ret = regmap_write(st->map, INV_ICM42600_REG_FIFO_CONFIG,
 			   INV_ICM42600_FIFO_CONFIG_STREAM);
@@ -334,6 +356,10 @@ static int inv_icm42600_buffer_predisable(struct iio_dev *indio_dev)
 {
 	struct inv_icm42600_state *st = iio_device_get_drvdata(indio_dev);
 	int ret;
+#if defined(CONFIG_IMU_DATA_READY)
+	struct inv_icm42600_timestamp *ts_accel;
+	struct inv_icm42600_timestamp *ts_gyro;
+#endif
 
 	mutex_lock(&st->lock);
 
@@ -355,9 +381,21 @@ static int inv_icm42600_buffer_predisable(struct iio_dev *indio_dev)
 	if (ret)
 		goto out_unlock;
 
+#if defined(CONFIG_IMU_DATA_READY)
+	ts_gyro = iio_priv(st->indio_gyro);
+	ts_accel = iio_priv(st->indio_accel);
+	kfifo_reset(&(ts_gyro->irq_time));
+	kfifo_reset(&(ts_accel->irq_time));
+
+	/* disable data ready interrupt */
+	ret = regmap_update_bits(st->map, INV_ICM42600_REG_INT_SOURCE0,
+				 INV_ICM42600_INT_SOURCE0_UI_DRDY_INT1_EN, 0);
+#else
 	/* disable FIFO threshold interrupt */
 	ret = regmap_update_bits(st->map, INV_ICM42600_REG_INT_SOURCE0,
 				 INV_ICM42600_INT_SOURCE0_FIFO_THS_INT1_EN, 0);
+#endif
+
 	if (ret)
 		goto out_unlock;
 
@@ -375,7 +413,6 @@ static int inv_icm42600_buffer_postdisable(struct iio_dev *indio_dev)
 	struct device *dev = regmap_get_device(st->map);
 	unsigned int sensor;
 	unsigned int *watermark;
-	struct inv_icm42600_timestamp *ts;
 	struct inv_icm42600_sensor_conf conf = INV_ICM42600_SENSOR_CONF_INIT;
 	unsigned int sleep_temp = 0;
 	unsigned int sleep_sensor = 0;
@@ -385,11 +422,9 @@ static int inv_icm42600_buffer_postdisable(struct iio_dev *indio_dev)
 	if (indio_dev == st->indio_gyro) {
 		sensor = INV_ICM42600_SENSOR_GYRO;
 		watermark = &st->fifo.watermark.gyro;
-		ts = iio_priv(st->indio_gyro);
 	} else if (indio_dev == st->indio_accel) {
 		sensor = INV_ICM42600_SENSOR_ACCEL;
 		watermark = &st->fifo.watermark.accel;
-		ts = iio_priv(st->indio_accel);
 	} else {
 		return -EINVAL;
 	}
@@ -416,8 +451,6 @@ static int inv_icm42600_buffer_postdisable(struct iio_dev *indio_dev)
 	/* if FIFO is off, turn temperature off */
 	if (!st->fifo.on)
 		ret = inv_icm42600_set_temp_conf(st, false, &sleep_temp);
-
-	inv_icm42600_timestamp_reset(ts);
 
 out_unlock:
 	mutex_unlock(&st->lock);
@@ -453,6 +486,14 @@ int inv_icm42600_buffer_fifo_read(struct inv_icm42600_state *st,
 	const int8_t *temp;
 	unsigned int odr;
 	int ret;
+#if defined(CONFIG_IMU_DATA_READY)
+	struct inv_icm42600_timestamp *ts_accel;
+	struct inv_icm42600_timestamp *ts_gyro;
+	int64_t irq_ts;
+
+	ts_gyro = iio_priv(st->indio_gyro);
+	ts_accel = iio_priv(st->indio_accel);
+#endif
 
 	/* reset all samples counters */
 	st->fifo.count = 0;
@@ -494,8 +535,20 @@ int inv_icm42600_buffer_fifo_read(struct inv_icm42600_state *st,
 			break;
 		if (gyro != NULL && inv_icm42600_fifo_is_data_valid(gyro))
 			st->fifo.nb.gyro++;
+#if defined(CONFIG_IMU_DATA_READY)
+		else {
+			if (8 != kfifo_out(&(ts_gyro->irq_time), (void *)(&irq_ts), 8))
+				printk("%s: %d: kfifo_out gyro irq_time error\n", __func__, __LINE__);
+		}
+#endif
 		if (accel != NULL && inv_icm42600_fifo_is_data_valid(accel))
 			st->fifo.nb.accel++;
+#if defined(CONFIG_IMU_DATA_READY)
+		else {
+			if (8 != kfifo_out(&(ts_accel->irq_time), (void *)(&irq_ts), 8))
+				printk("%s: %d: kfifo_out accel irq_time error\n", __func__, __LINE__);
+		}
+#endif
 		st->fifo.nb.total++;
 	}
 

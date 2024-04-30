@@ -1,0 +1,48 @@
+TARGET_NAME = libNano2D.so
+DYNAMIC = 1
+
+INCLUDE += -I$(AQARCH)/cmodel/inc
+INCLUDE += -I$(AQROOT)/inc
+INCLUDE += -I$(AQROOT)/inc/shared
+INCLUDE += -I$(AQROOT)/nano2D
+
+ifneq ($(wildcard $(AQROOT)/nano2D/nano2D_option.config),)
+    -include $(AQROOT)/nano2D/nano2D_option.config
+CFLAGS += ${PLATFORM_FLAGS}
+endif
+
+	INCLUDE += -I$(AQROOT)/nano2D/linux
+
+INCLUDE += -I$(AQROOT)/nano2Dkernel
+
+
+
+CFLAGS += $(INCLUDE)
+
+CFLAGS += -fPIC
+
+OBJECTS += $(OBJ_DIR)/nano2D.o \
+           $(OBJ_DIR)/nano2D_user_hardware.o \
+           $(OBJ_DIR)/nano2D_user_os.o \
+           $(OBJ_DIR)/nano2D_debug.o \
+           $(OBJ_DIR)/nano2D_user_hardware_dec.o \
+           $(OBJ_DIR)/nano2D_user_buffer.o \
+           $(OBJ_DIR)/nano2D_user_query.o \
+           $(OBJ_DIR)/nano2D_user.o \
+           $(OBJ_DIR)/nano2D_user_hardware_source.o \
+           $(OBJ_DIR)/nano2D_user_hardware_target.o \
+           $(OBJ_DIR)/common.o \
+           $(OBJ_DIR)/series_common.o \
+           $(OBJ_DIR)/chip.o
+
+
+LFLAGS += -Wl,--version-script=libNano2D.map
+
+
+INSTALL_DIR = $(OUTDIR)
+
+include $(AQROOT)/common.target
+
+$(OBJ_DIR)/nano2D_user_os.o: $(AQROOT)/nano2D/linux/nano2D_user_os.c
+	$(CC) -c $(CFLAGS) -o $@ $<
+

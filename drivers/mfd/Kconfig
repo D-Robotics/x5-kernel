@@ -2261,5 +2261,20 @@ config MFD_RSMU_SPI
 	  Additional drivers must be enabled in order to use the functionality
 	  of the device.
 
+config MFD_HPU3501
+	bool "hobot hpu3501 Power Management chips"
+	depends on I2C=y
+	select MFD_CORE
+	select REGMAP_I2C
+	help
+	  If you say yes here you get support for the hpu3501 Power
+	  Management chips.
+	  This driver provides common support for accessing the device,
+	  additional drivers must be enabled in order to use the
+	  functionality of the device.
+
+	  This driver can also be built as a module.  If so, the module
+	  will be called hpu3501.
+
 endmenu
 endif

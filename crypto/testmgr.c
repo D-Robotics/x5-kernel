@@ -57,16 +57,6 @@ module_param(fuzz_iterations, uint, 0644);
 MODULE_PARM_DESC(fuzz_iterations, "number of fuzz test iterations");
 #endif
 
-#ifdef CONFIG_CRYPTO_MANAGER_DISABLE_TESTS
-
-/* a perfect nop */
-int alg_test(const char *driver, const char *alg, u32 type, u32 mask)
-{
-	return 0;
-}
-
-#else
-
 #include "testmgr.h"
 
 /*
@@ -4506,6 +4496,20 @@ static const struct alg_test_desc alg_test_descs[] = {
 		.suite = {
 			.hash = __VECS(aes_cbcmac_tv_template)
 		}
+	},{
+		.alg = "cbcmac(des)",
+		.fips_allowed = 1,
+		.test = alg_test_hash,
+		.suite = {
+			.hash = __VECS(des_cbcmac_tv_template)
+		}
+	}, {
+		.alg = "cbcmac(des3_ede)",
+		.fips_allowed = 1,
+		.test = alg_test_hash,
+		.suite = {
+			.hash = __VECS(des3_ede_cbcmac_tv_template)
+		}
 	}, {
 		.alg = "cbcmac(sm4)",
 		.test = alg_test_hash,
@@ -4564,6 +4568,13 @@ static const struct alg_test_desc alg_test_descs[] = {
 		.test = alg_test_hash,
 		.suite = {
 			.hash = __VECS(aes_cmac128_tv_template)
+		}
+	}, {
+		.alg = "cmac(des)",
+		.fips_allowed = 1,
+		.test = alg_test_hash,
+		.suite = {
+			.hash = __VECS(des_cmac64_tv_template)
 		}
 	}, {
 		.alg = "cmac(des3_ede)",
@@ -5640,6 +5651,12 @@ static const struct alg_test_desc alg_test_descs[] = {
 		.suite = {
 			.cipher = __VECS(serpent_xts_tv_template)
 		}
+	},{
+		.alg = "xts(sm4)",
+		.test = alg_test_skcipher,
+		.suite = {
+			.cipher = __VECS(sm4_xts_tv_template)
+		}
 	}, {
 		.alg = "xts(twofish)",
 		.generic_driver = "xts(ecb(twofish-generic))",
@@ -5853,7 +5870,5 @@ notest:
 non_fips_alg:
 	return alg_fips_disabled(driver, alg);
 }
-
-#endif /* CONFIG_CRYPTO_MANAGER_DISABLE_TESTS */
 
 EXPORT_SYMBOL_GPL(alg_test);

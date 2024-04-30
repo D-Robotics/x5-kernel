@@ -2204,4 +2204,12 @@ config KEEMBAY_WATCHDOG
 	  To compile this driver as a module, choose M here: the
 	  module will be called keembay_wdt.
 
+config HORIZON_WATCHDOG_ENABLE
+	bool "HORIZON watchdog enable"
+	default n
+	depends on WATCHDOG && DW_WATCHDOG && ARCH_HOBOT_X5
+	help
+	  Say Y here to enable watchdog on sunrise5 device by default.
+	  Otherwise watchdog devices are probed but not enabled.
+
 endif # WATCHDOG

@@ -1,0 +1,9 @@
+# SPDX-License-Identifier: GPL-2.0-only
+#
+# Hobot mailbox drivers
+#
+
+comment "Hobot Mailbox Drivers"
+
+source "drivers/mailbox/hobot/mbox/Kconfig"
+source "drivers/mailbox/hobot/ipc/Kconfig"

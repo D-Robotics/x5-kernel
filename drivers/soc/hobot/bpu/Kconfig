@@ -1,0 +1,48 @@
+#
+# HOBOT BPU drivers
+#
+menuconfig HOBOT_BPU
+	bool "HOBOT BPU subsystem support"
+
+if HOBOT_BPU 
+
+config BPU
+	tristate "BPU framework driver"
+	default y
+	help
+	  Say y here to support the hobot BPU(Brain Processing Unit)
+
+	  If unsure, say N.
+
+config BPU_ONDEMAND_GOVERNOR
+	tristate "BPU OnDemand Governor"
+	depends on PM_DEVFREQ
+	depends on DEVFREQ_THERMAL
+	depends on BPU
+	default m
+	help
+	  Say y here to support BPU ondemand governor
+
+	  If unsure, say y.
+
+config BPU_CORE
+	tristate "BPU Cores driver"
+	depends on BPU
+	default n
+	help
+	  Say y here to support the hobot BPU(Brain Processing Unit)
+
+	  If unsure, say N.
+
+config BPU_PRIO_NUM
+	int "priority level number supported by BPU"
+	depends on BPU
+	range 1 8
+	default 8
+	depends on BPU_CORE
+	help
+	  Number of prioritys BPU support
+	  if larger than soc default, use software
+	  Priority mechanism, else by soc support.
+
+endif # HOBOT_BPU 

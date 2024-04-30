@@ -73,3 +73,5 @@ obj-$(CONFIG_DRM_PANEL_TRULY_NT35597_WQXGA) += panel-truly-nt35597.o
 obj-$(CONFIG_DRM_PANEL_VISIONOX_RM69299) += panel-visionox-rm69299.o
 obj-$(CONFIG_DRM_PANEL_WIDECHIPS_WS2401) += panel-widechips-ws2401.o
 obj-$(CONFIG_DRM_PANEL_XINPENG_XPP055C272) += panel-xinpeng-xpp055c272.o
+obj-$(CONFIG_DRM_PANEL_ATK_MD0550) += panel-atk-md0550.o
+obj-$(CONFIG_DRM_PANEL_JC_050HD134) += panel-jc-050hd134.o

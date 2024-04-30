@@ -26,6 +26,7 @@
 #define TXFFR		0x018
 
 /* Interrupt status register fields */
+#define ISR_TXFU	BIT(6)
 #define ISR_TXFO	BIT(5)
 #define ISR_TXFE	BIT(4)
 #define ISR_RXFO	BIT(1)
@@ -53,6 +54,13 @@
 #define I2S_COMP_VERSION	0x01F8
 #define I2S_COMP_TYPE		0x01FC
 
+/* DMA register */
+#define DMACR			0x0200
+
+/* DMACR register fields */
+#define DMAEN_TXBLOCK		BIT(17)
+#define DMAEN_RXBLOCK		BIT(16)
+
 /*
  * Component parameter register fields - define the I2S block's
  * configuration.
@@ -78,7 +86,7 @@
 #define	COMP_MAX_WORDSIZE	(1 << 3)
 #define	COMP_MAX_DATA_WIDTH	(1 << 2)
 
-#define MAX_CHANNEL_NUM		8
+#define MAX_CHANNEL_NUM		16
 #define MIN_CHANNEL_NUM		2
 
 union dw_i2s_snd_dma_data {
@@ -88,7 +96,11 @@ union dw_i2s_snd_dma_data {
 
 struct dw_i2s_dev {
 	void __iomem *i2s_base;
-	struct clk *clk;
+	struct clk *sclk;
+	struct clk *pclk;
+	struct clk *mux_clk;
+	struct clk *ext_io_clk;
+	struct clk *mclk;
 	int active;
 	unsigned int capability;
 	unsigned int quirks;

@@ -403,6 +403,9 @@ struct rproc_ops {
 	u64 (*get_boot_addr)(struct rproc *rproc, const struct firmware *fw);
 	unsigned long (*panic)(struct rproc *rproc);
 	void (*coredump)(struct rproc *rproc);
+
+	void (*timesync)(struct device *dev, u32 sec, u32 nsec, u32 diff);
+	int (*log)(struct device *dev, struct device_attribute *atrr, char *buf);
 };
 
 /**

@@ -1,0 +1,49 @@
+/* SPDX-License-Identifier: GPL-2.0 */
+/*
+ * Sunrise5 pinctrl display subsystem definitions
+ *
+ * Copyright(C) 2024, D-Robotics Co., Ltd. All rights reserved
+ */
+
+#ifndef __HORIZON_DISP_PINFUNC_H
+#define __HORIZON_DISP_PINFUNC_H
+/* Horizon display pin ctrl regs */
+#define DISP_IORING_SDIO_BT1120_CLK    0x00
+#define DISP_IORING_SDIO_BT1120_DATA0  0x04
+#define DISP_IORING_SDIO_BT1120_DATA1  0x08
+#define DISP_IORING_SDIO_BT1120_DATA2  0x0C
+#define DISP_IORING_SDIO_BT1120_DATA3  0x10
+#define DISP_IORING_SDIO_BT1120_DATA4  0x14
+#define DISP_IORING_SDIO_BT1120_DATA5  0x18
+#define DISP_IORING_SDIO_BT1120_DATA6  0x1C
+#define DISP_IORING_SDIO_BT1120_DATA7  0x20
+#define DISP_IORING_SDIO_BT1120_DATA8  0x24
+#define DISP_IORING_SDIO_BT1120_DATA9  0x28
+#define DISP_IORING_SDIO_BT1120_DATA10 0x2C
+#define DISP_IORING_SDIO_BT1120_DATA11 0x30
+#define DISP_IORING_SDIO_BT1120_DATA12 0x34
+#define DISP_IORING_SDIO_BT1120_DATA13 0x38
+#define DISP_IORING_SDIO_BT1120_DATA14 0x3C
+#define DISP_IORING_SDIO_BT1120_DATA15 0x40
+#define DISP_IORING_SDIO_BT1120_MS     0x44
+#define DISP_PINMUX_0                  0x48
+#define DISP_PINMUX_1                  0x4C
+/* horizon disp pin id */
+#define DISP_BT1120_DATA0      0
+#define DISP_BT1120_DATA1      1
+#define DISP_BT1120_DATA2      2
+#define DISP_BT1120_DATA3      3
+#define DISP_BT1120_DATA4      4
+#define DISP_BT1120_DATA5      5
+#define DISP_BT1120_DATA6      6
+#define DISP_BT1120_DATA7      7
+#define DISP_BT1120_DATA8      8
+#define DISP_BT1120_DATA9      9
+#define DISP_BT1120_DATA10     10
+#define DISP_BT1120_DATA11     11
+#define DISP_BT1120_DATA12     12
+#define DISP_BT1120_DATA13     13
+#define DISP_BT1120_DATA14     14
+#define DISP_BT1120_DATA15     15
+#define DISP_BT1120_O_PIXELCLK 16
+#endif /* __HORIZON_DISP_PINFUNC_H */

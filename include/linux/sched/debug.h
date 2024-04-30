@@ -51,4 +51,9 @@ extern char __sched_text_start[], __sched_text_end[];
 /* Is this address in the __sched functions? */
 extern int in_sched_functions(unsigned long addr);
 
+#ifdef CONFIG_SCHED_LOGGER
+extern int register_sched_logger(void *cb);
+extern void unregister_sched_logger(void);
+#endif
+
 #endif /* _LINUX_SCHED_DEBUG_H */

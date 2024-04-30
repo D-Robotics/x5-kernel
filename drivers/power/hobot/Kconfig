@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: GPL-2.0-only
+
+config X5_PMU
+	bool "Horizon X5 pmu support"
+	default y
+
+config X5_POWERDOMAIN
+	tristate "Horizon X5 power domain support"
+	depends on PM
+	select PM_GENERIC_DOMAINS
+	default y

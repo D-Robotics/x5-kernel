@@ -868,6 +868,65 @@ static int amd_i2c_adap_quirk(struct dw_i2c_dev *dev)
 	return ret;
 }
 
+
+#if IS_ENABLED(CONFIG_ARCH_HOBOT_X5)
+static const u32 supported_speeds[] = {
+	I2C_MAX_HIGH_SPEED_MODE_FREQ,
+	I2C_MAX_FAST_MODE_PLUS_FREQ,
+	I2C_MAX_FAST_MODE_FREQ,
+	I2C_MAX_STANDARD_MODE_FREQ,
+};
+
+static ssize_t speed_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	ssize_t	status = 0;
+	struct i2c_adapter *adap = to_i2c_adapter(dev);
+	struct dw_i2c_dev *data = i2c_get_adapdata(adap);
+
+	status = sprintf(buf, "%d\n", data->timings.bus_freq_hz);
+	dev_dbg(data->dev, "%s", __func__);
+	return status;
+}
+
+static ssize_t speed_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t size)
+{
+	int freq, i;
+	ssize_t	status = 0;
+	struct i2c_adapter *adap = to_i2c_adapter(dev);
+	struct dw_i2c_dev *data = i2c_get_adapdata(adap);
+
+	status = kstrtoint(buf, 0, &freq);
+	if (status == 0) {
+		for (i = 0; i < ARRAY_SIZE(supported_speeds); ++i) {
+			if (supported_speeds[i] == freq)
+				break;
+		}
+		if (i == ARRAY_SIZE(supported_speeds)) {
+			dev_err(data->dev, "invaild speed");
+			return -EPERM;
+		}
+		pm_runtime_get_sync(dev);
+		mutex_lock(&data->lock);
+		data->timings.bus_freq_hz = freq;
+		i2c_dw_configure(data);
+		i2c_dw_set_timings_master(data);
+		mutex_unlock(&data->lock);
+		pm_runtime_put_sync(dev);
+		status = size;
+		dev_dbg(data->dev, "%s freq: %d", __func__, freq);
+	}
+	return status;
+}
+
+static const struct device_attribute speed_attr = {
+	.attr = {.name = "speed", .mode = 0644},
+	.show = speed_show,
+	.store = speed_store,
+};
+#endif /* CONFIG_ARCH_HOBOT_X5 */
+
 int i2c_dw_probe_master(struct dw_i2c_dev *dev)
 {
 	struct i2c_adapter *adap = &dev->adapter;
@@ -942,6 +1001,14 @@ int i2c_dw_probe_master(struct dw_i2c_dev *dev)
 	ret = i2c_add_numbered_adapter(adap);
 	if (ret)
 		dev_err(dev->dev, "failure adding adapter: %d\n", ret);
+#if IS_ENABLED(CONFIG_ARCH_HOBOT_X5)
+	mutex_init(&dev->lock);
+	ret = device_create_file(&adap->dev, &speed_attr);
+	if (ret) {
+		dev_err(dev->dev, "create i2c speed_attr error");
+		return ret;
+	}
+#endif
 	pm_runtime_put_noidle(dev->dev);
 
 	return ret;

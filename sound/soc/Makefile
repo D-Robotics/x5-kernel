@@ -33,6 +33,8 @@ obj-$(CONFIG_SND_SOC_ACPI) += snd-soc-acpi.o
 
 obj-$(CONFIG_SND_SOC)	+= snd-soc-core.o
 obj-$(CONFIG_SND_SOC)	+= codecs/
+obj-$(CONFIG_SND_SOC)   += gua/
+obj-$(CONFIG_SND_SOC)   += hobot/
 obj-$(CONFIG_SND_SOC)	+= generic/
 obj-$(CONFIG_SND_SOC)	+= apple/
 obj-$(CONFIG_SND_SOC)	+= adi/
@@ -68,3 +70,4 @@ obj-$(CONFIG_SND_SOC)	+= uniphier/
 obj-$(CONFIG_SND_SOC)	+= ux500/
 obj-$(CONFIG_SND_SOC)	+= xilinx/
 obj-$(CONFIG_SND_SOC)	+= xtensa/
+obj-$(CONFIG_SND_SOC)	+= archband/

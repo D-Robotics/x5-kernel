@@ -271,3 +271,11 @@ config PSTORE_BLK_FTRACE_SIZE
 
 	  NOTE that, both Kconfig and module parameters can configure
 	  pstore/blk, but module parameters have priority over Kconfig.
+
+config SCHED_LOGGER
+	bool "HOBOT Sched Switch Logger Support"
+	depends on ARCH_HOBOT
+	depends on PSTORE
+	default n
+	help
+	  support the sched switch debugging in release version.

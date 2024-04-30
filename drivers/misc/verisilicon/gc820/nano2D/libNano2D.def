@@ -1,0 +1,29 @@
+LIBRARY Nano2D
+
+EXPORTS
+    n2d_allocate
+    n2d_blit
+    n2d_multisource_blit
+    n2d_close
+    n2d_fill
+    n2d_free
+    n2d_line
+    n2d_map
+    n2d_open
+    n2d_unmap
+    n2d_wrap
+    n2d_commit
+	n2d_switch_device
+    n2d_switch_core
+    n2d_commit_ex
+    n2d_load_palette
+    n2d_is_feature_support
+    n2d_filterblit
+    n2d_set
+    n2d_get
+    n2d_user_os_memory_copy
+    n2d_user_os_memory_fill
+    n2d_delogo
+    n2d_export_dma_buf
+    n2d_calcHist
+    n2d_equalizeHist

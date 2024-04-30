@@ -516,8 +516,14 @@ static int dwapb_gpio_add_port(struct dwapb_gpio *gpio,
 	dirout = gpio->regs + GPIO_SWPORTA_DDR + pp->idx * GPIO_SWPORT_DDR_STRIDE;
 
 	/* This registers 32 GPIO lines per port */
+#ifdef CONFIG_ARCH_HOBOT_X5
+	/* Fix inability to read corresponding values when gpio is set to output */
+	err = bgpio_init(&port->gc, gpio->dev, 4, dat, set, NULL, dirout,
+			 NULL, BGPIOF_READ_OUTPUT_REG_SET);
+#else
 	err = bgpio_init(&port->gc, gpio->dev, 4, dat, set, NULL, dirout,
 			 NULL, 0);
+#endif
 	if (err) {
 		dev_err(gpio->dev, "failed to init gpio chip for port%d\n",
 			port->idx);

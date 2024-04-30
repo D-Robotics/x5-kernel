@@ -20,6 +20,7 @@
 #include <linux/reset.h>
 #include <linux/slab.h>
 #include <linux/units.h>
+#include <linux/pm_runtime.h>
 
 /* PVT Common register */
 #define PVT_IP_CONFIG	0x04
@@ -179,39 +180,40 @@ struct pvt_device {
 	u32			p_num;
 	u32			v_num;
 	u32			ip_freq;
+	s32 ts_overwrite;
 };
 
-static ssize_t pvt_ts_coeff_j_read(struct file *file, char __user *user_buf,
-				   size_t count, loff_t *ppos)
+static int t_init(struct regmap *t_map, u32 clk_synth);
+
+static ssize_t pvt_ts_s32_read(struct file *file, char __user *user_buf, size_t count, loff_t *ppos)
 {
-	struct pvt_device *pvt = file->private_data;
+	s32 *rdata = file->private_data;
 	unsigned int len;
 	char buf[13];
 
-	len = scnprintf(buf, sizeof(buf), "%d\n", pvt->ts_coeff.j);
+	len = scnprintf(buf, sizeof(buf), "%d\n", *rdata);
 
 	return simple_read_from_buffer(user_buf, count, ppos, buf, len);
 }
 
-static ssize_t pvt_ts_coeff_j_write(struct file *file,
-				    const char __user *user_buf,
-				    size_t count, loff_t *ppos)
+static ssize_t pvt_ts_s32_write(struct file *file, const char __user *user_buf, size_t count,
+				loff_t *ppos)
 {
-	struct pvt_device *pvt = file->private_data;
+	s32 *wdata = file->private_data;
 	int ret;
 
-	ret = kstrtos32_from_user(user_buf, count, 0, &pvt->ts_coeff.j);
+	ret = kstrtos32_from_user(user_buf, count, 0, wdata);
 	if (ret)
 		return ret;
 
 	return count;
 }
 
-static const struct file_operations pvt_ts_coeff_j_fops = {
-	.read = pvt_ts_coeff_j_read,
-	.write = pvt_ts_coeff_j_write,
-	.open = simple_open,
-	.owner = THIS_MODULE,
+static const struct file_operations pvt_ts_s32_fops = {
+	.read	= pvt_ts_s32_read,
+	.write	= pvt_ts_s32_write,
+	.open	= simple_open,
+	.owner	= THIS_MODULE,
 	.llseek = default_llseek,
 };
 
@@ -233,8 +235,10 @@ static int pvt_ts_dbgfs_create(struct pvt_device *pvt, struct device *dev)
 			   &pvt->ts_coeff.g);
 	debugfs_create_u32("ts_coeff_cal5", 0644, pvt->dbgfs_dir,
 			   &pvt->ts_coeff.cal5);
-	debugfs_create_file("ts_coeff_j", 0644, pvt->dbgfs_dir, pvt,
-			    &pvt_ts_coeff_j_fops);
+	debugfs_create_file("ts_coeff_j", 0644, pvt->dbgfs_dir, &pvt->ts_coeff.j, &pvt_ts_s32_fops);
+
+	debugfs_create_file("ts_overwrite", 0644, pvt->dbgfs_dir, &pvt->ts_overwrite,
+			    &pvt_ts_s32_fops);
 
 	return devm_add_action_or_reset(dev, devm_pvt_ts_dbgfs_remove, pvt);
 }
@@ -251,6 +255,11 @@ static umode_t pvt_is_visible(const void *data, enum hwmon_sensor_types type,
 		if (attr == hwmon_in_input)
 			return 0444;
 		break;
+	case hwmon_pd:
+		if (attr == hwmon_pd_pvt)
+			return 0444;
+		break;
+
 	default:
 		break;
 	}
@@ -282,12 +291,32 @@ static int pvt_read_temp(struct device *dev, u32 attr, int channel, long *val)
 
 	switch (attr) {
 	case hwmon_temp_input:
-		ret = regmap_read_poll_timeout(t_map, SDIF_DONE(channel),
-					       stat, stat & SDIF_SMPL_DONE,
-					       PVT_POLL_DELAY_US,
+		if (pvt->ts_overwrite != PVT_TEMP_MAX_mC) {
+			*val = pvt->ts_overwrite;
+			return 0;
+		}
+
+		ret = regmap_read_poll_timeout(t_map, SDIF_DONE(channel), stat,
+					       stat & SDIF_SMPL_DONE, PVT_POLL_DELAY_US,
 					       PVT_POLL_TIMEOUT_US);
-		if (ret)
-			return ret;
+		if (ret) {
+			u32 clk_synth;
+
+			ret = regmap_read(t_map, CLK_SYNTH, &clk_synth);
+			if (ret)
+				return ret;
+
+			ret = t_init(t_map, clk_synth);
+			if (ret)
+				return ret;
+
+			ret = regmap_read_poll_timeout(t_map, SDIF_DONE(channel),
+						stat, stat & SDIF_SMPL_DONE,
+						PVT_POLL_DELAY_US,
+						PVT_POLL_TIMEOUT_US);
+			if (ret)
+				return ret;
+		}
 
 		ret = regmap_read(t_map, SDIF_DATA(channel), &nbs);
 		if (ret < 0)
@@ -356,6 +385,40 @@ static int pvt_read_in(struct device *dev, u32 attr, int channel, long *val)
 	}
 }
 
+static int pvt_read_pd(struct device *dev, u32 attr, int channel, long *val)
+{
+	struct pvt_device *pvt = dev_get_drvdata(dev);
+	struct regmap *p_map = pvt->p_map;
+	u32 stat, n, f_loop, freq;
+	int ret;
+
+	switch (attr) {
+	case hwmon_pd_pvt:
+		ret = regmap_read_poll_timeout(p_map, SDIF_DONE(0),
+					       stat, stat & SDIF_SMPL_DONE,
+					       PVT_POLL_DELAY_US,
+					       PVT_POLL_TIMEOUT_US);
+		if (ret)
+			return ret;
+
+		ret = regmap_read(p_map, SDIF_DATA(0), &n);
+		if (ret < 0)
+			return ret;
+
+		n &= SAMPLE_DATA_MSK;
+
+		/*
+		 * f_loop = (N BS * A * B * F CLK) / W
+		 */
+		freq = pvt->ip_freq/1000000;
+		f_loop = (n * 4 * 4 * freq) / 127;
+		*val = f_loop;
+		return 0;
+	default:
+		return -EOPNOTSUPP;
+	}
+}
+
 static int pvt_read(struct device *dev, enum hwmon_sensor_types type,
 		    u32 attr, int channel, long *val)
 {
@@ -364,6 +427,8 @@ static int pvt_read(struct device *dev, enum hwmon_sensor_types type,
 		return pvt_read_temp(dev, attr, channel, val);
 	case hwmon_in:
 		return pvt_read_in(dev, attr, channel, val);
+	case hwmon_pd:
+		return pvt_read_pd(dev, attr, channel, val);
 	default:
 		return -EOPNOTSUPP;
 	}
@@ -377,6 +442,10 @@ static struct hwmon_channel_info pvt_in = {
 	.type = hwmon_in,
 };
 
+static struct hwmon_channel_info pvt_pd = {
+	.type = hwmon_pd,
+};
+
 static const struct hwmon_ops pvt_hwmon_ops = {
 	.is_visible = pvt_is_visible,
 	.read = pvt_read,
@@ -385,6 +454,70 @@ static const struct hwmon_ops pvt_hwmon_ops = {
 static struct hwmon_chip_info pvt_chip_info = {
 	.ops = &pvt_hwmon_ops,
 };
+
+static int t_init(struct regmap *t_map, u32 clk_synth)
+{
+	u32 val;
+	int ret;
+
+	ret = regmap_write(t_map, SDIF_SMPL_CTRL, 0x0);
+	if (ret < 0)
+		return ret;
+
+	ret = regmap_write(t_map, SDIF_HALT, 0x0);
+	if (ret < 0)
+		return ret;
+
+	ret = regmap_write(t_map, CLK_SYNTH, clk_synth);
+	if (ret < 0)
+		return ret;
+
+	ret = regmap_write(t_map, SDIF_DISABLE, 0x0);
+	if (ret < 0)
+		return ret;
+
+	ret = regmap_read_poll_timeout(t_map, SDIF_STAT,
+					val, !(val & SDIF_BUSY),
+					PVT_POLL_DELAY_US,
+					PVT_POLL_TIMEOUT_US);
+	if (ret)
+		return ret;
+
+	val = CFG0_MODE_2 | CFG0_PARALLEL_OUT | CFG0_12_BIT |
+		IP_CFG << SDIF_ADDR_SFT | SDIF_WRN_W | SDIF_PROG;
+	ret = regmap_write(t_map, SDIF_W, val);
+	if (ret < 0)
+		return ret;
+
+	ret = regmap_read_poll_timeout(t_map, SDIF_STAT,
+					val, !(val & SDIF_BUSY),
+					PVT_POLL_DELAY_US,
+					PVT_POLL_TIMEOUT_US);
+	if (ret)
+		return ret;
+
+	val = POWER_DELAY_CYCLE_256 | IP_TMR << SDIF_ADDR_SFT |
+			SDIF_WRN_W | SDIF_PROG;
+	ret = regmap_write(t_map, SDIF_W, val);
+	if (ret < 0)
+		return ret;
+
+	ret = regmap_read_poll_timeout(t_map, SDIF_STAT,
+					val, !(val & SDIF_BUSY),
+					PVT_POLL_DELAY_US,
+					PVT_POLL_TIMEOUT_US);
+	if (ret)
+		return ret;
+
+	val = IP_RST_REL | IP_RUN_CONT | IP_AUTO |
+		IP_CTRL << SDIF_ADDR_SFT |
+		SDIF_WRN_W | SDIF_PROG;
+	ret = regmap_write(t_map, SDIF_W, val);
+	if (ret < 0)
+		return ret;
+
+	return 0;
+}
 
 static int pvt_init(struct pvt_device *pvt)
 {
@@ -426,36 +559,45 @@ static int pvt_init(struct pvt_device *pvt)
 	pvt->ip_freq = clk_get_rate(pvt->clk) / (key + 2);
 
 	if (t_num) {
-		ret = regmap_write(t_map, SDIF_SMPL_CTRL, 0x0);
+		ret = t_init(t_map, clk_synth);
+		if (ret)
+			return ret;
+
+		pvt->ts_overwrite = PVT_TEMP_MAX_mC;
+	}
+
+	if (p_num) {
+
+		ret = regmap_write(p_map, SDIF_SMPL_CTRL, 0x0);
 		if (ret < 0)
 			return ret;
 
-		ret = regmap_write(t_map, SDIF_HALT, 0x0);
+		ret = regmap_write(p_map, SDIF_HALT, 0x0);
 		if (ret < 0)
 			return ret;
 
-		ret = regmap_write(t_map, CLK_SYNTH, clk_synth);
+		ret = regmap_write(p_map, SDIF_DISABLE, 0);
 		if (ret < 0)
 			return ret;
 
-		ret = regmap_write(t_map, SDIF_DISABLE, 0x0);
+		ret = regmap_write(p_map, CLK_SYNTH, clk_synth);
 		if (ret < 0)
 			return ret;
 
-		ret = regmap_read_poll_timeout(t_map, SDIF_STAT,
+		ret = regmap_read_poll_timeout(p_map, SDIF_STAT,
 					       val, !(val & SDIF_BUSY),
 					       PVT_POLL_DELAY_US,
 					       PVT_POLL_TIMEOUT_US);
 		if (ret)
 			return ret;
 
-		val = CFG0_MODE_2 | CFG0_PARALLEL_OUT | CFG0_12_BIT |
-		      IP_CFG << SDIF_ADDR_SFT | SDIF_WRN_W | SDIF_PROG;
-		ret = regmap_write(t_map, SDIF_W, val);
+		val = 0x102000 | IP_CFG << SDIF_ADDR_SFT | SDIF_WRN_W | SDIF_PROG;
+
+		ret = regmap_write(p_map, SDIF_W, val);
 		if (ret < 0)
 			return ret;
 
-		ret = regmap_read_poll_timeout(t_map, SDIF_STAT,
+		ret = regmap_read_poll_timeout(p_map, SDIF_STAT,
 					       val, !(val & SDIF_BUSY),
 					       PVT_POLL_DELAY_US,
 					       PVT_POLL_TIMEOUT_US);
@@ -464,11 +606,11 @@ static int pvt_init(struct pvt_device *pvt)
 
 		val = POWER_DELAY_CYCLE_256 | IP_TMR << SDIF_ADDR_SFT |
 			      SDIF_WRN_W | SDIF_PROG;
-		ret = regmap_write(t_map, SDIF_W, val);
+		ret = regmap_write(p_map, SDIF_W, val);
 		if (ret < 0)
 			return ret;
 
-		ret = regmap_read_poll_timeout(t_map, SDIF_STAT,
+		ret = regmap_read_poll_timeout(p_map, SDIF_STAT,
 					       val, !(val & SDIF_BUSY),
 					       PVT_POLL_DELAY_US,
 					       PVT_POLL_TIMEOUT_US);
@@ -478,21 +620,8 @@ static int pvt_init(struct pvt_device *pvt)
 		val = IP_RST_REL | IP_RUN_CONT | IP_AUTO |
 		      IP_CTRL << SDIF_ADDR_SFT |
 		      SDIF_WRN_W | SDIF_PROG;
-		ret = regmap_write(t_map, SDIF_W, val);
-		if (ret < 0)
-			return ret;
-	}
 
-	if (p_num) {
-		ret = regmap_write(p_map, SDIF_HALT, 0x0);
-		if (ret < 0)
-			return ret;
-
-		ret = regmap_write(p_map, SDIF_DISABLE, BIT(p_num) - 1);
-		if (ret < 0)
-			return ret;
-
-		ret = regmap_write(p_map, CLK_SYNTH, clk_synth);
+		ret = regmap_write(p_map, SDIF_W, val);
 		if (ret < 0)
 			return ret;
 	}
@@ -768,7 +897,7 @@ static int mr75203_probe(struct platform_device *pdev)
 	u32 ts_num, vm_num, pd_num, ch_num, val, index, i;
 	const struct hwmon_channel_info **pvt_info;
 	struct device *dev = &pdev->dev;
-	u32 *temp_config, *in_config;
+	u32 *temp_config, *in_config, *pd_config;
 	struct device *hwmon_dev;
 	struct pvt_device *pvt;
 	int ret;
@@ -847,6 +976,16 @@ static int mr75203_probe(struct platform_device *pdev)
 		ret = pvt_get_regmap(pdev, "pd", pvt);
 		if (ret)
 			return ret;
+
+
+		pd_config = devm_kcalloc(dev, pd_num + 1,
+					sizeof(*pd_config), GFP_KERNEL);
+		if (!pd_config)
+			return -ENOMEM;
+
+		memset32(pd_config, HWMON_PD_PVT, pd_num);
+		pvt_pd.config = pd_config;
+		pvt_info[index++] = &pvt_pd;
 	}
 
 	if (vm_num) {
@@ -900,6 +1039,8 @@ static int mr75203_probe(struct platform_device *pdev)
 		return ret;
 	}
 
+	platform_set_drvdata(pdev, pvt);
+
 	pvt_chip_info.info = pvt_info;
 	hwmon_dev = devm_hwmon_device_register_with_info(dev, "pvt",
 							 pvt,
@@ -908,6 +1049,41 @@ static int mr75203_probe(struct platform_device *pdev)
 
 	return PTR_ERR_OR_ZERO(hwmon_dev);
 }
+#ifdef CONFIG_PM_SLEEP
+static __maybe_unused int pvt_suspend(struct device *dev)
+{
+	struct pvt_device *pvt = dev_get_drvdata(dev);
+
+	clk_disable_unprepare(pvt->clk);
+
+	return 0;
+}
+
+static __maybe_unused int pvt_resume(struct device *dev)
+{
+	struct pvt_device *pvt = dev_get_drvdata(dev);
+	int ret;
+
+	ret = clk_prepare_enable(pvt->clk);
+	if (ret) {
+		clk_disable_unprepare(pvt->clk);
+		dev_err(dev, "failed to enable pvt clock, error %d\n", ret);
+		return ret;
+	}
+
+	ret = pvt_init(pvt);
+	if (ret) {
+		dev_err(dev, "failed to init pvt: %d\n", ret);
+		return ret;
+	}
+
+	return 0;
+}
+#endif
+
+static const struct dev_pm_ops pvt_pm_ops = {
+	SET_SYSTEM_SLEEP_PM_OPS(pvt_suspend, pvt_resume)
+};
 
 static const struct of_device_id moortec_pvt_of_match[] = {
 	{ .compatible = "moortec,mr75203" },
@@ -919,6 +1095,7 @@ static struct platform_driver moortec_pvt_driver = {
 	.driver = {
 		.name = "moortec-pvt",
 		.of_match_table = moortec_pvt_of_match,
+		.pm = &pvt_pm_ops,
 	},
 	.probe = mr75203_probe,
 };

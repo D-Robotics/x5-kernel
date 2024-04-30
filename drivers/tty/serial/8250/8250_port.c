@@ -41,6 +41,8 @@
 #define UART_NPCM_TOR          7
 #define UART_NPCM_TOIE         BIT(7)  /* Timeout Interrupt Enable */
 
+#define UART_FCR_DMA_MODE_1    BIT(3)
+
 /*
  * Debugging.
  */
@@ -76,11 +78,11 @@ static const struct serial8250_config uart_config[] = {
 	},
 	[PORT_16550A] = {
 		.name		= "16550A",
-		.fifo_size	= 16,
-		.tx_loadsz	= 16,
-		.fcr		= UART_FCR_ENABLE_FIFO | UART_FCR_R_TRIG_10,
-		.rxtrig_bytes	= {1, 4, 8, 14},
-		.flags		= UART_CAP_FIFO,
+		.fifo_size	= 64,
+		.tx_loadsz	= 64,
+		.fcr		= UART_FCR_ENABLE_FIFO | UART_FCR_R_TRIG_01 | UART_FCR_DMA_MODE_1,
+		.rxtrig_bytes	= {1, 16, 32, 62},
+		.flags		= UART_CAP_FIFO | UART_CAP_AFE,
 	},
 	[PORT_CIRRUS] = {
 		.name		= "Cirrus",
@@ -1950,8 +1952,11 @@ static bool handle_rx_dma(struct uart_8250_port *up, unsigned int iir)
 		fallthrough;
 	case UART_IIR_RLSI:
 	case UART_IIR_RX_TIMEOUT:
-		serial8250_rx_dma_flush(up);
-		return true;
+		// serial8250_rx_dma_flush(up);
+		up->ier = serial8250_in_IER(up);
+		up->ier &= ~(UART_IER_RLSI | UART_IER_RDI);
+		serial8250_set_IER(up, up->ier);
+		return false;
 	}
 	return up->dma->rx_dma(up);
 }

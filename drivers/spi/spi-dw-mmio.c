@@ -48,9 +48,18 @@ struct dw_spi_mmio {
 #define SPARX5_FORCE_ENA			0xa4
 #define SPARX5_FORCE_VAL			0xa8
 
+#define CS_MASK(offset)         (0x3 << (offset))
+
 struct dw_spi_mscc {
 	struct regmap       *syscon;
 	void __iomem        *spi_mst; /* Not sparx5 */
+};
+
+struct dw_spi_vs {
+	struct regmap	    *syscon;
+	unsigned int        ctrl_reg;
+	u32                 cs_bit_offset;
+	bool                dsp_cs;
 };
 
 /*
@@ -78,6 +87,41 @@ static void dw_spi_mscc_set_cs(struct spi_device *spi, bool enable)
 
 	dw_spi_set_cs(spi, enable);
 }
+
+static void dw_spi_vs_set_cs(struct spi_device *spi, bool enable)
+{
+	struct dw_spi *dws = spi_master_get_devdata(spi->master);
+	struct dw_spi_mmio *dwsmmio =
+		container_of(dws, struct dw_spi_mmio, dws);
+	struct dw_spi_vs *dws_vs = dwsmmio->priv;
+	u32 cs = spi->chip_select;
+
+	if (cs < 4) {
+		regmap_update_bits(dws_vs->syscon, dws_vs->ctrl_reg,
+				   CS_MASK(dws_vs->cs_bit_offset + cs * 2),
+				   (enable ? 0x3 : 0x1) <<
+				   (dws_vs->cs_bit_offset + cs * 2));
+	}
+	dw_spi_set_cs(spi, enable);
+}
+
+static void dw_dsp_spi_vs_set_cs(struct spi_device *spi, bool enable)
+{
+	struct dw_spi *dws = spi_master_get_devdata(spi->master);
+	struct dw_spi_mmio *dwsmmio =
+		container_of(dws, struct dw_spi_mmio, dws);
+	struct dw_spi_vs *dws_vs = dwsmmio->priv;
+	u32 cs = spi->chip_select;
+	u32 val;
+
+	if (cs < 4) {
+		val = ((enable ? 0x0 : 0x2) << (dws_vs->cs_bit_offset + cs * 2));
+		regmap_update_bits(dws_vs->syscon, dws_vs->ctrl_reg,
+				   CS_MASK(dws_vs->cs_bit_offset + cs * 2), val);
+	}
+	dw_spi_set_cs(spi, enable);
+}
+
 
 static int dw_spi_mscc_init(struct platform_device *pdev,
 			    struct dw_spi_mmio *dwsmmio,
@@ -237,6 +281,74 @@ static int dw_spi_canaan_k210_init(struct platform_device *pdev,
 	return 0;
 }
 
+static int dw_spi_horizon_init(struct platform_device *pdev,
+			  struct dw_spi_mmio *dwsmmio)
+{
+	struct dw_spi_vs *dws_vs;
+	int ret;
+	struct device_node *np = pdev->dev.of_node;
+	u32 val;
+
+	dws_vs = devm_kzalloc(&pdev->dev, sizeof(*dws_vs), GFP_KERNEL);
+
+	if (!dws_vs)
+		return -ENOMEM;
+
+	dws_vs->syscon = syscon_regmap_lookup_by_phandle(np, "syscon-spi-cs");
+	if (IS_ERR(dws_vs->syscon))
+		return PTR_ERR(dws_vs->syscon);
+
+	ret = of_property_read_u32_index(np, "syscon-spi-cs",
+					 1, &dws_vs->ctrl_reg);
+	if (ret) {
+		dev_err(&pdev->dev,
+			"couldn't get ctrl_reg reg index\n");
+		return PTR_ERR(dws_vs->syscon);
+	}
+
+	device_property_read_u32(&pdev->dev, "cs-bit-offset", &dws_vs->cs_bit_offset);
+	dev_info(&pdev->dev, "bit_offset = %d\n", dws_vs->cs_bit_offset);
+
+	ret = device_property_read_u32(&pdev->dev, "dsp-cs", &val);
+	if (ret)
+		dws_vs->dsp_cs = false;
+	else
+		dws_vs->dsp_cs = !!val;
+
+	dwsmmio->dws.set_cs = dws_vs->dsp_cs ? dw_dsp_spi_vs_set_cs : dw_spi_vs_set_cs;
+	dwsmmio->priv = dws_vs;
+
+	dwsmmio->dws.ip = DW_HSSI_ID;
+
+	dw_spi_dma_setup_generic(&dwsmmio->dws);
+
+	return 0;
+}
+
+#ifdef CONFIG_PM_SLEEP
+static int dw_spi_mmio_suspend(struct device *dev)
+{
+	int ret;
+	struct dw_spi *dws = dev_get_drvdata(dev);
+
+	ret = dw_spi_suspend_host(dws);
+	return ret;
+}
+
+static int dw_spi_mmio_resume(struct device *dev)
+{
+	int ret;
+	struct dw_spi *dws = dev_get_drvdata(dev);
+
+	ret = dw_spi_resume_host(dws);
+	return ret;
+}
+#endif /* CONFIG_PM_SLEEP */
+
+static const struct dev_pm_ops dw_spi_mmio_pm = {
+	SET_SYSTEM_SLEEP_PM_OPS(dw_spi_mmio_suspend, dw_spi_mmio_resume)
+};
+
 static int dw_spi_mmio_probe(struct platform_device *pdev)
 {
 	int (*init_func)(struct platform_device *pdev,
@@ -352,6 +464,7 @@ static const struct of_device_id dw_spi_mmio_of_match[] = {
 	{ .compatible = "intel,thunderbay-ssi", .data = dw_spi_intel_init},
 	{ .compatible = "microchip,sparx5-spi", dw_spi_mscc_sparx5_init},
 	{ .compatible = "canaan,k210-spi", dw_spi_canaan_k210_init},
+	{ .compatible = "horizon,dwc-ssi-1.01a", .data = dw_spi_horizon_init},
 	{ /* end of table */}
 };
 MODULE_DEVICE_TABLE(of, dw_spi_mmio_of_match);
@@ -371,6 +484,7 @@ static struct platform_driver dw_spi_mmio_driver = {
 		.name	= DRIVER_NAME,
 		.of_match_table = dw_spi_mmio_of_match,
 		.acpi_match_table = ACPI_PTR(dw_spi_mmio_acpi_match),
+		.pm = &dw_spi_mmio_pm,
 	},
 };
 module_platform_driver(dw_spi_mmio_driver);

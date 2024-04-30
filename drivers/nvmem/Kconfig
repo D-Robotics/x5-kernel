@@ -55,6 +55,13 @@ config NVMEM_BRCM_NVRAM
 	  This driver provides support for Broadcom's NVRAM that can be accessed
 	  using I/O mapping.
 
+config NVMEM_HORIZON_EFUSE
+	tristate "Horizon eFuse Support"
+	depends on HAS_IOMEM
+	help
+	  This is a simple drive to dump specified values of Horizon SoC
+	  from eFuse, such as ADC calibration offset.
+
 config NVMEM_IMX_IIM
 	tristate "i.MX IC Identification Module support"
 	depends on ARCH_MXC || COMPILE_TEST

@@ -7,6 +7,9 @@
 #define INV_ICM42600_TIMESTAMP_H_
 
 #include <linux/kernel.h>
+#if defined(CONFIG_IMU_DATA_READY)
+#include <linux/kfifo.h>
+#endif
 
 struct inv_icm42600_state;
 
@@ -48,6 +51,9 @@ struct inv_icm42600_timestamp {
 	uint32_t new_mult;
 	uint32_t period;
 	struct inv_icm42600_timestamp_acc chip_period;
+#if defined(CONFIG_IMU_DATA_READY)
+	struct kfifo irq_time;
+#endif
 };
 
 void inv_icm42600_timestamp_init(struct inv_icm42600_timestamp *ts,

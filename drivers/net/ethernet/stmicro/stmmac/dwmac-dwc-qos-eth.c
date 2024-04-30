@@ -37,6 +37,16 @@ struct tegra_eqos {
 	struct gpio_desc *reset;
 };
 
+struct x5_eqos {
+	struct device *dev;
+	void __iomem *regs;
+
+	struct clk *clk_axi;
+	struct clk *clk_rgmii;
+
+	struct gpio_desc *phyreset;
+};
+
 static int dwc_eth_dwmac_config_dt(struct platform_device *pdev,
 				   struct plat_stmmacenet_data *plat_dat)
 {
@@ -398,6 +408,123 @@ static int tegra_eqos_remove(struct platform_device *pdev)
 	return 0;
 }
 
+static int x5_qos_clks_config(void *priv, bool enabled)
+{
+	struct x5_eqos *x5_qos = priv;
+	int ret = 0;
+
+	if (enabled) {
+		clk_prepare_enable(x5_qos->clk_rgmii);
+	} else {
+		clk_disable_unprepare(x5_qos->clk_rgmii);
+	}
+
+	return ret;
+}
+
+static int x5_qos_init(struct platform_device *pdev, void *priv)
+{
+	struct x5_eqos *x5_qos = priv;
+
+	clk_prepare_enable(x5_qos->clk_axi);
+	if (!IS_ERR_OR_NULL(x5_qos->phyreset)) {
+		gpiod_set_value(x5_qos->phyreset, 0);
+		msleep(20);
+		gpiod_set_value(x5_qos->phyreset, 1);
+		msleep(100);
+	}
+
+	return 0;
+}
+
+static void x5_qos_exit(struct platform_device *pdev, void *priv)
+{
+	struct x5_eqos *x5_qos = priv;
+
+	clk_disable_unprepare(x5_qos->clk_axi);
+
+	return;
+}
+
+static int x5_eqos_probe(struct platform_device *pdev,
+			    struct plat_stmmacenet_data *data,
+			    struct stmmac_resources *res)
+{
+	struct device *dev = &pdev->dev;
+	struct x5_eqos *x5_eqos;
+	int err;
+
+	x5_eqos = devm_kzalloc(&pdev->dev, sizeof(struct x5_eqos), GFP_KERNEL);
+	if (!x5_eqos)
+		return -ENOMEM;
+
+	x5_eqos->dev = &pdev->dev;
+	x5_eqos->regs = res->addr;
+
+	if (!is_of_node(dev->fwnode))
+		goto bypass_clk_reset_gpio;
+
+	x5_eqos->clk_axi = devm_clk_get(&pdev->dev, "axi_clk");
+	if (IS_ERR(x5_eqos->clk_axi)) {
+		dev_err(dev, "get axi clk failed\n");
+		err = PTR_ERR(x5_eqos->clk_axi);
+		goto error;
+	}
+
+	err = clk_prepare_enable(x5_eqos->clk_axi);
+	if (err < 0) {
+		dev_err(dev, "enable axi clk failed\n");
+		goto error;
+	}
+
+	x5_eqos->clk_rgmii = devm_clk_get(&pdev->dev, "rgmii_clk");
+	if (IS_ERR(x5_eqos->clk_rgmii)) {
+		dev_err(dev, "get rgmii_clk clk failed\n");
+		err = PTR_ERR(x5_eqos->clk_rgmii);
+		goto disable_axi;
+	}
+
+	err = clk_prepare_enable(x5_eqos->clk_rgmii);
+	if (err < 0) {
+		dev_err(dev, "enable rgmii_clk clk failed\n");
+		goto disable_axi;
+	}
+
+	x5_eqos->phyreset = devm_gpiod_get_optional(&pdev->dev, "phyreset", GPIOD_OUT_HIGH);
+	if (IS_ERR_OR_NULL(x5_eqos->phyreset)) {
+		err = PTR_ERR(x5_eqos->phyreset);
+		goto disable_axi;
+	}
+
+	/* do phy pulse reset, otherwise, ethernet not work.. */
+	gpiod_set_value(x5_eqos->phyreset, 0);
+	msleep(20);
+	gpiod_set_value(x5_eqos->phyreset, 1);
+	msleep(100);
+
+bypass_clk_reset_gpio:
+	data->clks_config = x5_qos_clks_config;
+	data->init = x5_qos_init;
+	data->exit = x5_qos_exit;
+	data->bsp_priv = x5_eqos;
+
+	return 0;
+
+disable_axi:
+	clk_disable_unprepare(x5_eqos->clk_axi);
+error:
+	return err;
+}
+
+static int x5_eqos_remove(struct platform_device *pdev)
+{
+	struct x5_eqos *x5_qos = get_stmmac_bsp_priv(&pdev->dev);
+
+	clk_disable_unprepare(x5_qos->clk_rgmii);
+	clk_disable_unprepare(x5_qos->clk_axi);
+	return 0;
+}
+
 struct dwc_eth_dwmac_data {
 	int (*probe)(struct platform_device *pdev,
 		     struct plat_stmmacenet_data *data,
@@ -413,6 +540,11 @@ static const struct dwc_eth_dwmac_data dwc_qos_data = {
 static const struct dwc_eth_dwmac_data tegra_eqos_data = {
 	.probe = tegra_eqos_probe,
 	.remove = tegra_eqos_remove,
+};
+
+static const struct dwc_eth_dwmac_data x5_eqos_data = {
+	.probe = x5_eqos_probe,
+	.remove = x5_eqos_remove,
 };
 
 static int dwc_eth_dwmac_probe(struct platform_device *pdev)
@@ -493,6 +625,7 @@ static int dwc_eth_dwmac_remove(struct platform_device *pdev)
 static const struct of_device_id dwc_eth_dwmac_match[] = {
 	{ .compatible = "snps,dwc-qos-ethernet-4.10", .data = &dwc_qos_data },
 	{ .compatible = "nvidia,tegra186-eqos", .data = &tegra_eqos_data },
+	{ .compatible = "x5,dwc-qos-ethernet-4.10", .data = &x5_eqos_data },
 	{ }
 };
 MODULE_DEVICE_TABLE(of, dwc_eth_dwmac_match);

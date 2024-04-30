@@ -150,7 +150,11 @@ libs-$(CONFIG_EFI_STUB) += $(objtree)/drivers/firmware/efi/libstub/lib.a
 boot		:= arch/arm64/boot
 
 ifeq ($(CONFIG_EFI_ZBOOT),)
-KBUILD_IMAGE	:= $(boot)/Image.gz
+  ifeq ($(CONFIG_HOBOT_BOOT_LZ4),y)
+	KBUILD_IMAGE	:= $(boot)/Image.lz4
+  else
+	KBUILD_IMAGE	:= $(boot)/Image.gz
+  endif
 else
 KBUILD_IMAGE	:= $(boot)/vmlinuz.efi
 endif
@@ -206,6 +210,7 @@ endif
 
 define archhelp
   echo  '* Image.gz      - Compressed kernel image (arch/$(ARCH)/boot/Image.gz)'
+  echo  '* Image.lz4     - Compressed kernel image (arch/$(ARCH)/boot/Image.lz4)'
   echo  '  Image         - Uncompressed kernel image (arch/$(ARCH)/boot/Image)'
   echo  '  install       - Install uncompressed kernel'
   echo  '  zinstall      - Install compressed kernel'

@@ -1379,4 +1379,12 @@ config TOUCHSCREEN_ZINITIX
 	  To compile this driver as a module, choose M here: the
 	  module will be called zinitix.
 
+config TOUCHSCREEN_GT9XX
+	tristate "Goodix GT9XX touchscreen"
+	depends on I2C
+	help
+	  Say Y here if you have the Goodix GT9XX touchscreen
+		chip
+	  If unsure, say N.
+
 endif

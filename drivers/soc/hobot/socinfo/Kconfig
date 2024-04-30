@@ -1,0 +1,7 @@
+# SPDX-License-Identifier: GPL-2.0-only
+
+config HOBOT_SOCINFO
+	tristate "horizon soc information"
+	default y
+	help
+	  Say y here to support display horizon soc information.

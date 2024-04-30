@@ -1,0 +1,580 @@
+// SPDX-License-Identifier: GPL-2.0
+/*
+ * dts for Sunrise5 som platform
+ *
+ * Copyright (C) 2024 Horizon Robotics Inc.
+ *
+ */
+
+/dts-v1/;
+#include "x5.dtsi"
+#include "pinmux-func.dtsi"
+#include "pinmux-gpio.dtsi"
+
+/ {
+	model = "Horizon Robotics X5 SOM board";
+	compatible = "Horizon, x5";
+
+	#address-cells = <2>;
+	#size-cells = <2>;
+
+	/*
+	 * We have one DDR memory range:
+	 * 0x0_87000000 - 0x0_79000000
+	 * 0x1_00000000 - 0x0_80000000
+	 */
+	memory@87000000 {
+		device_type = "memory";
+		reg = <0x0 0x87000000 0x0 0x79000000>,  /* 2GB - 112M */
+		      <0x1 0x00000000 0x0 0x80000000>;  /* 2GB */
+	};
+
+	reserved-memory {
+		#address-cells = <2>;
+		#size-cells = <2>;
+		ranges;
+
+		/* dtb 2M 0x87FDC000---0x87FFC000*/
+		/* uboot log 16k 0x87FFC000---0x88000000*/
+		uboot_log_reserved: log@87FF8000 {
+			compatible = "uboot_log";
+			reg = <0x0 0x87FFC000 0x0 0x4000>;  /* 16K */
+			status = "okay";
+		};
+
+		ion_reserved: ion_reserved@88000000 {
+			compatible = "ion-pool";
+			reg = <0x0 0x88000000 0x0 0x8000000>;
+			status = "okay";
+		};
+
+		ion_carveout: ion_carveout@90000000 {
+			compatible = "ion-carveout";
+			reg = <0x0 0x90000000 0x0 0x8000000>;
+			status = "okay";
+		};
+
+		ion_sram: ion_sram@98000000 {
+			compatible = "ion-sram";
+			reg = <0x0 0x98000000 0x0 0x800000>;
+			status = "okay";
+		};
+
+		linux,cma@a0000000 {
+			compatible = "shared-dma-pool";
+			reg = <0x0 0xa0000000 0x0 0x20000000>; /* 512MB */
+			reusable;
+			linux,cma-default;
+		};
+
+		ion_cma: ion_cma {
+			compatible = "shared-dma-pool";
+			alignment = <0x0 0x2000>;
+			reusable;
+			size = <0x0 0x20000000>;
+			status = "okay";
+		};
+
+		adsp_ddr: adsp_ddr@cfe00000 {
+			reg = <0x0 0xcfe00000 0x0 0x2200000>;
+			no-map;
+		};
+
+		audio_reserved: audio@d2000000 {
+			compatible = "shared-dma-pool";
+			no-map;
+			reg = <0x0 0xd2000000 0x0 0x1000000>;
+			status = "okay";
+		};
+
+		adsp_ipc_reserved: audio@d3000000 {
+			compatible = "shared-dma-pool";
+			no-map;
+			reg = <0x0 0xd3000000 0x0 0x800000>;
+			status = "okay";
+		};
+
+		adsp_bsp_reserved: audio@d3800000 {
+			compatible = "shared-dma-pool";
+			no-map;
+			reg = <0x0 0xd3800000 0x0 0x800000>;
+			status = "okay";
+		};
+
+		ramoops@d5000000 {
+			compatible = "ramoops";
+			reg = <0x0 0xd5000000 0x0 0x40000>;
+			console-size = <0x8000>;
+			pmg-size = <0x8000>;
+			ftrace-size = <0x8000>;
+			sched-size  = <0x8000>;
+			record-size = <0x4000>;
+			ecc-size = <0x0>;
+		};
+
+	};
+
+	gua_audio_rpc_wrapper:audio-rpc-wrapper {
+		compatible = "gua,audio-rpc-wrapper";
+		rpmsg-enable;
+		status = "okay";
+	};
+
+	ipc_wrapper:ipc-wrapper {
+		compatible = "gua,ipc-wrapper";
+		rpmsg-enable;
+		status = "okay";
+	};
+
+	sound_misc_0:misc-hifi {
+		compatible = "gua,misc-hifi-core";
+										// core channel
+		control-rpmsg-channel-mapping = <0x00 0x00	// a core to hifi 0
+										>;
+		msg-wrapper = <&ipc_wrapper>;
+		memory-region = <&adsp_bsp_reserved>;
+		status = "okay";
+	};
+
+	sound_cpu:cpu-dai {
+		compatible = "gua,cpu-dai";
+		msg-wrapper = <&ipc_wrapper>;
+		gua,pcm-buffer-size = <0x1E000>;
+		pcm-rpmsg-channel-mapping = <0x00>, <0x00>, <0x00>, <0x00>, <0x00>;
+		status = "okay";
+	};
+
+	sound-machine {
+		compatible = "gua,sound-card";
+		model = "gua-audio";
+		cpu-dai = <&sound_cpu>;
+		memory-region = <&audio_reserved>;
+		status = "okay";
+	};
+
+	vdd08_gpu_reg: vdd08_gpu_reg@3 {
+		status = "okay";
+		compatible = "regulator-gpio";
+		pinctrl-names = "default";
+		pinctrl-0 = <&hsio_gpio1_1>;
+		regulator-name = "VCC_GPU";
+		regulator-min-microvolt = <800000>;
+		regulator-max-microvolt = <800000>;
+		regulator-enable-ramp-delay = <3000>;
+		enable-gpio = <&hs_gpio1_porta 1 GPIO_ACTIVE_HIGH>;
+		states = <800000 0>;
+		startup-delay-us = <3000>;
+		enable-active-high;
+	};
+
+};
+
+&lsio_iomuxc {
+	icm_int1: icm-int1 {
+		horizon,pins = <
+			LSIO_I2C1_SDA	LSIO_PINMUX_2	BIT_OFFSET22	MUX_ALT1	&pconf_input_en_3v3
+		>;
+	};
+};
+
+&noc_qos {
+	status = "okay";
+};
+
+&adc {
+	status = "okay";
+};
+
+&uart0 {
+	status = "okay";
+};
+
+&uart1 {
+	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_uart1>;
+};
+
+&uart2 {
+	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_uart2>;
+};
+
+&uart3 {
+	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_uart3>;
+};
+
+&axi_dmac {
+	status = "okay";
+};
+
+
+&i2c2 {
+	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_i2c2>;
+	hpu3501@1c {
+		compatible = "hobot, hpu3501";
+		reg = <0x1c>;
+		status = "okay";
+		hpu3501-regulator {
+			master;
+			en_pin_map = <0x15>;
+			regulators {
+				vdd08_bpu_1_reg: BUCK2 {
+					regulator-name = "VCC_BPU";
+					regulator-min-microvolt = <800000>;
+					regulator-max-microvolt = <800000>;
+					regulator-enable-ramp-delay = <3000>;
+					regulator-ramp-delay = <2000>;
+				};
+				vdd08_cpu_reg: BUCK3 {
+					regulator-name = "VDD08_CPU";
+					regulator-min-microvolt = <600000>;
+					regulator-max-microvolt = <1000000>;
+					regulator-enable-ramp-delay = <3000>;
+					regulator-ramp-delay = <2000>;
+					regulator-always-on;
+					regulator-boot-on;
+				};
+			};
+		};
+
+	};
+};
+
+&i2c3 {
+	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_i2c3>;
+};
+
+&i2c4 {
+	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_i2c4>;
+};
+
+&i2c7 {
+	status = "okay";
+	es7210_0: es7210_0@40 {
+		compatible = "MicArray_0";
+		reg = <0x40>;
+		#sound-dai-cells = <1>;
+		channels = <4>;
+		adc_dev_num = <1>;
+		status = "okay";
+	};
+
+	es8156: es8156@8 {
+		compatible = "everest,es8156";
+		reg = <0x8>;
+		#sound-dai-cells = <0>;
+		status = "okay";
+	};
+};
+
+&lpwm0 {
+	status = "okay";
+	/* conflict with lsio_gpio1_0 */
+	// pinctrl-names = "default";
+	// pinctrl-0 = <&pinctrl_lpwm0_0 &pinctrl_lpwm0_2>;
+};
+
+&pwm2 {
+	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_pwm2_1>;
+};
+
+&pwm3 {
+	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_pwm3_0 &pinctrl_pwm3_1>;
+};
+
+&emmc {
+	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_emmc>;
+	fixed-emmc-driver-type = <2>;
+};
+
+&spi2 {
+	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_spi2>;
+
+	icm42652@0 {
+		compatible = "invensense,icm42652";
+		reg = <0>;
+		spi-max-frequency = <5000000>;
+		spi-cpha;
+		spi-cpol;
+		interrupt-parent = <&ls_gpio1_porta>;
+		interrupts = <10 IRQ_TYPE_EDGE_FALLING>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&icm_int1>;
+	};
+};
+
+&dc8000_nano {
+	status = "okay";
+};
+
+&hdmi_encoder {
+	status = "okay";
+};
+
+&display_subsystem {
+	status = "okay";
+};
+
+&extcon_usb2otg {
+	pinctrl-names = "default";
+	pinctrl-0 = <&aon_gpio_6>;
+
+	id-gpios = <&aon_gpio_porta 6 GPIO_ACTIVE_HIGH>;
+
+	status = "okay";
+};
+
+&dwc3_usb2 {
+	extcon = <&extcon_usb2otg>;
+
+	status = "okay";
+};
+
+&usb2 {
+	status = "okay";
+};
+
+&extcon_usb3otg {
+	pinctrl-names = "default";
+	pinctrl-0 = <&aon_gpio_5>;
+
+	id-gpios = <&aon_gpio_porta 5 GPIO_ACTIVE_HIGH>;
+
+	status = "okay";
+};
+
+&dwc3_usb3 {
+	role-switch-default-mode = "host";
+	extcon = <&extcon_usb3otg>;
+
+	status = "okay";
+};
+
+&usb3 {
+	status = "okay";
+};
+
+&dsp_axi_dma {
+	status = "okay";
+};
+
+&dw_i2s0 {
+	status = "okay";
+};
+
+&dw_i2s1 {
+	status = "okay";
+};
+
+&archband_pdm {
+	status = "okay";
+};
+
+&virt_codec {
+	status = "okay";
+};
+
+&mailbox0 {
+	status = "okay";
+};
+
+&ipc_instance0 {
+	status = "okay";
+};
+
+&ipc_instance1 {
+	status = "okay";
+};
+
+&ipc_instance2 {
+	status = "okay";
+};
+
+&pvt {
+	status = "okay";
+};
+
+&remoteproc_hifi5 {
+	status = "okay";
+	hifi5-rpmsg-channel-mapping = <0x00>, <0x00>;
+	msg-wrapper = <&ipc_wrapper>;
+};
+
+&hpsclks {
+	status = "okay";
+};
+
+&dspclks {
+	status = "okay";
+};
+
+&aonclks {
+	status = "okay";
+};
+
+&sound {
+	status = "okay";
+	#address-cells = <1>;
+	#size-cells = <0>;
+	simple-audio-card,name = "simple-audio-card";
+
+	simple-audio-card,dai-link@0 {
+		link-name = "dw-i2s0-dai-link";
+		reg = <1>;
+		format = "i2s";
+		mclk-fs = <64>;
+		bitclock-master = <&play_master0>;
+		frame-master = <&play_master0>;
+		play_master0: cpu {
+			sound-dai = <&dw_i2s0>;
+		};
+		codec {
+			sound-dai = <&es8156>;
+		};
+	};
+
+	simple-audio-card,dai-link@2 {
+		link-name = "dw-i2s1-dai-link";
+		reg = <1>;
+		format = "dsp_a";
+		mclk-fs = <64>;
+		bitclock-master = <&capture_master0>;
+		frame-master = <&capture_master0>;
+		capture_master0: cpu {
+			sound-dai = <&dw_i2s1>;
+		};
+		codec {
+			sound-dai = <&es7210_0 0>;
+		};
+	};
+
+	simple-audio-card,dai-link@1 {
+		link-name = "archband-pdm-dai-link";
+		reg = <1>;
+		format = "i2s";
+		mclk-fs = <64>;
+		bitclock-master = <&arb_dai>;
+		frame-master = <&arb_dai>;
+		arb_dai: cpu {
+			sound-dai = <&archband_pdm>;
+		};
+		codec {
+			sound-dai = <&virt_codec>;
+		};
+	};
+};
+
+&duplex_card {
+	status = "okay";
+	#address-cells = <1>;
+	#size-cells = <0>;
+	simple-audio-card,name = "duplex-audio-card";
+	simple-audio-card,dai-link@0 {
+		link-name = "dummy-dai-link0";
+		reg = <1>;
+		format = "i2s";
+		mclk-fs = <64>;
+		bitclock-master = <&dummy_master0>;
+		frame-master = <&dummy_master0>;
+		dummy_master0: cpu {
+				sound-dai = <&dw_i2s0>;
+		};
+		codec {
+				sound-dai = <&virt_codec>;
+		};
+	};
+
+	simple-audio-card,dai-link@1 {
+		link-name = "dummy-dai-link1";
+		reg = <1>;
+		format = "i2s";
+		mclk-fs = <64>;
+		bitclock-master = <&dummy_master1>;
+		frame-master = <&dummy_master1>;
+		cpu {
+				sound-dai = <&dw_i2s1>;
+		};
+		dummy_master1: codec {
+				sound-dai = <&virt_codec>;
+		};
+	};
+};
+
+&mipi_host0 {
+	//status = "okay";  //has enabled in x5.dtsi
+	pinctrl-names = "enable", "disable";
+        pinctrl-0 = <&pinctrl_sensor2_mclk>; //mclk2
+        pinctrl-1 = <&lsio_gpio0_26>;
+        snrclk-idx = <2>;  //mclk index
+};
+
+&mipi_host1 {
+	//status = "okay";  //has enabled in x5.dtsi
+        pinctrl-names = "enable", "disable";
+        pinctrl-0 = <&pinctrl_sensor3_mclk>; //mclk3
+        pinctrl-1 = <&lsio_gpio0_27>;
+        snrclk-idx = <3>;  //mclk index
+};
+
+&vin_vcon0 {
+       //status = "okay";  //has enabled in x5.dtsi
+      /* camera sensor
+           power_en gpio:  HSIO_GPIO0_07:       440
+	   reset gpio:	   HSIO_GPIO0_00:       433
+	   pwd gpio:       LSIO_GPIO1_00:       314
+	   mclk :                               mclk2
+	 */
+	pinctrl-names = "default";
+        pinctrl-0 = <&hsio_gpio0_7 &hsio_gpio0_0 &lsio_gpio1_0>;
+        gpio_oth = <440 434 316>;   //power_en gpio、 reset gpio、pwd gpio
+};
+
+&vin_vcon1 {
+       //status = "okay";  //has enabled in x5.dtsi
+      /* camera sensor
+	   power_en gpio:  HSIO_GPIO0_08:       441
+           reset gpio:     HSIO_GPIO0_01:       434
+	   pwd gpio:       LSIO_GPIO1_02:       316
+	   mclk gpio:                           mclk3
+	*/
+        pinctrl-names = "default";
+        pinctrl-0 = <&hsio_gpio0_8 &hsio_gpio0_1 &lsio_gpio1_2>;
+        gpio_oth = <441 433 314>;   //power_en gpio、reset gpio、pwd gpio
+};
+
+&bpu {
+	cnn-supply = <&vdd08_bpu_1_reg>;
+};
+
+/*For boards that do not need display module,
+the following ports need to be deleted*/
+
+&mipi_dsi0 {
+	ports {
+		/delete-node/ port@1;
+	};
+};
+
+&bt1120_bridge {
+	ports {
+		/delete-node/ port@1;
+	};
+};

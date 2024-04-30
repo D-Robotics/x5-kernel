@@ -1,0 +1,26 @@
+# SPDX-License-Identifier: GPL-2.0-only
+
+config HOBOT_AXI_MONITOR
+	tristate "Horizon AXI Performance Monitor"
+	depends on ARCH_HOBOT
+	default y
+	help
+	  Say y here to support horizon soc AXI master performance monitor.
+
+config HOBOT_AXI_MONITOR_DEBUGFS
+	bool "Horizon AXI Performance Monitor debug fs interfaces"
+	depends on HOBOT_AXI_MONITOR
+	depends on DEBUG_FS
+	default y
+	help
+	  Say y here to enable horizon soc AXI master performance monitor
+	  debugfs interface
+
+# config HOBOT_AXI_MON_ADVANCED
+# 	depends on HOBOT_AXI_MONITOR
+# 	depends on n
+# 	bool "Advanced configurations for Horizon AXI Performance Monitor"
+# 	default n
+# 	help
+# 	  Say y here to support horizon soc AXI master performance monitor
+# 	  advanced configurations. Say N if unsure.

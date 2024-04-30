@@ -623,6 +623,7 @@ static void dwc3_core_num_eps(struct dwc3 *dwc)
 	struct dwc3_hwparams	*parms = &dwc->hwparams;
 
 	dwc->num_eps = DWC3_NUM_EPS(parms);
+	dwc->num_ineps = DWC3_NUM_IN_EPS(parms);
 }
 
 static void dwc3_cache_hwparams(struct dwc3 *dwc)
@@ -1750,6 +1751,88 @@ static struct extcon_dev *dwc3_get_extcon(struct dwc3 *dwc)
 	return edev;
 }
 
+/* USB2 glue register */
+#define USB_CSR_SOFT_RESET_OFFSET	0x0
+#define USB_CSR_CTRL_RESET		BIT(1)
+#define USB_CSR_PHY_RESET		BIT(0)
+
+#define USB_CSR_CLOCK_CONTROL_OFFSET	0x1000
+#define USB_CSR_CLOCK_DISABLE		BIT(6)
+static void sunrise5_dwc3_gonfigure(struct platform_device *pdev)
+{
+	struct device		*dev = &pdev->dev;
+	struct resource		*res_csr;
+	void __iomem		*csr_base;
+
+	u32			reg;
+
+	res_csr = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+	if (!res_csr) {
+		dev_err(dev, "missing memory resource for index 1\n");
+		return;
+	}
+
+	csr_base = devm_ioremap_resource(dev, res_csr);
+
+	if (!csr_base) {
+		dev_err(dev, "%s mapping io memory failed!\n", __func__);
+		return;
+	}
+
+	/* usb2 ctrl & phy pulse reset */
+	reg = readl(csr_base + USB_CSR_SOFT_RESET_OFFSET);
+	reg |= (USB_CSR_CTRL_RESET | USB_CSR_PHY_RESET);
+	writel(reg, csr_base + USB_CSR_SOFT_RESET_OFFSET);
+	mdelay(10);
+	reg &= ((~USB_CSR_CTRL_RESET) & (~USB_CSR_PHY_RESET));
+	writel(reg, csr_base + USB_CSR_SOFT_RESET_OFFSET);
+
+	mdelay(10);
+
+	/* enable usb2 clock */
+	reg = readl(csr_base + USB_CSR_CLOCK_CONTROL_OFFSET);
+	reg &= ~USB_CSR_CLOCK_DISABLE;
+	writel(reg, csr_base + USB_CSR_CLOCK_CONTROL_OFFSET);
+
+	dev_info(dev, "%s done. clock_mask, bit6(0x%x)\n", __func__, reg);
+
+	return;
+}
+
+static void sunrise5_dwc3_destroy(struct platform_device *pdev)
+{
+/* FIXME: bypass dwc3 destroy this time */
+#if 0
+	struct device		*dev = &pdev->dev;
+	struct resource		*res_csr;
+	void __iomem		*csr_base;
+
+	u32			reg;
+
+	res_csr = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+	if (!res_csr) {
+		dev_err(dev, "missing memory resource for index 1\n");
+		return;
+	}
+
+	csr_base = devm_ioremap_resource(dev, res_csr);
+
+	if (!csr_base) {
+		dev_err(dev, "%s mapping io memory failed!\n", __func__);
+		return;
+	}
+
+	/* disable usb2 clock */
+	reg = readl(csr_base + USB_CSR_CLOCK_CONTROL_OFFSET);
+	reg |= USB_CSR_CLOCK_DISABLE;
+	writel(reg, csr_base + USB_CSR_CLOCK_CONTROL_OFFSET);
+
+	dev_info(dev, "%s done\n", __func__);
+#endif
+
+	return;
+}
+
 static int dwc3_probe(struct platform_device *pdev)
 {
 	struct device		*dev = &pdev->dev;
@@ -1768,7 +1851,7 @@ static int dwc3_probe(struct platform_device *pdev)
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	if (!res) {
-		dev_err(dev, "missing memory resource\n");
+		dev_err(dev, "missing memory resource for index 0\n");
 		return -ENODEV;
 	}
 
@@ -1791,6 +1874,8 @@ static int dwc3_probe(struct platform_device *pdev)
 
 	dwc->regs	= regs;
 	dwc->regs_size	= resource_size(&dwc_res);
+
+	sunrise5_dwc3_gonfigure(pdev);
 
 	dwc3_get_properties(dwc);
 
@@ -1992,6 +2077,8 @@ static int dwc3_remove(struct platform_device *pdev)
 
 	if (dwc->usb_psy)
 		power_supply_put(dwc->usb_psy);
+
+	sunrise5_dwc3_destroy(pdev);
 
 	return 0;
 }

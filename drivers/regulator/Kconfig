@@ -1524,4 +1524,9 @@ config REGULATOR_QCOM_LABIBB
 	  boost regulator and IBB can be used as a negative boost regulator
 	  for LCD display panel.
 
+config REGULATOR_HPU3501
+	tristate "hpu3501 regulator driver"
+	depends on MFD_HPU3501
+	help
+	  Say y here to support the regulators found on the HPU3501 PMIC.
 endif

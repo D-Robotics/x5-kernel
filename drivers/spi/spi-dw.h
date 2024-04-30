@@ -181,6 +181,8 @@ struct dw_spi {
 	u32			cur_rx_sample_dly;
 	u32			def_rx_sample_dly_ns;
 
+	bool			tx_dma_use_burst;
+
 	/* Custom memory operations */
 	struct spi_controller_mem_ops mem_ops;
 

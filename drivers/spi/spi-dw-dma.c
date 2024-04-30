@@ -293,6 +293,9 @@ static int dw_spi_dma_config_tx(struct dw_spi *dws)
 	txconf.dst_addr_width = dw_spi_dma_convert_width(dws->n_bytes);
 	txconf.device_fc = false;
 
+	txconf.src_msize = dws->tx_dma_use_burst ? (dw_readl(dws, DW_SPI_DMARDLR) + 1) : 1;
+	txconf.dst_msize =
+		dws->tx_dma_use_burst ? (dws->fifo_len - dw_readl(dws, DW_SPI_DMATDLR)) : 1;
 	return dmaengine_slave_config(dws->txchan, &txconf);
 }
 
@@ -394,6 +397,10 @@ static int dw_spi_dma_config_rx(struct dw_spi *dws)
 	rxconf.src_addr_width = dw_spi_dma_convert_width(dws->n_bytes);
 	rxconf.device_fc = false;
 
+	/* DMA.CTLx.SRC_MSIZE = SSI.DMARDLR + 1 */
+	rxconf.src_msize = dw_readl(dws, DW_SPI_DMARDLR) + 1;
+	/* DMA.CTLx.DEST_MSIZE = SSI.DMARDLR + 1 */
+	rxconf.dst_msize = dw_readl(dws, DW_SPI_DMARDLR) + 1;
 	return dmaengine_slave_config(dws->rxchan, &rxconf);
 }
 
@@ -489,6 +496,8 @@ static int dw_spi_dma_transfer_all(struct dw_spi *dws,
 	ret = dw_spi_dma_wait(dws, xfer->len, xfer->effective_speed_hz);
 
 err_clear_dmac:
+	if (dw_spi_ip_is(dws, HSSI))
+		dw_spi_enable_chip(dws, 0);
 	dw_writel(dws, DW_SPI_DMACR, 0);
 
 	return ret;
@@ -590,6 +599,8 @@ static int dw_spi_dma_transfer_one(struct dw_spi *dws,
 		rx_len -= len;
 	}
 
+	if (dw_spi_ip_is(dws, HSSI))
+		dw_spi_enable_chip(dws, 0);
 	dw_writel(dws, DW_SPI_DMACR, 0);
 
 	return ret;

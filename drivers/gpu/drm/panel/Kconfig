@@ -717,4 +717,28 @@ config DRM_PANEL_XINPENG_XPP055C272
 	  Say Y here if you want to enable support for the Xinpeng
 	  XPP055C272 controller for 720x1280 LCD panels with MIPI/RGB/SPI
 	  system interfaces.
+
+config DRM_PANEL_ATK_MD0550
+	tristate "ATK MD 0550 panel"
+	depends on OF
+	depends on DRM_MIPI_DSI
+	depends on BACKLIGHT_CLASS_DEVICE
+	select VIDEOMODE_HELPERS
+	help
+	  Say Y here if you want to enable support for the ATK MD 0550
+	  video mode panel with 720x1280 resolution. This panel support
+	  MIPI DSI interface.
+	  Say Y here if you want to enable support for the ATK MD 0550
+	  video mode panel with 720x1280 resolution. This panel support
+	  MIPI DSI interface.
+config DRM_PANEL_JC_050HD134
+	tristate "JC 050HD134 panel"
+	depends on OF
+	depends on DRM_MIPI_DSI
+	depends on BACKLIGHT_CLASS_DEVICE
+	select VIDEOMODE_HELPERS
+	help
+	  Say Y here if you want to enable support for the JC050HD134
+	  panel with 720x1280 resolution. This panel support
+	  MIPI DSI interface.
 endmenu
