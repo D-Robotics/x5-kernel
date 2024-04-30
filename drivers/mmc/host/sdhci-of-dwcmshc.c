@@ -435,11 +435,13 @@ static void dwcmshc_x5_set_clock(struct sdhci_host *host, unsigned int clock)
 	u16 sdhci_clk_reg_val;
 
 	host->mmc->actual_clock = 0;
-	sdhci_writew(host, 0, SDHCI_CLOCK_CONTROL);
-	if (clock == 0)
-		return;
-
 	clk_disable_unprepare(x5_priv->card_clk);
+	sdhci_writew(host, 0, SDHCI_CLOCK_CONTROL);
+	if (clock == 0) {
+		clk_prepare_enable(x5_priv->card_clk);
+		return;
+	}
+
 	sdhci_clk_reg_val = sdhci_calc_clk(host, clock, &host->mmc->actual_clock);
 	sdhci_writew(host, sdhci_clk_reg_val, SDHCI_CLOCK_CONTROL);
 	clk_prepare_enable(x5_priv->card_clk);
