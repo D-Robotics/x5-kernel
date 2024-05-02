@@ -7368,15 +7368,15 @@ static int32_t vpu_suspend(struct device *pdev) /* PRQA S 3673 */
 	//coverity[misra_c_2012_rule_20_7_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
 	dev = (hb_vpu_dev_t *) platform_get_drvdata(to_platform_device(pdev));
 	// PRQA S 3469,2810,1021,3430,0306,0497 --
-	ret = hb_vpu_clk_enable(dev, dev->vpu_freq);
-	VPU_INFO_DEV(dev->device, "[+]vpu_suspend enter\n");
-	if (ret != 0) {
-		VPU_ERR_DEV(dev->device, "Failed to enable vpu clock.\n");
-		vpu_send_diag_error_event((u16)EventIdVPUDevClkEnableErr, (u8)ERR_SEQ_0, 0, __LINE__);
-		return -EINVAL;
-	}
 
 	if (dev->vpu_open_ref_count > 0) {
+		ret = hb_vpu_clk_enable(dev, dev->vpu_freq);
+		VPU_INFO_DEV(dev->device, "[+]vpu_suspend enter\n");
+		if (ret != 0) {
+			VPU_ERR_DEV(dev->device, "Failed to enable vpu clock.\n");
+			vpu_send_diag_error_event((u16)EventIdVPUDevClkEnableErr, (u8)ERR_SEQ_0, 0, __LINE__);
+			return -EINVAL;
+		}
 		for (core = 0; core < MAX_NUM_VPU_CORE; core++) {
 			if (dev->bit_fm_info[core].size == 0U)
 				continue;
@@ -7457,11 +7457,12 @@ static int32_t vpu_suspend(struct device *pdev) /* PRQA S 3673 */
 				return -EAGAIN;
 			}
 		}
+		if (hb_vpu_clk_disable(dev) != 0) {
+			VPU_ERR_DEV(dev->device, "failed to disable clock.\n");
+	}
 	}
 
-	if (hb_vpu_clk_disable(dev) != 0) {
-		VPU_ERR_DEV(dev->device, "failed to disable clock.\n");
-	}
+
 	VPU_INFO_DEV(dev->device, "[-]vpu_suspend leave\n");
 	return 0;
 }
@@ -7470,7 +7471,8 @@ static int32_t vpu_suspend(struct device *pdev) /* PRQA S 3673 */
 static int32_t vpu_resume(struct device *pdev) /* PRQA S 3673 */
 {
 	uint32_t core;
-	int32_t ret, i;
+	//int32_t ret, i;
+	int32_t  i;
 	unsigned long timeout = jiffies + (unsigned long)HZ; /* PRQA S 5209,1840 */ /* vpu wait timeout to 1sec */
 	uint32_t product_code;
 
@@ -7507,12 +7509,12 @@ static int32_t vpu_resume(struct device *pdev) /* PRQA S 3673 */
 	dev = (hb_vpu_dev_t *) platform_get_drvdata(to_platform_device(pdev));
 	// PRQA S 3469,2810,1021,3430,0306,0497 --
 	VPU_INFO_DEV(dev->device, "[+]vpu_resume enter\n");
-	ret = hb_vpu_clk_enable(dev, dev->vpu_freq);
-	if (ret != 0) {
-		VPU_ERR_DEV(dev->device, "Failed to enable vpu clock.\n");
-		vpu_send_diag_error_event((u16)EventIdVPUDevClkEnableErr, (u8)ERR_SEQ_0, 0, __LINE__);
-		return -EINVAL;
-	}
+	// ret = hb_vpu_clk_enable(dev, dev->vpu_freq);
+	// if (ret != 0) {
+	// 	VPU_ERR_DEV(dev->device, "Failed to enable vpu clock.\n");
+	// 	vpu_send_diag_error_event((u16)EventIdVPUDevClkEnableErr, (u8)ERR_SEQ_0, 0, __LINE__);
+	// 	return -EINVAL;
+	// }
 
 	for (core = 0; core < MAX_NUM_VPU_CORE; core++) {
 		if (dev->bit_fm_info[core].size == 0U) {
@@ -7648,9 +7650,9 @@ static int32_t vpu_resume(struct device *pdev) /* PRQA S 3673 */
 		}
 	}
 
-	if (hb_vpu_clk_disable(dev) != 0) {
-		VPU_ERR_DEV(dev->device, "failed to disable clock.\n");
-	}
+	// if (hb_vpu_clk_disable(dev) != 0) {
+	// 	VPU_ERR_DEV(dev->device, "failed to disable clock.\n");
+	// }
 
 	VPU_INFO_DEV(dev->device, "[-]vpu_resume leave\n");
 
