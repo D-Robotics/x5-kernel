@@ -10,6 +10,7 @@
 #include "x5.dtsi"
 #include "pinmux-func.dtsi"
 #include "pinmux-gpio.dtsi"
+#include <dt-bindings/input/linux-event-codes.h>
 
 / {
 	model = "Horizon Robotics X5 EVB board";
@@ -112,6 +113,21 @@
 			ecc-size = <0x0>;
 		};
 
+	};
+
+	gpio-keys {
+		compatible = "gpio-keys";
+		autorepeat;
+		pinctrl-names = "default";
+		pinctrl-0 = <&aon_gpio_2>;
+
+		key-power {
+			debounce-interval = <100>;
+			gpios = <&aon_gpio_porta 2 GPIO_ACTIVE_LOW>;
+			label = "GPIO Key Power";
+			linux,code = <KEY_POWER>;
+			wakeup-source;
+		};
 	};
 
 	gua_audio_rpc_wrapper:audio-rpc-wrapper {
