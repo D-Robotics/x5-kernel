@@ -519,7 +519,6 @@ static int dw_i2s_runtime_suspend(struct device *dev)
 	struct dw_i2s_dev *dw_dev = dev_get_drvdata(dev);
 
 	if (dw_dev->capability & DW_I2S_MASTER) {
-		clk_disable(dw_dev->mclk);
 		clk_disable(dw_dev->sclk);
 	}
 	return 0;
@@ -531,8 +530,7 @@ static int dw_i2s_runtime_resume(struct device *dev)
 	int ret;
 
 	if (dw_dev->capability & DW_I2S_MASTER) {
-		ret = clk_prepare_enable(dw_dev->mclk);
-		ret += clk_prepare_enable(dw_dev->sclk);
+		ret = clk_prepare_enable(dw_dev->sclk);
 		if (ret)
 			return ret;
 	}
@@ -544,7 +542,6 @@ static int dw_i2s_suspend(struct snd_soc_component *component)
 	struct dw_i2s_dev *dev = snd_soc_component_get_drvdata(component);
 
 	if (dev->capability & DW_I2S_MASTER) {
-		clk_disable(dev->mclk);
 		clk_disable(dev->sclk);
 	}
 	return 0;
@@ -557,8 +554,7 @@ static int dw_i2s_resume(struct snd_soc_component *component)
 	int stream, ret;
 
 	if (dev->capability & DW_I2S_MASTER) {
-		ret = clk_enable(dev->mclk);
-		ret += clk_enable(dev->sclk);
+		ret = clk_enable(dev->sclk);
 		if (ret)
 			return ret;
 	}
@@ -900,6 +896,11 @@ static int dw_i2s_probe(struct platform_device *pdev)
 			return PTR_ERR(dev->pclk);
 
 		ret = clk_prepare_enable(dev->pclk);
+		if (ret) {
+			return ret;
+		}
+
+		ret = clk_prepare_enable(dev->mclk);
 		if (ret) {
 			return ret;
 		}
