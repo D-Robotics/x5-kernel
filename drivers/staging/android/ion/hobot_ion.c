@@ -1264,6 +1264,15 @@ int32_t ion_check_in_heap_carveout(phys_addr_t start, size_t size)
 		ion_cma_get_info(hb_ion->ion_dev, &ion_cma_extra_base, &ion_cma_extra_size,
 			ION_HEAP_TYPE_DMA_EX);
 	}
+	pr_debug("%s: Checking:%#llx(%#lx)\n", __func__, start, size);
+	pr_debug("%s: cvt:%#llx(%#lx), cam_reserved:%#llx(%#lx), ion_cma:%#llx(%#lx), "
+			 "custom:%#llx(%#lx), ion_cma_extra:%#llx(%#lx)\n",
+			__func__,
+			cvt->base, cvt->size,
+			cma_reserved->base, cma_reserved->size,
+			ion_cma_base, ion_cma_size,
+			custom->base, custom->size,
+			ion_cma_extra_base, ion_cma_extra_size);
 	if ((start < cvt->base || start + size > cvt->base + cvt->size)
 		&& (start < cma_reserved->base || start + size > cma_reserved->base + cma_reserved->size)
 		&& (start < ion_cma_base || start + size > ion_cma_base + ion_cma_size)
@@ -1378,7 +1387,7 @@ static int32_t hobot_heaps_prepare(struct hobot_ion *hb_ion)
 					= ion_pool_reserved.start;
 				hobot_heaps[ION_HEAP_TYPE_CARVEOUT].size
 					= resource_size(&ion_pool_reserved);
-				pr_info("Reserverd ION Carveout(ion-pool) MEM start 0x%llx, size 0x%lx\n",
+				pr_info("Reserved ION Carveout(ion-pool) MEM start 0x%llx, size 0x%lx\n",
 						hobot_heaps[ION_HEAP_TYPE_CARVEOUT].base,
 						hobot_heaps[ION_HEAP_TYPE_CARVEOUT].size);
 			}
@@ -1400,7 +1409,7 @@ static int32_t hobot_heaps_prepare(struct hobot_ion *hb_ion)
 					= ion_pool_reserved.start;
 				hobot_heaps[ION_HEAP_TYPE_CMA_RESERVED].size
 					= resource_size(&ion_pool_reserved);
-				pr_info("Reserverd ION cma(ion-carveout) reserved MEM start 0x%llx, size 0x%lx\n",
+				pr_info("Reserved ION cma(ion-carveout) reserved MEM start 0x%llx, size 0x%lx\n",
 						hobot_heaps[ION_HEAP_TYPE_CMA_RESERVED].base,
 						hobot_heaps[ION_HEAP_TYPE_CMA_RESERVED].size);
 			}
@@ -1477,7 +1486,7 @@ static int32_t hobot_heaps_prepare(struct hobot_ion *hb_ion)
 					= ion_pool_reserved.start;
 				hobot_heaps[ION_HEAP_TYPE_INLINE_ECC].size
 					= resource_size(&ion_pool_reserved);
-				pr_info("Reserverd ION cma(ion-inline-ecc) reserved MEM start 0x%llx, size 0x%lx\n",
+				pr_info("Reserved ION cma(ion-inline-ecc) reserved MEM start 0x%llx, size 0x%lx\n",
 						hobot_heaps[ION_HEAP_TYPE_INLINE_ECC].base,
 						hobot_heaps[ION_HEAP_TYPE_INLINE_ECC].size);
 			}
@@ -1497,7 +1506,7 @@ static int32_t hobot_heaps_prepare(struct hobot_ion *hb_ion)
 					= ion_pool_reserved.start;
 				hobot_heaps[ION_HEAP_TYPE_DMA].size
 					= resource_size(&ion_pool_reserved);
-				pr_info("Reserverd ION cma(ion-cma) reserved MEM start 0x%llx, size 0x%lx\n",
+				pr_info("Reserved ION cma(ion-cma) reserved MEM start 0x%llx, size 0x%lx\n",
 						hobot_heaps[ION_HEAP_TYPE_DMA].base,
 						hobot_heaps[ION_HEAP_TYPE_DMA].size);
 			}
@@ -1598,7 +1607,7 @@ static void hobot_ion_cma_carveout_prepare(struct hobot_ion *hb_ion)
 				hobot_heaps[ION_HEAP_TYPE_CMA_RESERVED].base = hb_ion->ion_cma_cc.start;
 				hobot_heaps[ION_HEAP_TYPE_CMA_RESERVED].size = hb_ion->ion_cma_cc.size;
 
-				pr_info("ION CMA reserverd MEM start 0x%llx, size 0x%lx\n",
+				pr_info("ION CMA reserved MEM start 0x%llx, size 0x%lx\n",
 						hobot_heaps[ION_HEAP_TYPE_CMA_RESERVED].base,
 						hobot_heaps[ION_HEAP_TYPE_CMA_RESERVED].size);
 			} else {
