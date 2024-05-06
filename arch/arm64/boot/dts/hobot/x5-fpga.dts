@@ -41,13 +41,6 @@
 			linux,cma-default;
 		};
 
-		ion_cma: ion_cma {
-			compatible = "shared-dma-pool";
-			alignment = <0x0 0x2000>;
-			reusable;
-			size = <0x0 0x20000000>;
-			status = "okay";
-		};
 
 		ion_reserved: ion_reserved@b0000000 {
 			compatible = "ion-pool";
@@ -93,6 +86,13 @@
 			status = "okay";
 		};
 
+		ion_cma: ion_cma {
+			compatible = "ion-cma";
+			alignment = <0x0 0x2000>;
+			reusable;
+			reg = <0x0 0xd0000000 0x0 0x20000000>;
+			status = "okay";
+		};
 	};
 
 	gua_audio_rpc_wrapper:audio-rpc-wrapper {

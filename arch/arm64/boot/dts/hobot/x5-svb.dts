@@ -68,10 +68,10 @@
 		};
 
 		ion_cma: ion_cma {
-			compatible = "shared-dma-pool";
+			compatible = "ion-cma";
 			alignment = <0x0 0x2000>;
 			reusable;
-			size = <0x0 0x20000000>;
+			reg = <0x0 0xc0000000 0x0 0x20000000>;
 			status = "okay";
 		};
 	};
