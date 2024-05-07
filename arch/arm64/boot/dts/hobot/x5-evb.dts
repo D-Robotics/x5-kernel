@@ -347,7 +347,7 @@
 
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_sd &hsio_gpio0_26 &hsio_gpio1_1>;
-	power = <&hs_gpio0_porta 26 GPIO_ACTIVE_HIGH>;
+	power-gpios = <&hs_gpio0_porta 26 GPIO_ACTIVE_HIGH>;
 	/* Drive voltage gpio to 0 to switch to 1.8V */
 	voltage-gpios = <&hs_gpio1_porta 1 GPIO_ACTIVE_LOW>;
 };
