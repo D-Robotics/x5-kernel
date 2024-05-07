@@ -18,6 +18,7 @@
 #include <linux/reset.h>
 #include <linux/sizes.h>
 #include <linux/gpio/consumer.h>
+#include <linux/pm_runtime.h>
 
 #include "sdhci-pltfm.h"
 
@@ -660,7 +661,8 @@ static const struct sdhci_pltfm_data sdhci_dwcmshc_pdata = {
 
 static const struct sdhci_pltfm_data sdhci_dwcmshc_x5_sd_pdata = {
 	.ops = &sdhci_dwcmshc_x5_sd_ops,
-	.quirks = SDHCI_QUIRK_CAP_CLOCK_BASE_BROKEN,
+	.quirks = SDHCI_QUIRK_CAP_CLOCK_BASE_BROKEN |
+			  SDHCI_QUIRK_SINGLE_POWER_WRITE,
 	.quirks2 = SDHCI_QUIRK2_PRESET_VALUE_BROKEN,
 };
 
@@ -707,7 +709,7 @@ static int dwcmshc_x5_start_signal_voltage_switch(struct mmc_host *mmc,
 		else if (ios->signal_voltage == MMC_SIGNAL_VOLTAGE_180)
 			state = 1;
 
-		dev_info(mmc_dev(host->mmc), "Set io-voltage gpio %s\n", state ? "Active" : "Inactive");
+		dev_dbg(mmc_dev(host->mmc), "Set io-voltage gpio %s\n", state ? "Active" : "Inactive");
 		gpiod_set_value_cansleep(x5_priv->voltage_gpio, state);
 	}
 
@@ -989,9 +991,21 @@ static int dwcmshc_probe(struct platform_device *pdev)
 
 	host->mmc->caps |= MMC_CAP_WAIT_WHILE_BUSY;
 
+#if IS_ENABLED(CONFIG_PM)
+	pm_runtime_get_noresume(&pdev->dev);
+	pm_runtime_set_active(&pdev->dev);
+	pm_runtime_enable(&pdev->dev);
+	pm_runtime_set_autosuspend_delay(&pdev->dev, 50);
+	pm_runtime_use_autosuspend(&pdev->dev);
+#endif
+
 	err = sdhci_setup_host(host);
 	if (err)
+#if IS_ENABLED(CONFIG_PM)
+		goto err_pm;
+#else
 		goto err_clk;
+#endif
 
 	if (rk_priv)
 		dwcmshc_rk35xx_postinit(host, priv);
@@ -1000,10 +1014,20 @@ static int dwcmshc_probe(struct platform_device *pdev)
 	if (err)
 		goto err_setup_host;
 
+#if IS_ENABLED(CONFIG_PM)
+	pm_runtime_put_autosuspend(&pdev->dev);
+#endif
+
 	return 0;
 
 err_setup_host:
 	sdhci_cleanup_host(host);
+#if IS_ENABLED(CONFIG_PM)
+err_pm:
+	pm_runtime_disable(&pdev->dev);
+	pm_runtime_set_suspended(&pdev->dev);
+	pm_runtime_put_noidle(&pdev->dev);
+#endif
 err_clk:
 	clk_disable_unprepare(pltfm_host->clk);
 	clk_disable_unprepare(priv->bus_clk);
@@ -1027,6 +1051,12 @@ static int dwcmshc_remove(struct platform_device *pdev)
 	struct x5_priv *x5_priv = priv->priv;
 	const struct sdhci_pltfm_data *pltfm_data = device_get_match_data(&pdev->dev);
 
+#if IS_ENABLED(CONFIG_PM)
+	pm_runtime_get_sync(&pdev->dev);
+	pm_runtime_disable(&pdev->dev);
+	pm_runtime_put_noidle(&pdev->dev);
+#endif
+
 	sdhci_remove_host(host, 0);
 
 	clk_disable_unprepare(pltfm_host->clk);
@@ -1048,6 +1078,122 @@ static int dwcmshc_remove(struct platform_device *pdev)
 	return 0;
 }
 
+#if IS_ENABLED(CONFIG_ARCH_HOBOT_X5)
+#ifdef CONFIG_PM_SLEEP
+static int dwcmshc_runtime_suspend(struct device *dev)
+{
+	struct sdhci_host *host = dev_get_drvdata(dev);
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+	struct dwcmshc_priv *priv = sdhci_pltfm_priv(pltfm_host);
+	const struct sdhci_pltfm_data *pltfm_data = device_get_match_data(dev);
+	struct rk35xx_priv *rk_priv = priv->priv;
+	struct x5_priv *x5_priv = priv->priv;
+	struct mmc_host *mmc = host->mmc;
+	int ret;
+	u32 ier;
+	unsigned long flags;
+
+	dev_dbg(dev, "%s\n", __func__);
+	ret = sdhci_runtime_suspend_host(host);
+	if (ret)
+		return ret;
+
+	if (!(mmc->caps & MMC_CAP_NONREMOVABLE)) {
+		/* For SD card keep hclk and card insert/remover
+		 * interrupt to handle card detect funtion
+		 */
+		spin_lock_irqsave(&host->lock, flags);
+		ier = SDHCI_INT_CARD_INSERT | SDHCI_INT_CARD_REMOVE;
+		sdhci_writel(host, ier, SDHCI_INT_ENABLE);
+		sdhci_writel(host, ier, SDHCI_SIGNAL_ENABLE);
+		/* sdhci_runtime_suspend_host will set runtime_suspended
+		 * to true then no interrupt will handle
+		 * here we set runtime_suspended to false to let controller
+		 * only handle card insert/remove interrupt
+		 */
+		host->runtime_suspended = false;
+		spin_unlock_irqrestore(&host->lock, flags);
+	}
+
+	clk_disable_unprepare(pltfm_host->clk);
+	if (!IS_ERR(priv->bus_clk) && (mmc->caps & MMC_CAP_NONREMOVABLE))
+		clk_disable_unprepare(priv->bus_clk);
+
+	if (pltfm_data == &sdhci_dwcmshc_rk35xx_pdata) {
+		if (rk_priv)
+			clk_bulk_disable_unprepare(RK35xx_MAX_CLKS,
+						rk_priv->rockchip_clks);
+	}
+
+	if (pltfm_data == &sdhci_dwcmshc_x5_sd_pdata ||
+	    pltfm_data == &sdhci_dwcmshc_x5_emmc_pdata) {
+		if (x5_priv) {
+			clk_disable_unprepare(x5_priv->card_clk);
+			clk_bulk_disable_unprepare(X5_MAX_CLKS,
+						x5_priv->x5_clks);
+		}
+	}
+
+	return ret;
+}
+
+static int dwcmshc_runtime_resume(struct device *dev)
+{
+	struct sdhci_host *host = dev_get_drvdata(dev);
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+	struct dwcmshc_priv *priv = sdhci_pltfm_priv(pltfm_host);
+	struct rk35xx_priv *rk_priv = priv->priv;
+	struct x5_priv *x5_priv = priv->priv;
+	const struct sdhci_pltfm_data *pltfm_data = device_get_match_data(dev);
+	struct mmc_host *mmc = host->mmc;
+	int ret;
+
+	dev_dbg(dev, "%s\n", __func__);
+	/* Make sure axi clock enable first */
+	if (pltfm_data == &sdhci_dwcmshc_x5_sd_pdata ||
+	    pltfm_data == &sdhci_dwcmshc_x5_emmc_pdata) {
+		if (x5_priv) {
+			ret = clk_bulk_prepare_enable(X5_MAX_CLKS,
+						x5_priv->x5_clks);
+			if (ret)
+				return ret;
+
+			ret = clk_prepare_enable(x5_priv->card_clk);
+			if (ret)
+				return ret;
+		}
+	}
+
+	ret = clk_prepare_enable(pltfm_host->clk);
+	if (ret)
+		return ret;
+
+	if (!IS_ERR(priv->bus_clk) && (mmc->caps & MMC_CAP_NONREMOVABLE)) {
+		ret = clk_prepare_enable(priv->bus_clk);
+		if (ret)
+			return ret;
+	}
+
+	if (pltfm_data == &sdhci_dwcmshc_rk35xx_pdata) {
+		if (rk_priv) {
+			ret = clk_bulk_prepare_enable(RK35xx_MAX_CLKS,
+						rk_priv->rockchip_clks);
+			if (ret)
+				return ret;
+		}
+	}
+
+	return sdhci_runtime_resume_host(host, 0);
+}
+
+static const struct dev_pm_ops dwcmshc_pmops = {
+	SET_RUNTIME_PM_OPS(dwcmshc_runtime_suspend,
+						dwcmshc_runtime_resume,
+						NULL)
+	SET_SYSTEM_SLEEP_PM_OPS(pm_runtime_force_suspend, pm_runtime_force_resume)
+};
+#endif /* CONFIG_PM_SLEEP */
+#else
 #ifdef CONFIG_PM_SLEEP
 static int dwcmshc_suspend(struct device *dev)
 {
@@ -1134,6 +1280,7 @@ static int dwcmshc_resume(struct device *dev)
 #endif
 
 static SIMPLE_DEV_PM_OPS(dwcmshc_pmops, dwcmshc_suspend, dwcmshc_resume);
+#endif /* CONFIG_ARCH_HOBOT_X5 */
 
 static struct platform_driver sdhci_dwcmshc_driver = {
 	.driver	= {
