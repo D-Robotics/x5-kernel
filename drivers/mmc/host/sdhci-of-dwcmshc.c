@@ -108,6 +108,7 @@ struct x5_priv {
 	struct clk	*card_clk;
 	struct clk_bulk_data x5_clks[X5_MAX_CLKS];
 	struct gpio_desc *voltage_gpio;
+	struct gpio_desc *power_gpio;
 	struct reset_control *reset;
 	u8 mshc_ctrl_val;
 	enum dwcmshc_x5_card_type card_type;
@@ -711,6 +712,24 @@ static int dwcmshc_x5_start_signal_voltage_switch(struct mmc_host *mmc,
 	return sdhci_start_signal_voltage_switch(mmc, ios);
 }
 
+static void dwcmshc_x5_toggle_sd_power(struct mmc_host *mmc)
+{
+	struct sdhci_host *host = mmc_priv(mmc);
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+	struct dwcmshc_priv *priv = sdhci_pltfm_priv(pltfm_host);
+	struct x5_priv *x5_priv = priv->priv;
+	u16 toggle_interval_us = 1000;
+
+	if (!IS_ERR_OR_NULL(x5_priv->power_gpio)) {
+		dev_dbg(mmc_dev(mmc), "Toggling power-gpio with interval %u us\n",
+				toggle_interval_us);
+		gpiod_set_value_cansleep(x5_priv->power_gpio, 0);
+		udelay(toggle_interval_us);
+		gpiod_set_value_cansleep(x5_priv->power_gpio, 1);
+	}
+	return;
+}
+
 static int dwcmshc_rk35xx_init(struct sdhci_host *host, struct dwcmshc_priv *dwc_priv)
 {
 	int err;
@@ -921,6 +940,13 @@ static int dwcmshc_probe(struct platform_device *pdev)
 			x5_priv->voltage_gpio = devm_gpiod_get_optional(&pdev->dev, "voltage", GPIOD_OUT_LOW);
 			if (IS_ERR(x5_priv->voltage_gpio))
 				dev_warn(dev, "can not parse voltage gpio\n");
+
+			x5_priv->power_gpio = devm_gpiod_get_optional(&pdev->dev, "power", GPIOD_OUT_LOW);
+			if (IS_ERR(x5_priv->voltage_gpio))
+				dev_warn(dev, "can not parse power gpio\n");
+			else
+				/* For warm boot, SD card need to be powered down */
+				dwcmshc_x5_toggle_sd_power(host->mmc);
 
 			host->mmc_host_ops.start_signal_voltage_switch = dwcmshc_x5_start_signal_voltage_switch;
 			/* TODO: Add power for reboot reset SD card slot */
