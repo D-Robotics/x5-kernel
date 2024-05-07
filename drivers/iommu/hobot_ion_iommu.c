@@ -927,7 +927,14 @@ int32_t ion_iommu_map_ion_handle(struct device *dev,
 		return -EINVAL;
 	}
 
-	dma->dma_addr = phys;
+	ret = ion_iommu_map_ion_phys(dev, phys, len,
+								&dma->dma_addr, iommu_prot);
+	if (ret) {
+		(void)pr_err("%s: ion_iommu_map_ion_phys failed with ret:%d!\n",
+					 __func__, ret);
+		return -EINVAL;
+	}
+
 	dma->client = client;
 
 	return 0;
