@@ -961,7 +961,7 @@ int32_t ion_iommu_map_ion_phys(struct device *dev,
 	start = phys & dma_get_mask(dev);
 	//coverity[misra_c_2012_rule_10_4_violation:SUPPRESS]
 	len = PAGE_ALIGN(size);
-
+	dev_dbg(dev, "Mapping Phys:%#llx(%#lx)\n", phys, len);
 	ret = iommu_map(domain, start, phys, len, iommu_prot);
 
 	if (ret != 0) {

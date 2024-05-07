@@ -248,7 +248,10 @@ static int lite_mmu_map(struct iommu_domain *iommu_domain, unsigned long _iova, 
 	}
 
 	spin_unlock_irqrestore(&domain->map_table_lock, flags);
-
+	pr_debug("%s: Mapping Phys:%#llx(%#lx), start:[%#x]-%#x, end:[%#x]-%#x\n",
+			 __func__, paddr, size,
+			 start_idx, domain->map_table[start_idx],
+			 end_idx, domain->map_table[end_idx]);
 	if (dirty)
 		__flush_domain(domain);
 	return 0;
