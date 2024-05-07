@@ -971,6 +971,11 @@
 				status = "okay";
 			};
 
+			osd: osd {
+				compatible = "hobot,osd";
+				status = "okay";
+			};
+
 			vin_vcon0: vcon@0 {
 				compatible = "hobot,vin-vcon";
 				type = <0>;
