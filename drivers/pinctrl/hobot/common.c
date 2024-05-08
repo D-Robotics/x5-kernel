@@ -486,7 +486,7 @@ static int horizon_gpio_set_direction(struct pinctrl_dev *pctldev, int pin, bool
 	void __iomem *reg_base;
 	struct pinctrl_gpio_range *gpio_range;
 
-	dev_info(ipctl->dev, "set pin = %d direction to %s\n", pin, input ? "input" : "output");
+	dev_dbg(ipctl->dev, "set pin = %d direction to %s\n", pin, input ? "input" : "output");
 	gpio_range = pinctrl_find_gpio_range_from_pin_nolock(pctldev, pin);
 	if (!gpio_range) {
 		dev_err(ipctl->dev, "pin = %d can not find corresponding gpio id\n", pin);
@@ -497,7 +497,7 @@ static int horizon_gpio_set_direction(struct pinctrl_dev *pctldev, int pin, bool
 		gpio_port = (gpio_range->npins >= 31) ? 0 : 1;
 	else
 		gpio_port = 0;
-	dev_info(ipctl->dev, "map pin%d to gpio[%d] - %d\n", pin, gpio_port, gpio);
+	dev_dbg(ipctl->dev, "map pin%d to gpio[%d] - %d\n", pin, gpio_port, gpio);
 
 	mutex_lock(&ipctl->mutex);
 	reg_base = ipctl->gpio_bank_base[gpio_port];
