@@ -194,7 +194,7 @@
 	};
 };
 
-&ls_gpio0 {
+&ls_gpio0_porta {
 	pinctrl-names = "default";
 	pinctrl-0 = < &lsio_gpio0_1
 				  &lsio_gpio0_2
