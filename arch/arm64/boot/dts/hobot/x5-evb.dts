@@ -701,7 +701,7 @@ the following ports need to be deleted*/
 
 	spi-flash@0 {
 		compatible = "spi-nand";
-		spi-max-frequency = <100000000>;
+		spi-max-frequency = <50000000>;
 		rx-sample-delay-ns = <10>;
 		reg = <0>;
 	};
