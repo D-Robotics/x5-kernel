@@ -40,6 +40,7 @@
 #include <linux/fs.h>
 #include <linux/init.h>
 #include <linux/uaccess.h>
+#include <linux/pm_runtime.h>
 #include "remoteproc_internal.h"
 #include "hobot_remoteproc.h"
 #include "hb_ipc_interface.h"
@@ -62,6 +63,7 @@ typedef struct _control {
 
 #define X5_DDR_HIGH_MASK  (0x3)
 
+#define CONFIG_HOBOT_REMOTEPROC_PM (1)
 #define HOBOT_HIFI5_PREP_CLK
 
 #define HORIZON_SMF_POWER_CHAN	(0)
@@ -96,6 +98,39 @@ extern int32_t sync_pipeline_state(uint16_t pcm_device, uint8_t stream, uint8_t 
 static int32_t hobot_dsp_ipc_close_instance(void);
 static void hobot_log_handler(uint8_t *userdata, int32_t instance, int32_t chan_id,
 	uint8_t *buf, uint64_t size);
+
+#ifdef CONFIG_HOBOT_REMOTEPROC_PM
+int32_t hobot_remoteproc_pm_ctrl(const struct hobot_rproc_pdata *pdata, uint16_t init, uint16_t ops) {
+       int32_t ret = 0;
+       struct device *dev = pdata->dev;
+
+       if (pdata == NULL) {
+               pr_err("To pm ctrl invalid HIFI\n");
+               return -EINVAL;
+       }
+
+       if (ops > 0u) {
+               if (init > 0u) {
+                       pm_runtime_set_autosuspend_delay(dev, 0);
+                       pm_runtime_enable(dev);
+               }
+               ret = pm_runtime_get_sync(dev);
+               if (ret < 0) {
+                       pm_runtime_put_noidle(dev);
+                       dev_err(dev, "pm runtime get sync failed\n");
+                       return ret;
+               }
+       } else {
+               ret = pm_runtime_put_sync_suspend(dev);
+               if (init > 0u) {
+                       pm_runtime_disable(dev);
+               }
+       }
+       udelay(100);
+
+       return ret;
+}
+#endif
 
 int32_t hobot_remoteproc_reset_hifi5(uint32_t id)
 {
@@ -560,6 +595,14 @@ static int32_t hobot_dsp_rproc_pre_load(struct rproc *rproc)
 	struct rproc_mem_entry *mem = NULL;
 	pr_debug("%s\n", __FUNCTION__);// dump_stack();
 
+#ifdef CONFIG_HOBOT_REMOTEPROC_PM
+	ret = hobot_remoteproc_pm_ctrl(pdata, 0, 1);
+	if (ret < 0) {
+		dev_err(pdata->dev, "HIFI pm start error\n");
+		return ret;
+	}
+#endif
+
 	ret = hobot_dsp_ipc_open_instance(pdata);
 	if (ret < 0)
 		return ret;
@@ -793,6 +836,13 @@ static int32_t hifi5_release_remoteproc(struct hobot_rproc_pdata *pdata)
 	}
 
 	hifi5_clear_litemmu();
+
+#ifdef CONFIG_HOBOT_REMOTEPROC_PM
+	ret = hobot_remoteproc_pm_ctrl(pdata, 0, 0);
+	if (ret < 0) {
+		dev_err(pdata->dev, "HIFI pm stop error\n");
+	}
+#endif
 
 	if (g_hifi5_res.pmu_reg)
 		devm_iounmap(pdata->dev, g_hifi5_res.pmu_reg);
@@ -1421,6 +1471,7 @@ static int32_t hobot_remoteproc_suspend(struct device *dev)
 		return 0;
 
 	if (mode == HOBOT_LITE_SLEEP && pdata->wakeup_status != HOBOT_AUDIO_WAKEUP_FAILED) {
+		device_wakeup_enable(dev);
 		ret = hb_send_power_cmd(pdata, AUDIO_POWER_TO_LOW_POWER);
 		if (ret < 0) {
 			dev_err(dev, "send power cmd error\n");
@@ -1503,6 +1554,8 @@ static int32_t hobot_remoteproc_resume(struct device *dev)
 		}
 	} else if (reason != HOBOT_AUDIO_WAKEUP && mode == HOBOT_DEEP_SLEEP) {
 		clk_prepare_enable(pdata->clk);
+	} else if (reason == HOBOT_AUDIO_WAKEUP && mode == HOBOT_LITE_SLEEP) {
+		device_wakeup_disable(dev);
 	}
 
 	return 0;
@@ -1673,6 +1726,14 @@ static int32_t hobot_remoteproc_probe(struct platform_device *pdev)
 	pdata->wakeup_status = HOBOT_AUDIO_WAKEUP_SUCCEED;
 	platform_set_drvdata(pdev, pdata);
 
+#ifdef CONFIG_HOBOT_REMOTEPROC_PM
+	ret = hobot_remoteproc_pm_ctrl(pdata, 1, 1);
+	if (ret < 0) {
+		dev_err(&pdev->dev, "HIFI pm enable error\n");
+		return ret;
+	}
+#endif
+
 	/* FIXME: it may need to extend to 64/48 bit */
 	ret = dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(48));
 	if (ret) {
@@ -1761,6 +1822,15 @@ static int32_t hobot_remoteproc_probe(struct platform_device *pdev)
 		goto create_file_out2; /*PRQA S ALL*/ /*qac-0.7.0-2001*/
 	}
 
+#ifdef CONFIG_HOBOT_REMOTEPROC_PM
+	ret = hobot_remoteproc_pm_ctrl(pdata, 0, 0);
+	if (ret < 0) {
+		dev_err(&pdev->dev, "HIFI pm disable error\n");
+		goto create_file_out2;
+	}
+#endif
+
+	device_init_wakeup(&pdev->dev, true);
 	pr_info("hobot_remoteproc_probe end\n");
 
 	return 0;
@@ -1794,6 +1864,14 @@ static int32_t hobot_remoteproc_remove(struct platform_device *pdev) {
 
 #ifdef CONFIG_HOBOT_ADSP_CTRL
 	iounmap(timesync_acore_to_adsp);
+#endif
+
+#ifdef CONFIG_HOBOT_REMOTEPROC_PM
+	ret = hobot_remoteproc_pm_ctrl(pdata, 1, 0);
+	if (ret < 0) {
+		dev_err(pdata->dev, "HIFI pm disable error\n");
+		return ret;
+	}
 #endif
 
 	rproc_free(pdata->rproc);
