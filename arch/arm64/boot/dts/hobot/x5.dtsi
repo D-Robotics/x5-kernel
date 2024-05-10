@@ -3143,7 +3143,7 @@
 			timesync-nanosec-reg = <0xd3ffff04>;
 			clocks = <&dspclks X5_DSP_HIFI5_CLK>, <&dspclks X5_DSP_HIFI5_APB_CLK>;
 			clock-names = "hifi5_clk", "hifi5_pbclk";
-			//power-domains = <&power X5_DSP_HIFI5>;
+			power-domains = <&power X5_DSP_HIFI5>;
 			resets = <&dsprst DSP_HIFI5_RESET>;
 		};
 
