@@ -44,6 +44,7 @@
 #include <linux/device-mapper.h>
 
 #include "dm-audit.h"
+#include "dm-fdekey.h"
 
 #define DM_MSG_PREFIX "crypt"
 
@@ -3202,16 +3203,26 @@ static int crypt_ctr(struct dm_target *ti, unsigned int argc, char **argv)
 	int ret;
 	size_t iv_size_padding, additional_req_size;
 	char dummy;
+	char dr_key[512] = {0};
 
 	if (argc < 5) {
 		ti->error = "Not enough arguments";
 		return -EINVAL;
 	}
 
-	key_size = get_key_size(&argv[1]);
-	if (key_size < 0) {
-		ti->error = "Cannot parse key size";
-		return -EINVAL;
+	if (! strncmp(argv[1], "dr-fde:", 7)) {
+		key_size = get_fde_key_from_efuse(argv[1], dr_key);
+		if (key_size < 0) {
+			ti->error = "Get key from efuse failed";
+			return -EINVAL;
+		}
+	} else {
+		key_size = get_key_size(&argv[1]);
+		if (key_size < 0) {
+			ti->error = "Cannot parse key size";
+			return -EINVAL;
+		}
+		strncpy(dr_key, argv[1], strlen(argv[1]));
 	}
 
 	cc = kzalloc(struct_size(cc, key, key_size), GFP_KERNEL);
@@ -3241,7 +3252,7 @@ static int crypt_ctr(struct dm_target *ti, unsigned int argc, char **argv)
 			goto bad;
 	}
 
-	ret = crypt_ctr_cipher(ti, argv[0], argv[1]);
+	ret = crypt_ctr_cipher(ti, argv[0], dr_key);
 	if (ret < 0)
 		goto bad;
 
