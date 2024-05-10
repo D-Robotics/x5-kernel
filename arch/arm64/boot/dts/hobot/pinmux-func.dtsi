@@ -22,6 +22,11 @@
 		drive-strength = <3>;
 	};
 
+	pconf_drv_pd_mid_1v8: pconf-dev-pd-mid-1v8 {
+		power-source = <HORIZON_IO_PAD_VOLTAGE_1V8>;
+		drive-strength = <7>;
+	};
+
 	pconf_drv_pu_mid_1v8: pconf-dev-pu-mid-1v8 {
 		bias-pull-up;
 		power-source = <HORIZON_IO_PAD_VOLTAGE_1V8>;
@@ -147,8 +152,8 @@
 
 	pinctrl_dsp_i2s0: i2s0grp {
 		horizon,pins = <
-			HIFI_I2S0_DI  DSP_PINMUX_0  BIT_OFFSET4  MUX_ALT0 &pconf_drv_pu_mid_1v8
-			HIFI_I2S0_DO  DSP_PINMUX_0  BIT_OFFSET6  MUX_ALT0 &pconf_drv_pu_mid_1v8
+			HIFI_I2S0_DI  DSP_PINMUX_0  BIT_OFFSET4  MUX_ALT0 &pconf_drv_pd_mid_1v8
+			HIFI_I2S0_DO  DSP_PINMUX_0  BIT_OFFSET6  MUX_ALT0 &pconf_drv_pd_mid_1v8
 			HIFI_I2S0_MCLK  DSP_PINMUX_0  BIT_OFFSET8  MUX_ALT0 &pconf_drv_pu_mid_1v8
 			HIFI_I2S0_SCLK  DSP_PINMUX_0  BIT_OFFSET10  MUX_ALT0 &pconf_drv_pu_mid_1v8
 			HIFI_I2S0_WS  DSP_PINMUX_0  BIT_OFFSET12  MUX_ALT0 &pconf_drv_pu_mid_1v8
@@ -157,8 +162,8 @@
 
 	pinctrl_dsp_i2s1: i2s1grp {
 		horizon,pins = <
-			HIFI_I2S1_DI  DSP_PINMUX_0  BIT_OFFSET14  MUX_ALT0 &pconf_drv_pu_mid_1v8
-			HIFI_I2S1_DO  DSP_PINMUX_0  BIT_OFFSET16  MUX_ALT0 &pconf_drv_pu_mid_1v8
+			HIFI_I2S1_DI  DSP_PINMUX_0  BIT_OFFSET14  MUX_ALT0 &pconf_drv_pd_mid_1v8
+			HIFI_I2S1_DO  DSP_PINMUX_0  BIT_OFFSET16  MUX_ALT0 &pconf_drv_pd_mid_1v8
 			HIFI_I2S1_MCLK  DSP_PINMUX_0  BIT_OFFSET18  MUX_ALT0 &pconf_drv_pu_mid_1v8
 			HIFI_I2S1_SCLK  DSP_PINMUX_0  BIT_OFFSET20  MUX_ALT0 &pconf_drv_pu_mid_1v8
 			HIFI_I2S1_WS  DSP_PINMUX_0  BIT_OFFSET22  MUX_ALT0 &pconf_drv_pu_mid_1v8
