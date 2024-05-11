@@ -322,6 +322,7 @@ static int es8156_set_bias_level(struct snd_soc_component *codec,
 	SNDRV_PCM_FMTBIT_S24_LE | SNDRV_PCM_FMTBIT_S32_LE)
 
 void es8156_shutdown(struct snd_pcm_substream *substream, struct snd_soc_dai *codec_dai) {
+#if 0
 	struct snd_soc_component *codec = codec_dai->component;
 	pr_err("%s start\n", __func__);
 	//snd_soc_component_write(codec,  0x14, 0x00);
@@ -335,6 +336,7 @@ void es8156_shutdown(struct snd_pcm_substream *substream, struct snd_soc_dai *co
 	snd_soc_component_write(codec,  0x09, 0x02);
 	snd_soc_component_write(codec,  0x09, 0x01);
 	snd_soc_component_write(codec,  0x08, 0x00);
+#endif
 }
 
 int es8156_startup(struct snd_pcm_substream *substream,
