@@ -519,45 +519,45 @@
 };
 
 &mipi_host0 {
-	//status = "okay";  //has enabled in x5.dtsi
+	status = "okay";
 	pinctrl-names = "enable", "disable";
-        pinctrl-0 = <&pinctrl_sensor2_mclk>; //mclk2
-        pinctrl-1 = <&lsio_gpio0_26>;
-        snrclk-idx = <2>;  //mclk index
+	pinctrl-0 = <&pinctrl_sensor2_mclk>; //mclk2
+	pinctrl-1 = <&lsio_gpio0_26>;
+	snrclk-idx = <2>;  //mclk index
 };
 
 &mipi_host1 {
-	//status = "okay";  //has enabled in x5.dtsi
-        pinctrl-names = "enable", "disable";
-        pinctrl-0 = <&pinctrl_sensor3_mclk>; //mclk3
-        pinctrl-1 = <&lsio_gpio0_27>;
-        snrclk-idx = <3>;  //mclk index
+	status = "okay";
+	pinctrl-names = "enable", "disable";
+	pinctrl-0 = <&pinctrl_sensor3_mclk>; //mclk3
+	pinctrl-1 = <&lsio_gpio0_27>;
+	snrclk-idx = <3>;  //mclk index
 };
 
 &vin_vcon0 {
-       //status = "okay";  //has enabled in x5.dtsi
-      /* camera sensor
-           power_en gpio:  HSIO_GPIO0_07:       440
-	   reset gpio:	   HSIO_GPIO0_00:       433
-	   pwd gpio:       LSIO_GPIO1_00:       314
-	   mclk :                               mclk2
-	 */
+	status = "okay";  //has enabled in x5.dtsi
+	/* camera sensor
+	   power_en gpio:  HSIO_GPIO0_07:       440
+	   reset gpio:	   HSIO_GPIO0_01:       434
+	   pwd gpio:       LSIO_GPIO1_02:       316
+	*/
 	pinctrl-names = "default";
-        pinctrl-0 = <&hsio_gpio0_7 &hsio_gpio0_0 &lsio_gpio1_0>;
-        gpio_oth = <440 434 316>;   //power_en gpio、 reset gpio、pwd gpio
+	pinctrl-0 = <&hsio_gpio0_7 &hsio_gpio0_0 &lsio_gpio1_2>;
+	gpio_oth = <440 434 316>;   //power_en gpio、 reset gpio、pwd gpio
+	bus = <4>;	//i2c-4
 };
 
 &vin_vcon1 {
-       //status = "okay";  //has enabled in x5.dtsi
-      /* camera sensor
+	status = "okay";  //has enabled in x5.dtsi
+	/* camera sensor
 	   power_en gpio:  HSIO_GPIO0_08:       441
-           reset gpio:     HSIO_GPIO0_01:       434
-	   pwd gpio:       LSIO_GPIO1_02:       316
-	   mclk gpio:                           mclk3
+           reset gpio:     HSIO_GPIO0_00:       433
+	   pwd gpio:       LSIO_GPIO1_02:       314
 	*/
-        pinctrl-names = "default";
-        pinctrl-0 = <&hsio_gpio0_8 &hsio_gpio0_1 &lsio_gpio1_2>;
-        gpio_oth = <441 433 314>;   //power_en gpio、reset gpio、pwd gpio
+	pinctrl-names = "default";
+	pinctrl-0 = <&hsio_gpio0_8 &hsio_gpio0_1 &lsio_gpio1_0>;
+	gpio_oth = <441 433 314>;   //power_en gpio、reset gpio、pwd gpio
+	bus = <3>;	//i2c-3
 };
 
 &bpu {

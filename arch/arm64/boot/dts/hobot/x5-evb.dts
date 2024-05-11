@@ -526,35 +526,36 @@
 };
 
 &mipi_host0 {
-	//status = "okay";  //has enabled in x5.dtsi
+	status = "okay";
 	pinctrl-names = "enable", "disable";
-        pinctrl-0 = <&pinctrl_sensor0_mclk>; //mclk0
-        pinctrl-1 = <&lsio_gpio0_24>;
-        snrclk-idx = <0>;  //mclk index
+	pinctrl-0 = <&pinctrl_sensor0_mclk>; //mclk0
+	pinctrl-1 = <&lsio_gpio0_24>;
+	snrclk-idx = <0>;  //mclk index
 };
 
 &mipi_host1 {
+	status = "okay";
 	//in x5-evb, mipi host0 & host1 share one mclk and gpio
 };
 
 &mipi_host2 {
-	//status = "okay";  //has enabled in x5.dtsi
+	status = "okay";
 	pinctrl-names = "enable", "disable";
-        pinctrl-0 = <&pinctrl_sensor2_mclk>; //mclk2
-        pinctrl-1 = <&lsio_gpio0_26>;
-        snrclk-idx = <2>;  //mclk index
+	pinctrl-0 = <&pinctrl_sensor2_mclk>; //mclk2
+	pinctrl-1 = <&lsio_gpio0_26>;
+	snrclk-idx = <2>;  //mclk index
 };
 
 &mipi_host3 {
-	//status = "okay";  //has enabled in x5.dtsi
+	status = "okay";
 	pinctrl-names = "enable", "disable";
-        pinctrl-0 = <&pinctrl_sensor3_mclk>; //mclk3
-        pinctrl-1 = <&lsio_gpio0_27>;
-        snrclk-idx = <3>;  //mclk index
+	pinctrl-0 = <&pinctrl_sensor3_mclk>; //mclk3
+	pinctrl-1 = <&lsio_gpio0_27>;
+	snrclk-idx = <3>;  //mclk index
 };
 
 &vin_vcon0 {
-	//status = "okay";  //has enabled in x5.dtsi
+	status = "okay";
 	/* camera sensor
 	 * reset gpio:	AON_GPIO0_00:	497
 	 * pwd gpio:	LSIO_GPIO1_00:	314
@@ -567,6 +568,7 @@
 };
 
 &vin_vcon1 {
+	status = "okay";
 	//use same sensor gpio with vcon0 and i2c bus
 	bus = <4>;
 	//lpwm_chn = <1>; //open lpwm0 - channel1
@@ -574,7 +576,7 @@
 };
 
 &vin_vcon2 {
-	//status = "okay";  //has enabled in x5.dtsi
+	status = "okay";
 	/* camera sensor
 	 * reset gpio:	AON_GPIO_PIN4:	501
 	 * pwd gpio:	LSIO_GPIO1_02:	316
@@ -587,7 +589,7 @@
 };
 
 &vin_vcon3 {
- 	//status = "okay";  //has enabled in x5.dtsi
+	status = "okay";
 	/* camera sensor
 	 * reset gpio:	LSIO_GPIO1_06:	320
 	 * pwd gpio:	LSIO_GPIO1_03:	317
