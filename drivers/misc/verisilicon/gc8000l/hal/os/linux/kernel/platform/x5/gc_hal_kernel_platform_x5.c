@@ -42,6 +42,7 @@
 #include <linux/of_irq.h>
 #include <linux/pm.h>
 #include <linux/pm_opp.h>
+#include <linux/reset.h>
 
 /* Disable MSI for internal FPGA build except PPC */
 #if gcdFPGA_BUILD
@@ -235,6 +236,8 @@ static int gpu_remove_power_domains(struct _gcsPLATFORM *platform)
 		}
 	}
 
+	reset_control_assert(platform->rst);
+
 	if (gpd->power_dev) {
 		pm_runtime_disable(gpd->power_dev);
 		dev_pm_domain_detach(gpd->power_dev, true);
@@ -275,6 +278,15 @@ static int gpu_add_power_domains(gcsPLATFORM *platform)
 		goto error;
 
 	pm_runtime_enable(&pdev->dev);
+
+	platform->rst = devm_reset_control_get(dev, "gc8000l_sw_rst");
+
+	if (IS_ERR(platform->rst)) {
+		dev_err(dev, "failed to get reset control.\n");
+		return -EINVAL;
+	}
+
+	reset_control_deassert(platform->rst);
 
 	return 0;
 

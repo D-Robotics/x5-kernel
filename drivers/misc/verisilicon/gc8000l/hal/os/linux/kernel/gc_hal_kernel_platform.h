@@ -402,6 +402,7 @@ struct _gcsPLATFORM {
 	gcsMODULE_PARAMETERS params;
 
 	struct gpu_power_domain gpd;
+	struct reset_control *rst;
 };
 
 int gckPLATFORM_Init(struct platform_driver *pdrv, gcsPLATFORM **platform);
