@@ -99,19 +99,16 @@
 					opp-hz = /bits/ 64 <300000000>;
 					opp-microvolt = <800000 800000 800000>;
 					clock-latency-ns = <40000>;
-					opp-suspend;
 			};
 			opp1 {
 					opp-hz = /bits/ 64 <600000000>;
 					opp-microvolt = <800000 800000 800000>;
 					clock-latency-ns = <40000>;
-					opp-suspend;
 			};
 			opp2 {
 					opp-hz = /bits/ 64 <1200000000>;
 					opp-microvolt = <800000 800000 800000>;
 					clock-latency-ns = <40000>;
-					opp-suspend;
 			};
 			opp3 {
 					opp-hz = /bits/ 64 <1500000000>;
@@ -123,7 +120,6 @@
 					opp-hz = /bits/ 64 <1800000000>;
 					opp-microvolt = <1000000 1000000 1000000>;
 					clock-latency-ns = <40000>;
-					opp-suspend;
 					turbo-mode;
 			};
 	};
@@ -137,19 +133,16 @@
 					opp-hz = /bits/ 64 <300000000>;
 					opp-microvolt = <800000 800000 800000>;
 					clock-latency-ns = <40000>;
-					opp-suspend;
 			};
 			opp1 {
 					opp-hz = /bits/ 64 <600000000>;
 					opp-microvolt = <800000 800000 800000>;
 					clock-latency-ns = <40000>;
-					opp-suspend;
 			};
 			opp2 {
 					opp-hz = /bits/ 64 <1200000000>;
 					opp-microvolt = <800000 800000 800000>;
 					clock-latency-ns = <40000>;
-					opp-suspend;
 			};
 			opp3 {
 					opp-hz = /bits/ 64 <1500000000>;
@@ -168,19 +161,16 @@
 					opp-hz = /bits/ 64 <300000000>;
 					opp-microvolt = <800000 800000 800000>;
 					clock-latency-ns = <40000>;
-					opp-suspend;
 			};
 			opp1 {
 					opp-hz = /bits/ 64 <600000000>;
 					opp-microvolt = <800000 800000 800000>;
 					clock-latency-ns = <40000>;
-					opp-suspend;
 			};
 			opp2 {
 					opp-hz = /bits/ 64 <1200000000>;
 					opp-microvolt = <800000 800000 800000>;
 					clock-latency-ns = <40000>;
-					opp-suspend;
 			};
 			opp3 {
 					opp-hz = /bits/ 64 <1500000000>;
@@ -199,19 +189,16 @@
 					opp-hz = /bits/ 64 <300000000>;
 					opp-microvolt = <800000 800000 800000>;
 					clock-latency-ns = <40000>;
-					opp-suspend;
 			};
 			opp1 {
 					opp-hz = /bits/ 64 <600000000>;
 					opp-microvolt = <800000 800000 800000>;
 					clock-latency-ns = <40000>;
-					opp-suspend;
 			};
 			opp2 {
 					opp-hz = /bits/ 64 <1200000000>;
 					opp-microvolt = <800000 800000 800000>;
 					clock-latency-ns = <40000>;
-					opp-suspend;
 			};
 			opp3 {
 					opp-hz = /bits/ 64 <1500000000>;
