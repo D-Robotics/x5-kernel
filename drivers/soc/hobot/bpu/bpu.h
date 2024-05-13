@@ -223,7 +223,7 @@ struct bpu {
 
 	uint32_t sched_seed;
 	uint32_t stat_reset_count;
-	spinlock_t sched_spin_lock;
+	struct mutex sched_mutex_lock;
 
 	struct bus_type *bus;
 

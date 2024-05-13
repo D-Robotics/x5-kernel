@@ -1397,7 +1397,7 @@ static int __init bpu_init(void)
 	spin_lock_init(&bpu->user_spin_lock);/*PRQA S 3334*/ /* Linux Macro */
 	INIT_LIST_HEAD(&bpu->group_list);
 	spin_lock_init(&bpu->group_spin_lock);/*PRQA S 3334*/ /* Linux Macro */
-	spin_lock_init(&bpu->sched_spin_lock);/*PRQA S 3334*/ /* Linux Macro */
+	mutex_init(&bpu->sched_mutex_lock);
 
 	bpu->miscdev.minor = MISC_DYNAMIC_MINOR;
 	bpu->miscdev.name = "bpu";

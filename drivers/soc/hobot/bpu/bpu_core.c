@@ -571,7 +571,7 @@ int32_t bpu_core_hw_io_resource_alloc(struct bpu_core *core)
 	if (core->hw_io != NULL) {
 		task_range_size = core->hw_io->task_size * core->hw_io->task_capacity;
 		if (core->hw_io->arch == ARCH_BAYES && (core->inst.reserved[3] == 0)) {
-			core->inst.reserved[3] = (uint64_t)kmalloc(sizeof(struct semaphore), GFP_KERNEL);
+			core->inst.reserved[3] = (uint64_t)kmalloc(sizeof(struct semaphore), GFP_ATOMIC);
 			if ((void *)core->inst.reserved[3] != NULL) {
 				sema_init((struct semaphore *)core->inst.reserved[3], 0);
 			}

@@ -134,11 +134,11 @@ int32_t bpu_sched_recover_core(struct bpu_core *core)
 	}
 
 	recovery_core = core;
-	spin_lock_irqsave(&g_bpu->sched_spin_lock, flags);
+	mutex_lock(&g_bpu->sched_mutex_lock);
 	if (bpu_recovery_work_inited > 0) {
 		queue_work(bpu_recovery_workqueue, &bpu_recovery_work);
 	}
-	spin_unlock_irqrestore(&g_bpu->sched_spin_lock, flags);
+	mutex_unlock(&g_bpu->sched_mutex_lock);
 
 	return 0;
 }
@@ -240,13 +240,11 @@ static void bpu_sched_worker(struct timer_list *t)
 
 int32_t bpu_sched_start(struct bpu *bpu)
 {
-	unsigned long flags;
-
 	if (bpu == NULL) {
 		return -EINVAL;
 	}
 
-	spin_lock_irqsave(&bpu->sched_spin_lock, flags);
+	mutex_lock(&bpu->sched_mutex_lock);
 	timer_setup(&bpu->sched_timer, bpu_sched_worker, 0);
 	bpu->sched_seed = HZ;
 	bpu->stat_reset_count = 0;
@@ -256,7 +254,7 @@ int32_t bpu_sched_start(struct bpu *bpu)
 	bpu_recovery_workqueue = alloc_workqueue("bpu_recovery_workqueue", 0, 0);
 	INIT_WORK(&bpu_recovery_work, bpu_recovery_work_func);
 	bpu_recovery_work_inited = 1u;
-	spin_unlock_irqrestore(&bpu->sched_spin_lock, flags);
+	mutex_unlock(&bpu->sched_mutex_lock);
 
 	return 0;
 }
@@ -265,16 +263,16 @@ int32_t bpu_sched_start(struct bpu *bpu)
 void bpu_sched_stop(struct bpu *bpu)
 {
 	int32_t ret;
-	unsigned long flags;
 
 	if (bpu == NULL) {
 		return;
 	}
 
-	spin_lock_irqsave(&bpu->sched_spin_lock, flags);
+	mutex_lock(&bpu->sched_mutex_lock);
 	bpu_recovery_work_inited = 0u;
 	ret = del_timer_sync(&bpu->sched_timer);
-	spin_unlock_irqrestore(&bpu->sched_spin_lock, flags);
+	mutex_unlock(&bpu->sched_mutex_lock);
+
 	destroy_workqueue(bpu_recovery_workqueue);
 	if (ret == 0) {
 		pr_debug("del no sched timer\n");/*PRQA S 0685*/ /*PRQA S 1294*/ /* Linux Macro */
