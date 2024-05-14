@@ -1,0 +1,5 @@
+config TSN
+	tristate "802.1 TSN Support"
+	depends on VLAN_8021Q && PTP_1588_CLOCK && CONFIGFS_FS
+	help
+	  Select this if you want to enable TSN on capable interfaces.
