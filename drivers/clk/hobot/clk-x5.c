@@ -119,14 +119,14 @@ static struct x5_rate_list soc_gen_rates[] = {
 	{X5_CODEC_NOC_CLK,		750000000},
 	{X5_GPU_NOC_CLK,		750000000},
 	{X5_ROM_ACLK,			400000000},
-	{X5_TOP_APB_CLK,		199875000},
+	{X5_TOP_APB_CLK,		200000000},
 	{X5_CPU_CORE_CLK,		1500000000},
 	{X5_CPU_PCLK,			300000000},
 	{X5_CPU_ATCLK,			300000000},
 	{X5_CSS600_TSGEN_CLK,		600000000},
 	{X5_CSS600_DBG_CLK,		150000000},
 	{X5_CSS600_TRACE_CLK,		400000000},
-	{X5_CSS600_TPIU_CLK,		199875000},
+	{X5_CSS600_TPIU_CLK,		200000000},
 	{X5_CPU_NOC_CLK,		750000000},
 	{X5_CAM_ISP8000_CORE_CLK,	600000000},
 	{X5_CAM_ISP8000_AXI_CLK,	600000000},
@@ -155,19 +155,19 @@ static struct x5_rate_list soc_gen_rates[] = {
 	{X5_VIDEO_CODEC_CORE_CLK,	600000000},
 	{X5_VIDEO_CODEC_BCLK,		500000000},
 	{X5_VIDEO_JPEG_CORE_CLK,	500000000},
-	{X5_HSIO_QSPI_BUS_CLK,		199875000},
-	{X5_HSIO_QSPI_CORE_CLK,		199875000},
+	{X5_HSIO_QSPI_BUS_CLK,		200000000},
+	{X5_HSIO_QSPI_CORE_CLK,		200000000},
 	{X5_HSIO_ENET_AXI_CLK,		400000000},
 	{X5_HSIO_ENET_RGMII_CLK,	125000000},
-	{X5_HSIO_ENET_PTP_REFCLK,	199875000},
+	{X5_HSIO_ENET_PTP_REFCLK,	200000000},
 	{X5_HSIO_ENET_REF_CLK,		50000000},
-	{X5_HSIO_EMMC_AXI_CLK,		199875000},
+	{X5_HSIO_EMMC_AXI_CLK,		200000000},
 	{X5_HSIO_24M_CLK,		24000000},
-	{X5_HSIO_EMMC_CCLK,		199875000},
-	{X5_HSIO_SDIO0_AXI_CLK,		199875000},
-	{X5_HSIO_SDIO0_CCLK,		199875000},
-	{X5_HSIO_SDIO1_AXI_CLK,		199875000},
-	{X5_HSIO_SDIO1_CCLK,		199875000},
+	{X5_HSIO_EMMC_CCLK,		200000000},
+	{X5_HSIO_SDIO0_AXI_CLK,		200000000},
+	{X5_HSIO_SDIO0_CCLK,		200000000},
+	{X5_HSIO_SDIO1_AXI_CLK,		200000000},
+	{X5_HSIO_SDIO1_CCLK,		200000000},
 	{X5_HSIO_USB2_AXI_CLK,		400000000},
 	{X5_HSIO_USB3_AXI_CLK,		400000000},
 	{X5_SEC_AXI_CLK,		400000000},
@@ -181,7 +181,7 @@ static struct x5_rate_list soc_gen_rates[] = {
 	{X5_LSIO_SENSOR1_CLK,		24000000},
 	{X5_LSIO_SENSOR2_CLK,		24000000},
 	{X5_LSIO_SENSOR3_CLK,		24000000},
-	{X5_BPU_NOC_PCLK,		199875000},
+	{X5_BPU_NOC_PCLK,		200000000},
 };
 
 struct drobot_clk_provider {
@@ -201,7 +201,7 @@ static const char *i2s0_s_src_sels[] = { "dsp_i2s0_child_sclk", "audio_externel"
 static const char *i2s1_s_src_sels[] = { "dsp_i2s1_child_sclk", "audio_externel" };
 static const char *dsp_noc_gen_src_sels[] = { "osc", "dsp_pll_p", "dsp_pll_r" };
 static const char *soc_gen_src_sels[] = { "osc", "cpu_pll_p", "cpu_pll_r", "sys0_pll_p", "sys0_pll_r", "sys1_pll_p", "sys1_pll_r" , "pixel_pll_r" };
-static const char *apb_gen_src_sels[] = { "osc", "osc", "osc", "osc", "osc", "sys1_pll_p", "osc" , "osc" };
+static const char *apb_gen_src_sels[] = { "osc", "cpu_pll_p", "osc", "osc", "osc", "osc", "osc" , "osc" };
 static const char *disp_gen_src_sels[] = { "osc", "disp_pll_p", "pixel_pll_p", "disp_pll_r", "pixel_pll_r" };
 
 /* use osc clock to disable parent selection */
