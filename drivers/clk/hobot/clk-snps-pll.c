@@ -166,11 +166,8 @@ static void pll_set_regs(struct drobot_clk_pll *pll,
 			const struct pll_rate_table *rate_table,
 			unsigned long parent_rate)
 {
-	u32 cfg_reg, fbdiv_reg = 0, postdiv_reg = 0;
+	u32 val, cfg_reg, fbdiv_reg = 0, postdiv_reg = 0;
 	u64 fvco = parent_rate;
-
-	fbdiv_reg = 0;
-	postdiv_reg = 0;
 
 	cfg_reg = PLL_CTRL_CFG0;
 	fvco = (parent_rate * rate_table->mint) + ((parent_rate * rate_table->mfrac) >> 16);
@@ -189,7 +186,6 @@ static void pll_set_regs(struct drobot_clk_pll *pll,
 
 	fbdiv_reg |= SET_PLL_MINT(rate_table->mint - 16);
 	fbdiv_reg |= PLL_MFRAC_MASK & rate_table->mfrac;
-	fbdiv_reg |= PLL_FBDIV_LOAD;
 
 	postdiv_reg |= PLL_EN;
 	postdiv_reg |= SET_PLL_DIVVCOP(pll_get_divvco_reg(rate_table->divvcop));
@@ -197,9 +193,13 @@ static void pll_set_regs(struct drobot_clk_pll *pll,
 	postdiv_reg |= SET_PLL_DIVVCOR(pll_get_divvco_reg(rate_table->divvcor));
 	postdiv_reg |= SET_PLL_POSTDIVR(rate_table->postdivr - 1);
 
-	writel(0, pll->cfg_reg + PLL_POSTDIV_OFFSET);
-	writel(PLL_BYPASS, pll->cfg_reg);
+	/* pll bypass before relocking pll */
+	val = readl(pll->cfg_reg + PLL_POSTDIV_OFFSET) & (~(PLL_P_OUT | PLL_R_OUT));
+	writel(val, pll->cfg_reg + PLL_POSTDIV_OFFSET);
+	writel(PLL_CTRL_DEFAULT, pll->cfg_reg);
+	writel(fbdiv_reg, pll->cfg_reg + PLL_FBDIV_OFFSET);
 
+	fbdiv_reg |= PLL_FBDIV_LOAD;
 	writel(fbdiv_reg, pll->cfg_reg + PLL_FBDIV_OFFSET);
 	writel(cfg_reg, pll->cfg_reg);
 	writel(PLL_FRAC_EN, pll->internal_reg + PLL_SCFRAC_CNT);

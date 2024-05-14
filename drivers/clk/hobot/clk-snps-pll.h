@@ -91,6 +91,7 @@ struct drobot_clk_pll {
 #define PLL_LOCK		BIT(0)
 #define PLL_FRAC_EN		BIT(0)
 #define PLL_BYPASS_SYNC		(BIT(3) | BIT(4))
+#define PLL_CTRL_DEFAULT	0x2838
 
 struct clk_hw *clk_hw_register_pll(const char *name, const char *parent_name,
 				void __iomem *cfg_reg, void __iomem *internal_reg,
