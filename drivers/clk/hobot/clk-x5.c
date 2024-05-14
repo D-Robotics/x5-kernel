@@ -53,22 +53,20 @@
 }
 
 static struct pll_rate_table x5_pll_rates[] = {
-	/* _rate, _prediv, _mint, _mfrac, _postdivp, _divvcop, _postdivr, _divvcor */
+	/* _rate, _prediv, _mint, _mfrac, _p, _divvcop, _r, _divvcor */
 	X5_PLL_RATE(1800000000, 1, 0x96, 0x0, 1, 2, 1, 2),
 	X5_PLL_RATE(1622250000, 1, 0x87, 0x3000, 1, 2, 3, 2),
 	X5_PLL_RATE(1620000000, 1, 0x87, 0, 1, 2, 1, 2),
 	X5_PLL_RATE(1500000000, 1, 0x7D, 0, 1, 2, 2, 2),
 	X5_PLL_RATE(1347750000, 1, 0x70, 0x5000, 1, 2, 1, 2),
-	X5_PLL_RATE(1200000000, 1, 0xC8, 0, 2, 2, 6, 2),
-	X5_PLL_RATE(999375000,  1, 0xA6, 0x9000, 2, 2, 4, 2),
-	X5_PLL_RATE(405420000,  1, 0xA8, 0xECCD, 5, 2, 2, 2),
-	X5_PLL_RATE(400000000,  1, 0xC8, 0, 6, 2, 2, 2),
-	X5_PLL_RATE(350000000,  1, 0xAF, 0, 6, 2, 4, 2),
+	X5_PLL_RATE(1200000000, 1, 0xC8, 0, 1, 4, 1, 4),
+	X5_PLL_RATE(1050000000, 1, 0xAF, 0, 1, 4, 1, 4),
+	X5_PLL_RATE(996000000,  1, 0xA6, 0, 1, 4, 2, 4),
 	X5_PLL_RATE(339937500,  1, 0x71, 0x5000, 4, 2, 2, 2),
 	X5_PLL_RATE(312375000,  1, 0x9C, 0x3000, 6, 2, 2, 2),
-	X5_PLL_RATE(297000000,  1, 0xC6, 0, 8, 2, 2, 2),
+	X5_PLL_RATE(297000000,  1, 0xC6, 0, 2, 8, 2, 8),
 	X5_PLL_RATE(251750000,  1, 0x7D, 0xE000, 6, 2, 2, 2),
-	X5_PLL_RATE(65000000,   1, 0x82, 0, 24, 2, 2, 2),
+	X5_PLL_RATE(65000000,   1, 0x82, 0, 6, 8, 6, 8),
 };
 
 struct x5_rate_list {
@@ -102,7 +100,7 @@ static struct x5_rate_list dsp_gen_rates[] = {
 static struct x5_rate_list soc_pll_rates0[] = {
 	{X5_CPU_PLL_P,		1200000000},
 	{X5_SYS0_PLL_P,		1500000000},
-	{X5_SYS1_PLL_P,		999375000},
+	{X5_SYS1_PLL_P,		996000000},
 	{X5_DISP_PLL_P,		297000000},
 	{X5_PIXEL_PLL_P,	297000000},
 };
@@ -110,7 +108,7 @@ static struct x5_rate_list soc_pll_rates0[] = {
 static struct x5_rate_list soc_pll_rates1[] = {
 	{X5_CPU_PLL_P,		1200000000}, /* use low frequency to remove children */
 	{X5_SYS0_PLL_P,		1500000000},
-	{X5_SYS1_PLL_P,		999375000},
+	{X5_SYS1_PLL_P,		996000000},
 	{X5_DISP_PLL_P,		297000000},
 	{X5_PIXEL_PLL_P,	1800000000},
 };
@@ -149,10 +147,10 @@ static struct x5_rate_list soc_gen_rates[] = {
 	{X5_DISP_BT1120_ACLK,		600000000},
 	{X5_DISP_DC8000_ACLK,		600000000},
 	{X5_GPU_GC820_CLK,		750000000},
-	{X5_GPU_GC8000L_CLK,		1000000000},
+	{X5_GPU_GC8000L_CLK,		996000000},
 	{X5_GPU_GC820_ACLK,		750000000},
-	{X5_GPU_GC8000L_ACLK,		1000000000},
-	{X5_BPU_MCLK_2X,		1000000000},
+	{X5_GPU_GC8000L_ACLK,		996000000},
+	{X5_BPU_MCLK_2X,		996000000},
 	{X5_BPU_SYS_TIMER_CLK,		6000000},
 	{X5_VIDEO_CODEC_CORE_CLK,	600000000},
 	{X5_VIDEO_CODEC_BCLK,		500000000},
@@ -244,6 +242,7 @@ static int crm_dsp_clk_init(struct platform_device *pdev)
 			base + DSP_PLL_INTERNAL, PLL_R_OUT, NULL, 0);
 
 	clk_set_rate(hws[X5_DSP_PLL_P]->clk, 1622250000);
+	clk_get_rate(hws[X5_DSP_PLL_R]->clk);
 
 	hws[X5_DSP_NOC_CLK] = drobot_clk_register_generator_flags_no_idle("dsp_noc_clk", dsp_noc_gen_src_sels, ARRAY_SIZE(dsp_noc_gen_src_sels), base + 0x800, CLK_IS_CRITICAL);
 	hws[X5_DSP_APB_CLK] = drobot_clk_register_generator("dsp_apb_clk", dsp_gen_src_sels, ARRAY_SIZE(dsp_gen_src_sels), base + 0x820, CLK_IS_CRITICAL, NULL, 0xff);
@@ -413,6 +412,9 @@ static int crm_hps_clk_init(struct platform_device *pdev)
 	else
 		for(i = 0; i < ARRAY_SIZE(soc_pll_rates1); i++)
 			clk_set_rate(hws[soc_pll_rates1[i].id]->clk, soc_pll_rates1[i].rate);
+
+	for(i = X5_CPU_PLL_P; i <= X5_PIXEL_PLL_R; i++)
+		clk_get_rate(hws[i]->clk);
 
 	hws[X5_TOP_NOC_CLK] = drobot_clk_register_generator_flags_no_idle("top_noc_clk", soc_gen_src_sels, ARRAY_SIZE(soc_gen_src_sels), base + HPS_CLK_GEN, CLK_IS_CRITICAL);
 	hws[X5_BPU_NOC_CLK] = drobot_clk_register_generator_flags_no_idle("bpu_noc_clk", soc_gen_src_sels, ARRAY_SIZE(soc_gen_src_sels), base + HPS_CLK_GEN + 0x20, CLK_IS_CRITICAL);
