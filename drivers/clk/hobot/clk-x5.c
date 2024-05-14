@@ -121,7 +121,7 @@ static struct x5_rate_list soc_gen_rates[] = {
 	{X5_CODEC_NOC_CLK,		750000000},
 	{X5_GPU_NOC_CLK,		750000000},
 	{X5_ROM_ACLK,			400000000},
-	{X5_TOP_APB_CLK,		187500000},
+	{X5_TOP_APB_CLK,		199875000},
 	{X5_CPU_CORE_CLK,		1500000000},
 	{X5_CPU_PCLK,			300000000},
 	{X5_CPU_ATCLK,			300000000},
@@ -163,9 +163,9 @@ static struct x5_rate_list soc_gen_rates[] = {
 	{X5_HSIO_ENET_RGMII_CLK,	125000000},
 	{X5_HSIO_ENET_PTP_REFCLK,	199875000},
 	{X5_HSIO_ENET_REF_CLK,		50000000},
-	{X5_HSIO_EMMC_AXI_CLK,		187500000},
+	{X5_HSIO_EMMC_AXI_CLK,		199875000},
 	{X5_HSIO_24M_CLK,		24000000},
-	{X5_HSIO_EMMC_CCLK,		187500000},
+	{X5_HSIO_EMMC_CCLK,		199875000},
 	{X5_HSIO_SDIO0_AXI_CLK,		199875000},
 	{X5_HSIO_SDIO0_CCLK,		199875000},
 	{X5_HSIO_SDIO1_AXI_CLK,		199875000},
@@ -419,7 +419,7 @@ static int crm_hps_clk_init(struct platform_device *pdev)
 	hws[X5_CODEC_NOC_CLK] = drobot_clk_register_generator_flags_no_idle("codec_noc_clk", soc_gen_src_sels, ARRAY_SIZE(soc_gen_src_sels), base + HPS_CLK_GEN + 0x40, CLK_IS_CRITICAL);
 	hws[X5_GPU_NOC_CLK] = drobot_clk_register_generator_flags_no_idle("gpu_noc_clk", soc_gen_src_sels, ARRAY_SIZE(soc_gen_src_sels), base + HPS_CLK_GEN + 0x60, CLK_IS_CRITICAL);
 	hws[X5_ROM_ACLK] = drobot_clk_register_generator_flags_no_idle("rom_aclk", soc_gen_src_sels, ARRAY_SIZE(soc_gen_src_sels), base + HPS_CLK_GEN + 0x80, CLK_IS_CRITICAL);
-	hws[X5_TOP_APB_CLK] = drobot_clk_register_generator_flags_no_idle("top_apb_clk", soc_gen_src_sels, ARRAY_SIZE(soc_gen_src_sels), base + HPS_CLK_GEN + 0xA0, CLK_IS_CRITICAL);
+	hws[X5_TOP_APB_CLK] = drobot_clk_register_generator_flags_no_idle("top_apb_clk", apb_gen_src_sels, ARRAY_SIZE(apb_gen_src_sels), base + HPS_CLK_GEN + 0xA0, CLK_IS_CRITICAL);
 
 	hws[X5_WDT_PCLK] = drobot_clk_hw_register_gate_no_idle("wdt_pclk", "top_apb_clk", base + TOP_CLK_ENB, 4, 0);
 	hws[X5_DMA_PCLK] = drobot_clk_hw_register_gate_no_idle("dma_pclk", "top_apb_clk", base + TOP_CLK_ENB, 5, 0);
@@ -537,8 +537,8 @@ static int crm_hps_clk_init(struct platform_device *pdev)
 	hws[X5_HSIO_ENET_PCLK] = drobot_clk_hw_register_gate_no_idle("enet_pclk", "top_apb_clk", base + HSIO_CLK_ENB, 4, 0);
 
 	hws[X5_HSIO_24M_CLK] = drobot_clk_register_generator_flags_no_idle("hsio_24m_clk", soc_gen_src_sels, ARRAY_SIZE(soc_gen_src_sels), base + HPS_CLK_GEN + 0x7E0, CLK_IS_CRITICAL);
-	hws[X5_HSIO_EMMC_AXI_CLK] = drobot_clk_register_generator_no_idle("emmc_axi_clk", soc_gen_src_sels, ARRAY_SIZE(soc_gen_src_sels), base + HPS_CLK_GEN + 0x720);
-	hws[X5_HSIO_EMMC_CCLK] = drobot_clk_register_gen_no_flags("emmc_cclk", soc_gen_src_sels, ARRAY_SIZE(soc_gen_src_sels), base + HPS_CLK_GEN + 0x740, ctx->idle, ISO_CG_EMMC);
+	hws[X5_HSIO_EMMC_AXI_CLK] = drobot_clk_register_generator_no_idle("emmc_axi_clk", apb_gen_src_sels, ARRAY_SIZE(apb_gen_src_sels), base + HPS_CLK_GEN + 0x720);
+	hws[X5_HSIO_EMMC_CCLK] = drobot_clk_register_gen_no_flags("emmc_cclk", apb_gen_src_sels, ARRAY_SIZE(apb_gen_src_sels), base + HPS_CLK_GEN + 0x740, ctx->idle, ISO_CG_EMMC);
 
 	hws[X5_HSIO_EMMC_ACLK] = drobot_clk_hw_register_gate("emmc_aclk", "emmc_axi_clk", base + HSIO_CLK_ENB, 8, gate_flags, ctx->idle, ISO_CG_EMMC);
 	hws[X5_HSIO_EMMC_HCLK] = drobot_clk_hw_register_gate_no_idle("emmc_hclk", "top_apb_clk", base + HSIO_CLK_ENB, 9, 0);
