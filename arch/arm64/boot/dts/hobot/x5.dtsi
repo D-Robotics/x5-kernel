@@ -2679,6 +2679,92 @@
 				};
 			};
 
+			hobot_tsn: hobot_tsn@35010000 {
+				compatible = "snps,dwc-qos-ethernet-4.10a";
+				status = "disabled";
+				reg = <0x35010000 0x10000>,
+					<0x35050000 0x4>;
+				interrupt-parent = <&gic>;
+				interrupts = <GIC_SPI 24 IRQ_TYPE_LEVEL_HIGH>;
+				interrupt-names = "mac-irq";
+				clocks = <&hpsclks X5_HSIO_ENET_AXI_CLK>,
+					 <&hpsclks X5_HSIO_ENET_RGMII_CLK>,
+					 <&hpsclks X5_HSIO_ENET_PCLK>,
+					 <&hpsclks X5_HSIO_ENET_REF_CLK>,
+					 <&hpsclks X5_HSIO_ENET_PTP_REFCLK>;
+				clock-names = "eth0_pre_clk", "eth0_clk", "eth0_pclk", "eth0_ref", "sys_div_pclk";
+				resets = <&socrst HSIO_ENET_RESET>;
+				reset-names = "enet_rst";
+				snps,burst-map = <5>;
+				snps,force_sf_dma_mode = <1>;
+				phy-mode = "rgmii-id";
+				phy-handle = <&hobot_ethphy0>;
+				snps,tso;
+
+				mdio {
+					compatible = "snps,dwmac-mdio";
+					#address-cells = <1>;
+					#size-cells = <0>;
+					hobot_ethphy0: hobot_ethernet-phy@1 {
+						compatible =
+							"ethernet-phy-ieee802.3-c22";
+						reg = <0>;
+					};
+				};
+
+				snps,mtl-tx-config {
+					snps,tx-queues-to-use = <4>;
+					hobot_txqueue0: hobot_txqueue@1 {
+						snps,dcb-algorithm;
+						snps,tx-sched-sp;
+					};
+					hobot_txqueue1: hobot_txqueue@2 {
+						snps,avb-algorithm;
+						snps,idle_slope = <0x38e>;
+						snps,send_slope = <0x1ccc>;
+						snps,high_credit = <0x556aaa>;
+						snps,low_credit = <0xff57400>;
+						snps,priority = <0x2>;
+					};
+					hobot_txqueue2: hobot_txqueue@3 {
+						snps,avb-algorithm;
+						snps,idle_slope = <0x8e4>;
+						snps,send_slope = <0x1800>;
+						snps,high_credit = <0x7d0000>;
+						snps,low_credit = <0xff736000>;
+						snps,priority = <0x4>;
+					};
+					hobot_txqueue3: hobot_txqueue@4 {
+						snps,avb-algorithm;
+						snps,idle_slope = <0xe38>;
+						snps,send_slope = <0x1333>;
+						snps,high_credit = <0x4b0000>;
+						snps,low_credit = <0xff8f8000>;
+						snps,priority = <0x8>;
+					};
+				};
+
+				snps,mtl-rx-config {
+					snps,rx-queues-to-use = <4>;
+					snps,rx-sched-sp;
+					hobot_rxqueue0: hobot_rxqueue@1 {
+						snps,dcb-algorithm;
+					};
+					hobot_rxqueue1: hobot_rxqueue@2 {
+						snps,avb-algorithm;
+						snps,route-ptp;
+					};
+					hobot_rxqueue2: hobot_rxqueue@3 {
+						snps,priority = <0x4>;
+						snps,avb-algorithm;
+					};
+					hobot_rxqueue3: hobot_rxqueue@4 {
+						snps,avb-algorithm;
+						snps,priority = <0x8>;
+					};
+				};
+			};
+
 			sdio_0: sdhci@35020000 {
 				compatible = "horizon,x5-dwcmshc-sd";
 				status = "disabled";
