@@ -614,6 +614,7 @@ static void bt1120_disp_enable(struct vs_crtc *vs_crtc)
 	struct bt1120_disp *bt1120_disp = to_bt1120_disp(vs_crtc);
 	struct drm_display_mode *mode	= &vs_crtc->base.state->adjusted_mode;
 	struct bt1120_scan scan;
+	u32 pix_clk_rate;
 	int ret;
 
 	if (mode->flags & DRM_MODE_FLAG_INTERLACE)
@@ -627,10 +628,12 @@ static void bt1120_disp_enable(struct vs_crtc *vs_crtc)
 		return;
 	}
 
-	if (bt1120_disp->state->pix_clk_rate != mode->clock) {
+	bt1120_disp->refresh_rate = 30;
+	pix_clk_rate		  = clk_get_rate(bt1120_disp->bt1120->pix_clk) / 1000;
+
+	if (pix_clk_rate != mode->clock) {
 		clk_set_rate(bt1120_disp->bt1120->pix_clk, (unsigned long)(mode->clock) * 1000);
-		bt1120_disp->state->pix_clk_rate = mode->clock;
-		bt1120_disp->state->refresh_rate =
+		bt1120_disp->refresh_rate =
 			(unsigned long)(mode->clock) * 1000 / (mode->htotal * mode->vtotal);
 	}
 
@@ -665,10 +668,10 @@ static void bt1120_disp_disable(struct vs_crtc *vs_crtc)
 	bt1120_set_clear(bt1120_disp->bt1120, REG_BT1120_CTL, 0, BIT(0));
 
 	/* make sure refresh rate is valid value */
-	if (bt1120_disp->state->refresh_rate == 0)
-		bt1120_disp->state->refresh_rate = 30;
+	if (bt1120_disp->refresh_rate == 0)
+		bt1120_disp->refresh_rate = 30;
 	/* wait till last framestart irq triggered, so last frame can be fully displayed.*/
-	mdelay(1000 / bt1120_disp->state->refresh_rate);
+	mdelay(1000 / bt1120_disp->refresh_rate);
 
 	clk_disable_unprepare(bt1120_disp->bt1120->pix_clk);
 }
@@ -708,7 +711,6 @@ static void bt1120_disp_destroy(struct vs_crtc *vs_crtc)
 
 static struct drm_crtc_state *bt1120_disp_create_state(struct vs_crtc *vs_crtc)
 {
-	struct bt1120_disp *bt1120_disp = to_bt1120_disp(vs_crtc);
 	struct bt1120_disp_state *state;
 
 	state = kzalloc(sizeof(*state), GFP_KERNEL);
@@ -716,9 +718,6 @@ static struct drm_crtc_state *bt1120_disp_create_state(struct vs_crtc *vs_crtc)
 		return NULL;
 
 	state->underflow_cnt = 0;
-	state->refresh_rate  = 30;
-	state->pix_clk_rate  = clk_get_rate(bt1120_disp->bt1120->pix_clk) / 1000;
-	bt1120_disp->state   = state;
 
 	return &state->base;
 }

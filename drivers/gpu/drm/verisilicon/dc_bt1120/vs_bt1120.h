@@ -214,8 +214,8 @@ struct bt1120_disp {
 	/** display info */
 	struct bt1120_display_info *info;
 
-	/** display state */
-	struct bt1120_disp_state *state;
+	/** refresh_rate, in Hz. */
+	u32 refresh_rate;
 };
 
 /**
@@ -226,12 +226,6 @@ struct bt1120_disp_state {
 	struct drm_crtc_state base;
 
 	u32 underflow_cnt;
-
-	/** pixel clock rate, in KHz. */
-	u32 pix_clk_rate;
-
-	/** refresh_rate, in Hz. */
-	u32 refresh_rate;
 };
 
 /**
