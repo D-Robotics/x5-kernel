@@ -160,6 +160,8 @@ struct n2d_config {
 	u8 sequential_mode; //sequential processing
 	u64 in_buffer_addr[N2D_IN_MAX][VIO_BUFFER_MAX_PLANES];
 	u64 out_buffer_addr[VIO_BUFFER_MAX_PLANES];
+	u32 overlay_x;
+	u32 overlay_y;
 	n2d_command_t command;
 };
 

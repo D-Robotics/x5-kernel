@@ -1397,8 +1397,8 @@ static int do_overlay(struct vio_node *vnode, struct n2d_config *config)
 	dst.tiling   = N2D_LINEAR;
 	N2D_ON_ERROR(n2d_map(&dst));
 
-	rect.x = 64; /* add dst rect */
-	rect.y = 64;
+	rect.x = config->overlay_x; /* add dst rect */
+	rect.y = config->overlay_y;
 	rect.width = src1.width;
 	rect.height = src1.height;
 
