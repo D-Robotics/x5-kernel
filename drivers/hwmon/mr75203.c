@@ -942,6 +942,8 @@ static int mr75203_probe(struct platform_device *pdev)
 		val++;
 	if (vm_num)
 		val++;
+	if (pd_num)
+		val++;
 	if (!val)
 		return -ENODEV;
 
