@@ -326,7 +326,7 @@ static void axi_calculate_statistics(struct axi_monitor *axi_mon)
 {
 	uint64_t apb_cycles, axi_cycles, rd_bw_raw, wr_bw_raw, full_bw_raw,
 			rd_cmd_num, wr_cmd_num, rd_max_latency, rd_min_latency, wr_max_latency,
-			wr_min_latency, rd_time_total, wr_time_total, rd_max_ost, wr_max_ost, 
+			wr_min_latency, rd_time_total, wr_time_total, rd_max_ost, wr_max_ost,
 			rd_stop_ost, wr_stop_ost;
 	uint32_t reg_ok_to, time_low, time_high, int_status;
 	struct list_head *port_entry;
@@ -582,7 +582,6 @@ static int axi_monitor_probe(struct platform_device *pdev)
 		goto error;
 	}
 
-	dev_set_name(dev, "axi-monitor");
 	axi_mon->pdev = pdev;
 	axi_mon->irq = platform_get_irq(pdev, 0);
 	ret = devm_request_irq(dev, axi_mon->irq, axi_monitor_isr,
