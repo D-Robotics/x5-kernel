@@ -61,6 +61,7 @@
 #define DW_SPI_DR			0x60
 #define DW_SPI_RX_SAMPLE_DLY		0xf0
 #define DW_SPI_CS_OVERRIDE		0xf4
+#define DW_SPI_ENHANCE_CTRLR0		0xf4
 
 /* Bit fields in CTRLR0 (DWC APB SSI) */
 #define DW_PSSI_CTRLR0_DFS_MASK			GENMASK(3, 0)
@@ -85,6 +86,12 @@
 #define DW_PSSI_CTRLR0_SLV_OE			BIT(10)
 #define DW_PSSI_CTRLR0_SRL			BIT(11)
 #define DW_PSSI_CTRLR0_CFS			BIT(12)
+
+#define DW_SPI_SPI_FRF_MASK			GENMASK(23, 22)
+#define DW_SPI_STD_SPI_FRF			0x0
+#define DW_SPI_DUAL_SPI_FRF			0x1
+#define DW_SPI_QUAD_SPI_FRF			0x2
+#define DW_SPI_OCTAL_SPI_FRF			0x3
 
 /* Bit fields in CTRLR0 (DWC SSI with AHB interface) */
 #define DW_HSSI_CTRLR0_DFS_MASK			GENMASK(4, 0)
@@ -121,6 +128,43 @@
 #define DW_SPI_DMACR_RDMAE			BIT(0)
 #define DW_SPI_DMACR_TDMAE			BIT(1)
 
+/* Bit fields in SPI_CTRLR0 */
+#define SPI_WAIT_CYCS_OFFSET	11
+#define SPI_CLK_STRETCH_OFFSEST	30
+
+#define SPI_INST_L_OFFSET	8
+#define SPI_INST_L_0		0x0         /* 0-bit, No Instruction */
+#define SPI_INST_L_1		0x1         /* 4-bit Instruction */
+#define SPI_INST_L_2		0x2         /* 8-bit Instruction */
+#define SPI_INST_L_3		0x3         /* 16-bit Instruction */
+
+#define SPI_ADDR_L_OFFSET	2
+#define SPI_ADDR_L_0		0x0         /* 0-bit Address Width */
+#define SPI_ADDR_L_1		0x1         /* 4-bit Address Width */
+#define SPI_ADDR_L_2		0x2         /* 8-bit Address Width */
+#define SPI_ADDR_L_3		0x3         /* 12-bit Address Width */
+#define SPI_ADDR_L_4		0x4         /* 16-bit Address Width */
+#define SPI_ADDR_L_5		0x5         /* 20-bit Address Width */
+#define SPI_ADDR_L_6		0x6         /* 24-bit Address Width */
+#define SPI_ADDR_L_7		0x7         /* 28-bit Address Width */
+#define SPI_ADDR_L_8		0x8         /* 32-bit Address Width */
+#define SPI_ADDR_L_9		0x9         /* 36-bit Address Width */
+#define SPI_ADDR_L_10		0xa         /* 40-bit Address Width */
+#define SPI_ADDR_L_11		0xb         /* 44-bit Address Width */
+#define SPI_ADDR_L_12		0xc         /* 48-bit Address Width */
+#define SPI_ADDR_L_13		0xd         /* 52-bit Address Width */
+#define SPI_ADDR_L_14		0xe         /* 56-bit Address Width */
+#define SPI_ADDR_L_15		0xf         /* 60-bit Address Width */
+
+#define SPI_TRANS_TYPE_OFFSET	0
+#define SPI_TRANS_TYPE_0	0x0
+#define SPI_TRANS_TYPE_1	0x1
+#define SPI_TRANS_TYPE_2	0x2
+
+#define SPI_BUS_STANDARD	0x1
+#define SPI_BUS_DUAL		0x2
+#define SPI_BUS_QUAD		0x3
+
 /* Mem/DMA operations helpers */
 #define DW_SPI_WAIT_RETRIES			5
 #define DW_SPI_BUF_SIZE \
@@ -135,6 +179,8 @@ struct dw_spi_cfg {
 	u8 dfs;
 	u32 ndf;
 	u32 freq;
+	u8 mode;
+	u8 addrl;
 };
 
 struct dw_spi;

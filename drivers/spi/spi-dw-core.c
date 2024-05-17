@@ -325,8 +325,10 @@ void dw_spi_update_config(struct dw_spi *dws, struct spi_device *spi,
 {
 	struct dw_spi_chip_data *chip = spi_get_ctldata(spi);
 	u32 cr0 = chip->cr0;
+	u32 spi_ctl0;
 	u32 speed_hz;
 	u16 clk_div;
+	u32 val;
 
 	/* CTRLR0[ 4/3: 0] or CTRLR0[ 20: 16] Data Frame Size */
 	cr0 |= (cfg->dfs - 1) << dws->dfs_offset;
@@ -338,11 +340,46 @@ void dw_spi_update_config(struct dw_spi *dws, struct spi_device *spi,
 		/* CTRLR0[11:10] Transfer Mode */
 		cr0 |= FIELD_PREP(DW_HSSI_CTRLR0_TMOD_MASK, cfg->tmode);
 
+	dw_writel(dws, DW_SPI_TXFTLR, 0);
+	dw_writel(dws, DW_SPI_RXFTLR, 0);
+
+	if (cfg->mode == SPI_BUS_DUAL) {
+		dw_writel(dws, DW_SPI_TXFTLR, dws->fifo_len / 2);
+		dw_writel(dws, DW_SPI_RXFTLR, dws->fifo_len / 2);
+		cr0 &= ~DW_SPI_SPI_FRF_MASK;
+		cr0 |= FIELD_PREP(DW_SPI_SPI_FRF_MASK, DW_SPI_DUAL_SPI_FRF);
+		spi_ctl0 = (SPI_TRANS_TYPE_0 << SPI_TRANS_TYPE_OFFSET) |
+					((cfg->addrl * 2) << SPI_ADDR_L_OFFSET) |
+					(SPI_INST_L_2 << SPI_INST_L_OFFSET) |
+					(0 << SPI_WAIT_CYCS_OFFSET) |
+					(1 << SPI_CLK_STRETCH_OFFSEST);
+		dw_writel(dws, DW_SPI_ENHANCE_CTRLR0, spi_ctl0);
+	} else if (cfg->mode == SPI_BUS_QUAD) {
+		dw_writel(dws, DW_SPI_TXFTLR, dws->fifo_len / 2);
+		dw_writel(dws, DW_SPI_RXFTLR, dws->fifo_len / 2);
+		cr0 &= ~DW_SPI_SPI_FRF_MASK;
+		cr0 |= FIELD_PREP(DW_SPI_SPI_FRF_MASK, DW_SPI_QUAD_SPI_FRF);
+		spi_ctl0 = (SPI_TRANS_TYPE_0 << SPI_TRANS_TYPE_OFFSET) |
+					((cfg->addrl * 2) << SPI_ADDR_L_OFFSET) |
+					(SPI_INST_L_2 << SPI_INST_L_OFFSET) |
+					(0 << SPI_WAIT_CYCS_OFFSET) |
+					(1 << SPI_CLK_STRETCH_OFFSEST);
+		dw_writel(dws, DW_SPI_ENHANCE_CTRLR0, spi_ctl0);
+	}
+
 	dw_writel(dws, DW_SPI_CTRLR0, cr0);
 
 	if (cfg->tmode == DW_SPI_CTRLR0_TMOD_EPROMREAD ||
 	    cfg->tmode == DW_SPI_CTRLR0_TMOD_RO)
 		dw_writel(dws, DW_SPI_CTRLR1, cfg->ndf ? cfg->ndf - 1 : 0);
+
+	if (cfg->tmode == DW_SPI_CTRLR0_TMOD_TO && cfg->mode == SPI_BUS_QUAD) {
+		dw_writel(dws, DW_SPI_CTRLR1, cfg->ndf ? cfg->ndf - 1 : 0);
+		val = dw_readl(dws, DW_SPI_TXFTLR);
+		val &= (unsigned int)0xffff;
+		val |= 0x2 << 16;
+		dw_writel(dws, DW_SPI_TXFTLR, val);
+	}
 
 	/* Note DW APB SSI clock divider doesn't support odd numbers */
 	clk_div = (DIV_ROUND_UP(dws->max_freq, cfg->freq) + 1) & 0xfffe;
@@ -428,6 +465,7 @@ static int dw_spi_transfer_one(struct spi_controller *master,
 		.tmode = DW_SPI_CTRLR0_TMOD_TR,
 		.dfs = transfer->bits_per_word,
 		.freq = transfer->speed_hz,
+		.mode = SPI_BUS_STANDARD,
 	};
 	int ret;
 
@@ -759,6 +797,267 @@ static int dw_spi_exec_mem_op(struct spi_mem *mem, const struct spi_mem_op *op)
 	return ret;
 }
 
+static bool dw_qspi_supports_mem_op(struct spi_mem *mem,
+				   const struct spi_mem_op *op)
+{
+	if (op->addr.buswidth > 1 || op->dummy.buswidth > 1 || op->cmd.buswidth > 1)
+		return false;
+
+	return spi_mem_default_supports_op(mem, op);
+}
+
+static int dw_qspi_adjust_mem_op_size(struct spi_mem *mem, struct spi_mem_op *op)
+{
+	if (op->data.nbytes % 4)
+		op->data.nbytes += (4 - op->data.nbytes % 4);
+
+	op->data.nbytes = clamp_val(op->data.nbytes, 0, (DW_SPI_NDF_MASK + 1) * 4);
+
+	return 0;
+}
+
+static int dw_qspi_wait_mem_op_done(struct dw_spi *dws)
+{
+	int retry = 1000;
+	struct spi_delay delay;
+	unsigned long ns, us;
+	u32 nents;
+
+	nents = dw_readl(dws, DW_SPI_TXFLR);
+	ns = NSEC_PER_SEC / dws->current_freq * nents;
+	ns *= dws->n_bytes * BITS_PER_BYTE;
+	if (ns <= NSEC_PER_USEC) {
+		delay.unit = SPI_DELAY_UNIT_NSECS;
+		delay.value = ns;
+	} else {
+		us = DIV_ROUND_UP(ns, NSEC_PER_USEC);
+		delay.unit = SPI_DELAY_UNIT_USECS;
+		delay.value = clamp_val(us, 0, USHRT_MAX);
+	}
+
+	while (--retry) {
+		if ((dw_readl(dws, DW_SPI_SR) & (DW_SPI_SR_BUSY | DW_SPI_SR_TF_EMPT)) == DW_SPI_SR_TF_EMPT)
+			break;
+		spi_delay_exec(&delay, NULL);
+	}
+
+	if (retry < 0) {
+		dev_err(&dws->master->dev, "Mem op hanged up status:0x%x\n", dw_readl(dws, DW_SPI_SR));
+		return -EIO;
+	}
+
+	return 0;
+}
+
+static int dw_qspi_init_mem_buf(struct dw_spi *dws, const struct spi_mem_op *op)
+{
+	unsigned int len;
+	u32 *out;
+	u32 *buf;
+	u32 i;
+
+	len = 0;
+	if (op->cmd.nbytes)
+		len += 4;
+	if (op->addr.nbytes)
+		len += 4;
+	if (op->data.dir == SPI_MEM_DATA_OUT)
+		len += op->data.nbytes;
+
+	if (len <= DW_SPI_BUF_SIZE) {
+		out = (u32*)dws->buf;
+	} else {
+		out = kzalloc(len, GFP_KERNEL);
+		if (!out)
+			return -ENOMEM;
+	}
+
+	/*
+	 * Collect the operation code, address and dummy bytes into the single
+	 * buffer. If it's a transfer with data to be sent, also copy it into the
+	 * single buffer in order to speed the data transmission up.
+	 */
+	out[0] = op->cmd.opcode;
+	out[1] = op->addr.val << (op->dummy.nbytes * 8);
+
+	if (op->data.dir == SPI_MEM_DATA_OUT) {
+		buf = (u32*)op->data.buf.out;
+		memcpy((void*)&out[2], op->data.buf.out, op->data.nbytes);
+		for (i = 0; i < (op->data.nbytes / 4); i++)
+			out[2 + i] = cpu_to_be32(*(buf + i));
+	}
+
+	dws->n_bytes = 4;
+	dws->tx = out;
+	dws->tx_len = len / dws->n_bytes;
+	if (op->data.dir == SPI_MEM_DATA_IN) {
+		dws->rx = op->data.buf.in;
+		dws->rx_len = op->data.nbytes / dws->n_bytes;
+	} else {
+		dws->rx = NULL;
+		dws->rx_len = 0;
+	}
+
+	return 0;
+}
+
+static int dw_qspi_write_then_read(struct dw_spi *dws, struct spi_device *spi)
+{
+	u32 room, entries, sts, txw, rxw;
+	unsigned int len;
+	u32 *buf;
+
+	len = dws->tx_len;
+	buf = (u32 *)dws->tx;
+	while (len) {
+		entries = readl_relaxed(dws->regs + DW_SPI_TXFLR);
+
+		room = min(dws->fifo_len - entries, len);
+		for (; room; --room, --len) {
+			txw = *(buf);
+			dw_write_io_reg(dws, DW_SPI_DR, txw);
+			buf++;
+		}
+	}
+
+	len = dws->rx_len;
+	buf = (u32 *)dws->rx;
+	while (len) {
+		entries = readl_relaxed(dws->regs + DW_SPI_RXFLR);
+		if (!entries) {
+			sts = readl_relaxed(dws->regs + DW_SPI_RISR);
+			if (sts & DW_SPI_INT_RXOI) {
+				dev_err(&dws->master->dev, "FIFO overflow on Rx\n");
+				return -EIO;
+			}
+			continue;
+		}
+
+		entries = min(entries, len);
+		if (entries) {
+			for (; entries; --entries, --len) {
+				rxw = dw_read_io_reg(dws, DW_SPI_DR);
+				*(buf) = be32_to_cpu(rxw);
+				buf++;
+			}
+		}
+	}
+
+	return 0;
+}
+
+static void dw_qspi_stop_mem_op(struct dw_spi *dws, struct spi_device *spi)
+{
+	dw_spi_enable_chip(dws, 0);
+	dws->set_cs(spi, true);
+	dw_spi_enable_chip(dws, 1);
+}
+
+static int dw_qspi_exec_mem_op(struct spi_mem *mem, const struct spi_mem_op *op)
+{
+	struct dw_spi *dws = spi_controller_get_devdata(mem->spi->controller);
+	struct dw_spi_cfg cfg;
+	unsigned long flags;
+	int ret;
+
+	if (op->data.buswidth != 4 || op->addr.buswidth != 1 || op->cmd.buswidth != 1)
+		return -ENOTSUPP;
+
+	/*
+	 * Collect the outbound data into a single buffer to speed the
+	 * transmission up at least on the initial stage.
+	 */
+	ret = dw_qspi_init_mem_buf(dws, op);
+	if (ret)
+		return ret;
+
+	/*
+	 * DW SPI EEPROM-read mode is required only for the SPI memory Data-IN
+	 * operation. Transmit-only mode is suitable for the rest of them.
+	 */
+	cfg.dfs = 32;
+	cfg.freq = clamp(mem->spi->max_speed_hz, 0U, dws->max_mem_freq);
+	if (op->data.dir == SPI_MEM_DATA_IN) {
+		cfg.tmode = DW_SPI_CTRLR0_TMOD_RO;
+		cfg.ndf = op->data.nbytes / 4;
+		if (op->data.nbytes % 4)
+			cfg.ndf++;
+	} else {
+		cfg.tmode = DW_SPI_CTRLR0_TMOD_TO;
+		cfg.ndf = op->data.nbytes / 4;
+		if (op->data.nbytes % 4)
+			cfg.ndf++;
+	}
+	cfg.addrl = op->addr.nbytes + op->dummy.nbytes;
+	cfg.mode = SPI_BUS_QUAD;
+
+	dws->set_cs(mem->spi, false);
+
+	dw_spi_enable_chip(dws, 0);
+
+	dw_spi_update_config(dws, mem->spi, &cfg);
+
+	dw_spi_mask_intr(dws, 0xff);
+
+	dw_spi_enable_chip(dws, 1);
+
+	/*
+	 * DW APB SSI controller has very nasty peculiarities. First originally
+	 * (without any vendor-specific modifications) it doesn't provide a
+	 * direct way to set and clear the native chip-select signal. Instead
+	 * the controller asserts the CS lane if Tx FIFO isn't empty and a
+	 * transmission is going on, and automatically de-asserts it back to
+	 * the high level if the Tx FIFO doesn't have anything to be pushed
+	 * out. Due to that a multi-tasking or heavy IRQs activity might be
+	 * fatal, since the transfer procedure preemption may cause the Tx FIFO
+	 * getting empty and sudden CS de-assertion, which in the middle of the
+	 * transfer will most likely cause the data loss. Secondly the
+	 * EEPROM-read or Read-only DW SPI transfer modes imply the incoming
+	 * data being automatically pulled in into the Rx FIFO. So if the
+	 * driver software is late in fetching the data from the FIFO before
+	 * it's overflown, new incoming data will be lost. In order to make
+	 * sure the executed memory operations are CS-atomic and to prevent the
+	 * Rx FIFO overflow we have to disable the local interrupts so to block
+	 * any preemption during the subsequent IO operations.
+	 *
+	 * Note. At some circumstances disabling IRQs may not help to prevent
+	 * the problems described above. The CS de-assertion and Rx FIFO
+	 * overflow may still happen due to the relatively slow system bus or
+	 * CPU not working fast enough, so the write-then-read algo implemented
+	 * here just won't keep up with the SPI bus data transfer. Such
+	 * situation is highly platform specific and is supposed to be fixed by
+	 * manually restricting the SPI bus frequency using the
+	 * dws->max_mem_freq parameter.
+	 */
+	local_irq_save(flags);
+	preempt_disable();
+
+	ret = dw_qspi_write_then_read(dws, mem->spi);
+
+	local_irq_restore(flags);
+	preempt_enable();
+
+	/*
+	 * Wait for the operation being finished and check the controller
+	 * status only if there hasn't been any run-time error detected. In the
+	 * former case it's just pointless. In the later one to prevent an
+	 * additional error message printing since any hw error flag being set
+	 * would be due to an error detected on the data transfer.
+	 */
+
+	if (!ret) {
+		ret = dw_qspi_wait_mem_op_done(dws);
+		if (!ret)
+			ret = dw_spi_check_status(dws, true);
+	}
+
+	dw_qspi_stop_mem_op(dws, mem->spi);
+
+	dw_spi_free_mem_buf(dws);
+
+	return ret;
+}
+
 /*
  * Initialize the default memory operations if a glue layer hasn't specified
  * custom ones. Direct mapping operations will be preserved anyway since DW SPI
@@ -775,6 +1074,12 @@ static void dw_spi_init_mem_ops(struct dw_spi *dws)
 		dws->mem_ops.adjust_op_size = dw_spi_adjust_mem_op_size;
 		dws->mem_ops.supports_op = dw_spi_supports_mem_op;
 		dws->mem_ops.exec_op = dw_spi_exec_mem_op;
+		if (!dws->max_mem_freq)
+			dws->max_mem_freq = dws->max_freq;
+	} else {
+		dws->mem_ops.adjust_op_size = dw_qspi_adjust_mem_op_size;
+		dws->mem_ops.supports_op = dw_qspi_supports_mem_op;
+		dws->mem_ops.exec_op = dw_qspi_exec_mem_op;
 		if (!dws->max_mem_freq)
 			dws->max_mem_freq = dws->max_freq;
 	}
@@ -934,7 +1239,8 @@ int dw_spi_add_host(struct device *dev, struct dw_spi *dws)
 	}
 
 	master->use_gpio_descriptors = true;
-	master->mode_bits = SPI_CPOL | SPI_CPHA | SPI_LOOP;
+	master->mode_bits = SPI_CPOL | SPI_CPHA | SPI_LOOP |
+						SPI_TX_DUAL | SPI_RX_DUAL | SPI_TX_QUAD | SPI_RX_QUAD;
 	if (dws->caps & DW_SPI_CAP_DFS32)
 		master->bits_per_word_mask = SPI_BPW_RANGE_MASK(4, 32);
 	else
