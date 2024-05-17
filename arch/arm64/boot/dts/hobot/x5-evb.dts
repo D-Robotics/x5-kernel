@@ -716,6 +716,8 @@ the following ports need to be deleted*/
 		compatible = "spi-nand";
 		spi-max-frequency = <50000000>;
 		rx-sample-delay-ns = <10>;
+		spi-tx-bus-width = <4>;
+		spi-rx-bus-width = <4>;
 		reg = <0>;
 	};
 };
