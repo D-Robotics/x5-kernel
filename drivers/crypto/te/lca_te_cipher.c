@@ -1212,7 +1212,7 @@ int lca_te_cipher_alloc(struct te_drvdata *drvdata)
 		} else {
 			list_add_tail(&t_alg->entry,
 					  &cipher_handle->alg_list);
-			dev_err(dev, "Registered %s\n",
+			dev_dbg(dev, "Registered %s\n",
 				t_alg->skcipher_alg.base.cra_driver_name);
 		}
 	}
@@ -1255,4 +1255,3 @@ fail0:
 	lca_te_cipher_free(drvdata);
 	return rc;
 }
-
