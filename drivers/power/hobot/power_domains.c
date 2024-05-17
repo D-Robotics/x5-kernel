@@ -402,7 +402,7 @@ static void drobot_pm_domain_cleanup(struct drobot_pmu *pmu)
 	struct drobot_pm_domain *pd;
 	int i;
 
-	for (i = pmu->genpd_data.num_domains; i >= 0; i--) {
+	for (i = pmu->genpd_data.num_domains - 1; i >= 0; i--) {
 		genpd = pmu->genpd_data.domains[i];
 		if (genpd) {
 			pd = to_drobot_pd(genpd);
