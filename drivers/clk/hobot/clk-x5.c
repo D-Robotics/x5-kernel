@@ -56,7 +56,7 @@ static struct pll_rate_table x5_pll_rates[] = {
 	/* _rate, _prediv, _mint, _mfrac, _p, _divvcop, _r, _divvcor */
 	X5_PLL_RATE(1800000000, 1, 0x96, 0x0, 1, 2, 1, 2),
 	X5_PLL_RATE(1622250000, 1, 0x87, 0x3000, 1, 2, 3, 2),
-	X5_PLL_RATE(1620000000, 1, 0x87, 0, 1, 2, 1, 2),
+	X5_PLL_RATE(1620000000, 1, 0x87, 0, 1, 2, 3, 2),
 	X5_PLL_RATE(1500000000, 1, 0x7D, 0, 1, 2, 2, 2),
 	X5_PLL_RATE(1347750000, 1, 0x70, 0x5000, 1, 2, 1, 2),
 	X5_PLL_RATE(1200000000, 1, 0xC8, 0, 1, 4, 1, 4),
@@ -214,6 +214,7 @@ static int crm_dsp_clk_init(struct platform_device *pdev)
 	struct drobot_clk_provider *ctx;
 	struct clk_hw **hws;
 	void __iomem *base;
+	bool disable_frac = false;
 	int ret, i;
 
 	ctx = devm_kzalloc(dev, struct_size(ctx, clk_hw_data.hws, X5_DSP_END_CLK), GFP_KERNEL);
@@ -225,6 +226,8 @@ static int crm_dsp_clk_init(struct platform_device *pdev)
 
 	ctx->clk_hw_data.num = X5_DSP_END_CLK;
 	hws = ctx->clk_hw_data.hws;
+
+	disable_frac = device_property_read_bool(dev, "disable-dsp-pll-frac");
 
 	ctx->idle = drobot_idle_get_dev(dev->of_node);
 	if (IS_ERR(ctx->idle)) {
@@ -241,7 +244,11 @@ static int crm_dsp_clk_init(struct platform_device *pdev)
 	hws[X5_DSP_PLL_R] = clk_hw_register_pll("dsp_pll_r", "osc", base,
 			base + DSP_PLL_INTERNAL, PLL_R_OUT, NULL, 0);
 
-	clk_set_rate(hws[X5_DSP_PLL_P]->clk, 1622250000);
+	if (disable_frac)
+		clk_set_rate(hws[X5_DSP_PLL_P]->clk, 1620000000);
+	else
+		clk_set_rate(hws[X5_DSP_PLL_P]->clk, 1622250000);
+
 	clk_get_rate(hws[X5_DSP_PLL_R]->clk);
 
 	hws[X5_DSP_NOC_CLK] = drobot_clk_register_generator_flags_no_idle("dsp_noc_clk", dsp_noc_gen_src_sels, ARRAY_SIZE(dsp_noc_gen_src_sels), base + 0x800, CLK_IS_CRITICAL);
