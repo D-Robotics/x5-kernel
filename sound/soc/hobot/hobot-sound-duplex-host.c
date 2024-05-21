@@ -635,7 +635,6 @@ static int asoc_simple_probe(struct platform_device *pdev)
 	struct link_info *li;
 	int ret;
 
-	pr_err("%s start\n", __func__);
 	/* Allocate the private data and the DAI link array */
 	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
 	if (!priv)
@@ -732,7 +731,7 @@ static int asoc_simple_probe(struct platform_device *pdev)
 	}
 
 	devm_kfree(dev, li);
-	pr_err("%s end\n", __func__);
+	dev_info(dev, "%s end\n", __func__);
 	return 0;
 err:
 	asoc_simple_clean_reference(card);
