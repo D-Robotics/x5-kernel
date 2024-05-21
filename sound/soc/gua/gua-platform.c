@@ -685,6 +685,9 @@ static void pcm_addr_offset_calc(void)
 }
 
 static struct snd_soc_component_driver gua_soc_component = {
+#ifdef CONFIG_DEBUG_FS
+	.debugfs_prefix = "platform",
+#endif
 	.name		= "platform-component",
 	.open		= gua_pcm_open,
 	.close		= gua_pcm_close,
