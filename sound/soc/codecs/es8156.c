@@ -121,7 +121,7 @@ static const struct snd_kcontrol_new es8156_snd_controls[] = {
 
 
 static const struct snd_soc_dapm_widget es8156_dapm_widgets[] = {
-	SND_SOC_DAPM_AIF_OUT("SDOUT", "I2S Capture", 0,
+	SND_SOC_DAPM_AIF_OUT("AIF SDOUT", "I2S Capture", 0,
 				 ES8156_P2S_CONTROL_REG0D, 2, 0),
 
 	SND_SOC_DAPM_AIF_IN("SDIN", "I2S Playback", 0,
