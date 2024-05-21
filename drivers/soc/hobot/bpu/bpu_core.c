@@ -1161,7 +1161,7 @@ static int32_t bpu_core_parse_dts(struct platform_device *pdev, struct bpu_core 
 
 	ret = of_property_read_u32(np, "power_delay", &core->power_delay);/*PRQA S ALL*/
 	if (ret < 0) {
-		dev_err(&pdev->dev, "Can't get bpu power delay, use default\n");
+		dev_info(&pdev->dev, "Can't get bpu power delay, use default\n");
 		core->power_delay = 600;
 	}
 
