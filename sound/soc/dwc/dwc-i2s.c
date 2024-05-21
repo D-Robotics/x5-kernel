@@ -760,14 +760,14 @@ static int dw_configure_dai_by_dt(struct dw_i2s_dev *dev,
 static struct snd_soc_dai_driver dw_i2s_dai_drv[] = {
         {
                 .playback = {
-                        .stream_name = "Playback",
+                        .stream_name = "Playback0",
                         .channels_min = 2,
                         .channels_max = 8,
                         .rates = SNDRV_PCM_RATE_8000_192000,
                         .formats = g_formats[4],
                 },
                 .capture = {
-                        .stream_name = "Capture",
+                        .stream_name = "Capture0",
                         .channels_min = 2,
                         .channels_max = 8,
                         .rates = SNDRV_PCM_RATE_8000_192000,
@@ -779,14 +779,14 @@ static struct snd_soc_dai_driver dw_i2s_dai_drv[] = {
         },
         {
                 .playback = {
-                        .stream_name = "Playback",
+                        .stream_name = "Playback1",
                         .channels_min = 2,
                         .channels_max = 8,
                         .rates = SNDRV_PCM_RATE_8000_192000,
                         .formats = g_formats[4],
                 },
                 .capture = {
-                        .stream_name = "Capture",
+                        .stream_name = "Capture1",
                         .channels_min = 2,
                         .channels_max = 8,
                         .rates = SNDRV_PCM_RATE_8000_192000,
@@ -798,14 +798,14 @@ static struct snd_soc_dai_driver dw_i2s_dai_drv[] = {
         },
         {
                 .playback = {
-                        .stream_name = "Playback",
+                        .stream_name = "Playback2",
                         .channels_min = 2,
                         .channels_max = 8,
                         .rates = SNDRV_PCM_RATE_8000_192000,
                         .formats = g_formats[4],
                 },
                 .capture = {
-                        .stream_name = "Capture",
+                        .stream_name = "Capture2",
                         .channels_min = 2,
                         .channels_max = 8,
                         .rates = SNDRV_PCM_RATE_8000_192000,
