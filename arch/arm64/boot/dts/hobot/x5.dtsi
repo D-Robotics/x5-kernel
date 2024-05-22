@@ -1019,7 +1019,7 @@
 				interrupts =
 					<GIC_SPI 44 IRQ_TYPE_LEVEL_HIGH>;
 				interrupt-names = "csi";
-				status = "disabled";
+				status = "okay";
 			};
 
 			mipi_host1: mipi_host@3d070000 {
