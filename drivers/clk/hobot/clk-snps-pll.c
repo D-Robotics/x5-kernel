@@ -115,7 +115,6 @@ static int pll_enable(struct clk_hw *hw)
 	tmp = readl(pll->cfg_reg + PLL_POSTDIV_OFFSET) | PLL_P_OUT | PLL_R_OUT;
 	writel(tmp, pll->cfg_reg + PLL_POSTDIV_OFFSET);
 
-	pr_err("%s: pll clk %s\n", __func__, __clk_get_name(hw->clk));
 	return 0;
 }
 
