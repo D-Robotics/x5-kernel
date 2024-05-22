@@ -1004,14 +1004,14 @@
 				status = "disabled";
 			};
 
-			mipi_dphy: mipi_dphy@0 {
+			mipi_dphy: mipi_dphy@3d0a0000 {
 				compatible = "hobot,mipi-dphy";
 				reg = <0x3d0a0000 0x10000>;
 				reg-names = "reg";
 				status = "okay";
 			};
 
-			mipi_host0: mipi_host0 {
+			mipi_host0: mipi_host@3d060000 {
 				compatible = "hobot,mipi-host";
 				reg = <0x3d060000 0x10000>;
 				reg-names = "reg";
@@ -1022,7 +1022,7 @@
 				status = "disabled";
 			};
 
-			mipi_host1: mipi_host1 {
+			mipi_host1: mipi_host@3d070000 {
 				compatible = "hobot,mipi-host";
 				reg = <0x3d070000 0x10000>;
 				reg-names = "reg";
@@ -1033,7 +1033,7 @@
 				status = "disabled";
 			};
 
-			mipi_host2: mipi_host2 {
+			mipi_host2: mipi_host@3d080000 {
 				compatible = "hobot,mipi-host";
 				reg = <0x3d080000 0x10000>;
 				reg-names = "reg";
@@ -1044,7 +1044,7 @@
 				status = "disabled";
 			};
 
-			mipi_host3: mipi_host3 {
+			mipi_host3: mipi_host@3d090000 {
 				compatible = "hobot,mipi-host";
 				reg = <0x3d090000 0x10000>;
 				reg-names = "reg";
