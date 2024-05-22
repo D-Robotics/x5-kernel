@@ -517,7 +517,10 @@ static int drobot_pm_domain_probe(struct platform_device *pdev)
 	for_each_available_child_of_node (np, node) {
 		ret = drobot_pm_add_one_domain(pmu, node);
 		if (ret) {
-			dev_err(dev, "failed to handle node %pOFn: %d\n", node, ret);
+			if (ret == -EPROBE_DEFER)
+				dev_dbg(dev, "need retry to handle node %pOFn: %d, \n", node, ret);
+			else
+				dev_err(dev, "failed to handle node %pOFn: %d\n", node, ret);
 			of_node_put(node);
 			goto err_out;
 		}
