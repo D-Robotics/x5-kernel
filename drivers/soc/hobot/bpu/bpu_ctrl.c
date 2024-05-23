@@ -888,7 +888,9 @@ static int32_t bpu_core_set_clk(struct bpu_core *core, uint64_t rate)
 			if (core->hw_io->ops.set_clk!= NULL) {
 				ret = core->hw_io->ops.set_clk(&core->inst, rate);
 			} else {
-				ret = bpu_core_set_clkrate(core, rate);;
+				spin_unlock_irqrestore(&core->hw_io_spin_lock, flags);
+				ret = bpu_core_set_clkrate(core, rate);
+				spin_lock_irqsave(&core->hw_io_spin_lock, flags);
 			}
 		} else {
 			spin_unlock_irqrestore(&core->hw_io_spin_lock, flags);
