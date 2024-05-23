@@ -1253,9 +1253,9 @@ static void xj3_set_speed(struct xj3_priv *priv) {
     struct net_device *ndev = priv->dev;
     struct phy_device *phydev = ndev->phydev;
     u32 regval;
-    int target = 0;
-    //int rate_L1 = 0;
-    int rate_L2 = 0;
+    // int target = 0;
+    // int rate_L1 = 0;
+    // int rate_L2 = 0;
 
     regval = xj3_reg_read(priv, REG_DWCEQOS_MAC_CFG);
     regval &= ~(DWCEQOS_MAC_CFG_PS | DWCEQOS_MAC_CFG_FES | DWCEQOS_MAC_CFG_DM);
@@ -1271,6 +1271,18 @@ static void xj3_set_speed(struct xj3_priv *priv) {
         return;
     }
 
+    /*
+     * FIXME: no need re-config clock path for x5 chip in link up stage.
+     * Just keep below setting for enet is okay. They are clock source, but not actual rgmii bus clock...
+     * rgmii bus clock will automatic adjust the frequency.
+     *  root@buildroot:~$ cat /sys/kernel/debug/clk/clk_summary | grep enet
+     *  enet_rgmii_clk                 1        1        0   125000000          0     0  50000         Y
+     *  enet_ref_clk                   1        1        0    50000000          0     0  50000         Y
+     *  enet_ptp_bclk                  2        2        0   200000000          0     0  50000         Y
+     *  enet_axi_clk                   1        1        0   400000000          0     0  50000         Y
+     *     enet_pclk                   1        1        0   200000000          0     0  50000         Y
+     */
+#if 0
     if (phydev->speed == SPEED_10) {
         /*target = 12500000;
         rate_L1 = clk_round_rate(priv->plat->xj3_mac_pre_div_clk, target);
@@ -1297,6 +1309,7 @@ static void xj3_set_speed(struct xj3_priv *priv) {
         rate_L2 = clk_round_rate(priv->plat->xj3_mac_div_clk, target);
         clk_set_rate(priv->plat->xj3_mac_div_clk, rate_L2);
     }
+#endif
 
     xj3_reg_write(priv, REG_DWCEQOS_MAC_CFG, regval);
 }
