@@ -959,6 +959,13 @@ int32_t ion_iommu_map_ion_phys(struct device *dev,
 	struct iommu_domain *domain;
 	int32_t ret;
 
+	if (IS_ERR_OR_NULL(iommu)) {
+		dev_warn_once(dev,
+			"Not attached to any iommu, using physical address!");
+		*iova = phys_addr;
+		return 0;
+	}
+
 	if (!iommu->domain)
 		return -EINVAL;
 
