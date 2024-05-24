@@ -1806,6 +1806,7 @@
 			clock-names = "osc", "32k";
 			idle-dev = <&noc_idle>;
 			#clock-cells = <1>;
+			disable-dsp-pll-frac;
 			status = "disabled";
 		};
 
