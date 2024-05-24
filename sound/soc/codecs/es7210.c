@@ -1940,6 +1940,15 @@ static int es7210_pcm_startup(struct snd_pcm_substream *substream,
 		schedule_delayed_work(&es7210->pcm_pop_work,
 					  msecs_to_jiffies(100));
 	}
+
+	/* Setting MIC GAIN */
+	if (es7210->channels > 0) {
+		es7210_write(ES7210_MIC1_GAIN_REG43, 0x1e, i2c_clt1[0]);
+		es7210_write(ES7210_MIC2_GAIN_REG44, 0x1e, i2c_clt1[0]);
+		es7210_write(ES7210_MIC3_GAIN_REG45, 0x1e, i2c_clt1[0]);
+		es7210_write(ES7210_MIC4_GAIN_REG46, 0x1e, i2c_clt1[0]);
+	}
+
 	return 0;
 }
 
@@ -2024,24 +2033,7 @@ static int es7210_pcm_hw_params(struct snd_pcm_substream *substream,
 		break;
 	}
 
-
-	es7210_multi_chips_write(ES7210_RESET_CTL_REG00, 0x73);
-	msleep(10);
-	es7210_multi_chips_write(ES7210_RESET_CTL_REG00, 0x71);
 	for (i = 0; i < es7210->adc_dev; i++) {
-		if (es7210->mastermode == 1) {
-			if(i == 0) {
-				es7210_write(ES7210_RESET_CTL_REG00,
-						0x01, i2c_clt1[i]);
-			} else {
-				es7210_write(ES7210_RESET_CTL_REG00,
-						0x41, i2c_clt1[i]);
-			}
-		} else {
-			es7210_write(ES7210_RESET_CTL_REG00,
-					0x41, i2c_clt1[i]);
-		}
-
 		if (params_rate(params) >= 64000) {
 			es7210_read(ES7210_MODE_CFG_REG08, &clksel, i2c_clt1[i]);
 			clksel |= 0x1 << 1;
@@ -2104,39 +2096,12 @@ static int es7210_set_bias_level(struct snd_soc_component *component,
 
 	switch (level) {
 	case SND_SOC_BIAS_ON:
-		pr_info("%s on\n", __func__);
-		for (i = 0;i < es7210->adc_dev; i++) {
-			es7210_write(ES7210_RESET_CTL_REG00, 0x73, i2c_clt1[i]);
-			msleep(10);
-			es7210_write(ES7210_RESET_CTL_REG00, 0x71, i2c_clt1[i]);
-			if (es7210->mastermode == 1) {
-				if(i == 0) {
-					es7210_write(ES7210_RESET_CTL_REG00,
-							0x01, i2c_clt1[i]);
-				} else {
-					es7210_write(ES7210_RESET_CTL_REG00,
-							0x41, i2c_clt1[i]);
-				}
-			} else {
-				es7210_write(ES7210_RESET_CTL_REG00,
-						0x41, i2c_clt1[i]);
-			}
-		}
-		msleep(175);
+		dev_dbg(&es7210->i2c->dev, "%s on\n", __func__);
 		break;
 	case SND_SOC_BIAS_PREPARE:
-		pr_info("%s prepare\n", __func__);
 		break;
 	case SND_SOC_BIAS_STANDBY:
-		pr_info("%s standby\n", __func__);
-		es7210_multi_chips_update_bits(ES7210_MIC1_GAIN_REG43,
-				0x10, 0x10);
-		es7210_multi_chips_update_bits(ES7210_MIC2_GAIN_REG44,
-				0x10, 0x10);
-		es7210_multi_chips_update_bits(ES7210_MIC3_GAIN_REG45,
-				0x10, 0x10);
-		es7210_multi_chips_update_bits(ES7210_MIC4_GAIN_REG46,
-				0x10, 0x10);
+		dev_dbg(&es7210->i2c->dev, "%s standby\n", __func__);
 		es7210_multi_chips_update_bits(ES7210_DIGITAL_PDN_REG06,
 				0x03, 0x00);
 		for (i = 0;i < es7210->adc_dev; i++) {
@@ -2200,7 +2165,7 @@ static int es7210_resume(struct snd_soc_component *component)
 */
 static void es7210_tdm_init_codec(u8 mode)
 {
-	int cnt, channel;
+	int cnt, channel, i;
 	struct es7210_priv *es7210 = es7210_private;
 
 	for (cnt = 0;
@@ -2344,6 +2309,24 @@ static void es7210_tdm_init_codec(u8 mode)
 	es7210_multi_chips_write(ES7210_ALC2_MAX_GAIN_REG1D, 0xBF);
 	es7210_multi_chips_write(ES7210_ALC3_MAX_GAIN_REG1C, 0xBF);
 	es7210_multi_chips_write(ES7210_ALC4_MAX_GAIN_REG1B, 0xBF);
+
+	es7210_multi_chips_write(ES7210_RESET_CTL_REG00, 0x73);
+	msleep(10);
+	es7210_multi_chips_write(ES7210_RESET_CTL_REG00, 0x71);
+	for (i = 0; i < es7210->adc_dev; i++) {
+		if (es7210->mastermode == 1) {
+			if(i == 0) {
+				es7210_write(ES7210_RESET_CTL_REG00,
+						0x01, i2c_clt1[i]);
+			} else {
+				es7210_write(ES7210_RESET_CTL_REG00,
+						0x41, i2c_clt1[i]);
+			}
+		} else {
+			es7210_write(ES7210_RESET_CTL_REG00,
+					0x41, i2c_clt1[i]);
+		}
+	}
 }
 
 
