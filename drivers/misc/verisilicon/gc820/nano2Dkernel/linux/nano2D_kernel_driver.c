@@ -912,27 +912,12 @@ int drv_ioctl_internal(n2d_ioctl_interface_t *iface)
 	int ret = 0;
 	n2d_error_t error;
 
-	/*user data converted to kernel data*/
-	// if (copy_from_user(iface, (void __user *)arg, sizeof(n2d_ioctl_interface_t))) {
-	// 	n2d_kernel_os_print("ioctl: failed to read data.\n");
-	// 	return -ENOTTY;
-	// }
-
-	if (iface->command == N2D_KERNEL_COMMAND_OPEN || iface->command == N2D_KERNEL_COMMAND_CLOSE)
-		return 0;
-
 	iface->error = n2d_kernel_dispatch(global_device->kernel, iface->command, iface->dev_id,
 					   iface->core, &iface->u);
 	if (iface->error == N2D_INTERRUPTED) {
 		ret = -ERESTARTSYS;
 		ONERROR(iface->error);
 	}
-
-	/*kernel data converted to user data*/
-	// if (copy_to_user((void __user *)arg, iface, sizeof(n2d_ioctl_interface_t))) {
-	// 	n2d_kernel_os_print("ioctl: failed to write data.\n");
-	// 	return -ENOTTY;
-	// }
 
 	return 0;
 
@@ -1007,9 +992,6 @@ static int n2d_vnode_open(struct vio_video_ctx *vctx)
 	gcmkASSERT(g_device == global_device);
 	gpu_resume(N2D_NULL);
 
-	ONERROR(n2d_kernel_dispatch(global_device->kernel, N2D_KERNEL_COMMAND_OPEN, 0, 0,
-				    N2D_NULL));
-on_error:
 	return error;
 }
 
@@ -1023,7 +1005,6 @@ static int n2d_vnode_close(struct vio_video_ctx *vctx)
 
 	gcmkASSERT(g_device == global_device);
 
-	n2d_kernel_dispatch(global_device->kernel, N2D_KERNEL_COMMAND_CLOSE, 0, 0, N2D_NULL);
 	n2d_check_allocate_count(&allocate_count);
 	if (allocate_count)
 		n2d_kernel_os_print("Allocated %d memory\n", allocate_count);
@@ -1513,12 +1494,7 @@ on_error:
 	return error;
 }
 
-// static int n2d_push_work(struct n2d_subnode *n2d_sub)
-// {
-// 	return 0;
-// }
-
-static void n2d_judge_triger_worker(struct vio_subdev *vdev, struct vio_frame *frame)
+static void n2d_judge_trigger_worker(struct vio_subdev *vdev, struct vio_frame *frame)
 {
 	int ret = 0;
 	long long timestamp_gap = 0;
@@ -1680,6 +1656,77 @@ err:
 	vio_set_hw_free(vnode);
 }
 
+static void n2d_trigger_frame_work(struct vio_node *vnode)
+{
+	n2d_uint32_t ctx_id = vnode->ctx_id;
+	struct horizon_n2d_dev *n2d = global_n2d;
+
+	if (ctx_id > VIO_MAX_STREAM) {
+		vio_err("[S%d][C%d] %s: invalid ctx_id %d.\n", vnode->flow_id, vnode->ctx_id,
+			__func__, ctx_id);
+	}
+
+	if (&n2d->vnode[ctx_id] != vnode) {
+		vio_err("[S%d][C%d] %s: incompatible vnode.\n", vnode->flow_id, vnode->ctx_id,
+			__func__);
+	}
+
+	up(&n2d->vsemas[ctx_id]);
+}
+
+static int frame_work_routine(void *ctxt)
+{
+	struct horizon_n2d_dev *n2d = global_n2d;
+	n2d_uint32_t ctx_id = gcmPTR2INT(ctxt);
+
+	vio_info("%s: ctx_id %d.\n", __func__, ctx_id);
+	if (ctx_id < 0 || ctx_id > VIO_MAX_STREAM)
+		vio_err("%s: invalid ctx_id %d.\n", __func__, ctx_id);
+
+	for (;;) {
+		int down;
+
+		down = down_interruptible(&n2d->vsemas[ctx_id]);
+		if (down && down != -EINTR)
+			return down;
+
+		if (unlikely(n2d->kill_thread)) {
+			/* The daemon exits. */
+			while (!kthread_should_stop()) {
+				n2d_kernel_os_delay(global_device->os, 1);
+			}
+			return 0;
+		}
+
+		n2d_frame_work(&n2d->vnode[ctx_id]);
+	}
+}
+
+static int start_n2d_frame_work_thread(struct horizon_n2d_dev *n2d, n2d_uint32_t ctx_id)
+{
+	n2d_error_t error = N2D_SUCCESS;
+	struct task_struct *task;
+
+	task = kthread_run(frame_work_routine, gcmINT2PTR(ctx_id), "n2d_framework/%d", ctx_id);
+	if (IS_ERR(task))
+			ONERROR(N2D_GENERIC_IO);
+
+	n2d->framework_task[ctx_id] = task;
+
+on_error:
+	return error;
+}
+
+static int stop_n2d_frame_work_thread(struct horizon_n2d_dev *n2d, n2d_uint32_t ctx_id)
+{
+	n2d->kill_thread = N2D_TRUE;
+	up(&n2d->vsemas[ctx_id]);
+	kthread_stop(n2d->framework_task[ctx_id]);
+	n2d->framework_task[ctx_id] = N2D_NULL;
+
+	return N2D_SUCCESS;
+}
+
 static struct vio_common_ops n2d_vnode_vops = {
 	.open		    = n2d_vnode_open,
 	.close		    = n2d_vnode_close,
@@ -1689,11 +1736,12 @@ static struct vio_common_ops n2d_vnode_vops = {
 	.video_get_version = n2d_get_version,
 };
 
-static int horizon_n2d_device_node_init(struct horizon_n2d_dev *n2d)
+static int horizon_n2d_device_node_init(void)
 {
 	int ret = 0;
 	int i = 0, j = 0;
 	char name[32];
+	struct horizon_n2d_dev *n2d = global_n2d;
 	struct vio_node *vnode = n2d->vnode;
 
 	n2d->galcore = global_device;
@@ -1706,7 +1754,7 @@ static int horizon_n2d_device_node_init(struct horizon_n2d_dev *n2d)
 		vnode[i].ctx_id = i;
 		for (j = 0; j < N2D_IN_MAX; j++) {
 			vnode[i].ich_subdev[j] = &n2d->n2d_sub[i].subdev[j].vdev;
-			vnode[i].ich_subdev[j]->vdev_work = n2d_judge_triger_worker;
+			vnode[i].ich_subdev[j]->vdev_work = n2d_judge_trigger_worker;
 			vnode[i].ich_subdev[j]->vnode = &vnode[i];
 			vnode[i].active_ich	      |= 1 << j;
 		}
@@ -1718,7 +1766,11 @@ static int horizon_n2d_device_node_init(struct horizon_n2d_dev *n2d)
 
 		vnode[i].gtask = &n2d->gtask;
 		vnode[i].allow_bind = n2d_allow_bind;
-		vnode[i].frame_work = n2d_frame_work;
+		vnode[i].frame_work = n2d_trigger_frame_work;
+		sema_init(&n2d->vsemas[i], 0);
+		ret	= start_n2d_frame_work_thread(n2d, i);
+		if (ret != 0)
+			goto err;
 	}
 
 	/* Register vpf device. */
@@ -1884,7 +1936,6 @@ static int __devinit gpu_probe(struct platform_device *pdev)
 	n2d_error_t error;
 	n2d_uint32_t ret;
 	static u64 dma_mask  = 0;
-	struct horizon_n2d_dev *n2d;
 	struct device *dev_p = &(pdev->dev);
 	struct vs_n2d_aux *aux;
 	pm_message_t state = {0};
@@ -1944,18 +1995,16 @@ static int __devinit gpu_probe(struct platform_device *pdev)
 
 	show_param(&global_param, global_device);
 
-	n2d = n2d_kmalloc(sizeof(struct horizon_n2d_dev), GFP_KERNEL);
-	if (NULL == n2d) {
+	global_n2d = n2d_kmalloc(sizeof(struct horizon_n2d_dev), GFP_KERNEL);
+	if (NULL == global_n2d) {
 		n2d_kernel_os_print("allocate n2d_dev structure failed.\n");
 		return -1;
 	}
-	memset(n2d, 0, sizeof(struct horizon_n2d_dev));
+	memset(global_n2d, 0, sizeof(struct horizon_n2d_dev));
 
-	ret = horizon_n2d_device_node_init(n2d);
+	ret = horizon_n2d_device_node_init();
 	if (ret != 0)
 		return ret;
-
-	global_n2d = n2d;
 
 	aux = devm_kzalloc(dev_p, sizeof(*aux), GFP_KERNEL);
 	if (!aux)
@@ -1977,6 +2026,10 @@ on_error:
 static void horizon_n2d_device_node_deinit(struct horizon_n2d_dev *n2d)
 {
 	int i = 0;
+
+	for (i = 0; i < VIO_MAX_STREAM; i++) {
+		stop_n2d_frame_work_thread(n2d, i);
+	}
 
 	for (i = 0; i < N2D_CH_MAX; i++) {
 		vio_unregister_device_node(&n2d->vps[i]);

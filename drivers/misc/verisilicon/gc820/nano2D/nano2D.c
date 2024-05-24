@@ -1092,6 +1092,9 @@ n2d_error_t n2d_open(
         n2d_ioctl_interface_t       iface = {0};
         n2d_kernel_command_get_hw_info_t* hw_info = N2D_NULL;
 
+        iface.command = N2D_KERNEL_COMMAND_OPEN;
+        N2D_ON_ERROR(n2d_user_os_ioctl(&iface));
+
         iface.command = N2D_KERNEL_COMMAND_GET_HW_INFO;
         /*default use device 0 and core 0 */
         iface.dev_id = N2D_DEVICE_0;
@@ -1153,12 +1156,16 @@ n2d_error_t n2d_close(
 
     if (tls->s_running == 1)
     {
+        n2d_ioctl_interface_t iface = {0};
         /* Close the dump file. */
         gcmGETHARDWARE(hardware)
         N2D_DUMP_CLOSE(hardware);
         N2D_ON_ERROR(_gcFreeEngine(tls->engine));
         N2D_ON_ERROR(n2d_user_os_free(tls->engine));
         tls->engine = N2D_NULL;
+
+        iface.command = N2D_KERNEL_COMMAND_CLOSE;
+        N2D_ON_ERROR(n2d_user_os_ioctl(&iface));
     }
 
     tls->s_running--;

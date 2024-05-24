@@ -187,7 +187,9 @@ struct horizon_n2d_dev {
 	struct vpf_device vps[N2D_CH_MAX]; /* set 4 as source channel, 1 as output */
 	struct n2d_subnode n2d_sub[VIO_MAX_STREAM];
 	struct vio_node vnode[VIO_MAX_STREAM];
-	// struct n2d_config config[VIO_MAX_STREAM];
+	struct task_struct *framework_task[VIO_MAX_STREAM];
+	struct semaphore    vsemas[VIO_MAX_STREAM];
+	n2d_bool_t      kill_thread;
 };
 
 struct vs_n2d_aux {
