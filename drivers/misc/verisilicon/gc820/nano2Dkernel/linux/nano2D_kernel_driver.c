@@ -1652,7 +1652,20 @@ static void n2d_frame_work(struct vio_node *vnode)
 	} else {
 		vio_warn("[S%d][C%d] %s no output frame\n", vnode->flow_id, vnode->ctx_id, __func__);
 		framemgr_print_queues(out_framemgr);
-		vio_frame_done(vdev);//src frame invalid run;
+		goto err;
+	}
+
+	vdev = vnode->ich_subdev[0];
+	if (!osal_test_bit((s32)VIO_SUBDEV_BIND_DONE, &vdev->state) && !osal_test_bit((s32)VIO_SUBDEV_BIND_DONE, &och_vdev->state)) {
+		vio_info("[S%d][C%d] %s feedback mode.\n", vnode->flow_id, vnode->ctx_id, __func__);
+		for (j = 0; j < i; j++) {
+			vdev = vnode->ich_subdev[j];
+			framemgr = &vdev->framemgr;
+			vio_e_barrier_irqs(framemgr, flags);
+			frame = peek_frame(framemgr, FS_COMPLETE);
+			trans_frame(framemgr, frame, FS_USED);
+			vio_x_barrier_irqr(framemgr, flags);
+		}
 	}
 
 	vio_set_hw_free(vnode);
