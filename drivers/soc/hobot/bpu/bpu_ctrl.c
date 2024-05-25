@@ -1109,8 +1109,7 @@ int32_t bpu_core_dvfs_register(struct bpu_core *core, const char *name)
 		dev_err(core->dev, "Invalid operating-points in devicetree.\n");
 		return -EINVAL;
 	}
-
-	core->dvfs->profile.polling_ms	= 0;
+	device_property_read_u32(core->dev, "polling_ms", &core->dvfs->profile.polling_ms);
 	core->dvfs->profile.target = bpu_core_set_freq;
 	core->dvfs->profile.get_cur_freq = bpu_core_get_freq;
 	if (core->mclk != NULL) {
