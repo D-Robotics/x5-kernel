@@ -691,7 +691,7 @@ the following ports need to be deleted*/
 /**display sub-system end**/
 
 &hobot_tsn {
-	status = "okay";
+	status = "disabled";
 
 	phy-mode = "rgmii-id";
 	pinctrl-names = "default";
@@ -700,7 +700,7 @@ the following ports need to be deleted*/
 };
 
 &gmac_tsn {
-	status = "disabled";
+	status = "okay";
 
 	phy-mode = "rgmii-id";
 	pinctrl-names = "default";
