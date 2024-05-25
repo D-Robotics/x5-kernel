@@ -274,7 +274,7 @@ err_regulator:
 static int drobot_pd_power_on(struct generic_pm_domain *genpd)
 {
 	struct drobot_pm_domain *pd = to_drobot_pd(genpd);
-	pr_info("%s power on\n", pd->info->name);
+	pr_debug("%s power on\n", pd->info->name);
 
 	return __pd_power_on(pd);
 }
@@ -282,7 +282,7 @@ static int drobot_pd_power_on(struct generic_pm_domain *genpd)
 static int drobot_pd_power_off(struct generic_pm_domain *genpd)
 {
 	struct drobot_pm_domain *pd = to_drobot_pd(genpd);
-	pr_info("%s power off\n", pd->info->name);
+	pr_debug("%s power off\n", pd->info->name);
 
 	return __pd_power_off(pd);
 }
