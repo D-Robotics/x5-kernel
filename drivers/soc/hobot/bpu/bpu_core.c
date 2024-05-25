@@ -648,7 +648,7 @@ static int32_t bpu_core_check_to_open(struct bpu_core *core)
 			dev_err(core->dev, "Can't bpu core hw enable failed\n");
 			return ret;
 		}
-
+		devfreq_resume_device(core->dvfs->devfreq);
 		ret = bpu_core_hw_io_resource_alloc(core);
 		if (ret < 0) {
 			return ret;
@@ -676,6 +676,7 @@ static int32_t bpu_core_check_to_open(struct bpu_core *core)
 				dev_err(core->dev, "Can't bpu core hw enable failed\n");
 				return ret;
 			}
+			devfreq_resume_device(core->dvfs->devfreq);
 		}
 	}
 
@@ -881,6 +882,7 @@ static int bpu_core_release(struct inode *inode, struct file *filp)
 	atomic_dec(&core->open_counter);
 
 	if (atomic_read(&core->open_counter) == 0) {
+		devfreq_suspend_device(core->dvfs->devfreq);
 		bpu_core_make_sure_close(core);
 	}
 
@@ -1281,8 +1283,8 @@ static int bpu_core_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "BPU core registe dvfs failed\n");
 	}
 
+	devfreq_suspend_device(core->dvfs->devfreq);
 	(void)bpu_core_pm_ctrl(core, 0, 0);
-
 	return 0;
 }
 
