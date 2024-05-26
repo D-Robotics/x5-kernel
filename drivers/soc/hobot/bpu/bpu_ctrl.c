@@ -847,7 +847,7 @@ static int32_t bpu_core_set_volt(struct bpu_core *core, int32_t volt)
 	} else {
 		spin_unlock_irqrestore(&core->hw_io_spin_lock, flags);
 		dev_err(core->dev, "No BPU HW IO for Core to use!\n");
-		ret = -EINVAL;
+		return -ENODEV;
 	}
 	spin_unlock_irqrestore(&core->hw_io_spin_lock, flags);
 
@@ -894,8 +894,9 @@ static int32_t bpu_core_set_clk(struct bpu_core *core, uint64_t rate)
 			}
 		} else {
 			spin_unlock_irqrestore(&core->hw_io_spin_lock, flags);
+			bpu_core_pm_ctrl(core, 0, 0);
 			dev_err(core->dev, "No BPU HW IO for Core to use!\n");
-			ret = -ENODEV;
+			return -ENODEV;
 		}
 		spin_unlock_irqrestore(&core->hw_io_spin_lock, flags);
 
