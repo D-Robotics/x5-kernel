@@ -20070,11 +20070,6 @@ OnError:
 
 		gcmkONERROR(gckHARDWARE_QueryPowerState(Hardware, &statesStored));
 
-		if (statesStored == gcvPOWER_OFF) {
-			*Load = 0;
-			goto OnError;
-		}
-
 		gcmkONERROR(gckHARDWARE_SetPowerState(Hardware, gcvPOWER_ON_AUTO));
 		if (hardwareCount == 0) {
 			hardware[0]   = Hardware;

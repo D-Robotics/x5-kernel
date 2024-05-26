@@ -3081,12 +3081,10 @@ static gctUINT32 cur_freq = GC_MAX_FREQ;
 static int gc_df_target(struct device *dev, unsigned long *freq, u32 flags)
 {
 	gctUINT32 i	= 0;
-	gctUINT32 _freq = 1;
-	gckHARDWARE hardware;
-	gckDEVICE device = galDevice->devices[0];
 	struct gpu_power_domain *gpd = &galDevice->platform->gpd;
+	struct dev_pm_opp *opp;
 
-	struct dev_pm_opp *opp = devfreq_recommended_opp(dev, freq, flags);
+	opp = devfreq_recommended_opp(dev, freq, flags);
 	*freq = dev_pm_opp_get_freq(opp);
 
 	if (cur_freq == *freq) {
@@ -3096,15 +3094,6 @@ static int gc_df_target(struct device *dev, unsigned long *freq, u32 flags)
 	for (i = 0; i < gpd->clk_num; i++) {
 		if (gpd->core_clk[i]) {
 			clk_set_rate(gpd->core_clk[i], *freq);
-		}
-	}
-
-	_freq = 64;
-
-	for (i = 0; i < gcvCORE_3D_MAX; i++) {
-		if (device->kernels[i]) {
-			hardware = device->kernels[i]->hardware;
-			gckHARDWARE_SetClock(hardware, _freq, _freq);
 		}
 	}
 
@@ -3119,19 +3108,26 @@ static gceSTATUS gc_df_status(struct device *dev, struct devfreq_dev_status *sta
 	gctUINT32 load	 = 0;
 	gceSTATUS status = gcvSTATUS_OK;
 	gctUINT32 count = 0;
+	gctBOOL clockState;
 
 	gcmkHEADER();
+
+	gckOS_GetClockState(galDevice->os, kernel, &clockState);
+	if (clockState == gcvFALSE) {
+		goto OnError;
+	}
 
 	do {
 		count++;
 		gcmkONERROR(gckHARDWARE_QueryCoreLoad(kernel->hardware, 1, &load));
 	} while (status == gcvSTATUS_CHIP_NOT_READY && count < 10);
 
+OnError:
+
 	stat->current_frequency = (unsigned long)cur_freq;
 	stat->busy_time		= (unsigned long)load;
 	stat->total_time	= (unsigned long)100;
 
-OnError:
 	gcmkFOOTER_NO();
 	return status;
 }
@@ -3167,10 +3163,17 @@ static gceSTATUS gc_df_governor_target(struct devfreq *df, unsigned long *freq)
 	gctUINT32 up_threshold	    = UP_THRESHOLD;
 	gctUINT32 down_differential = DOWN_DIFFERENCTIAL;
 	gceSTATUS status	    = gcvSTATUS_OK;
+	gctBOOL clockState;
 
 	gcmkHEADER();
 
 	gcmkONERROR(devfreq_update_stats(df));
+
+	gckOS_GetClockState(galDevice->os, _GetValidKernel(galDevice), &clockState);
+	if (clockState == gcvFALSE) {
+		*freq =  df->freq_table[0];
+		goto OnError;
+	}
 
 	stat = &df->last_status;
 	i = df->max_state - 1;
