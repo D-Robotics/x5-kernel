@@ -964,9 +964,10 @@
 				clocks =
 					<&hpsclks X5_CAM_VSE_CORE_CLK>,
 					<&hpsclks X5_CAM_VSE_UPSCALE_CLK>,
-					<&hpsclks X5_CAM_DEWARP_HCLK>,
-					<&hpsclks X5_CAM_VSE_AXI_CLK>;
-				clock-names = "core", "ups", "gdc_hclk", "axi";
+					<&hpsclks X5_CAM_VSE_AXI_CLK>,
+					<&hpsclks X5_CAM_DEWARP_AXI_CLK>,
+					<&hpsclks X5_CAM_DEWARP_HCLK>;
+				clock-names = "core", "ups", "axi", "gdc_axi", "gdc_hclk";
 				resets = <&socrst CAM_DEWARP_RESET>;
 				reset-names = "rst";
 				instances = <7>;
