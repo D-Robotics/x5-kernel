@@ -105,7 +105,6 @@ static int audio_msg_send(audio_poster_t *au_poster, uint8_t *payload, uint32_t 
 		wait_queue_entry_t wait_queue;
 		long timeout;
 		init_waitqueue_entry(&wait_queue, current);
-		set_current_state(TASK_KILLABLE);
 		add_wait_queue(&au_poster->waker, &wait_queue);
 		au_poster->sync_response = false;
 		if (hb_ipc_acquire_buf(inst_id, AUDIO_HBIPC_CHANNEL_ID_0, payload_size, &send_buf)) {
@@ -121,6 +120,7 @@ static int audio_msg_send(audio_poster_t *au_poster, uint8_t *payload, uint32_t 
 			mutex_unlock(&au_poster->send_lock);
 			return ret;
 		}
+		set_current_state(TASK_KILLABLE);
 		while (1) {
 			if (0 != (ret = fatal_signal_pending(current))) {
 				dev_err(dev, "AUDIO : fatal_signal_pending return, signal: %d\n", ret);

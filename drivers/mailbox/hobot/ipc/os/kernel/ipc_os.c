@@ -69,7 +69,6 @@ struct ipc_os_priv_instance {
 };
 
 struct mbox_share_res {
-	spinlock_t lock;
 	int32_t user_cnt;
 	struct mbox_chan *mchan;
 } g_mbox_res[MAX_MBOX_IDX];
@@ -393,7 +392,6 @@ int32_t ipc_os_mbox_open(int32_t instance)
 		cfg->mchan = g_mbox_res->mchan;
 		return 0;
 	}
-	spin_lock_init(&g_mbox_res[cfg->mbox_chan_idx].lock);
 
 	pmclient->rx_callback = ipc_os_handler;
 	pmclient->tx_prepare = NULL;
@@ -479,7 +477,6 @@ int32_t ipc_os_mbox_notify(int32_t instance)
 {
 	int err = 0;
 	uint32_t tmp_data[NUM_DATA] = {0, 0, 0, 0, 0, 0, NUM_DATA};
-	unsigned long flags;
 
 	if (priv.id[instance].mbox_chan_idx == IPC_MBOX_NONE) {
 		return 0;//unused mailbox
@@ -491,14 +488,11 @@ int32_t ipc_os_mbox_notify(int32_t instance)
 		return -EINVAL;
 	}
 
-	spin_lock_irqsave(&g_mbox_res[priv.id[instance].mbox_chan_idx].lock, flags);
-
 	mutex_lock(&priv.id[instance].notify_mutex_lock);
 	err = mbox_send_message(priv.id[instance].mchan, tmp_data);
 	if (err < 0) {
 		mutex_unlock(&priv.id[instance].notify_mutex_lock);
 		ipc_err("ipc instance %d: mailbox notify failed: %d\n", instance, err);
-		spin_unlock_irqrestore(&g_mbox_res[priv.id[instance].mbox_chan_idx].lock, flags);
 		return err;
 	}
 
@@ -508,12 +502,10 @@ int32_t ipc_os_mbox_notify(int32_t instance)
 		if (err < 0) {
 			ipc_err("ipc instance %d: mailbox no ack : %d\n", instance, err);
 			mutex_unlock(&priv.id[instance].notify_mutex_lock);
-			spin_unlock_irqrestore(&g_mbox_res[priv.id[instance].mbox_chan_idx].lock, flags);
 			return err;
 		}
 	}
 	mutex_unlock(&priv.id[instance].notify_mutex_lock);
-	spin_unlock_irqrestore(&g_mbox_res[priv.id[instance].mbox_chan_idx].lock, flags);
 	return 0;
 }
 
