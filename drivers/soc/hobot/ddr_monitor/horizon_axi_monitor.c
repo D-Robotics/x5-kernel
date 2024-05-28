@@ -331,6 +331,7 @@ static void axi_calculate_statistics(struct axi_monitor *axi_mon)
 	uint32_t reg_ok_to, time_low, time_high, int_status;
 	struct list_head *port_entry;
 	struct axi_port *port;
+	unsigned long flags;
 
 	/* Poll for register Okay */
 	reg_ok_to = 500000; /* 100ms reg stable time */
@@ -359,8 +360,7 @@ static void axi_calculate_statistics(struct axi_monitor *axi_mon)
 	dev_dbg(&axi_mon->pdev->dev,
 			 "Monitor session ended, total time: %llu millisesc\n",
 			  axi_mon->actual_time);
-
-	mutex_lock(&axi_mon->ops_mutex);
+	spin_lock_irqsave(&axi_mon->ops_lock, flags);
 	full_bw_raw = AXI_DATA_WIDTH * axi_cycles / 8;
 	axi_mon->full_bw = full_bw_raw / axi_mon->actual_time * 1000;
 	if (ddr_info != NULL) {
@@ -416,8 +416,7 @@ static void axi_calculate_statistics(struct axi_monitor *axi_mon)
 
 	cur_idx = ((cur_idx + 1) % TOTAL_RECORD_NUM);
 	g_rec_num++;
-	mutex_unlock(&axi_mon->ops_mutex);
-
+	spin_unlock_irqrestore(&axi_mon->ops_lock, flags);
 	if (g_rec_num >= g_sample_number) {
 		wake_up_interruptible(&axi_mon->wq_head);
 	}
@@ -429,6 +428,7 @@ static void axi_calculate_statistics(struct axi_monitor *axi_mon)
 void axi_mon_start(struct axi_monitor *axi_mon, uint32_t start)
 {
 	struct device *dev = &axi_mon->pdev->dev;
+	unsigned long flags;
 	if (start) {
 		if (mon_period != 0) {
 			axi_mon->session_time = mon_period;
@@ -438,23 +438,23 @@ void axi_mon_start(struct axi_monitor *axi_mon, uint32_t start)
 			axi_mon->session_time = 1000;
 		}
 		dev_dbg(dev, "Session start for %llu millisec\n", axi_mon->session_time);
-		mutex_lock(&axi_mon->ops_mutex);
+		spin_lock_irqsave(&axi_mon->ops_lock, flags);
 		axi_mon->busy = BUSY;
-		mutex_unlock(&axi_mon->ops_mutex);
+		spin_unlock_irqrestore(&axi_mon->ops_lock, flags);
 #if IS_ENABLED(CONFIG_HOBOT_AXI_ADVANCED)
 		/* TODO: Add advanced configurations here */
 #endif
 	hrtimer_start(&axi_mon->hrtimer, ktime_set(axi_mon->session_time / 1000, (axi_mon->session_time % 1000) * 1000000),HRTIMER_MODE_REL);
 	} else {
 		hrtimer_cancel(&axi_mon->hrtimer);
-		mutex_lock(&axi_mon->ops_mutex);
+		spin_lock_irqsave(&axi_mon->ops_lock, flags);
 		axi_mon->busy = IDLE;
+		spin_unlock_irqrestore(&axi_mon->ops_lock, flags);
 		if (ddr_info != NULL) {
 			vfree(ddr_info);
 			ddr_info = NULL;
 			ddr_info_bc = NULL;
 		}
-		mutex_unlock(&axi_mon->ops_mutex);
 	}
 	axi_mon_writel(axi_mon, START, start);
 
