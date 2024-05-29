@@ -2770,7 +2770,6 @@ gceSTATUS gckGALDEVICE_Construct(gcsPLATFORM *Platform, const gcsMODULE_PARAMETE
 	/* Setup external SRAM video memory pool. */
 	gcmkONERROR(_SetupExternalSRAMVidMem(gal_device, Args));
 #endif
-
 	if (!kernel)
 		gcmkONERROR(gcvSTATUS_INVALID_ARGUMENT);
 
@@ -3076,8 +3075,11 @@ gceSTATUS gckGALDEVICE_Destroy(gckGALDEVICE gal_device)
 
 #if gcdENABLE_DEVFREQ
 #include <../drivers/devfreq/governor.h>
+#include <linux/devfreq_cooling.h>
+
 #define GC_MAX_FREQ    1000000000
-static gctUINT32 cur_freq = GC_MAX_FREQ;
+static unsigned long cur_freq = GC_MAX_FREQ;
+
 static int gc_df_target(struct device *dev, unsigned long *freq, u32 flags)
 {
 	gctUINT32 i	= 0;
@@ -3144,8 +3146,6 @@ static int gc_df_get_cur_freq(struct device *dev, unsigned long *freq)
 
 static struct devfreq *df;
 
-//static struct devfreq_simple_ondemand_data galcore_gov_data;
-
 static struct devfreq_dev_profile gc_df_profile = {
 	.polling_ms	= POLLING_MS,
 	.is_cooling_device = true,
@@ -3154,115 +3154,36 @@ static struct devfreq_dev_profile gc_df_profile = {
 	.get_cur_freq	= gc_df_get_cur_freq,
 };
 
-static gceSTATUS gc_df_governor_target(struct devfreq *df, unsigned long *freq)
-{
-	struct devfreq_dev_status *stat = NULL;
-	unsigned long long a, b;
-	int i = 0;
-
-	gctUINT32 up_threshold	    = UP_THRESHOLD;
-	gctUINT32 down_differential = DOWN_DIFFERENCTIAL;
-	gceSTATUS status	    = gcvSTATUS_OK;
-	gctBOOL clockState;
-
-	gcmkHEADER();
-
-	gcmkONERROR(devfreq_update_stats(df));
-
-	gckOS_GetClockState(galDevice->os, _GetValidKernel(galDevice), &clockState);
-	if (clockState == gcvFALSE) {
-		*freq =  df->freq_table[0];
-		goto OnError;
-	}
-
-	stat = &df->last_status;
-	i = df->max_state - 1;
-
-	/* Set MAX if it's busy enough */
-	if (stat->busy_time * 100 > stat->total_time * up_threshold) {
-		*freq = df->freq_table[i];
-		goto OnError;
-	}
-
-	/* Set MAX if we do not know the initial frequency */
-	if (stat->current_frequency == 0) {
-		*freq = df->freq_table[i];
-		goto OnError;
-	}
-
-	/* Keep the current frequency */
-	if (stat->busy_time * 100 > stat->total_time * (up_threshold - down_differential)) {
-		*freq = stat->current_frequency;
-		goto OnError;
-	}
-
-	/* Set the desired frequency based on the load */
-	a = stat->busy_time;
-	a *= stat->current_frequency;
-	b = div_u64(a, stat->total_time);
-	b *= 100;
-	b = div_u64(b, (up_threshold - down_differential / 2));
-
-	*freq = b * GC_MAX_FREQ / 64;
-
-	while (i >= 0 && *freq < df->freq_table[i]) {
-		i--;
-	}
-	i = gcmMIN(i + 1, df->max_state - 1);
-
-	*freq = df->freq_table[i];
-
-OnError:
-	gcmkFOOTER_NO();
-
-	return status;
-}
-
-static int gc_df_governor_handler(struct devfreq *df, unsigned int event, void *data)
-{
-	switch (event) {
-	case DEVFREQ_GOV_START:
-		devfreq_monitor_start(df);
-		break;
-
-	case DEVFREQ_GOV_STOP:
-		devfreq_monitor_stop(df);
-		break;
-
-	default:
-		break;
-	}
-
-	return 0;
-}
-
-static struct devfreq_governor gc_df_governor = {
-	.name		 = "galcore_gov",
-	.get_target_freq = gc_df_governor_target,
-	.event_handler	 = gc_df_governor_handler,
-};
-
 static gceSTATUS gc_df_init(gckGALDEVICE Device)
 {
 	gceSTATUS status	      = gcvSTATUS_OK;
 	gctINT32 err		      = 0;
 	struct device *galcore_device = Device->devices[0]->dev;
+	struct dev_pm_opp *opp;
+	unsigned long init_freq;
 
-	err = devfreq_add_governor(&gc_df_governor);
+	/* initialize cur freq*/
+	err = devm_pm_opp_of_add_table(galcore_device);
+	if (err)
+		return err;
 
-	if (err) {
-		gcmkPRINT("Failed to add governor: %d", err);
-		return gcvSTATUS_NOT_SUPPORTED;
-	}
+	opp = devfreq_recommended_opp(galcore_device, &init_freq, 0);
+	if (IS_ERR(opp))
+		return PTR_ERR(opp);
 
-	// df = devm_devfreq_add_device(galcore_device, &gc_df_profile, "galcore_gov",
-	// 			     &galcore_gov_data);
-	df = devm_devfreq_add_device(galcore_device, &gc_df_profile, "performance",
+	gc_df_profile.initial_freq = init_freq;
+	dev_pm_opp_put(opp);
+
+	df = devm_devfreq_add_device(galcore_device, &gc_df_profile, DEVFREQ_GOV_SIMPLE_ONDEMAND,
 				     NULL);
 	if (IS_ERR(df)) {
 		gcmkPRINT("Error: init devfreq %lx, error %ld.\n", (unsigned long)galcore_device, (uintptr_t)df);
 		status = gcvSTATUS_NOT_SUPPORTED;
 	}
+
+	Device->cooling = of_devfreq_cooling_register(galcore_device->of_node, df);
+	if (IS_ERR(Device->cooling))
+		dev_info(galcore_device, "Failed to register cooling device\n");
 
 	return status;
 }
@@ -3270,17 +3191,14 @@ static gceSTATUS gc_df_init(gckGALDEVICE Device)
 static gceSTATUS gc_df_exit(gckGALDEVICE Device)
 {
 	gceSTATUS status	      = gcvSTATUS_OK;
-	gctINT32 err		      = 0;
 	struct device *galcore_device = Device->devices[0]->dev;
 
-	devm_devfreq_remove_device(galcore_device, df);
-
-	err = devfreq_remove_governor(&gc_df_governor);
-
-	if (err) {
-		gcmkPRINT("%s %d: failed remove governor %d", __FUNCTION__, __LINE__, err);
-		status = gcvSTATUS_NOT_SUPPORTED;
+	if (Device->cooling) {
+		devfreq_cooling_unregister(Device->cooling);
+		Device->cooling = NULL;
 	}
+
+	devm_devfreq_remove_device(galcore_device, df);
 
 	return status;
 }

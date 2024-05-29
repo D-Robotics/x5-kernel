@@ -55,6 +55,7 @@
 #ifndef __gc_hal_kernel_device_h_
 #define __gc_hal_kernel_device_h_
 
+#include <linux/devfreq_cooling.h>
 #include "gc_hal_kernel_debugfs.h"
 #include "gc_hal_ta.h"
 
@@ -129,6 +130,7 @@ typedef struct _gckGALDEVICE {
 #if gcdENABLE_DRM
 	void *drm;
 #endif
+	struct thermal_cooling_device *cooling;
 } * gckGALDEVICE;
 
 typedef struct _gcsHAL_PRIVATE_DATA {
