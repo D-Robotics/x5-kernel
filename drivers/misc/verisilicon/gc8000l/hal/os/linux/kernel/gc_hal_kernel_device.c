@@ -3174,7 +3174,7 @@ static gceSTATUS gc_df_init(gckGALDEVICE Device)
 	gc_df_profile.initial_freq = init_freq;
 	dev_pm_opp_put(opp);
 
-	df = devm_devfreq_add_device(galcore_device, &gc_df_profile, DEVFREQ_GOV_SIMPLE_ONDEMAND,
+	df = devm_devfreq_add_device(galcore_device, &gc_df_profile, DEVFREQ_GOV_PERFORMANCE,
 				     NULL);
 	if (IS_ERR(df)) {
 		gcmkPRINT("Error: init devfreq %lx, error %ld.\n", (unsigned long)galcore_device, (uintptr_t)df);
