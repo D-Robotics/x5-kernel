@@ -31,8 +31,8 @@
 #define MAP_ADDR_SHIFT	28
 #define MAP_ENTRY_SIZE	BIT(28)
 
-/* 2B to 256 MB */
-#define LITE_MMU_PGSIZE_BITMAP 0x1FFFF000
+/* 1B to 256 MB */
+#define LITE_MMU_PGSIZE_BITMAP 0x1FFFFFFF
 
 struct lite_mmu_domain {
 	struct list_head iommus;
