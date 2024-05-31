@@ -934,7 +934,6 @@
 				reset-names = "rst";
 				instances = <6>;
 				cam-ctrl = <&cam_ctrl>;
-				// TODO: iommu depends on power-domain, if no-power, it will hung.
 				iommus = <&isp_iommu>;
 				power-domains = <&power X5_ISP>;
 				status = "okay";
@@ -968,7 +967,6 @@
 				reset-names = "rst";
 				instances = <7>;
 				cam-ctrl = <&cam_ctrl>;
-				// TODO: iommu depends on power-domain, if no-power, it will hung.
 				iommus = <&vse_iommu>;
 				status = "okay";
 			};
@@ -1082,7 +1080,6 @@
 				instances = <4>;
 				cam-ctrl = <&cam_ctrl>;
 				status = "okay";
-				// TODO: iommu depends on power-domain, if no-power, it will hung.
 				iommus = <&cam_sif_iommu>;
 			};
 
@@ -1108,7 +1105,6 @@
 				instances = <2>;
 				cam-ctrl = <&cam_ctrl>;
 				status = "okay";
-				// TODO: iommu depends on power-domain, if no-power, it will hung.
 				iommus = <&cam_sif_iommu>;
 			};
 
@@ -1134,7 +1130,6 @@
 				instances = <4>;
 				cam-ctrl = <&cam_ctrl>;
 				status = "okay";
-				// TODO: iommu depends on power-domain, if no-power, it will hung.
 				iommus = <&cam_sif_iommu>;
 			};
 
@@ -1160,7 +1155,6 @@
 				instances = <2>;
 				cam-ctrl = <&cam_ctrl>;
 				status = "okay";
-				// TODO: iommu depends on power-domain, if no-power, it will hung.
 				iommus = <&cam_sif_iommu>;
 			};
 
@@ -1292,7 +1286,6 @@
 				id = <0>;
 				instances = <2>;
 				cam-ctrl = <&cam_ctrl>;
-				// TODO: iommu depends on power-domain, if no-power, it will hung.
 				iommus = <&gdc_iommu>;
 				status = "okay";
 			};
@@ -2034,7 +2027,6 @@
 			assigned-clock-rates = <200000000>, <750000000>, <750000000>;
 			power-domains = <&power X5_GPU>;
 
-			// TODO: iommu depends on power-domain, if no-power, it will hung.
 			iommus = <&gc820_iommu>;
 			resets = <&socrst GPU_GC820_RESET>;
 			reset-names = "gc820_sw_rst";
@@ -2060,7 +2052,6 @@
 				<GIC_SPI 31 IRQ_TYPE_LEVEL_HIGH>;
 			interrupt-names = "bpu";
 
-			// TODO: iommu depends on power-domain, if no-power, it will hung.
 			iommus = <&bpu_iommu>;
 
 			cnn-id = <0>;
