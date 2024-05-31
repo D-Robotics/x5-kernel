@@ -1970,7 +1970,6 @@ static int es7210_pcm_hw_params(struct snd_pcm_substream *substream,
 	case 22050:
 		es7210->sysclk = 11289600;
 		break;
-	case 8000:
 	case 16000:
 	case 32000:
 	case 48000:
