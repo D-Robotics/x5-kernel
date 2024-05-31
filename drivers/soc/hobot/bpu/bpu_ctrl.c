@@ -1073,6 +1073,30 @@ static int bpu_core_get_freq(struct device *dev, unsigned long *freq)
 	return 0;
 }
 
+static int bpu_get_dev_status(struct device *dev,
+					 struct devfreq_dev_status *stat)
+{
+	struct bpu *bpu = NULL;
+	struct bpu_core *core = (struct bpu_core *)dev_get_drvdata(dev);
+	uint32_t b_ratio = 0;
+	unsigned long freq = 0;
+
+	if (core == NULL) {
+		return -EINVAL;
+	}
+
+	bpu = core->host;
+	if (bpu == NULL) {
+		return -EINVAL;
+	}
+	b_ratio = bpu_ratio(bpu);
+	bpu_core_get_freq(dev, &freq);
+	stat->current_frequency = freq;
+	stat->busy_time = b_ratio;
+	stat->total_time = 100;
+	return 0;
+}
+
 /**
  * bpu_core_dvfs_register() - register bpu core to linux dvfs mechanism
  * @core: bpu core, could not be null
@@ -1113,6 +1137,7 @@ int32_t bpu_core_dvfs_register(struct bpu_core *core, const char *name)
 	device_property_read_u32(core->dev, "polling_ms", &core->dvfs->profile.polling_ms);
 	core->dvfs->profile.target = bpu_core_set_freq;
 	core->dvfs->profile.get_cur_freq = bpu_core_get_freq;
+	core->dvfs->profile.get_dev_status = bpu_get_dev_status;
 	if (core->mclk != NULL) {
 		core->dvfs->profile.initial_freq = bpu_core_get_clk(core);
 	} else {
