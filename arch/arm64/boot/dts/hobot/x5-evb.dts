@@ -229,6 +229,12 @@
 	dmas = <&axi_dmac 5>, <&axi_dmac 4>;
 };
 
+&uart6 {
+	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_uart6>;
+};
+
 &axi_dmac {
 	status = "okay";
 };
