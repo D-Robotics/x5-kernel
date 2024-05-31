@@ -794,7 +794,6 @@
 			reg = <0x3b020004 0x14>;
 
 			#iommu-cells = <0>;
-			dma-coherent;
 			power-domains = <&power X5_VIDEO>;
 			status = "okay";
 		};
@@ -824,7 +823,6 @@
 			reg = <0x3b020018 0x14>;
 
 			#iommu-cells = <0>;
-			dma-coherent;
 			power-domains = <&power X5_VIDEO>;
 			status = "okay";
 		};
@@ -912,7 +910,6 @@
 				reg = <0x3d0b0038 0x14>;
 
 				#iommu-cells = <0>;
-				dma-coherent;
 				power-domains = <&power X5_ISP>;
 				status = "okay";
 			};
@@ -948,7 +945,6 @@
 				reg = <0x3d0b0010 0x14>;
 
 				#iommu-cells = <0>;
-				dma-coherent;
 				status = "okay";
 			};
 
@@ -1061,7 +1057,6 @@
 				reg = <0x3d0b0024 0x14>;
 
 				#iommu-cells = <0>;
-				dma-coherent;
 				status = "okay";
 			};
 
@@ -1276,7 +1271,6 @@
 				reg = <0x3d0b004c 0x14>;
 
 				#iommu-cells = <0>;
-				dma-coherent;
 				status = "okay";
 			};
 
@@ -2021,7 +2015,6 @@
 			reg = <0x3c020040 0x14>;
 
 			#iommu-cells = <0>;
-			dma-coherent;
 			power-domains = <&power X5_GPU>;
 
 			status = "okay";
@@ -2054,7 +2047,6 @@
 			reg = <0x3a010030 0x14>;
 
 			#iommu-cells = <0>;
-			dma-coherent;
 			power-domains = <&power X5_BPU>;
 			status = "okay";
 		};
@@ -2257,7 +2249,6 @@
 				reg = <0x3e0a0158 0x14>;
 
 				#iommu-cells = <0>;
-				dma-coherent;
 				status = "okay";
 			};
 
@@ -2329,7 +2320,6 @@
 				reg = <0x3e0a0130 0x14>;
 
 				#iommu-cells = <0>;
-				dma-coherent;
 				status = "okay";
 			};
 
@@ -2375,7 +2365,6 @@
 				reg = <0x3e0a0144 0x14>;
 
 				#iommu-cells = <0>;
-				dma-coherent;
 				status = "okay";
 			};
 
