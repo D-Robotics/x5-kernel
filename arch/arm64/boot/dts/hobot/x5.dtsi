@@ -1995,26 +1995,6 @@
 
 
 		/* Sunrise5 gpu subsystem */
-		gc8000_a0_iommu: gc8000_a0_iommu@3c020018 {
-			compatible = "d-robotics,lite_mmu";
-			reg = <0x3c020018 0x14>;
-
-			#iommu-cells = <0>;
-			dma-coherent;
-			power-domains = <&power X5_GPU>;
-			status = "okay";
-		};
-
-		gc8000_a1_iommu: gc8000_a1_iommu@3c02002c {
-			compatible = "d-robotics,lite_mmu";
-			reg = <0x3c02002c 0x14>;
-
-			#iommu-cells = <0>;
-			dma-coherent;
-			power-domains = <&power X5_GPU>;
-
-			status = "okay";
-		};
 
 		gc8000: gc8000@3c000000 {
 			compatible = "verisilicon,galcore";
@@ -2030,8 +2010,6 @@
 			power-domains = <&power X5_GPU>;
 			#cooling-cells = <2>;
 
-			// TODO: iommu depends on power-domain, if no-power, it will hung.
-			// iommus = <&gc8000_a0_iommu &gc8000_a1_iommu>;
 			resets = <&socrst GPU_GC8000_RESET>;
 			reset-names = "gc8000l_sw_rst";
 
