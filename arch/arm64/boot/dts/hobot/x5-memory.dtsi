@@ -1,0 +1,98 @@
+// SPDX-License-Identifier: GPL-2.0
+/*
+ * dtsi for Sunrise5 platform
+ *
+ * Copyright (C) 2024 Horizon Robotics Inc.
+ *
+ */
+
+#include "x5.dtsi"
+
+/ {
+	memory@87000000 {
+		device_type = "memory";
+		reg = <0x0 0x84000000 0x0 0x7C000000>;
+		/* Expect Bootloader to properly configure total memory size */
+	};
+
+	reserved-memory {
+		#address-cells = <2>;
+		#size-cells = <2>;
+		ranges;
+
+		/* dtb 2M 0x87FDC000---0x87FFC000*/
+		/* uboot log 16k 0x87FFC000---0x88000000*/
+		uboot_log_reserved: log@87FF8000 {
+			compatible = "uboot_log";
+			reg = <0x0 0x87FFC000 0x0 0x00004000>;  /* 16K */
+			status = "okay";
+		};
+
+		linux,cma@88000000 {
+			compatible = "shared-dma-pool";
+			reg = <0x0 0x88000000 0x0 0x08000000>; /* 128MB */
+			reusable;
+			linux,cma-default;
+		};
+
+		adsp_ddr: adsp_ddr@90000000 {
+			reg = <0x0 0x90000000 0x0 0x02200000>;
+			no-map;
+		};
+
+		audio_reserved: audio@92200000 {
+			compatible = "shared-dma-pool";
+			no-map;
+			reg = <0x0 0x92200000 0x0 0x01000000>;
+			status = "okay";
+		};
+
+		adsp_ipc_reserved: audio@93200000 {
+			compatible = "shared-dma-pool";
+			no-map;
+			reg = <0x0 0x93200000 0x0 0x00800000>;
+			status = "okay";
+		};
+
+		adsp_bsp_reserved: audio@93A00000 {
+			compatible = "shared-dma-pool";
+			no-map;
+			reg = <0x0 0x93A00000 0x0 0x00800000>;
+			status = "okay";
+		};
+
+		ramoops@94200000 {
+			compatible = "ramoops";
+			reg = <0x0 0x94200000 0x0 0x00040000>;
+			console-size = <0x8000>;
+			pmg-size = <0x8000>;
+			ftrace-size = <0x8000>;
+			sched-size  = <0x8000>;
+			record-size = <0x4000>;
+			ecc-size = <0x0>;
+		};
+
+		ion_reserved: ion_reserved@94240000 {
+			compatible = "ion-pool";
+			reg = <0x0 0x94240000 0x0 0x20000000>; /* 512MB */
+			status = "okay";
+		};
+
+		ion_carveout: ion_carveout@B4240000 {
+			compatible = "ion-carveout";
+			reg = <0x0 0xB4240000 0x0 0x20000000>; /* 512MB */
+			status = "okay";
+		};
+
+		ion_cma: ion_cma {
+			compatible = "ion-cma";
+			alignment = <0x0 0x2000>;
+			reusable;
+			reg = <0x0 0xD4240000 0x0 0x18000000>; /* 384MB */
+			status = "okay";
+		};
+		/* The remaining memory is used as kernel heaps,
+		 * please reserve with CAUTION!
+		 */
+	};
+};
