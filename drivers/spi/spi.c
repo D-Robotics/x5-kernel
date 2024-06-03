@@ -127,10 +127,10 @@ do {									\
 		unsigned int start;					\
 		pcpu_stats = per_cpu_ptr(in, i);			\
 		do {							\
-			start = u64_stats_fetch_begin(		\
+			start = u64_stats_fetch_begin_irq(		\
 					&pcpu_stats->syncp);		\
 			inc = u64_stats_read(&pcpu_stats->field);	\
-		} while (u64_stats_fetch_retry(			\
+		} while (u64_stats_fetch_retry_irq(			\
 					&pcpu_stats->syncp, start));	\
 		ret += inc;						\
 	}								\
