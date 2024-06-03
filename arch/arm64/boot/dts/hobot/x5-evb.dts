@@ -8,6 +8,7 @@
 
 /dts-v1/;
 #include "x5.dtsi"
+#include "x5-memory.dtsi"
 #include "pinmux-func.dtsi"
 #include "pinmux-gpio.dtsi"
 #include <dt-bindings/input/linux-event-codes.h>
@@ -19,102 +20,6 @@
 
 	#address-cells = <2>;
 	#size-cells = <2>;
-
-	/*
-	 * We have one DDR memory range:
-	 * 0x0_87000000 - 0x0_79000000
-	 * 0x1_00000000 - 0x0_80000000
-	 */
-	memory@87000000 {
-		device_type = "memory";
-		reg = <0x0 0x87000000 0x0 0x79000000>,  /* 2GB - 112M */
-		      <0x1 0x00000000 0x0 0x80000000>;  /* 2GB */
-	};
-
-	reserved-memory {
-		#address-cells = <2>;
-		#size-cells = <2>;
-		ranges;
-
-		/* dtb 2M 0x87FDC000---0x87FFC000*/
-		/* uboot log 16k 0x87FFC000---0x88000000*/
-		uboot_log_reserved: log@87FF8000 {
-			compatible = "uboot_log";
-			reg = <0x0 0x87FFC000 0x0 0x4000>;  /* 16K */
-			status = "okay";
-		};
-
-		ion_reserved: ion_reserved@88000000 {
-			compatible = "ion-pool";
-			reg = <0x0 0x88000000 0x0 0x8000000>;
-			status = "okay";
-		};
-
-		ion_carveout: ion_carveout@90000000 {
-			compatible = "ion-carveout";
-			reg = <0x0 0x90000000 0x0 0x8000000>;
-			status = "okay";
-		};
-
-		ion_sram: ion_sram@98000000 {
-			compatible = "ion-sram";
-			reg = <0x0 0x98000000 0x0 0x800000>;
-			status = "okay";
-		};
-
-		linux,cma@a0000000 {
-			compatible = "shared-dma-pool";
-			reg = <0x0 0xa0000000 0x0 0x20000000>; /* 512MB */
-			reusable;
-			linux,cma-default;
-		};
-
-		ion_cma: ion_cma {
-			compatible = "ion-cma";
-			alignment = <0x0 0x2000>;
-			reusable;
-			reg = <0x0 0xc0000000 0x0 0xfe00000>; /* 254MB */
-			status = "okay";
-		};
-
-		adsp_ddr: adsp_ddr@cfe00000 {
-			reg = <0x0 0xcfe00000 0x0 0x2200000>;
-			no-map;
-		};
-
-		audio_reserved: audio@d2000000 {
-			compatible = "shared-dma-pool";
-			no-map;
-			reg = <0x0 0xd2000000 0x0 0x1000000>;
-			status = "okay";
-		};
-
-		adsp_ipc_reserved: audio@d3000000 {
-			compatible = "shared-dma-pool";
-			no-map;
-			reg = <0x0 0xd3000000 0x0 0x800000>;
-			status = "okay";
-		};
-
-		adsp_bsp_reserved: audio@d3800000 {
-			compatible = "shared-dma-pool";
-			no-map;
-			reg = <0x0 0xd3800000 0x0 0x800000>;
-			status = "okay";
-		};
-
-		ramoops@d5000000 {
-			compatible = "ramoops";
-			reg = <0x0 0xd5000000 0x0 0x40000>;
-			console-size = <0x8000>;
-			pmg-size = <0x8000>;
-			ftrace-size = <0x8000>;
-			sched-size  = <0x8000>;
-			record-size = <0x4000>;
-			ecc-size = <0x0>;
-		};
-
-	};
 
 	gpio-keys {
 		compatible = "gpio-keys";
