@@ -134,13 +134,13 @@
 	gua_audio_rpc_wrapper:audio-rpc-wrapper {
 		compatible = "gua,audio-rpc-wrapper";
 		rpmsg-enable;
-		status = "okay";
+		status = "disabled";
 	};
 
 	ipc_wrapper:ipc-wrapper {
 		compatible = "gua,ipc-wrapper";
 		rpmsg-enable;
-		status = "okay";
+		status = "disabled";
 	};
 
 	sound_misc_0:misc-hifi {
@@ -150,7 +150,7 @@
 										>;
 		msg-wrapper = <&ipc_wrapper>;
 		memory-region = <&adsp_bsp_reserved>;
-		status = "okay";
+		status = "disabled";
 	};
 
 	sound_cpu:cpu-dai {
@@ -158,7 +158,7 @@
 		msg-wrapper = <&ipc_wrapper>;
 		gua,pcm-buffer-size = <0x1E000>;
 		pcm-rpmsg-channel-mapping = <0x00>, <0x00>, <0x00>, <0x00>, <0x00>;
-		status = "okay";
+		status = "disabled";
 	};
 
 	sound-machine {
@@ -166,7 +166,7 @@
 		model = "gua-audio";
 		cpu-dai = <&sound_cpu>;
 		memory-region = <&audio_reserved>;
-		status = "okay";
+		status = "disabled";
 	};
 
 	vdd08_gpu_reg: vdd08_gpu_reg@3 {
@@ -459,19 +459,19 @@
 };
 
 &mailbox0 {
-	status = "okay";
+	status = "disabled";
 };
 
 &ipc_instance0 {
-	status = "okay";
+	status = "disabled";
 };
 
 &ipc_instance1 {
-	status = "okay";
+	status = "disabled";
 };
 
 &ipc_instance2 {
-	status = "okay";
+	status = "disabled";
 };
 
 &pvt {
@@ -479,7 +479,7 @@
 };
 
 &remoteproc_hifi5 {
-	status = "okay";
+	status = "disabled";
 	hifi5-rpmsg-channel-mapping = <0x00>, <0x00>;
 	msg-wrapper = <&ipc_wrapper>;
 };
