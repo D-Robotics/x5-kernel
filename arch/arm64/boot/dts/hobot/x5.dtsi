@@ -3243,14 +3243,14 @@
 			mboxes = <&mailbox0 0 1 0 1 0 1 0 1 0>;
 			instance = <1>;
 			def_mode = <1>;
-			num_chans = <2>;
+			num_chans = <1>;
 			shm_size = <0x400>;
 			local_shm_addr = /bits/ 64 <0xd3000800>;//note big-endian and little-endian
 			remote_shm_addr = /bits/ 64 <0xd3000c00>;//note big-endian and little-endian
 			ipc_channel0 {
 				num_pools = <1>;
 				ipc_pool0 {
-					num_bufs = /bits/ 16 <8>;//note big-endian and little-endian
+					num_bufs = /bits/ 16 <2>;//note big-endian and little-endian
 					buf_size = <32>;
 				};
 			};

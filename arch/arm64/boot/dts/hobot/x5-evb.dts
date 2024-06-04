@@ -45,7 +45,8 @@
 	ipc_wrapper:ipc-wrapper {
 		compatible = "gua,ipc-wrapper";
 		rpmsg-enable;
-		status = "disabled";
+		status = "okay";
+		gua-ipc = <&ipc_instance0>;
 	};
 
 	sound_misc_0:misc-hifi {
@@ -384,9 +385,11 @@
 };
 
 &remoteproc_hifi5 {
-	status = "disabled";
+	status = "okay";
 	hifi5-rpmsg-channel-mapping = <0x00>, <0x00>;
 	msg-wrapper = <&ipc_wrapper>;
+	shm-addr = <&adsp_bsp_reserved>;
+	remoteproc-ipc = <&ipc_instance1>;
 };
 
 &hpsclks {
