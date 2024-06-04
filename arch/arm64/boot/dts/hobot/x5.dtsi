@@ -2611,7 +2611,7 @@
 				resets = <&socrst HSIO_ENET_RESET>;
 
 				txnode:txnode@1 {
-					snps,tx-queues-to-use = <4>;
+					snps,tx-queues-to-use = <1>;
 					txqueue0: txqueue@1 {
 						snps,dcb-algorithm;
 					};
@@ -2639,7 +2639,7 @@
 				};
 
 				rxnode:rxnode@1 {
-					snps,rx-queues-to-use = <4>;
+					snps,rx-queues-to-use = <1>;
 					rxqueue0: rxqueue@1 {
 						snps,dcb-algorithm;
 					};
