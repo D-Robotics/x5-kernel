@@ -1641,14 +1641,17 @@ static void n2d_trigger_frame_work(struct vio_node *vnode)
 	n2d_uint32_t ctx_id = vnode->ctx_id;
 	struct horizon_n2d_dev *n2d = global_n2d;
 
-	if (ctx_id > VIO_MAX_STREAM) {
+	if (ctx_id >= VIO_MAX_STREAM) {
 		vio_err("[S%d][C%d] %s: invalid ctx_id %d.\n", vnode->flow_id, vnode->ctx_id,
 			__func__, ctx_id);
+
+		return;
 	}
 
 	if (&n2d->vnode[ctx_id] != vnode) {
 		vio_err("[S%d][C%d] %s: incompatible vnode.\n", vnode->flow_id, vnode->ctx_id,
 			__func__);
+		return;
 	}
 
 	up(&n2d->vsemas[ctx_id]);
@@ -1659,9 +1662,10 @@ static int frame_work_routine(void *ctxt)
 	struct horizon_n2d_dev *n2d = global_n2d;
 	n2d_uint32_t ctx_id = gcmPTR2INT(ctxt);
 
-	vio_info("%s: ctx_id %d.\n", __func__, ctx_id);
-	if (ctx_id < 0 || ctx_id > VIO_MAX_STREAM)
+	if (ctx_id >= VIO_MAX_STREAM) {
 		vio_err("%s: invalid ctx_id %d.\n", __func__, ctx_id);
+		return -1;
+	}
 
 	for (;;) {
 		int down;

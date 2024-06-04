@@ -270,7 +270,7 @@ n2d_error_t n2d_kernel_event_add(n2d_event_center_t *event_center, n2d_ioctl_int
 		ONERROR(N2D_OUT_OF_MEMORY);
 	event_ptr = (n2d_event_t *)pointer;
 	ONERROR(n2d_kernel_os_memory_copy(hardware->os, &event_ptr->iface, iface,
-					  sizeof(n2d_event_t)));
+					  sizeof(n2d_ioctl_interface_t)));
 	ONERROR(n2d_kernel_os_get_process(hardware->os, &event_ptr->process));
 	event_ptr->next_ptr = N2D_NULL;
 
