@@ -21,6 +21,7 @@
 #include <sound/pcm_params.h>
 #include <sound/soc.h>
 #include <linux/sched/signal.h>
+#include "hb_ipc_interface.h"
 
 /*!
  * @file ipc_wrapper.h
@@ -82,7 +83,12 @@ typedef struct ipc_wrapper_data {
 	struct work_struct work;
 	audio_poster_t poster[AUDIO_MAX_HBIPC_POSTER_NUM];	/*!< own audio posters */
 	int (*send_msg)(audio_poster_t *au_poster, uint8_t *payload, uint32_t payload_size);	/*!< function for sending message for all posters */
+
+	struct ipc_instance_cfg *ipc_cfg;
 } ipc_wrapper_data_t;
+
+int32_t ipc_wrapper_open_instance(struct ipc_instance_cfg *ipc_cfg);
+int32_t ipc_wrapper_close_instance(void);
 
 /*! @} */
 #endif /* __ipc_wrapper_H */

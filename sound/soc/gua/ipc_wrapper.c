@@ -26,7 +26,6 @@
 #include <linux/iommu.h>
 #include <linux/printk.h>
 #include <linux/io.h>
-#include "hb_ipc_interface.h"
 #include "ipc_wrapper.h"
 #include "gua_pcm.h"
 
@@ -173,7 +172,6 @@ void hbipc_data_chan_rx_cb(uint8_t *arg, int32_t instance, int32_t chan_id, uint
 	// 	return;
 	// }
 	if (hb_ipc_is_remote_ready(AUDIO_HBIPC_INSTANCE_ID_0)) {
-		dev_warn_ratelimited(NULL, "AUDIO[%s][%d] : HB-IPC instance(%d) disconnected!\n", __func__, __LINE__, AUDIO_HBIPC_INSTANCE_ID_0);
 		return;
 	}
 
@@ -263,6 +261,41 @@ static void hbipc_audio_work(struct work_struct *work)
 	}
 
 	// data->linked_up = true;
+}
+
+int32_t ipc_wrapper_open_instance(struct ipc_instance_cfg *ipc_cfg) {
+	int32_t ret = 0;
+
+	struct ipc_channel_info *chan;
+	ipc_cfg->timeout = 100;
+	ipc_cfg->trans_flags = SYNC_TRANS | SPIN_WAIT;
+	ipc_cfg->mbox_chan_idx = 0;
+	if (ipc_cfg->mode == 0) {
+		ipc_cfg->info.def_cfg.recv_callback = hbipc_data_chan_rx_cb;
+	} else {
+		for (int i = 0; i < ipc_cfg->info.custom_cfg.num_chans; i++) {
+			chan = ipc_cfg->info.custom_cfg.chans + i;
+			chan->recv_callback = hbipc_data_chan_rx_cb;
+		}
+	}
+
+	ret = hb_ipc_open_instance(AUDIO_HBIPC_INSTANCE_ID_0, ipc_cfg);
+	if (ret < 0) {
+		pr_err("AUDIO[%s][%d]: HB-IPC instance %d init failed\n", __func__, __LINE__, AUDIO_HBIPC_INSTANCE_ID_0);
+	}
+
+	return ret;
+}
+
+int32_t ipc_wrapper_close_instance(void) {
+	int32_t ret = 0;
+
+	ret = hb_ipc_close_instance(AUDIO_HBIPC_INSTANCE_ID_0);
+	if (ret < 0) {
+		pr_err("AUDIO[%s][%d]: HB-IPC instance %d close failed\n", __func__, __LINE__, AUDIO_HBIPC_INSTANCE_ID_0);
+	}
+
+	return ret;
 }
 
 static ssize_t store_iwrap_status(struct kobject *kobj,
@@ -404,6 +437,9 @@ static int ipc_wrapper_probe(struct platform_device *pdev)
 	struct device *dev = &pdev->dev;
 	ipc_wrapper_data_t *data;
 	int ret = 0, i;
+	struct device_node *ipc_np;
+	struct platform_device *ipc_pdev;
+	struct ipc_dev_instance *ipc_dev;
 
 	dev_info(dev, "AUDIO : audio wrapper probe\n");
 
@@ -425,6 +461,20 @@ static int ipc_wrapper_probe(struct platform_device *pdev)
 		data->poster[i].registed = false;
 	}
 	s_data = data;
+
+	ipc_np = of_parse_phandle(pdev->dev.of_node, "gua-ipc", 0);
+	if (!ipc_np) {
+		dev_err(&pdev->dev, "get gua-ipc error\n");
+		return -1;
+	}
+	ipc_pdev = of_find_device_by_node(ipc_np);
+	if (!ipc_pdev) {
+		dev_err(&pdev->dev, "find gua-ipc error\n");
+		return -1;
+	}
+	ipc_dev = (struct ipc_dev_instance *)platform_get_drvdata(ipc_pdev);
+	data->ipc_cfg = &ipc_dev->ipc_info;
+
 	platform_set_drvdata(pdev, data);
 
 	// create sysfs
