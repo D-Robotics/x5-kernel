@@ -43,7 +43,6 @@
 #include <linux/pm_runtime.h>
 #include "remoteproc_internal.h"
 #include "hobot_remoteproc.h"
-#include "hb_ipc_interface.h"
 #include "gua_audio_rpc_protocol.h"
 #include "gua_audio_ipc.h"
 #include "gua_audio_struct_define.h"
@@ -55,7 +54,6 @@ typedef struct _control {
 } control_msg_s_t;
 
 #define CONFIG_HOBOT_ADSP_CTRL 1
-#define HORIZON_SIPC_WRAPPER_NODE "/sys/kernel/gua-ipc-wrapper-debug/iwrap_debug"
 
 #define HORIZON_SIP_HIFI5_VEC_SET		0xc2000007
 #define HORIZON_SIP_HIFI5_VEC_GET		0xc2000008
@@ -475,86 +473,40 @@ static void *hobot_dsp_rproc_da_to_va(struct rproc *rproc, u64 da, size_t len, b
 static int32_t hobot_dsp_log_open_instance(struct hobot_rproc_pdata *pdata) {
 	int32_t ret = 0;
 	int32_t instance = IPC_REMOTEPROC_LOG_INSTANCE;
-	struct ipc_instance_cfg log_cfg_instances;
-	struct ipc_channel_info ipcf_cfg_chan;
-	struct ipc_pool_info ipcf_pool;
+	struct ipc_instance_cfg *ipc_cfg = pdata->ipc_cfg;
+	struct ipc_channel_info *chan;
 
-	log_cfg_instances.mode = 1;
-	log_cfg_instances.timeout = 100;
-	log_cfg_instances.trans_flags = SYNC_TRANS | SPIN_WAIT;
-	log_cfg_instances.mbox_chan_idx = 0;
-	if (log_cfg_instances.mode == 0) {
-		log_cfg_instances.info.def_cfg.userdata = (uint8_t *)pdata;
-		log_cfg_instances.info.def_cfg.recv_callback = hobot_log_handler;
+	ipc_cfg->timeout = 100;
+	ipc_cfg->trans_flags = SYNC_TRANS | SPIN_WAIT;
+	ipc_cfg->mbox_chan_idx = 0;
+	if (ipc_cfg->mode == 0) {
+		ipc_cfg->info.def_cfg.userdata = (uint8_t *)pdata;
+		ipc_cfg->info.def_cfg.recv_callback = hobot_log_handler;
 	} else {
-		log_cfg_instances.info.custom_cfg.local_shm_addr = 0xd3000800;
-		log_cfg_instances.info.custom_cfg.remote_shm_addr = 0xd3000c00;
-		log_cfg_instances.info.custom_cfg.shm_size = 0x400;
-		log_cfg_instances.info.custom_cfg.num_chans = 1;
-		log_cfg_instances.info.custom_cfg.chans = &ipcf_cfg_chan;
+		for (int i = 0; i < ipc_cfg->info.custom_cfg.num_chans; i++) {
+			chan = ipc_cfg->info.custom_cfg.chans + i;
+			chan->recv_callback = hobot_log_handler;
+			chan->userdata = (uint8_t *)pdata;
+		}
 
+	}
 
-		ipcf_pool.num_bufs = 2;
-		ipcf_pool.buf_size = 32;
-		ipcf_cfg_chan.num_pools = 1;
-		ipcf_cfg_chan.pools = &ipcf_pool;
-		ipcf_cfg_chan.recv_callback = hobot_log_handler;
-		ipcf_cfg_chan.userdata = (uint8_t *)pdata;
-	}
-	ret = hb_ipc_open_instance(instance, &log_cfg_instances);
-	if (ret) {
-		dev_err(pdata->dev, "hb_ipc_open_instance failed\n");
-	}
+	ret = hb_ipc_open_instance(instance, ipc_cfg);
+        if (ret) {
+                dev_err(pdata->dev, "hb_ipc_open_instance failed\n");
+        }
 
 	return ret;
 }
 
-static int32_t hobot_dsp_ipc_wrapper_open_instance(void) {
-	struct file *file;
-	loff_t pos = 0;
-	int32_t ret;
-	char *cmd = "0";
+static int32_t hobot_dsp_ipc_wrapper_open_instance(struct hobot_rproc_pdata *pdata) {
+	ipc_wrapper_data_t *smf_wrapper_data = pdata->smf_wrapper_data;
 
-	file = filp_open(HORIZON_SIPC_WRAPPER_NODE, O_WRONLY | O_TRUNC, S_IWUSR | S_IRUSR);
-	if (IS_ERR(file)) {
-		pr_err("Open %s failed\n", HORIZON_SIPC_WRAPPER_NODE);
-		return -ENODEV;
-	}
-
-	ret = kernel_write(file, cmd, sizeof(cmd), &pos);
-	if (ret < 0) {
-		pr_err("Write to %s failed\n", HORIZON_SIPC_WRAPPER_NODE);
-	}
-	filp_close(file, NULL);
-
-	return ret;
+	return ipc_wrapper_open_instance(smf_wrapper_data->ipc_cfg);
 }
 
 static int32_t hobot_dsp_ipc_wrapper_close_instance(void) {
-	struct file *file;
-	loff_t pos = 0;
-	int32_t ret;
-	char *cmd = "5";
-	char *cmd1 = "6";
-
-	file = filp_open(HORIZON_SIPC_WRAPPER_NODE, O_WRONLY | O_TRUNC, S_IWUSR | S_IRUSR);
-	if (IS_ERR(file)) {
-		pr_err("Open %s failed\n", HORIZON_SIPC_WRAPPER_NODE);
-		return -ENODEV;
-	}
-
-	ret = kernel_write(file, cmd, sizeof(cmd), &pos);
-	if (ret < 0) {
-		pr_err("Write %s to %s failed\n", cmd, HORIZON_SIPC_WRAPPER_NODE);
-	}
-
-	ret = kernel_write(file, cmd1, sizeof(cmd1), &pos);
-	if (ret < 0) {
-		pr_err("Write %s to %s failed\n", cmd1, HORIZON_SIPC_WRAPPER_NODE);
-	}
-	filp_close(file, NULL);
-
-	return ret;
+	return ipc_wrapper_close_instance();
 }
 
 static int32_t hobot_dsp_ipc_open_instance(struct hobot_rproc_pdata *pdata) {
@@ -567,7 +519,7 @@ static int32_t hobot_dsp_ipc_open_instance(struct hobot_rproc_pdata *pdata) {
 	}
 
 	//ipc wrapper
-	ret = hobot_dsp_ipc_wrapper_open_instance();
+	ret = hobot_dsp_ipc_wrapper_open_instance(pdata);
 	if (ret < 0) {
 		return ret;
 	}
@@ -1206,6 +1158,7 @@ static void hobot_log_handler(uint8_t *userdata, int32_t instance, int32_t chan_
 		uint8_t *buf, uint64_t size) {
 	struct hobot_rproc_pdata *pdata;
 	uint32_t *ipcdata;
+
 	if (userdata == NULL) {
 		pr_err("%s:%d pdata NULL\n", __func__, __LINE__);
 		return;
@@ -1246,6 +1199,9 @@ static int32_t log_init(struct platform_device *pdev) {
 	u32 log_size;
 	u32 log_write_index_offset;
 	u32 log_read_index_reg;
+	struct device_node *ipc_np;
+	struct platform_device *ipc_pdev;
+	struct ipc_dev_instance *ipc_dev;
 	struct device_node *node;
 	struct resource res;
 
@@ -1255,6 +1211,18 @@ static int32_t log_init(struct platform_device *pdev) {
 		dev_err(&pdev->dev, "Get adsp_bsp_reserved failed\n");
 		return ret;
 	}
+	ipc_np = of_parse_phandle(pdev->dev.of_node, "remoteproc-ipc", 0);
+	if (!ipc_np) {
+		dev_err(&pdev->dev, "get remoteproc-ipc error\n");
+		return -1;
+	}
+	ipc_pdev = of_find_device_by_node(ipc_np);
+	if (!ipc_pdev) {
+		dev_err(&pdev->dev, "find remoteproc-ipc error\n");
+		return -1;
+	}
+	ipc_dev = (struct ipc_dev_instance *)platform_get_drvdata(ipc_pdev);
+	pdata->ipc_cfg = &ipc_dev->ipc_info;
 
 	ret = of_property_read_u32(pdev->dev.of_node, "log-offset", &log_offset);
 	if (ret) {
