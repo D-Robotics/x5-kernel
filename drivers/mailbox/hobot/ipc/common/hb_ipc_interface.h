@@ -106,6 +106,17 @@ struct ipc_instance_cfg {
 };
 
 /**
+ * @struct ipc_dev_instance
+ * Define the descriptor of ipc device
+ * @NO{S17E09C06}
+ */
+struct ipc_dev_instance {
+        int32_t instance;/**< instance id*/
+        struct device *dev;/**< deivce pointer*/
+        struct ipc_instance_cfg ipc_info;/**< ipc instance information*/
+};
+
+/**
  * @NO{S17E09C06I}
  * @ASIL{B}
  * @brief open a ipc instance, and updata instance status to opened

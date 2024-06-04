@@ -36,17 +36,6 @@
 #define DEV_MEM_END		(0x3fffffffu)/**< device memory end address*/
 
 /**
- * @struct ipc_dev_instance
- * Define the descriptor of ipc device
- * @NO{S17E09C06}
- */
-struct ipc_dev_instance {
-	int32_t instance;/**< instance id*/
-	struct device *dev;/**< deivce pointer*/
-	struct ipc_instance_cfg ipc_info;/**< ipc instance information*/
-};
-
-/**
  * @struct ipc_os_priv_instance
  * Define the descriptor of OS specific private data each instance
  * @NO{S17E09C06}
@@ -734,6 +723,7 @@ static int32_t hb_ipc_probe(struct platform_device *pdev)
 	if (err != 0 || def_mode != SUPPORT_DEF_MODE) {
 		ipc_dev->ipc_info.mode = NO_DEF_MODE;
 	} else {
+		ipc_dev->ipc_info.mode = def_mode;
 		def_info = &ipc_dev->ipc_info.info.custom_cfg;
 		err = get_ipc_def_resource(pdev, ipc_node, def_info);
 		if (err != 0) {
