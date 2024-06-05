@@ -19,6 +19,9 @@ static int io_file_bitmap_get(struct io_ring_ctx *ctx)
 	unsigned long nr = ctx->file_alloc_end;
 	int ret;
 
+	if (!table->bitmap)
+		return -ENFILE;
+
 	do {
 		ret = find_next_zero_bit(table->bitmap, nr, table->alloc_hint);
 		if (ret != nr)
@@ -92,12 +95,10 @@ static int io_install_fixed_file(struct io_ring_ctx *ctx, struct file *file,
 		needs_switch = true;
 	}
 
-	ret = io_scm_file_account(ctx, file);
-	if (!ret) {
-		*io_get_tag_slot(ctx->file_data, slot_index) = 0;
-		io_fixed_file_set(file_slot, file);
-		io_file_bitmap_set(&ctx->file_table, slot_index);
-	}
+	*io_get_tag_slot(ctx->file_data, slot_index) = 0;
+	io_fixed_file_set(file_slot, file);
+	io_file_bitmap_set(&ctx->file_table, slot_index);
+	return 0;
 err:
 	if (needs_switch)
 		io_rsrc_node_switch(ctx, ctx->file_data);

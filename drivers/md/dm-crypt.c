@@ -53,15 +53,17 @@
 struct convert_context {
 	struct completion restart;
 	struct bio *bio_in;
-	struct bio *bio_out;
 	struct bvec_iter iter_in;
+	struct bio *bio_out;
 	struct bvec_iter iter_out;
-	u64 cc_sector;
 	atomic_t cc_pending;
+	u64 cc_sector;
 	union {
 		struct skcipher_request *req;
 		struct aead_request *req_aead;
 	} r;
+	bool aead_recheck;
+	bool aead_failed;
 
 };
 
@@ -72,15 +74,17 @@ struct dm_crypt_io {
 	struct crypt_config *cc;
 	struct bio *base_bio;
 	u8 *integrity_metadata;
-	bool integrity_metadata_from_pool;
+	bool integrity_metadata_from_pool:1;
+
 	struct work_struct work;
-	struct tasklet_struct tasklet;
 
 	struct convert_context ctx;
 
 	atomic_t io_pending;
 	blk_status_t error;
 	sector_t sector;
+
+	struct bvec_iter saved_bi_iter;
 
 	struct rb_node rb_node;
 } CRYPTO_MINALIGN_ATTR;
@@ -172,14 +176,14 @@ struct crypt_config {
 	} iv_gen_private;
 	u64 iv_offset;
 	unsigned int iv_size;
-	unsigned short int sector_size;
+	unsigned short sector_size;
 	unsigned char sector_shift;
 
 	union {
 		struct crypto_skcipher **tfms;
 		struct crypto_aead **tfms_aead;
 	} cipher_tfm;
-	unsigned tfms_count;
+	unsigned int tfms_count;
 	unsigned long cipher_flags;
 
 	/*
@@ -213,7 +217,7 @@ struct crypt_config {
 	 * pool for per bio private data, crypto requests,
 	 * encryption requeusts/buffer pages and integrity tags
 	 */
-	unsigned tag_pool_max_sectors;
+	unsigned int tag_pool_max_sectors;
 	mempool_t tag_pool;
 	mempool_t req_pool;
 	mempool_t page_pool;
@@ -230,7 +234,7 @@ struct crypt_config {
 #define POOL_ENTRY_SIZE	512
 
 static DEFINE_SPINLOCK(dm_crypt_clients_lock);
-static unsigned dm_crypt_clients_n = 0;
+static unsigned int dm_crypt_clients_n = 0;
 static volatile unsigned long dm_crypt_pages_per_client;
 #define DM_CRYPT_MEMORY_PERCENT			2
 #define DM_CRYPT_MIN_PAGES_PER_CLIENT		(BIO_MAX_VECS * 16)
@@ -355,7 +359,7 @@ static int crypt_iv_essiv_gen(struct crypt_config *cc, u8 *iv,
 static int crypt_iv_benbi_ctr(struct crypt_config *cc, struct dm_target *ti,
 			      const char *opts)
 {
-	unsigned bs;
+	unsigned int bs;
 	int log;
 
 	if (crypt_integrity_aead(cc))
@@ -732,8 +736,7 @@ static int crypt_iv_eboiv_ctr(struct crypt_config *cc, struct dm_target *ti,
 	}
 
 	if (crypto_skcipher_blocksize(any_tfm(cc)) != cc->iv_size) {
-		ti->error = "Block size of EBOIV cipher does "
-			    "not match IV size of block cipher";
+		ti->error = "Block size of EBOIV cipher does not match IV size of block cipher";
 		return -EINVAL;
 	}
 
@@ -1367,10 +1370,13 @@ static int crypt_convert_block_aead(struct crypt_config *cc,
 	if (r == -EBADMSG) {
 		sector_t s = le64_to_cpu(*sector);
 
-		DMERR_LIMIT("%pg: INTEGRITY AEAD ERROR, sector %llu",
-			    ctx->bio_in->bi_bdev, s);
-		dm_audit_log_bio(DM_MSG_PREFIX, "integrity-aead",
-				 ctx->bio_in, s, 0);
+		ctx->aead_failed = true;
+		if (ctx->aead_recheck) {
+			DMERR_LIMIT("%pg: INTEGRITY AEAD ERROR, sector %llu",
+				    ctx->bio_in->bi_bdev, s);
+			dm_audit_log_bio(DM_MSG_PREFIX, "integrity-aead",
+					 ctx->bio_in, s, 0);
+		}
 	}
 
 	if (!r && cc->iv_gen_ops && cc->iv_gen_ops->post)
@@ -1465,7 +1471,7 @@ static void kcryptd_async_done(struct crypto_async_request *async_req,
 static int crypt_alloc_req_skcipher(struct crypt_config *cc,
 				     struct convert_context *ctx)
 {
-	unsigned key_index = ctx->cc_sector & (cc->tfms_count - 1);
+	unsigned int key_index = ctx->cc_sector & (cc->tfms_count - 1);
 
 	if (!ctx->r.req) {
 		ctx->r.req = mempool_alloc(&cc->req_pool, in_interrupt() ? GFP_ATOMIC : GFP_NOIO);
@@ -1659,13 +1665,13 @@ static void crypt_free_buffer_pages(struct crypt_config *cc, struct bio *clone);
  * non-blocking allocations without a mutex first but on failure we fallback
  * to blocking allocations with a mutex.
  */
-static struct bio *crypt_alloc_buffer(struct dm_crypt_io *io, unsigned size)
+static struct bio *crypt_alloc_buffer(struct dm_crypt_io *io, unsigned int size)
 {
 	struct crypt_config *cc = io->cc;
 	struct bio *clone;
 	unsigned int nr_iovecs = (size + PAGE_SIZE - 1) >> PAGE_SHIFT;
 	gfp_t gfp_mask = GFP_NOWAIT | __GFP_HIGHMEM;
-	unsigned i, len, remaining_size;
+	unsigned int i, len, remaining_size;
 	struct page *page;
 
 retry:
@@ -1726,6 +1732,8 @@ static void crypt_io_init(struct dm_crypt_io *io, struct crypt_config *cc,
 	io->base_bio = bio;
 	io->sector = sector;
 	io->error = 0;
+	io->ctx.aead_recheck = false;
+	io->ctx.aead_failed = false;
 	io->ctx.r.req = NULL;
 	io->integrity_metadata = NULL;
 	io->integrity_metadata_from_pool = false;
@@ -1737,11 +1745,7 @@ static void crypt_inc_pending(struct dm_crypt_io *io)
 	atomic_inc(&io->io_pending);
 }
 
-static void kcryptd_io_bio_endio(struct work_struct *work)
-{
-	struct dm_crypt_io *io = container_of(work, struct dm_crypt_io, work);
-	bio_endio(io->base_bio);
-}
+static void kcryptd_queue_read(struct dm_crypt_io *io);
 
 /*
  * One of the bios was finished. Check for completion of
@@ -1756,6 +1760,15 @@ static void crypt_dec_pending(struct dm_crypt_io *io)
 	if (!atomic_dec_and_test(&io->io_pending))
 		return;
 
+	if (likely(!io->ctx.aead_recheck) && unlikely(io->ctx.aead_failed) &&
+	    cc->on_disk_tag_size && bio_data_dir(base_bio) == READ) {
+		io->ctx.aead_recheck = true;
+		io->ctx.aead_failed = false;
+		io->error = 0;
+		kcryptd_queue_read(io);
+		return;
+	}
+
 	if (io->ctx.r.req)
 		crypt_free_req(cc, io->ctx.r.req, base_bio);
 
@@ -1766,22 +1779,7 @@ static void crypt_dec_pending(struct dm_crypt_io *io)
 
 	base_bio->bi_status = error;
 
-	/*
-	 * If we are running this function from our tasklet,
-	 * we can't call bio_endio() here, because it will call
-	 * clone_endio() from dm.c, which in turn will
-	 * free the current struct dm_crypt_io structure with
-	 * our tasklet. In this case we need to delay bio_endio()
-	 * execution to after the tasklet is done and dequeued.
-	 */
-	if (tasklet_trylock(&io->tasklet)) {
-		tasklet_unlock(&io->tasklet);
-		bio_endio(base_bio);
-		return;
-	}
-
-	INIT_WORK(&io->work, kcryptd_io_bio_endio);
-	queue_work(cc->io_queue, &io->work);
+	bio_endio(base_bio);
 }
 
 /*
@@ -1805,16 +1803,20 @@ static void crypt_endio(struct bio *clone)
 {
 	struct dm_crypt_io *io = clone->bi_private;
 	struct crypt_config *cc = io->cc;
-	unsigned rw = bio_data_dir(clone);
-	blk_status_t error;
+	unsigned int rw = bio_data_dir(clone);
+	blk_status_t error = clone->bi_status;
+
+	if (io->ctx.aead_recheck && !error) {
+		kcryptd_queue_crypt(io);
+		return;
+	}
 
 	/*
 	 * free the processed pages
 	 */
-	if (rw == WRITE)
+	if (rw == WRITE || io->ctx.aead_recheck)
 		crypt_free_buffer_pages(cc, clone);
 
-	error = clone->bi_status;
 	bio_put(clone);
 
 	if (rw == READ && !error) {
@@ -1834,6 +1836,22 @@ static int kcryptd_io_read(struct dm_crypt_io *io, gfp_t gfp)
 {
 	struct crypt_config *cc = io->cc;
 	struct bio *clone;
+
+	if (io->ctx.aead_recheck) {
+		if (!(gfp & __GFP_DIRECT_RECLAIM))
+			return 1;
+		crypt_inc_pending(io);
+		clone = crypt_alloc_buffer(io, io->base_bio->bi_iter.bi_size);
+		if (unlikely(!clone)) {
+			crypt_dec_pending(io);
+			return 1;
+		}
+		clone->bi_iter.bi_sector = cc->start + io->sector;
+		crypt_convert_init(cc, &io->ctx, clone, clone, io->sector);
+		io->saved_bi_iter = clone->bi_iter;
+		dm_submit_bio_remap(io->base_bio, clone);
+		return 0;
+	}
 
 	/*
 	 * We need the original biovec array in order to decrypt the whole bio
@@ -1934,6 +1952,7 @@ pop_from_list:
 			io = crypt_io_from_node(rb_first(&write_tree));
 			rb_erase(&io->rb_node, &write_tree);
 			kcryptd_io_write(io);
+			cond_resched();
 		} while (!RB_EMPTY_ROOT(&write_tree));
 		blk_finish_plug(&plug);
 	}
@@ -2060,6 +2079,12 @@ static void kcryptd_crypt_write_convert(struct dm_crypt_io *io)
 	io->ctx.bio_out = clone;
 	io->ctx.iter_out = clone->bi_iter;
 
+	if (crypt_integrity_aead(cc)) {
+		bio_copy_data(clone, io->base_bio);
+		io->ctx.bio_in = clone;
+		io->ctx.iter_in = clone->bi_iter;
+	}
+
 	sector += bio_sectors(clone);
 
 	crypt_inc_pending(io);
@@ -2096,6 +2121,14 @@ dec:
 
 static void kcryptd_crypt_read_done(struct dm_crypt_io *io)
 {
+	if (io->ctx.aead_recheck) {
+		if (!io->error) {
+			io->ctx.bio_in->bi_iter = io->saved_bi_iter;
+			bio_copy_data(io->base_bio, io->ctx.bio_in);
+		}
+		crypt_free_buffer_pages(io->cc, io->ctx.bio_in);
+		bio_put(io->ctx.bio_in);
+	}
 	crypt_dec_pending(io);
 }
 
@@ -2125,11 +2158,17 @@ static void kcryptd_crypt_read_convert(struct dm_crypt_io *io)
 
 	crypt_inc_pending(io);
 
-	crypt_convert_init(cc, &io->ctx, io->base_bio, io->base_bio,
-			   io->sector);
+	if (io->ctx.aead_recheck) {
+		io->ctx.cc_sector = io->sector + cc->iv_offset;
+		r = crypt_convert(cc, &io->ctx,
+				  test_bit(DM_CRYPT_NO_READ_WORKQUEUE, &cc->flags), true);
+	} else {
+		crypt_convert_init(cc, &io->ctx, io->base_bio, io->base_bio,
+				   io->sector);
 
-	r = crypt_convert(cc, &io->ctx,
-			  test_bit(DM_CRYPT_NO_READ_WORKQUEUE, &cc->flags), true);
+		r = crypt_convert(cc, &io->ctx,
+				  test_bit(DM_CRYPT_NO_READ_WORKQUEUE, &cc->flags), true);
+	}
 	/*
 	 * Crypto API backlogged the request, because its queue was full
 	 * and we're in softirq context, so continue from a workqueue
@@ -2172,10 +2211,13 @@ static void kcryptd_async_done(struct crypto_async_request *async_req,
 	if (error == -EBADMSG) {
 		sector_t s = le64_to_cpu(*org_sector_of_dmreq(cc, dmreq));
 
-		DMERR_LIMIT("%pg: INTEGRITY AEAD ERROR, sector %llu",
-			    ctx->bio_in->bi_bdev, s);
-		dm_audit_log_bio(DM_MSG_PREFIX, "integrity-aead",
-				 ctx->bio_in, s, 0);
+		ctx->aead_failed = true;
+		if (ctx->aead_recheck) {
+			DMERR_LIMIT("%pg: INTEGRITY AEAD ERROR, sector %llu",
+				    ctx->bio_in->bi_bdev, s);
+			dm_audit_log_bio(DM_MSG_PREFIX, "integrity-aead",
+					 ctx->bio_in, s, 0);
+		}
 		io->error = BLK_STS_PROTECTION;
 	} else if (error < 0)
 		io->error = BLK_STS_IOERR;
@@ -2212,11 +2254,6 @@ static void kcryptd_crypt(struct work_struct *work)
 		kcryptd_crypt_write_convert(io);
 }
 
-static void kcryptd_crypt_tasklet(unsigned long work)
-{
-	kcryptd_crypt((struct work_struct *)work);
-}
-
 static void kcryptd_queue_crypt(struct dm_crypt_io *io)
 {
 	struct crypt_config *cc = io->cc;
@@ -2228,14 +2265,10 @@ static void kcryptd_queue_crypt(struct dm_crypt_io *io)
 		 * irqs_disabled(): the kernel may run some IO completion from the idle thread, but
 		 * it is being executed with irqs disabled.
 		 */
-		if (in_hardirq() || irqs_disabled()) {
-			tasklet_init(&io->tasklet, kcryptd_crypt_tasklet, (unsigned long)&io->work);
-			tasklet_schedule(&io->tasklet);
+		if (!(in_hardirq() || irqs_disabled())) {
+			kcryptd_crypt(&io->work);
 			return;
 		}
-
-		kcryptd_crypt(&io->work);
-		return;
 	}
 
 	INIT_WORK(&io->work, kcryptd_crypt);
@@ -2258,7 +2291,7 @@ static void crypt_free_tfms_aead(struct crypt_config *cc)
 
 static void crypt_free_tfms_skcipher(struct crypt_config *cc)
 {
-	unsigned i;
+	unsigned int i;
 
 	if (!cc->cipher_tfm.tfms)
 		return;
@@ -2283,7 +2316,7 @@ static void crypt_free_tfms(struct crypt_config *cc)
 
 static int crypt_alloc_tfms_skcipher(struct crypt_config *cc, char *ciphermode)
 {
-	unsigned i;
+	unsigned int i;
 	int err;
 
 	cc->cipher_tfm.tfms = kcalloc(cc->tfms_count,
@@ -2341,12 +2374,12 @@ static int crypt_alloc_tfms(struct crypt_config *cc, char *ciphermode)
 		return crypt_alloc_tfms_skcipher(cc, ciphermode);
 }
 
-static unsigned crypt_subkey_size(struct crypt_config *cc)
+static unsigned int crypt_subkey_size(struct crypt_config *cc)
 {
 	return (cc->key_size - cc->key_extra_size) >> ilog2(cc->tfms_count);
 }
 
-static unsigned crypt_authenckey_size(struct crypt_config *cc)
+static unsigned int crypt_authenckey_size(struct crypt_config *cc)
 {
 	return crypt_subkey_size(cc) + RTA_SPACE(sizeof(struct crypto_authenc_key_param));
 }
@@ -2357,7 +2390,7 @@ static unsigned crypt_authenckey_size(struct crypt_config *cc)
  * This funcion converts cc->key to this special format.
  */
 static void crypt_copy_authenckey(char *p, const void *key,
-				  unsigned enckeylen, unsigned authkeylen)
+				  unsigned int enckeylen, unsigned int authkeylen)
 {
 	struct crypto_authenc_key_param *param;
 	struct rtattr *rta;
@@ -2375,7 +2408,7 @@ static void crypt_copy_authenckey(char *p, const void *key,
 
 static int crypt_setkey(struct crypt_config *cc)
 {
-	unsigned subkey_size;
+	unsigned int subkey_size;
 	int err = 0, i, r;
 
 	/* Ignore extra keys (which are used for IV etc) */
@@ -2503,7 +2536,7 @@ static int crypt_set_keyring_key(struct crypt_config *cc, const char *key_string
 		type = &key_type_encrypted;
 		set_key = set_key_encrypted;
 	} else if (IS_ENABLED(CONFIG_TRUSTED_KEYS) &&
-	           !strncmp(key_string, "trusted:", key_desc - key_string + 1)) {
+		   !strncmp(key_string, "trusted:", key_desc - key_string + 1)) {
 		type = &key_type_trusted;
 		set_key = set_key_trusted;
 	} else {
@@ -3110,7 +3143,7 @@ static int crypt_ctr_optional(struct dm_target *ti, unsigned int argc, char **ar
 			sval = strchr(opt_string + strlen("integrity:"), ':') + 1;
 			if (!strcasecmp(sval, "aead")) {
 				set_bit(CRYPT_MODE_INTEGRITY_AEAD, &cc->cipher_flags);
-			} else  if (strcasecmp(sval, "none")) {
+			} else if (strcasecmp(sval, "none")) {
 				ti->error = "Unknown integrity profile";
 				return -EINVAL;
 			}
@@ -3436,7 +3469,7 @@ static int crypt_map(struct dm_target *ti, struct bio *bio)
 	crypt_io_init(io, cc, bio, dm_target_offset(ti, bio->bi_iter.bi_sector));
 
 	if (cc->on_disk_tag_size) {
-		unsigned tag_len = cc->on_disk_tag_size * (bio_sectors(bio) >> cc->sector_shift);
+		unsigned int tag_len = cc->on_disk_tag_size * (bio_sectors(bio) >> cc->sector_shift);
 
 		if (unlikely(tag_len > KMALLOC_MAX_SIZE) ||
 		    unlikely(!(io->integrity_metadata = kmalloc(tag_len,
@@ -3464,14 +3497,14 @@ static int crypt_map(struct dm_target *ti, struct bio *bio)
 
 static char hex2asc(unsigned char c)
 {
-	return c + '0' + ((unsigned)(9 - c) >> 4 & 0x27);
+	return c + '0' + ((unsigned int)(9 - c) >> 4 & 0x27);
 }
 
 static void crypt_status(struct dm_target *ti, status_type_t type,
-			 unsigned status_flags, char *result, unsigned maxlen)
+			 unsigned int status_flags, char *result, unsigned int maxlen)
 {
 	struct crypt_config *cc = ti->private;
-	unsigned i, sz = 0;
+	unsigned int i, sz = 0;
 	int num_feature_args = 0;
 
 	switch (type) {
@@ -3587,8 +3620,8 @@ static void crypt_resume(struct dm_target *ti)
  *	key set <key>
  *	key wipe
  */
-static int crypt_message(struct dm_target *ti, unsigned argc, char **argv,
-			 char *result, unsigned maxlen)
+static int crypt_message(struct dm_target *ti, unsigned int argc, char **argv,
+			 char *result, unsigned int maxlen)
 {
 	struct crypt_config *cc = ti->private;
 	int key_size, ret = -EINVAL;
@@ -3649,10 +3682,10 @@ static void crypt_io_hints(struct dm_target *ti, struct queue_limits *limits)
 	limits->max_segment_size = PAGE_SIZE;
 
 	limits->logical_block_size =
-		max_t(unsigned, limits->logical_block_size, cc->sector_size);
+		max_t(unsigned int, limits->logical_block_size, cc->sector_size);
 	limits->physical_block_size =
-		max_t(unsigned, limits->physical_block_size, cc->sector_size);
-	limits->io_min = max_t(unsigned, limits->io_min, cc->sector_size);
+		max_t(unsigned int, limits->physical_block_size, cc->sector_size);
+	limits->io_min = max_t(unsigned int, limits->io_min, cc->sector_size);
 	limits->dma_alignment = limits->logical_block_size - 1;
 }
 
