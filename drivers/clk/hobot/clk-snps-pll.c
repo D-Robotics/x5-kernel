@@ -198,12 +198,13 @@ static void pll_set_regs(struct drobot_clk_pll *pll,
 	writel(PLL_CTRL_DEFAULT, pll->cfg_reg);
 	writel(fbdiv_reg, pll->cfg_reg + PLL_FBDIV_OFFSET);
 
+	writel(cfg_reg, pll->cfg_reg);
+	writel(postdiv_reg, pll->cfg_reg + PLL_POSTDIV_OFFSET);
 	fbdiv_reg |= PLL_FBDIV_LOAD;
 	writel(fbdiv_reg, pll->cfg_reg + PLL_FBDIV_OFFSET);
-	writel(cfg_reg, pll->cfg_reg);
-	writel(PLL_FRAC_EN, pll->internal_reg + PLL_SCFRAC_CNT);
+	if (rate_table->mfrac)
+		writel(PLL_FRAC_EN, pll->internal_reg + PLL_SCFRAC_CNT);
 	writel((cfg_reg | PLL_PWRON), pll->cfg_reg);
-	writel(postdiv_reg, pll->cfg_reg + PLL_POSTDIV_OFFSET);
 }
 
 static const struct pll_rate_table *get_pll_settings(struct drobot_clk_pll *pll, unsigned long rate)
