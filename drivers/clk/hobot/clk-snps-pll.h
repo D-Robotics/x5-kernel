@@ -49,7 +49,6 @@ struct drobot_clk_pll {
 #define PLL_FBDIV_OFFSET	(0x4)
 #define PLL_POSTDIV_OFFSET	(0x8)
 #define PLL_LOCK_OFFSET		(0xC)
-#define PLL_ANAREG6		(0x14)
 #define PLL_SCFRAC_CNT		(0x38)
 
 #define PLL_LOWFREQ_SHIFT	(4)
