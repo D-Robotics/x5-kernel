@@ -1152,48 +1152,53 @@ EXPORT_SYMBOL(hobot_remoteproc_boot_hifi5);/*PRQA S 0307*//*kernel macro*/
 static int timesync_init(struct platform_device *pdev) {
 	int ret = 0;
 	struct hobot_rproc_pdata *pdata = (struct hobot_rproc_pdata *)(pdev->dev.driver_data);
-	u32 timesync_sec_reg;
-        u32 timesync_sec_diff_reg;
-        u32 timesync_nanosec_reg;
+	u32 timesync_sec_offset;
+	u32 timesync_sec_diff_offset;
+	u32 timesync_nanosec_offset;
 	//void __iomem *aon_sram_base_va;
+	struct device_node *node;
+	struct resource res;
+
+	node = of_parse_phandle(pdev->dev.of_node, "shm-addr", 0);
+	ret = of_address_to_resource(node, 0, &res);
+	if (ret) {
+		dev_err(&pdev->dev, "Get adsp_bsp_reserved failed\n");
+		return ret;
+	}
 
 #ifdef CONFIG_HOBOT_ADSP_CTRL
-	timesync_acore_to_adsp = ioremap(TIMESYNC_ADSP_NOTIFY_ADDR, 0x4);
-#else
+	timesync_acore_to_adsp = ioremap(res.start + TIMESYNC_ADSP_NOTIFY_OFF, 0x4);
 #endif
 
-#if 0
-	aon_sram_base_va = ioremap(AON_SRAM_BASE,AON_SRAM_END_BASE-AON_SRAM_BASE);
-        if(aon_sram_base_va == NULL){
-                dev_err(&pdev->dev, "ioremap aon_sram_base_va error\n");
-                return -1;
-        }
-#endif
-	ret = of_property_read_u32(pdev->dev.of_node, "timesync-sec-reg", &timesync_sec_reg);
-        if (ret) {
-                dev_err(&pdev->dev, "get timesync-sec-reg error\n");
-                return -1;
-        }
-        pdata->timesync_sec_reg_va = //aon_sram_base_va + (timesync_sec_reg - AON_SRAM_BASE);
-		ioremap(timesync_sec_reg, 0x4);
+	ret = of_property_read_u32(pdev->dev.of_node, "timesync-sec-offset", &timesync_sec_offset);
+	if (ret) {
+		dev_err(&pdev->dev, "get timesync-sec-offset error\n");
+		return -1;
+	}
+	pdata->timesync_sec_reg_va = //aon_sram_base_va + (timesync_sec_reg - AON_SRAM_BASE);
+		ioremap(res.start + timesync_sec_offset, 0x4);
 
-        ret = of_property_read_u32(pdev->dev.of_node, "timesync-sec-diff-reg", &timesync_sec_diff_reg);
-        if (ret) {
-                dev_err(&pdev->dev, "get timesync-sec-diff-reg error\n");
-                return -1;
-        }
+	ret = of_property_read_u32(pdev->dev.of_node, "timesync-sec-diff-offset", &timesync_sec_diff_offset);
+	if (ret) {
+		dev_err(&pdev->dev, "get timesync-sec-diff-offset error\n");
+		return -1;
+	}
 
 	pdata->timesync_sec_diff_reg_va = //aon_sram_base_va + (timesync_sec_diff_reg - AON_SRAM_BASE);
-                ioremap(timesync_sec_diff_reg, 0x4);
+		ioremap(res.start + timesync_sec_diff_offset, 0x4);
 
-        ret = of_property_read_u32(pdev->dev.of_node, "timesync-nanosec-reg", &timesync_nanosec_reg);
-        if (ret) {
-                dev_err(&pdev->dev, "get timesync-nanosec-reg error\n");
-                return -1;
-        }
-        pdata->timesync_nanosec_reg_va = //aon_sram_base_va + (timesync_nanosec_reg - AON_SRAM_BASE);
-		ioremap(timesync_nanosec_reg, 0x4);
+	ret = of_property_read_u32(pdev->dev.of_node, "timesync-nanosec-offset", &timesync_nanosec_offset);
+	if (ret) {
+		dev_err(&pdev->dev, "get timesync-nanosec-offset error\n");
+		return -1;
+	}
+	pdata->timesync_nanosec_reg_va = //aon_sram_base_va + (timesync_nanosec_reg - AON_SRAM_BASE);
+		ioremap(res.start + timesync_nanosec_offset, 0x4);
 
+
+	dev_dbg(&pdev->dev, "base (0x%llx) sec (0x%llx) nsec(0x%llx) diff(0x%llx)\n",
+		res.start, res.start + timesync_sec_offset, res.start + timesync_sec_diff_offset,
+		res.start + timesync_nanosec_offset);
 	return 0;
 }
 
@@ -1237,53 +1242,60 @@ static void hobot_log_handler(uint8_t *userdata, int32_t instance, int32_t chan_
 static int32_t log_init(struct platform_device *pdev) {
 	int32_t ret = 0;
 	struct hobot_rproc_pdata *pdata = (struct hobot_rproc_pdata *)(pdev->dev.driver_data);
-	u32 log_addr;
-        u32 log_size;
-        u32 log_write_index_reg;
-        u32 log_read_index_reg;
+	u32 log_offset;
+	u32 log_size;
+	u32 log_write_index_offset;
+	u32 log_read_index_reg;
+	struct device_node *node;
+	struct resource res;
 
-	ret = of_property_read_u32(pdev->dev.of_node, "log-addr", &log_addr);
+	node = of_parse_phandle(pdev->dev.of_node, "shm-addr", 0);
+	ret = of_address_to_resource(node, 0, &res);
 	if (ret) {
-                dev_err(&pdev->dev, "get log-addr error\n");
-                return -1;
-        }
+		dev_err(&pdev->dev, "Get adsp_bsp_reserved failed\n");
+		return ret;
+	}
+
+	ret = of_property_read_u32(pdev->dev.of_node, "log-offset", &log_offset);
+	if (ret) {
+		dev_err(&pdev->dev, "get log-offset error\n");
+		return -1;
+	}
 
 	ret = of_property_read_u32(pdev->dev.of_node, "log-size", &log_size);
-        if (ret) {
-                dev_err(&pdev->dev, "get log-size error\n");
-                return -1;
-        }
+	if (ret) {
+		dev_err(&pdev->dev, "get log-size error\n");
+		return -1;
+	}
 
-	pdata->log_addr_va = ioremap(log_addr, log_size);
-        if (pdata->log_addr_va == NULL) {
-                dev_err(&pdev->dev, "ioremap log_addr error\n");
-                return -1;
-        }
+	pdata->log_addr_va = ioremap(res.start + log_offset, log_size);
+	if (pdata->log_addr_va == NULL) {
+		dev_err(&pdev->dev, "ioremap log_addr error\n");
+		return -1;
+	}
 
 	pdata->log_size = log_size;
 
-	ret = of_property_read_u32(pdev->dev.of_node, "log-write-index-reg",
-        &log_write_index_reg);
-        if (ret) {
-                dev_err(&pdev->dev, "get log-write-index-reg error\n");
-                return -1;
-        }
-        pdata->log_write_index_reg_va = //aon_sram_base_va + (log_write_index_reg - AON_SRAM_BASE);
-                ioremap(log_write_index_reg, 0x4);
-        (void)memset(pdata->log_write_index_reg_va, 0, 0x4);
+	ret = of_property_read_u32(pdev->dev.of_node, "log-write-index-offset",
+		&log_write_index_offset);
+	if (ret) {
+		dev_err(&pdev->dev, "get log-write-index-offset error\n");
+		return -1;
+	}
+	pdata->log_write_index_reg_va = //aon_sram_base_va + (log_write_index_reg - AON_SRAM_BASE);
+		ioremap(res.start + log_write_index_offset, 0x4);
+	(void)memset(pdata->log_write_index_reg_va, 0, 0x4);
 
-	ret = of_property_read_u32(pdev->dev.of_node, "log-read-index-reg", &log_read_index_reg);
-        if (ret) {
-                dev_err(&pdev->dev, "get log-read-index-reg error\n");
-                return -1;
-        }
-        pdata->log_read_index_reg_va = //aon_sram_base_va + (log_read_index_reg - AON_SRAM_BASE);
-                ioremap(log_read_index_reg, 0x4);
+	log_read_index_reg = res.start + log_write_index_offset;
+	pdata->log_read_index_reg_va = //aon_sram_base_va + (log_read_index_reg - AON_SRAM_BASE);
+		ioremap(log_read_index_reg, 0x4);
 
 	init_completion(&pdata->completion_log);
 	spin_lock_init(&(pdata->r_index_lock));
 	spin_lock_init(&(pdata->w_index_lock));
 
+	dev_dbg(&pdev->dev, "start(0x%llx) offset(0x%llx) index(0x%llx)\n",
+			res.start, res.start + log_offset, res.start + log_write_index_offset);
 	return 0;
 }
 

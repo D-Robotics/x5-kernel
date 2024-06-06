@@ -74,6 +74,7 @@ enum hifi5_runstall {
 
 //acore timesync notify
 #define TIMESYNC_ADSP_NOTIFY_ADDR	(0xd3ffff0cu)
+#define TIMESYNC_ADSP_NOTIFY_OFF	(0x7fff0cu)
 
 #define MAX_R_INDEX_NUM 16u
 
