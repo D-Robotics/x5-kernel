@@ -520,6 +520,10 @@ static int32_t get_ipc_def_resource(struct platform_device *pdev,
 	char node_name[NODE_NAME_MAX_LEN];
 	struct ipc_channel_info *chans, *chancfg;
 	struct ipc_pool_info *pools, *poolcfg;
+	struct device_node *node;
+	struct resource res;
+	uint32_t local_offset;
+	uint32_t remote_offset;
 
 	if (!dev || !ipc_node || !def_info) {
 		dev_err(dev,"%s invalid parameter\n", __func__);
@@ -553,31 +557,29 @@ static int32_t get_ipc_def_resource(struct platform_device *pdev,
 
 		return -EINVAL;
 	}
-	err = of_property_read_u64(ipc_node, "local_shm_addr", &def_info->local_shm_addr);
-	if (err != 0) {
-		dev_err(dev, "ipc local_shm_addr read failed %d\n", err);
 
+	node = of_parse_phandle(ipc_node, "shm-addr", 0);
+	err = of_address_to_resource(node, 0, &res);
+	if (err) {
+		dev_err(dev, "Get adsp_ipc_reserved failed\n");
+		return err;
+	}
+	err = of_property_read_u32(ipc_node, "local-offset", &local_offset);
+	if (err) {
+		dev_err(dev, "Get local-offset failed\n");
+		return err;
+	}
+	err = of_property_read_u32(ipc_node, "remote-offset", &remote_offset);
+	if (err) {
+		dev_err(dev, "Get remote-offset failed\n");
 		return err;
 	}
 
-	if (def_info->local_shm_addr == 0) {
-		dev_err(dev, "ipc local_shm_addr invalid\n");
+	def_info->local_shm_addr = res.start + local_offset;
+	def_info->remote_shm_addr = res.start + remote_offset;
 
-		return -EINVAL;
-	}
-
-	err = of_property_read_u64(ipc_node, "remote_shm_addr", &def_info->remote_shm_addr);
-	if (err != 0) {
-		dev_err(dev, "ipc remote_shm_addr read failed %d\n", err);
-
-		return err;
-	}
-
-	if (def_info->remote_shm_addr == 0) {
-		dev_err(dev, "ipc remote_shm_addr invalid\n");
-
-		return -EINVAL;
-	}
+	dev_dbg(dev, "base(0x%llx) local(0x%llx) remote(0x%llx)\n",
+		res.start, def_info->local_shm_addr, def_info->remote_shm_addr);
 
 	chans = devm_kzalloc(dev, sizeof(*chans) * def_info->num_chans, GFP_KERNEL);
 	if (!chans) {
