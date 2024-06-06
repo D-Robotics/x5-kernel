@@ -3172,13 +3172,12 @@
 			status = "disabled";
 			interrupt-parent = <&gic>;
 			interrupts = <0 19 4>, <0 217 0x4>;
-			log-addr = <0xd3ffe000>;
+			log-offset = <0x7fe000>;
 			log-size = <4096>;
-			log-write-index-reg = <0xd3ffff10>;
-			log-read-index-reg = <0xd3ffff10>;
-			timesync-sec-reg = <0xd3ffff00>;
-			timesync-sec-diff-reg = <0xd3ffff08>;
-			timesync-nanosec-reg = <0xd3ffff04>;
+			log-write-index-offset = <0x7fff10>;
+			timesync-sec-offset = <0x7fff00>;
+			timesync-sec-diff-offset = <0x7fff08>;
+			timesync-nanosec-offset = <0x7fff04>;
 			clocks = <&dspclks X5_DSP_HIFI5_CLK>, <&dspclks X5_DSP_HIFI5_APB_CLK>;
 			clock-names = "hifi5_clk", "hifi5_pbclk";
 			power-domains = <&power X5_DSP_HIFI5>;
@@ -3218,8 +3217,6 @@
 			def_mode = <1>;
 			num_chans = <2>;
 			shm_size = <0x400>;
-			local_shm_addr = /bits/ 64 <0xd3000000>;//note big-endian and little-endian
-			remote_shm_addr = /bits/ 64 <0xd3000400>;//note big-endian and little-endian
 			ipc_channel0 {
 				num_pools = <1>;
 				ipc_pool0 {
@@ -3245,8 +3242,6 @@
 			def_mode = <1>;
 			num_chans = <1>;
 			shm_size = <0x400>;
-			local_shm_addr = /bits/ 64 <0xd3000800>;//note big-endian and little-endian
-			remote_shm_addr = /bits/ 64 <0xd3000c00>;//note big-endian and little-endian
 			ipc_channel0 {
 				num_pools = <1>;
 				ipc_pool0 {
@@ -3272,8 +3267,6 @@
 			def_mode = <1>;
 			num_chans = <2>;
 			shm_size = <0x3000>;
-			local_shm_addr = /bits/ 64 <0xd3001000>;//note big-endian and little-endian
-			remote_shm_addr = /bits/ 64 <0xd3004000>;//note big-endian and little-endian
 			ipc_channel0 {
 				num_pools = <1>;
 				ipc_pool0 {
