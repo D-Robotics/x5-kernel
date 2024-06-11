@@ -138,26 +138,6 @@ static const char * x5_idles_name[] = {
 	[ISO_Q_BPU]   = "iso q bpu",
 };
 
-static int __wait_idle(struct drobot_idle *idle, u8 id, bool is_idle)
-{
-	u32 val;
-	u32 mask	  = idle->info[id].mask;
-	void __iomem *reg = idle->base + idle->info[id].reg_status;
-	bool set	  = idle->info[id].reverse ? !is_idle : is_idle;
-	u32 target	  = set ? mask : 0;
-	int ret;
-
-	ret = readl_poll_timeout_atomic(reg, val, (val & mask) == target, IDLE_ACK_DELAY,
-					IDLE_ACK_TIMEOUT);
-
-	if (ret) {
-		dev_err(idle->dev, "timeout to wait idle: %s to 0x%x\n", x5_idles_name[id], target);
-		return ret;
-	}
-
-	return 0;
-}
-
 static void __send_request(struct drobot_idle *idle, u8 id, bool is_idle)
 {
 	u32 val;
@@ -176,6 +156,33 @@ static void __send_request(struct drobot_idle *idle, u8 id, bool is_idle)
 
     writel(val, reg);
 	spin_unlock_irqrestore(&idle->lock, flags);
+}
+
+static int __wait_idle(struct drobot_idle *idle, u8 id, bool is_idle)
+{
+	u32 val;
+	u32 mask	  = idle->info[id].mask;
+	void __iomem *reg = idle->base + idle->info[id].reg_status;
+	bool set	  = idle->info[id].reverse ? !is_idle : is_idle;
+	u32 target	  = set ? mask : 0;
+	int ret;
+
+	ret = readl_poll_timeout_atomic(reg, val, (val & mask) == target, IDLE_ACK_DELAY,
+					IDLE_ACK_TIMEOUT);
+
+	if (ret) {
+		dev_err(idle->dev, "timeout to wait idle: %s to 0x%x, try again\n", x5_idles_name[id], target);
+		__send_request(idle, id, !is_idle);
+		__send_request(idle, id, is_idle);
+		ret = readl_poll_timeout_atomic(reg, val, (val & mask) == target, IDLE_ACK_DELAY,
+						IDLE_ACK_TIMEOUT);
+		if (ret) {
+			dev_err(idle->dev, "still timeout to wait idle: %s to 0x%x\n", x5_idles_name[id], target);
+			return ret;
+		}
+	}
+
+	return 0;
 }
 
 struct device *drobot_idle_get_dev(const struct device_node *of_node)
