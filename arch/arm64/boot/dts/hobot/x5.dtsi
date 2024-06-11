@@ -84,8 +84,8 @@
 				opp-hz = /bits/ 64 <3733>;
 		};
 
-		opp-4267M {
-				opp-hz = /bits/ 64 <4267>;
+		opp-4266M {
+				opp-hz = /bits/ 64 <4266>;
 		};
 
 	};
