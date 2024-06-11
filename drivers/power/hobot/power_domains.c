@@ -250,7 +250,9 @@ static int __pd_power_off(struct drobot_pm_domain *pd)
 {
 	int ret;
 
-	__pcu_off(pd);
+	ret = __pcu_off(pd);
+	if (ret)
+		return ret;
 
 	if (pd->regulator) {
 		if (pd->pmu->flag & SUSPEND_IN_PROGRESS) {
