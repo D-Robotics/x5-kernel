@@ -2744,7 +2744,6 @@
 					 <&hpsclks X5_HSIO_SDIO0_CCLK>,
 					 <&hpsclks X5_HSIO_SDIO0_TCLK>;
 				clock-names = "core", "bus", "axi", "card", "timer";
-				no-1-8-v;
 				no-mmc;
 				no-sdio;
 				cap-sd-highspeed;

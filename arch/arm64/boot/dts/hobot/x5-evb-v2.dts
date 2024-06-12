@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
- * dts for Sunrise5 EVB platform
+ * dts for Sunrise5 EVB-V2 platform
  *
  * Copyright (C) 2024 Horizon Robotics Inc.
  *
@@ -15,7 +15,7 @@
 #include <autoconf.h>
 
 / {
-	model = "Horizon Robotics X5 EVB board";
+	model = "Horizon Robotics X5 EVB-V2 board";
 	compatible = "Horizon, x5";
 
 	#address-cells = <2>;
@@ -39,14 +39,13 @@
 	gua_audio_rpc_wrapper:audio-rpc-wrapper {
 		compatible = "gua,audio-rpc-wrapper";
 		rpmsg-enable;
-		status = "okay";
+		status = "disabled";
 	};
 
 	ipc_wrapper:ipc-wrapper {
 		compatible = "gua,ipc-wrapper";
 		rpmsg-enable;
-		status = "okay";
-		gua-ipc = <&ipc_instance0>;
+		status = "disabled";
 	};
 
 	sound_misc_0:misc-hifi {
@@ -56,7 +55,7 @@
 										>;
 		msg-wrapper = <&ipc_wrapper>;
 		memory-region = <&adsp_bsp_reserved>;
-		status = "okay";
+		status = "disabled";
 	};
 
 	sound_cpu:cpu-dai {
@@ -64,7 +63,7 @@
 		msg-wrapper = <&ipc_wrapper>;
 		gua,pcm-buffer-size = <0x1E000>;
 		pcm-rpmsg-channel-mapping = <0x00>, <0x00>, <0x00>, <0x00>, <0x00>;
-		status = "okay";
+		status = "disabled";
 	};
 
 	sound-machine {
@@ -72,7 +71,7 @@
 		model = "gua-audio";
 		cpu-dai = <&sound_cpu>;
 		memory-region = <&audio_reserved>;
-		status = "okay";
+		status = "disabled";
 	};
 
 	vdd08_gpu_reg: vdd08_gpu_reg@3 {
@@ -179,12 +178,6 @@
 	};
 };
 
-&i2c3 {
-	status = "okay";
-	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_i2c3>;
-};
-
 &i2c5 {
 	status = "okay";
 	pinctrl-names = "default";
@@ -232,6 +225,12 @@
 	};
 };
 
+&i2c7 {
+	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_dsp_i2c5>;
+};
+
 &lpwm0 {
 	status = "okay";
 	/* conflict with camera pwd gpio */
@@ -257,7 +256,6 @@
 /* SD Card */
 &sdio_0 {
 	status = "okay";
-	no-1-8-v;
 
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_sd &hsio_gpio0_26 &hsio_gpio1_1>;
@@ -366,28 +364,19 @@
 };
 
 &mailbox0 {
-	status = "okay";
+	status = "disabled";
 };
 
 &ipc_instance0 {
-	status = "okay";
-	shm-addr = <&adsp_ipc_reserved>;
-	local-offset = <0x0>;
-	remote-offset = <0x400>;
+	status = "disabled";
 };
 
 &ipc_instance1 {
-	status = "okay";
-	shm-addr = <&adsp_ipc_reserved>;
-	local-offset = <0x800>;
-	remote-offset = <0xc00>;
+	status = "disabled";
 };
 
 &ipc_instance2 {
-	status = "okay";
-	shm-addr = <&adsp_ipc_reserved>;
-	local-offset = <0x1000>;
-	remote-offset = <0x4000>;
+	status = "disabled";
 };
 
 &pvt {
@@ -395,11 +384,9 @@
 };
 
 &remoteproc_hifi5 {
-	status = "okay";
+	status = "disabled";
 	hifi5-rpmsg-channel-mapping = <0x00>, <0x00>;
 	msg-wrapper = <&ipc_wrapper>;
-	shm-addr = <&adsp_bsp_reserved>;
-	remoteproc-ipc = <&ipc_instance1>;
 };
 
 &hpsclks {
