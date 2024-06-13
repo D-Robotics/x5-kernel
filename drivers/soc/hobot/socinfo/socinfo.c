@@ -39,7 +39,7 @@ const char *bootmode;
 const char *socuid;
 const char *origin_board_id;
 const char *board_id;
-const char *ddr_vender;
+const char *ddr_vendor;
 const char *ddr_type;
 const char *ddr_freq;
 const char *ddr_size;
@@ -52,6 +52,17 @@ static unsigned int secure_chip = 0;
 static void __iomem *sec_flag_addr;
 struct _reg_info g_bak_slot_info;
 struct _reg_info g_boot_count;
+const static char *ddr_vendor_array[] = {"unkown", "Samsung", "unkown",
+                                         "unkown", "unkown", "Nanya",
+                                         "SK hynix", "unkown", "Winbond",
+                                         "ESMT", "unkown", "unkown",
+                                         "unkown", "unkown", "unkown",
+                                         "unkown", "unkown", "unkown",
+                                         "unkown", "cxmt"};
+const char *ddr_freq_array[] = {"unkown", "3200", "3733", "4266"};
+const char *ddr_type_array[] = {"unkown", "lpddr4", "lpddr4x"};
+const char *ddr_size_array[] = {"1G", "2G", "4G", "8G"};
+
 EXPORT_SYMBOL_GPL(base_board_name);
 
 #if 0
@@ -166,7 +177,7 @@ ssize_t name_show(struct class *class,
 	}
 
 	/* add ddr vender */
-	index = simple_strtoul(ddr_vender, NULL, 16);
+	index = simple_strtoul(ddr_vendor, NULL, 16);
 	switch (index) {
 	case DDR_MANU_HYNIX:
 		snprintf(name + strlen(name), sizeof(name) - strlen(name), "-hynix");
@@ -263,7 +274,7 @@ ssize_t ddr_vender_show(struct class *class,
 {
 	if (!buf)
 		return 0;
-	snprintf(buf, BUF_LEN, "%s\n", ddr_vender);
+	snprintf(buf, BUF_LEN, "%s\n", ddr_vendor);
 
 	return strlen(buf);
 }
@@ -389,7 +400,7 @@ static struct class_attribute origin_id_attribute =
 	__ATTR(origin_board_id, 0644, origin_id_show, soc_store);
 
 static struct class_attribute ddr_vender_attribute =
-	__ATTR(ddr_vender, 0644, ddr_vender_show, soc_store);
+	__ATTR(ddr_vendor, 0644, ddr_vender_show, soc_store);
 
 static struct class_attribute ddr_name_attribute =
 	__ATTR(ddr_type, 0644, ddr_name_show, soc_store);
@@ -467,6 +478,10 @@ MODULE_DEVICE_TABLE(of, socinfo_of_match);
 static int socinfo_probe(struct platform_device *pdev)
 {
 	int ret = 0;
+	struct resource *resource = NULL;
+	static void __iomem *ddr_info_addr = NULL;
+	uint32_t ddr_info = 0;
+
 	dev_info(&pdev->dev, "Start socinfo probe.\n");
 
 	ret = of_property_read_string(pdev->dev.of_node, "board_name",
@@ -485,41 +500,6 @@ static int socinfo_probe(struct platform_device *pdev)
 
 	ret = of_property_read_string(pdev->dev.of_node, "origin_board_id",
 		&origin_board_id);
-	if (ret != 0) {
-		pr_err("of_property_read_string error\n");
-		return ret;
-	}
-
-	ret = of_property_read_string(pdev->dev.of_node, "ddr_vender",
-		&ddr_vender);
-	if (ret != 0) {
-		pr_err("of_property_read_string error\n");
-		return ret;
-	}
-
-	ret = of_property_read_string(pdev->dev.of_node, "ddr_type",
-		&ddr_type);
-	if (ret != 0) {
-		pr_err("of_property_read_string error\n");
-		return ret;
-	}
-
-	ret = of_property_read_string(pdev->dev.of_node, "ddr_freq",
-		&ddr_freq);
-	if (ret != 0) {
-		pr_err("of_property_read_string error\n");
-		return ret;
-	}
-
-	ret = of_property_read_string(pdev->dev.of_node, "ddr_size",
-		&ddr_size);
-	if (ret != 0) {
-		pr_err("of_property_read_string error\n");
-		return ret;
-	}
-
-	ret = of_property_read_string(pdev->dev.of_node, "ddr_part_num",
-		&ddr_part_num);
 	if (ret != 0) {
 		pr_err("of_property_read_string error\n");
 		return ret;
@@ -585,6 +565,23 @@ static int socinfo_probe(struct platform_device *pdev)
 					 g_boot_count.reg_info[1]);
 	if (!g_boot_count.map)
 		return -ENOMEM;
+
+	resource = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+	if (resource == NULL) {
+		dev_err(&pdev->dev, "Can't get ddr info resource error\n");
+		return -ENODEV;
+	}
+
+	ddr_info_addr = devm_ioremap_resource(&pdev->dev, resource);
+	if (IS_ERR(ddr_info_addr)) {
+		dev_err(&pdev->dev, "Can't get ddr info resource\n");
+		return (int32_t)PTR_ERR(ddr_info_addr);
+	}
+	ddr_info = readl(ddr_info_addr);
+	ddr_vendor = ddr_vendor_array[DR_DDR_VENDOR(ddr_info)];
+	ddr_freq = ddr_freq_array[DR_DDR_FREQ(ddr_info)];
+	ddr_size = ddr_size_array[DR_DDR_SIZE(ddr_info)];
+	ddr_type = ddr_type_array[DR_DDR_TYPE(ddr_info)];
 
 	ret = class_register(&socinfo_class);
 	dev_info(&pdev->dev, "Socinfo probe end with retval: %d\n", ret);
