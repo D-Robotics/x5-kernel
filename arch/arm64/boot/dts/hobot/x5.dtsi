@@ -2085,29 +2085,6 @@
 			#size-cells = <1>;
 			ranges;
 
-			disp_gpio: gpio@3e040000 {
-				compatible = "snps,dw-apb-gpio";
-				status = "okay";
-				reg = <0x3e040000 0x10000>;
-				#address-cells = <1>;
-				#size-cells = <0>;
-				clocks = <&hpsclks X5_DISP_GPIO_PCLK>;
-				clock-names = "bus";
-				resets = <&socrst DISP_GPIO_P_RESET>;
-				disp_gpio_porta: gpio@0 {
-					compatible = "snps,dw-apb-gpio-port";
-					gpio-controller;
-					snps,nr-gpios = <32>;
-					reg = <0>;
-					#gpio-cells = <2>;
-					interrupt-parent = <&gic>;
-					interrupts = <GIC_SPI 67 IRQ_TYPE_LEVEL_HIGH>;
-					interrupt-controller;
-					#interrupt-cells = <2>;
-					gpio-ranges = <&disp_iomuxc 0 0 17>;
-				};
-			};
-
 			disp_sys_con: syscon@3e0a0000 {
 				compatible = "syscon";
 				reg = <0x3e0a0000 0x130>;
@@ -2116,7 +2093,6 @@
 			disp_iomuxc: disp_iomuxc@3e0a0054 {
 				compatible = "d-robotics,x5-disp-iomuxc";
 				reg = <0x3e0a0054 0x4c>;
-				horizon,gpio-banks = <&disp_gpio>;
 			};
 
 			dsi_backlight: backlight {

@@ -734,10 +734,6 @@
 	cnn-supply = <&vdd08_bpu_1_reg>;
 };
 
-&disp_gpio {
-	status = "disabled";
-};
-
 &dphy0 {
 	status = "okay";
 };
