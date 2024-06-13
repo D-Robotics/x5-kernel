@@ -143,10 +143,10 @@
 };
 
 &dsp_iomuxc {
-	pinctrl_dsp_i2c5: dsp_i2c5grp {
+	pinctrl_dsp_i2c7: dsp_i2c7grp {
 		horizon,pins = <
-			DSP_I2C5_SDA  DSP_PINMUX_0  BIT_OFFSET0  MUX_ALT0 &pconf_drv_pu_mid_1v8
-			DSP_I2C5_SCL  DSP_PINMUX_0  BIT_OFFSET2  MUX_ALT0 &pconf_drv_pu_mid_1v8
+			DSP_I2C7_SDA  DSP_PINMUX_0  BIT_OFFSET0  MUX_ALT0 &pconf_drv_pu_mid_1v8
+			DSP_I2C7_SCL  DSP_PINMUX_0  BIT_OFFSET2  MUX_ALT0 &pconf_drv_pu_mid_1v8
 		>;
 	};
 
@@ -194,10 +194,10 @@
 		>;
 	};
 
-	pinctrl_dsp_uart5: uart5grp {
+	pinctrl_dsp_uart0: uart0grp {
 		horizon,pins = <
-			DSP_UART5_RXD  DSP_PINMUX_1  BIT_OFFSET10  MUX_ALT0 &pconf_drv_pu_mid_1v8
-			DSP_UART5_TXD  DSP_PINMUX_1  BIT_OFFSET12  MUX_ALT0 &pconf_drv_pu_mid_1v8
+			DSP_UART0_RXD  DSP_PINMUX_1  BIT_OFFSET10  MUX_ALT0 &pconf_drv_pu_mid_1v8
+			DSP_UART0_TXD  DSP_PINMUX_1  BIT_OFFSET12  MUX_ALT0 &pconf_drv_pu_mid_1v8
 		>;
 	};
 
@@ -206,15 +206,6 @@
 &lsio_iomuxc {
 	pinctrl_uart1: uart1grp {
 		horizon,pins = <
-			LSIO_UART0_RX	LSIO_PINMUX_3	BIT_OFFSET4		MUX_ALT0 &pconf_drv_pu_mid_3v3
-			LSIO_UART0_TX	LSIO_PINMUX_3	BIT_OFFSET6		MUX_ALT0 &pconf_drv_pu_mid_3v3
-			LSIO_UART0_CTS	LSIO_PINMUX_3	BIT_OFFSET8		MUX_ALT0 &pconf_drv_pu_mid_3v3
-			LSIO_UART0_RTS	LSIO_PINMUX_3	BIT_OFFSET10	MUX_ALT0 &pconf_drv_pu_mid_3v3
-		>;
-	};
-
-	pinctrl_uart2: uart2grp {
-		horizon,pins = <
 			LSIO_UART1_RX	LSIO_PINMUX_3 BIT_OFFSET12  MUX_ALT0	&pconf_drv_pu_mid_3v3
 			LSIO_UART1_TX	LSIO_PINMUX_3 BIT_OFFSET14  MUX_ALT0	&pconf_drv_pu_mid_3v3
 			LSIO_UART1_CTS  LSIO_PINMUX_3 BIT_OFFSET28  MUX_ALT0	&pconf_drv_pu_mid_3v3
@@ -222,21 +213,21 @@
 		>;
 	};
 
-	pinctrl_uart3: uart3grp {
+	pinctrl_uart2: uart2grp {
 		horizon,pins = <
 			LSIO_UART2_RX  LSIO_PINMUX_3 BIT_OFFSET16  MUX_ALT0 &pconf_drv_pu_mid_3v3
 			LSIO_UART2_TX  LSIO_PINMUX_3 BIT_OFFSET18  MUX_ALT0 &pconf_drv_pu_mid_3v3
 		>;
 	};
 
-	pinctrl_uart4: uart4grp {
+	pinctrl_uart3: uart3grp {
 		horizon,pins = <
 			LSIO_UART3_RX  LSIO_PINMUX_3 BIT_OFFSET20  MUX_ALT0 &pconf_drv_pu_mid_3v3
 			LSIO_UART3_TX  LSIO_PINMUX_3 BIT_OFFSET22  MUX_ALT0 &pconf_drv_pu_mid_3v3
 		>;
 	};
 
-	pinctrl_uart5: uart5grp {
+	pinctrl_uart4: uart4grp {
 		horizon,pins = <
 			LSIO_UART4_RX  LSIO_PINMUX_3 BIT_OFFSET24  MUX_ALT0 &pconf_drv_pu_mid_3v3
 			LSIO_UART4_TX  LSIO_PINMUX_3 BIT_OFFSET26  MUX_ALT0 &pconf_drv_pu_mid_3v3
@@ -332,17 +323,26 @@
 		>;
 	};
 
-	pinctrl_uart6: uart6grp {
+	pinctrl_uart5: uart5grp {
 		horizon,pins = <
 			LSIO_SPI4_SCLK  LSIO_PINMUX_2 BIT_OFFSET0  MUX_ALT2 &pconf_drv_pu_mid_1v8
 			LSIO_SPI4_SSN  LSIO_PINMUX_2 BIT_OFFSET2  MUX_ALT2 &pconf_drv_pu_mid_1v8
 		>;
 	};
 
+	pinctrl_uart6: uart6grp {
+		horizon,pins = <
+			LSIO_UART7_CTS  LSIO_PINMUX_3 BIT_OFFSET8	MUX_ALT1 &pconf_drv_pu_mid_3v3
+			LSIO_UART7_RTS  LSIO_PINMUX_3 BIT_OFFSET10	MUX_ALT1 &pconf_drv_pu_mid_3v3
+		>;
+	};
+
 	pinctrl_uart7: uart7grp {
 		horizon,pins = <
-			LSIO_UART0_CTS  LSIO_PINMUX_3 BIT_OFFSET8	MUX_ALT1 &pconf_drv_pu_mid_3v3
-			LSIO_UART0_RTS  LSIO_PINMUX_3 BIT_OFFSET10	MUX_ALT1 &pconf_drv_pu_mid_3v3
+			LSIO_UART7_RX	LSIO_PINMUX_3	BIT_OFFSET4		MUX_ALT0 &pconf_drv_pu_mid_3v3
+			LSIO_UART7_TX	LSIO_PINMUX_3	BIT_OFFSET6		MUX_ALT0 &pconf_drv_pu_mid_3v3
+			LSIO_UART7_CTS	LSIO_PINMUX_3	BIT_OFFSET8		MUX_ALT0 &pconf_drv_pu_mid_3v3
+			LSIO_UART7_RTS	LSIO_PINMUX_3	BIT_OFFSET10	MUX_ALT0 &pconf_drv_pu_mid_3v3
 		>;
 	};
 

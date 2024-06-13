@@ -71,7 +71,7 @@
 };
 
 &uart1 {
-	status = "okay";
+	status = "disabled";
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_uart1>;
 };
@@ -83,7 +83,7 @@
 };
 
 &uart3 {
-	status = "disabled";
+	status = "okay";
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_uart3>;
 };
@@ -95,7 +95,7 @@
 };
 
 &uart5 {
-	status = "okay";
+	status = "disabled";
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_uart5>;
 };
@@ -107,7 +107,7 @@
 };
 
 &uart7 {
-	status = "disabled";
+	status = "okay";
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_uart7>;
 };

@@ -31,10 +31,10 @@
 #define LSIO_PINMUX_3 0x84
 
 /* horizon lsio pin id */
-#define LSIO_UART0_RX 		0
-#define LSIO_UART0_TX 		1
-#define LSIO_UART0_CTS 		2
-#define LSIO_UART0_RTS 		3
+#define LSIO_UART7_RX 		0
+#define LSIO_UART7_TX 		1
+#define LSIO_UART7_CTS 		2
+#define LSIO_UART7_RTS 		3
 #define LSIO_UART1_RX 		4
 #define LSIO_UART1_TX 		5
 #define LSIO_UART1_CTS 		6

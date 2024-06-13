@@ -20,10 +20,10 @@
 #define DSP_PINCTRL_6 (0x3C - 0x14)
 
 /* horizon dsp pin id */
-#define DSP_I2C5_SCL  0
-#define DSP_I2C5_SDA  1
-#define DSP_UART5_RXD 2
-#define DSP_UART5_TXD 3
+#define DSP_I2C7_SCL  0
+#define DSP_I2C7_SDA  1
+#define DSP_UART0_RXD 2
+#define DSP_UART0_TXD 3
 #define DSP_I2S0_MCLK 4
 #define DSP_I2S0_SCLK 5
 #define DSP_I2S0_WS   6

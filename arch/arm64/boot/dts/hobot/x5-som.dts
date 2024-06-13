@@ -94,6 +94,12 @@
 	status = "okay";
 };
 
+&uart7 {
+	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_uart7>;
+};
+
 &uart1 {
 	status = "okay";
 	pinctrl-names = "default";
@@ -104,12 +110,6 @@
 	status = "okay";
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_uart2>;
-};
-
-&uart3 {
-	status = "okay";
-	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_uart3>;
 };
 
 &axi_dmac {

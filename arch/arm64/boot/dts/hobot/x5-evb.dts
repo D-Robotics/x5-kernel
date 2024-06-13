@@ -128,18 +128,18 @@
 	status = "okay";
 };
 
-&uart3 {
+&uart2 {
 	status = "okay";
 	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_uart3>;
+	pinctrl-0 = <&pinctrl_uart2>;
 	dma-names = "tx", "rx";
 	dmas = <&axi_dmac 5>, <&axi_dmac 4>;
 };
 
-&uart6 {
+&uart5 {
 	status = "okay";
 	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_uart6>;
+	pinctrl-0 = <&pinctrl_uart5>;
 };
 
 &axi_dmac {

@@ -13,24 +13,24 @@
 &dsp_iomuxc {
 	dsp_gpio0_0: dsp_gpio0_0 {
 		horizon,pins = <
-			DSP_I2C5_SCL  DSP_PINMUX_0  BIT_OFFSET2  MUX_ALT1  &pconf_input_en_1v8
+			DSP_I2C7_SCL  DSP_PINMUX_0  BIT_OFFSET2  MUX_ALT1  &pconf_input_en_1v8
 		>;
 	};
 	dsp_gpio0_1: dsp_gpio0_1 {
 		horizon,pins = <
-			DSP_I2C5_SDA  DSP_PINMUX_0  BIT_OFFSET0  MUX_ALT1  &pconf_input_en_1v8
+			DSP_I2C7_SDA  DSP_PINMUX_0  BIT_OFFSET0  MUX_ALT1  &pconf_input_en_1v8
 		>;
 	};
 
 	dsp_gpio0_2: dsp_gpio0_2 {
 		horizon,pins = <
-			DSP_UART5_RXD  DSP_PINMUX_1  BIT_OFFSET10  MUX_ALT1  &pconf_input_en_1v8
+			DSP_UART0_RXD  DSP_PINMUX_1  BIT_OFFSET10  MUX_ALT1  &pconf_input_en_1v8
 		>;
 	};
 
 	dsp_gpio0_3: dsp_gpio0_3 {
 		horizon,pins = <
-			DSP_UART5_TXD  DSP_PINMUX_1  BIT_OFFSET12  MUX_ALT1  &pconf_input_en_1v8
+			DSP_UART0_TXD  DSP_PINMUX_1  BIT_OFFSET12  MUX_ALT1  &pconf_input_en_1v8
 		>;
 	};
 
@@ -154,25 +154,25 @@
 	/* LSIO_GPIO0 0-31 */
 	lsio_gpio0_0: lsio_gpio0_0 {
 		horizon,pins = <
-			LSIO_UART0_RX	LSIO_PINMUX_3 BIT_OFFSET4	MUX_ALT2	&pconf_input_en_3v3
+			LSIO_UART7_RX	LSIO_PINMUX_3 BIT_OFFSET4	MUX_ALT2	&pconf_input_en_3v3
 		>;
 	};
 
 	lsio_gpio0_1: lsio_gpio0_1 {
 		horizon,pins = <
-			LSIO_UART0_TX	LSIO_PINMUX_3 BIT_OFFSET6	MUX_ALT2	&pconf_input_en_3v3
+			LSIO_UART7_TX	LSIO_PINMUX_3 BIT_OFFSET6	MUX_ALT2	&pconf_input_en_3v3
 		>;
 	};
 
 	lsio_gpio0_2: lsio_gpio0_2 {
 		horizon,pins = <
-			LSIO_UART0_CTS	LSIO_PINMUX_3 BIT_OFFSET8	MUX_ALT2	&pconf_input_en_3v3
+			LSIO_UART7_CTS	LSIO_PINMUX_3 BIT_OFFSET8	MUX_ALT2	&pconf_input_en_3v3
 		>;
 	};
 
 	lsio_gpio0_3: lsio_gpio0_3 {
 		horizon,pins = <
-			LSIO_UART0_RTS	LSIO_PINMUX_3 BIT_OFFSET10	MUX_ALT2	&pconf_input_en_3v3
+			LSIO_UART7_RTS	LSIO_PINMUX_3 BIT_OFFSET10	MUX_ALT2	&pconf_input_en_3v3
 		>;
 	};
 

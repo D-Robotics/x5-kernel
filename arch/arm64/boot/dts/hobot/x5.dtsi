@@ -2947,7 +2947,7 @@
 				clocks = <&dspclks X5_DSP_UART_CLK>;
 				clock-frequency = <202752000>;
 				pinctrl-names = "default";
-				pinctrl-0 = <&pinctrl_dsp_uart5>;
+				pinctrl-0 = <&pinctrl_dsp_uart0>;
 				interrupt-parent = <&gic>;
 				interrupts = <GIC_SPI 146 IRQ_TYPE_LEVEL_HIGH>;
 				resets = <&dsprst DSP_UART_RESET>;
@@ -2973,7 +2973,7 @@
 				clocks = <&dspclks X5_DSP_I2C_PCLK>, <&dspclks X5_DSP_I2C_PCLK>;
 				clock-names = "i2c_clk", "pclk";
 				pinctrl-names = "default";
-				pinctrl-0 = <&pinctrl_dsp_i2c5>;
+				pinctrl-0 = <&pinctrl_dsp_i2c7>;
 				#address-cells = <1>;
 				#size-cells = <0>;
 				clock-frequency = <100000>;
@@ -3374,20 +3374,7 @@
 				reset-names = "spi";
 			};
 
-			uart1: serial@34060000 {
-				compatible = "snps,dw-apb-uart";
-				status = "disabled";
-				reg = <0x34060000 0x10000>;
-				reg-shift = <2>;
-				clocks = <&hpsclks X5_LSIO_UART0_CLK>,
-						<&hpsclks X5_LSIO_UART0_PCLK>;
-				clock-names = "clk","apb_pclk";
-				interrupt-parent = <&gic>;
-				interrupts = <GIC_SPI 81 IRQ_TYPE_LEVEL_HIGH>;
-				resets = <&socrst LSIO_UART0_RESET>;
-			};
-
-			uart2: serial@34070000 {
+			uart1: serial@34070000 {
 				compatible = "snps,dw-apb-uart";
 				status = "disabled";
 				reg = <0x34070000 0x10000>;
@@ -3400,7 +3387,7 @@
 				resets = <&socrst LSIO_UART1_RESET>;
 			};
 
-			uart3: serial@34080000 {
+			uart2: serial@34080000 {
 				compatible = "snps,dw-apb-uart";
 				status = "disabled";
 				reg = <0x34080000 0x10000>;
@@ -3413,7 +3400,7 @@
 				resets = <&socrst LSIO_UART2_RESET>;
 			};
 
-			uart4: serial@34090000 {
+			uart3: serial@34090000 {
 				compatible = "snps,dw-apb-uart";
 				status = "disabled";
 				reg = <0x34090000 0x10000>;
@@ -3426,7 +3413,7 @@
 				resets = <&socrst LSIO_UART3_RESET>;
 			};
 
-			uart5: serial@340a0000 {
+			uart4: serial@340a0000 {
 				compatible = "snps,dw-apb-uart";
 				status = "disabled";
 				reg = <0x340a0000 0x10000>;
@@ -3668,7 +3655,7 @@
 				reset-names = "guc-adc";
 			};
 
-			uart6: serial@341a0000 {
+			uart5: serial@341a0000 {
 				compatible = "snps,dw-apb-uart";
 				status = "disabled";
 				reg = <0x341a0000 0x10000>;
@@ -3681,7 +3668,7 @@
 				resets = <&socrst LSIO_UART5_RESET>;
 			};
 
-			uart7: serial@341b0000 {
+			uart6: serial@341b0000 {
 				compatible = "snps,dw-apb-uart";
 				status = "disabled";
 				reg = <0x341b0000 0x10000>;
@@ -3692,6 +3679,19 @@
 				interrupt-parent = <&gic>;
 				interrupts = <GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH>;
 				resets = <&socrst LSIO_UART6_RESET>;
+			};
+
+			uart7: serial@34060000 {
+				compatible = "snps,dw-apb-uart";
+				status = "disabled";
+				reg = <0x34060000 0x10000>;
+				reg-shift = <2>;
+				clocks = <&hpsclks X5_LSIO_UART7_CLK>,
+						<&hpsclks X5_LSIO_UART7_PCLK>;
+				clock-names = "clk","apb_pclk";
+				interrupt-parent = <&gic>;
+				interrupts = <GIC_SPI 81 IRQ_TYPE_LEVEL_HIGH>;
+				resets = <&socrst LSIO_UART7_RESET>;
 			};
 
 			i2c5: i2c@341c0000 {
