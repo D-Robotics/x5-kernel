@@ -30,7 +30,7 @@
 
 		linux,cma@88000000 {
 			compatible = "shared-dma-pool";
-			reg = <0x0 0x88000000 0x0 0x07E80000>; /* 126MB */
+			reg = <0x0 0x88000000 0x0 0x07E00000>; /* 126MB */
 			reusable;
 			linux,cma-default;
 		};
