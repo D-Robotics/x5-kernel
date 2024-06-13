@@ -133,7 +133,6 @@ static const struct drobot_rst_signal soc_rst_signals[SOC_RESET_NUM] = {
 	[HSIO_GPIO0_RESET] = {"HS-GPIO0", HSIO_SW_RST, BIT(9), 0xff},
 	[HSIO_GPIO1_RESET] = {"HS-GPIO1", HSIO_SW_RST, BIT(10), 0xff},
 
-	[LSIO_UART0_RESET]     = {"UART0", LSIO_0_SW_RST, BIT(0) | BIT(5), 0xff},
 	[LSIO_UART1_RESET]     = {"UART1", LSIO_0_SW_RST, BIT(1) | BIT(6), 0xff},
 	[LSIO_UART2_RESET]     = {"UART2", LSIO_0_SW_RST, BIT(2) | BIT(7), 0xff},
 	[LSIO_UART3_RESET]     = {"UART3", LSIO_0_SW_RST, BIT(3) | BIT(8), 0xff},
@@ -161,6 +160,7 @@ static const struct drobot_rst_signal soc_rst_signals[SOC_RESET_NUM] = {
 	[LSIO_ADC_RESET]      = {"ADC", LSIO_1_SW_RST, BIT(0) | BIT(1), 0xff},
 	[LSIO_UART5_RESET]    = {"UART5", LSIO_1_SW_RST, BIT(2) | BIT(4), 0xff},
 	[LSIO_UART6_RESET]    = {"UART6", LSIO_1_SW_RST, BIT(3) | BIT(5), 0xff},
+	[LSIO_UART7_RESET]     = {"UART7", LSIO_0_SW_RST, BIT(0) | BIT(5), 0xff},
 	[LSIO_I2C5_APB_RESET] = {"I2C5", LSIO_1_SW_RST, BIT(6), 0xff},
 	[LSIO_I2C6_APB_RESET] = {"I2C6", LSIO_1_SW_RST, BIT(7), 0xff},
 };
