@@ -143,61 +143,61 @@
 };
 
 &dsp_iomuxc {
-	pinctrl_dsp_i2c5: hifii2c5grp {
+	pinctrl_dsp_i2c5: dsp_i2c5grp {
 		horizon,pins = <
-			HIFI_I2C5_SDA  DSP_PINMUX_0  BIT_OFFSET0  MUX_ALT0 &pconf_drv_pu_mid_1v8
-			HIFI_I2C5_SCL  DSP_PINMUX_0  BIT_OFFSET2  MUX_ALT0 &pconf_drv_pu_mid_1v8
+			DSP_I2C5_SDA  DSP_PINMUX_0  BIT_OFFSET0  MUX_ALT0 &pconf_drv_pu_mid_1v8
+			DSP_I2C5_SCL  DSP_PINMUX_0  BIT_OFFSET2  MUX_ALT0 &pconf_drv_pu_mid_1v8
 		>;
 	};
 
 	pinctrl_dsp_i2s0: i2s0grp {
 		horizon,pins = <
-			HIFI_I2S0_DI  DSP_PINMUX_0  BIT_OFFSET4  MUX_ALT0 &pconf_drv_pd_mid_1v8
-			HIFI_I2S0_DO  DSP_PINMUX_0  BIT_OFFSET6  MUX_ALT0 &pconf_drv_pd_mid_1v8
-			HIFI_I2S0_MCLK  DSP_PINMUX_0  BIT_OFFSET8  MUX_ALT0 &pconf_drv_pu_mid_1v8
-			HIFI_I2S0_SCLK  DSP_PINMUX_0  BIT_OFFSET10  MUX_ALT0 &pconf_drv_pu_mid_1v8
-			HIFI_I2S0_WS  DSP_PINMUX_0  BIT_OFFSET12  MUX_ALT0 &pconf_drv_pu_mid_1v8
+			DSP_I2S0_DI  DSP_PINMUX_0  BIT_OFFSET4  MUX_ALT0 &pconf_drv_pd_mid_1v8
+			DSP_I2S0_DO  DSP_PINMUX_0  BIT_OFFSET6  MUX_ALT0 &pconf_drv_pd_mid_1v8
+			DSP_I2S0_MCLK  DSP_PINMUX_0  BIT_OFFSET8  MUX_ALT0 &pconf_drv_pu_mid_1v8
+			DSP_I2S0_SCLK  DSP_PINMUX_0  BIT_OFFSET10  MUX_ALT0 &pconf_drv_pu_mid_1v8
+			DSP_I2S0_WS  DSP_PINMUX_0  BIT_OFFSET12  MUX_ALT0 &pconf_drv_pu_mid_1v8
 		>;
 	};
 
 	pinctrl_dsp_i2s1: i2s1grp {
 		horizon,pins = <
-			HIFI_I2S1_DI  DSP_PINMUX_0  BIT_OFFSET14  MUX_ALT0 &pconf_drv_pd_mid_1v8
-			HIFI_I2S1_DO  DSP_PINMUX_0  BIT_OFFSET16  MUX_ALT0 &pconf_drv_pd_mid_1v8
-			HIFI_I2S1_MCLK  DSP_PINMUX_0  BIT_OFFSET18  MUX_ALT0 &pconf_drv_pu_mid_1v8
-			HIFI_I2S1_SCLK  DSP_PINMUX_0  BIT_OFFSET20  MUX_ALT0 &pconf_drv_pu_mid_1v8
-			HIFI_I2S1_WS  DSP_PINMUX_0  BIT_OFFSET22  MUX_ALT0 &pconf_drv_pu_mid_1v8
+			DSP_I2S1_DI  DSP_PINMUX_0  BIT_OFFSET14  MUX_ALT0 &pconf_drv_pd_mid_1v8
+			DSP_I2S1_DO  DSP_PINMUX_0  BIT_OFFSET16  MUX_ALT0 &pconf_drv_pd_mid_1v8
+			DSP_I2S1_MCLK  DSP_PINMUX_0  BIT_OFFSET18  MUX_ALT0 &pconf_drv_pu_mid_1v8
+			DSP_I2S1_SCLK  DSP_PINMUX_0  BIT_OFFSET20  MUX_ALT0 &pconf_drv_pu_mid_1v8
+			DSP_I2S1_WS  DSP_PINMUX_0  BIT_OFFSET22  MUX_ALT0 &pconf_drv_pu_mid_1v8
 		>;
 	};
 
 	pinctrl_dsp_pdm_cko: pdmckogrp {
 		horizon,pins = <
-			HIFI_PDM_CKO  DSP_PINMUX_0  BIT_OFFSET24  MUX_ALT0 &pconf_drv_pu_mid_1v8
+			DSP_PDM_CKO  DSP_PINMUX_0  BIT_OFFSET24  MUX_ALT0 &pconf_drv_pu_mid_1v8
 		>;
 	};
 
 	pinctrl_dsp_pdm_in: pdmingrp {
 		horizon,pins = <
-			HIFI_PDM_IN0  DSP_PINMUX_0  BIT_OFFSET26  MUX_ALT0 &pconf_drv_pu_mid_1v8
-			HIFI_PDM_IN1  DSP_PINMUX_0  BIT_OFFSET28  MUX_ALT0 &pconf_drv_pu_mid_1v8
-			HIFI_PDM_IN2  DSP_PINMUX_0  BIT_OFFSET30  MUX_ALT0 &pconf_drv_pu_mid_1v8
-			HIFI_PDM_IN3  DSP_PINMUX_1  BIT_OFFSET0  MUX_ALT0 &pconf_drv_pu_mid_1v8
+			DSP_PDM_IN0  DSP_PINMUX_0  BIT_OFFSET26  MUX_ALT0 &pconf_drv_pu_mid_1v8
+			DSP_PDM_IN1  DSP_PINMUX_0  BIT_OFFSET28  MUX_ALT0 &pconf_drv_pu_mid_1v8
+			DSP_PDM_IN2  DSP_PINMUX_0  BIT_OFFSET30  MUX_ALT0 &pconf_drv_pu_mid_1v8
+			DSP_PDM_IN3  DSP_PINMUX_1  BIT_OFFSET0  MUX_ALT0 &pconf_drv_pu_mid_1v8
 		>;
 	};
 
 	pinctrl_dsp_spi: dsp_spigrp {
 		horizon,pins = <
-			HIFI_SPI6_MISO  DSP_PINMUX_1  BIT_OFFSET2  MUX_ALT0 &pconf_drv_pu_mid_1v8
-			HIFI_SPI6_MOSI  DSP_PINMUX_1  BIT_OFFSET4  MUX_ALT0 &pconf_drv_pu_mid_1v8
-			HIFI_SPI6_SCLK  DSP_PINMUX_1  BIT_OFFSET6  MUX_ALT0 &pconf_drv_pu_mid_1v8
-			HIFI_SPI6_SSN  DSP_PINMUX_1  BIT_OFFSET8  MUX_ALT0 &pconf_drv_pu_mid_1v8
+			DSP_SPI6_MISO  DSP_PINMUX_1  BIT_OFFSET2  MUX_ALT0 &pconf_drv_pu_mid_1v8
+			DSP_SPI6_MOSI  DSP_PINMUX_1  BIT_OFFSET4  MUX_ALT0 &pconf_drv_pu_mid_1v8
+			DSP_SPI6_SCLK  DSP_PINMUX_1  BIT_OFFSET6  MUX_ALT0 &pconf_drv_pu_mid_1v8
+			DSP_SPI6_SSN  DSP_PINMUX_1  BIT_OFFSET8  MUX_ALT0 &pconf_drv_pu_mid_1v8
 		>;
 	};
 
 	pinctrl_dsp_uart5: uart5grp {
 		horizon,pins = <
-			HIFI_UART5_RXD  DSP_PINMUX_1  BIT_OFFSET10  MUX_ALT0 &pconf_drv_pu_mid_1v8
-			HIFI_UART5_TXD  DSP_PINMUX_1  BIT_OFFSET12  MUX_ALT0 &pconf_drv_pu_mid_1v8
+			DSP_UART5_RXD  DSP_PINMUX_1  BIT_OFFSET10  MUX_ALT0 &pconf_drv_pu_mid_1v8
+			DSP_UART5_TXD  DSP_PINMUX_1  BIT_OFFSET12  MUX_ALT0 &pconf_drv_pu_mid_1v8
 		>;
 	};
 
