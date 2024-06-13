@@ -259,7 +259,7 @@
 					type = "passive";
 				};
 				cpu_alert1: cpu-alert1 {
-					temperature = <85000>;
+					temperature = <95000>;
 					hysteresis = <1000>;
 					type = "passive";
 				};
@@ -302,7 +302,7 @@
 
 			trips {
 				ddr_alert0: ddr-alert0 {
-					temperature = <85000>;
+					temperature = <95000>;
 					hysteresis = <1000>;
 					type = "passive";
 				};
