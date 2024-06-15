@@ -510,7 +510,7 @@
 	pinctrl-names = "default";
 	pinctrl-0 = <&lsio_gpio1_6>;
 	gpio_oth = <353>;   //reset gpio
-	bus = <3>;  //i2c3
+	bus = <5>;  //i2c5
 	lpwm_chn = <3>; //open lpwm0 - channel3
 };
 
