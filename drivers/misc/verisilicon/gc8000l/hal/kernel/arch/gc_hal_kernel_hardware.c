@@ -256,22 +256,11 @@ static gceSTATUS _IdentifyHardwareByDatabase(gckHARDWARE Hardware, gckOS Os, gck
 
 	Hardware->largeVA = Identity->virtualAddressBits > 32;
 
-	if (gcmIS_SUCCESS(gckOS_QueryOption(Hardware->os, "sRAMBases", Device->sRAMBases[0]))) {
-		gckOS_MemCopy(Identity->sRAMBases, Device->sRAMBases[Hardware->core],
-			      sizeof(gctUINT64) * gcvSRAM_INTER_COUNT);
-	} else {
-		for (i = 0; i < gcvSRAM_INTER_COUNT; i++)
-			Identity->sRAMBases[i] = gcvINVALID_PHYSICAL_ADDRESS;
-	}
+	gckOS_MemCopy(Identity->sRAMBases, Device->sRAMBases[Hardware->core],
+					sizeof(gctUINT64) * gcvSRAM_INTER_COUNT);
 
-	if (gcmIS_SUCCESS(gckOS_QueryOption(Hardware->os, "sRAMSizes",
-					    (gctUINT64 *)Device->sRAMSizes[0]))) {
-		gckOS_MemCopy(Identity->sRAMSizes, Device->sRAMSizes[Hardware->core],
-			      sizeof(gctUINT32) * gcvSRAM_INTER_COUNT);
-	} else {
-		for (i = gcvSRAM_INTERNAL0; i < gcvSRAM_INTER_COUNT; i++)
-			Identity->sRAMSizes[i] = 0;
-	}
+	gckOS_MemCopy(Identity->sRAMSizes, Device->sRAMSizes[Hardware->core],
+					sizeof(gctUINT32) * gcvSRAM_INTER_COUNT);
 
 	for (i = gcvSRAM_INTERNAL0; i < gcvSRAM_INTER_COUNT; i++) {
 		if (Identity->sRAMSizes[i])
@@ -285,7 +274,7 @@ static gceSTATUS _IdentifyHardwareByDatabase(gckHARDWARE Hardware, gckOS Os, gck
 		for (i = Hardware->core; i < gcdCORE_3D_COUNT; i++) {
 			for (j = gcvSRAM_INTERNAL0; j < gcvSRAM_INTER_COUNT; j++) {
 				/* Try to get SRAM sizes from database. */
-				if (database->VIP_SRAM_SIZE_ARRAY[0] > 0) {
+				if (i < gcdVIP_SRAM_ARRAY_SIZE && database->VIP_SRAM_SIZE_ARRAY[i] > 0) {
 					Device->sRAMSizes[i][j] = database->VIP_SRAM_SIZE_ARRAY[i];
 					Identity->sRAMSizes[j]	= database->VIP_SRAM_SIZE_ARRAY[i];
 				} else {
@@ -1931,8 +1920,7 @@ static void _SetHardwareOptions(gckHARDWARE Hardware)
 
 	options->userClusterMask = Hardware->identity.clusterAvailMask;
 
-	status = gckOS_QueryOption(Hardware->os, "userClusterMasks",
-				   (gctUINT64 *)options->userClusterMasks);
+	status = gckOS_QueryUserClusterMasks(Hardware->os, Hardware);
 
 	if (gcmIS_SUCCESS(status)) {
 		for (i = 0; i < gcdMAX_MAJOR_CORE_COUNT; i++)
@@ -2116,8 +2104,7 @@ static gceSTATUS _SetupSRAMVidMem(gckHARDWARE Hardware)
 
 				gcmkSPRINTF(sRAMName, gcmSIZEOF(sRAMName) - 1, "gcCore%dSRAM%d",
 					    Hardware->core, i);
-				status	      = gckOS_QueryOption(Hardware->os, "sRAMRequested",
-								  (gctUINT64 *)&data);
+				status = gckOS_QueryOption(Hardware->os, "sRAMRequested", &data);
 				sRAMRequested = (status == gcvSTATUS_OK) ? (data != 0) : gcvFALSE;
 
 				gcmkONERROR(gckOS_RequestReservedMemory(

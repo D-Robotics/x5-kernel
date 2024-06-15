@@ -2438,7 +2438,7 @@ gceSTATUS gckGALDEVICE_Construct(gcsPLATFORM *Platform, const gcsMODULE_PARAMETE
 	gckDEVICE device;
 	gceSTATUS status     = gcvSTATUS_OK;
 	gctUINT64 isrPolling = -1;
-	gctINT32 i	     = 0;
+	gctINT32 i = 0, j = 0;
 	gctUINT32 devIndex, globalIndex = 0;
 	gctUINT32 global2DIndex = 0;
 	gctUINT32 index		= 0;
@@ -2569,6 +2569,20 @@ gceSTATUS gckGALDEVICE_Construct(gcsPLATFORM *Platform, const gcsMODULE_PARAMETE
 					}
 				}
 			}
+		}
+
+		if (gcmSIZEOF(Args->sRAMBases) >=
+			gcvSRAM_INTER_COUNT * gcvCORE_COUNT * gcmSIZEOF(gctUINT64)) {
+			for (i = 0; i < gcvCORE_COUNT; i++)
+				for (j = 0; j < gcvSRAM_INTER_COUNT; j++)
+					device->sRAMBases[i][j] = Args->sRAMBases[i][j];
+		}
+
+		if (gcmSIZEOF(Args->sRAMSizes) >=
+			gcvSRAM_INTER_COUNT * gcvCORE_COUNT * gcmSIZEOF(gctUINT32)) {
+			for (i = 0; i < gcvCORE_COUNT; i++)
+				for (j = 0; j < gcvSRAM_INTER_COUNT; j++)
+					device->sRAMSizes[i][j] = Args->sRAMSizes[i][j];
 		}
 	}
 

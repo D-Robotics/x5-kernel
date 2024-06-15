@@ -6399,6 +6399,27 @@ gceSTATUS gckOS_GetFd(gctSTRING Name, gcsFDPRIVATE_PTR Private, gctINT *Fd)
 #endif
 }
 
+/******************************************************************************
+ **
+ **  gckOS_QueryOption
+ **
+ **      Query the value of Args and pass it to the variable the pointer refers to.
+ **      Only allow to query and pass values of gctUNIT64 size.
+ **
+ **  INPUT:
+ **
+ **      gckOS
+ **          Pointer to an initialized gckOS object.
+ **
+ **      gctCONST_STRING Option
+ **          Query option.
+ **
+ **  OUTPUT:
+ **
+ **     gctUINT64 *Value
+ **          Pointer to a variable that is equal to the value queried from Args.
+ **
+ */
 gceSTATUS gckOS_QueryOption(gckOS Os, gctCONST_STRING Option, gctUINT64 *Value)
 {
 	gckGALDEVICE device = Os->device;
@@ -6422,29 +6443,8 @@ gceSTATUS gckOS_QueryOption(gckOS Os, gctCONST_STRING Option, gctUINT64 *Value)
 		*Value = (gctUINT64)device->args.powerManagement;
 	} else if (!strcmp(Option, "TA")) {
 		*Value = 0;
-	} else if (!strcmp(Option, "userClusterMasks")) {
-		if (gcmSIZEOF(device->args.userClusterMasks) >=
-		    gcdMAX_MAJOR_CORE_COUNT * gcmSIZEOF(gctUINT32))
-			memcpy(Value, device->args.userClusterMasks,
-			       gcdMAX_MAJOR_CORE_COUNT * gcmSIZEOF(gctUINT32));
-		else
-			return gcvSTATUS_NOT_SUPPORTED;
 	} else if (!strcmp(Option, "smallBatch")) {
 		*Value = device->args.smallBatch;
-	} else if (!strcmp(Option, "sRAMBases")) {
-		if (gcmSIZEOF(device->args.sRAMBases) >=
-		    gcvSRAM_INTER_COUNT * gcvCORE_COUNT * gcmSIZEOF(gctUINT64))
-			memcpy(Value, device->args.sRAMBases,
-			       gcvSRAM_INTER_COUNT * gcvCORE_COUNT * gcmSIZEOF(gctUINT64));
-		else
-			return gcvSTATUS_NOT_SUPPORTED;
-	} else if (!strcmp(Option, "sRAMSizes")) {
-		if (gcmSIZEOF(device->args.sRAMSizes) >=
-		    gcvSRAM_INTER_COUNT * gcvCORE_COUNT * gcmSIZEOF(gctUINT32))
-			memcpy(Value, device->args.sRAMSizes,
-			       gcvSRAM_INTER_COUNT * gcvCORE_COUNT * gcmSIZEOF(gctUINT32));
-		else
-			return gcvSTATUS_NOT_SUPPORTED;
 	} else if (!strcmp(Option, "sRAMRequested")) {
 		*Value = (gctUINT64)device->args.sRAMRequested;
 	} else if (!strcmp(Option, "sRAMLoopMode")) {
@@ -6473,12 +6473,6 @@ gceSTATUS gckOS_QueryOption(gckOS Os, gctCONST_STRING Option, gctUINT64 *Value)
 		*Value = (gctUINT64)device->args.enableNN;
 	} else if (!strcmp(Option, "softReset")) {
 		*Value = (gctUINT64)device->args.softReset;
-	} else if (!strcmp(Option, "devCoreCounts")) {
-		if (gcmSIZEOF(device->args.devCoreCounts) >= gcmSIZEOF(gctUINT32) * gcdDEVICE_COUNT)
-			memcpy(Value, device->args.devCoreCounts,
-			       gcmSIZEOF(gctUINT32) * gcdDEVICE_COUNT);
-		else
-			return gcvSTATUS_NOT_SUPPORTED;
 	} else {
 		status = gcvSTATUS_NOT_SUPPORTED;
 	}
@@ -6849,4 +6843,18 @@ void gckOS_NodeIdAssign(gckOS Os, gcuVIDMEM_NODE_PTR Node)
 			atomic_set(&Os->nodeID, userID);
 		}
 	}
+}
+
+gceSTATUS gckOS_QueryUserClusterMasks(gckOS Os, gckHARDWARE Hardware)
+{
+	gckGALDEVICE device = Os->device;
+	gceSTATUS status = gcvSTATUS_OK;
+
+	if (gcmSIZEOF(device->args.userClusterMasks) >= gcdMAX_MAJOR_CORE_COUNT * gcmSIZEOF(gctUINT32))
+		memcpy(Hardware->options.userClusterMasks, device->args.userClusterMasks,
+			   gcdMAX_MAJOR_CORE_COUNT * gcmSIZEOF(gctUINT32));
+	else
+		status = gcvSTATUS_NOT_SUPPORTED;
+
+	return status;
 }

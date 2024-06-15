@@ -990,17 +990,6 @@ gceSTATUS gckKERNEL_Destroy(gckKERNEL Kernel)
 	if (Kernel->asyncCommand)
 		gcmkVERIFY_OK(gckCOMMAND_Destroy(Kernel->asyncCommand));
 
-	if (Kernel->parityEvent)
-		gcmkVERIFY_OK(gckEVENT_Destroy(Kernel->parityEvent));
-
-	if (Kernel->asyncEvent)
-		gcmkVERIFY_OK(gckEVENT_Destroy(Kernel->asyncEvent));
-
-	if (Kernel->eventObj) {
-		/* Destroy the gckEVENT object. */
-		gcmkVERIFY_OK(gckEVENT_Destroy(Kernel->eventObj));
-	}
-
 	if (Kernel->hardware) {
 		/* Destroy hardware resources before destroying MMU. */
 		gcmkVERIFY_OK(gckHARDWARE_PreDestroy(Kernel->hardware));
@@ -1092,6 +1081,23 @@ gceSTATUS gckKERNEL_Destroy(gckKERNEL Kernel)
 		/* Notify stuck timer to quit. */
 		Kernel->monitorTimerStop = gcvTRUE;
 	}
+
+#if gcdENABLE_VG
+	if (!Kernel->vg) {
+#endif
+		if (Kernel->parityEvent)
+				gcmkVERIFY_OK(gckEVENT_Destroy(Kernel->parityEvent));
+
+		if (Kernel->asyncEvent)
+				gcmkVERIFY_OK(gckEVENT_Destroy(Kernel->asyncEvent));
+
+		if (Kernel->eventObj) {
+			/* Destroy the gckEVENT object. */
+			gcmkVERIFY_OK(gckEVENT_Destroy(Kernel->eventObj));
+		}
+#if gcdENABLE_VG
+	}
+#endif
 
 #if gcdDVFS
 	if (Kernel->dvfs) {
