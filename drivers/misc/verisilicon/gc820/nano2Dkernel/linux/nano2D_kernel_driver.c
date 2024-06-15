@@ -958,6 +958,7 @@ int aux_open(struct vs_n2d_aux *aux)
 
 	gcmkASSERT(dev == global_device->dev);
 
+	gpu_resume(N2D_NULL);
 	ONERROR(n2d_kernel_dispatch(global_device->kernel, N2D_KERNEL_COMMAND_OPEN, 0, 0,
 				    N2D_NULL));
 on_error:
@@ -969,6 +970,7 @@ int aux_close(struct vs_n2d_aux *aux)
 {
 	struct device *dev = aux->dev;
 	int allocate_count = 0;
+	pm_message_t state = {0};
 
 	gcmkASSERT(dev == global_device->dev);
 
@@ -976,6 +978,8 @@ int aux_close(struct vs_n2d_aux *aux)
 	n2d_check_allocate_count(&allocate_count);
 	if (allocate_count)
 		n2d_kernel_os_print("Allocated %d memory\n", allocate_count);
+
+	gpu_suspend(N2D_NULL, state);
 
 	return 0;
 }
