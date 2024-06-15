@@ -671,7 +671,7 @@ static void bt1120_disp_disable(struct vs_crtc *vs_crtc)
 	if (bt1120_disp->refresh_rate == 0)
 		bt1120_disp->refresh_rate = 30;
 	/* wait till last framestart irq triggered, so last frame can be fully displayed.*/
-	mdelay(1000 / bt1120_disp->refresh_rate);
+	mdelay(2 * 1000 / bt1120_disp->refresh_rate);
 
 	clk_disable_unprepare(bt1120_disp->bt1120->pix_clk);
 }
