@@ -448,7 +448,7 @@
 	*/
 	pinctrl-names = "default";
 	pinctrl-0 = <&hsio_gpio0_7 &hsio_gpio0_0 &lsio_gpio1_2>;
-	gpio_oth = <440 434 316>;   //power_en gpio、 reset gpio、pwd gpio
+	gpio_oth = <473 466 349>;   //power_en gpio、 reset gpio、pwd gpio
 	bus = <4>;	//i2c-4
 };
 
@@ -461,7 +461,7 @@
 	*/
 	pinctrl-names = "default";
 	pinctrl-0 = <&hsio_gpio0_8 &hsio_gpio0_1 &lsio_gpio1_0>;
-	gpio_oth = <441 433 314>;   //power_en gpio、reset gpio、pwd gpio
+	gpio_oth = <474 467 347>;   //power_en gpio、reset gpio、pwd gpio
 	bus = <3>;	//i2c-3
 };
 

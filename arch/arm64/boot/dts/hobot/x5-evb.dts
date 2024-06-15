@@ -483,12 +483,12 @@
 &vin_vcon0 {
 	status = "okay";
 	/* camera sensor
-	 * reset gpio:	AON_GPIO0_00:	497
-	 * pwd gpio:	LSIO_GPIO1_00:	314
+	 * reset gpio:	AON_GPIO0_00:	498
+	 * pwd gpio:	LSIO_GPIO1_00:	347
 	 */
 	pinctrl-names = "default";
 	pinctrl-0 = <&aon_gpio_0>;
-	gpio_oth = <497>;   //reset gpio
+	gpio_oth = <498>;   //reset gpio
 	bus = <4>; //i2c4
 	lpwm_chn = <0>;  //open lpwm0 - channel0
 };
@@ -504,12 +504,12 @@
 &vin_vcon2 {
 	status = "okay";
 	/* camera sensor
-	 * reset gpio:	AON_GPIO_PIN4:	501
-	 * pwd gpio:	LSIO_GPIO1_02:	316
+	 * reset gpio:	AON_GPIO_PIN4:	502
+	 * pwd gpio:	LSIO_GPIO1_02:	349
 	 */
 	pinctrl-names = "default";
 	pinctrl-0 = <&aon_gpio_4>;
-	gpio_oth = <501>;   //reset gpio
+	gpio_oth = <502>;   //reset gpio
 	bus = <2>;  //i2c2
 	lpwm_chn = <2>; //open lpwm0 - channel2
 };
@@ -517,12 +517,12 @@
 &vin_vcon3 {
 	status = "okay";
 	/* camera sensor
-	 * reset gpio:	LSIO_GPIO1_06:	320
-	 * pwd gpio:	LSIO_GPIO1_03:	317
+	 * reset gpio:	LSIO_GPIO1_06:	353
+	 * pwd gpio:	LSIO_GPIO1_03:	350
 	 */
 	pinctrl-names = "default";
 	pinctrl-0 = <&lsio_gpio1_6>;
-	gpio_oth = <320>;   //reset gpio
+	gpio_oth = <353>;   //reset gpio
 	bus = <3>;  //i2c3
 	lpwm_chn = <3>; //open lpwm0 - channel3
 };
