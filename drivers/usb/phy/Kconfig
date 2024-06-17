@@ -193,4 +193,13 @@ config JZ4770_PHY
 	  This driver provides PHY support for the USB controller found
 	  on the JZ-series and X-series SoCs from Ingenic.
 
+config USB_SUNRISE5_PHY
+	tristate "D-Robotics Sunrise5 USB PHY Driver"
+	depends on ARCH_HOBOT || COMPILE_TEST
+	select USB_COMMON
+	select USB_PHY
+	help
+	  This driver provides PHY support for the USB controllers found
+	  on D-Robotics Sunrise5 SoC's.
+
 endmenu

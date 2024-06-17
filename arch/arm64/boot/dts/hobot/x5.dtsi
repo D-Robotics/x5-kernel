@@ -3127,7 +3127,7 @@
 					reg = <0x35100000 0x10000>;
 					dr_mode = "otg"; // peripheral/host
 					usb-role-switch;
-					phy_type = "utmi";
+					usb-phy = <&usb3_u2phy>;
 					snps,dis_enblslpm_quirk;
 					snps,dis_u2_susphy_quirk;
 					snps,dis_u3_susphy_quirk;
@@ -3139,6 +3139,18 @@
 
 					status = "disabled";
 				};
+			};
+
+			usb3_u2phy: usb3_u2phy {
+				compatible = "d-robotics,sunrise5-usb-phy";
+				#phy-cells = <0>;
+				status = "disabled";
+			};
+
+			extcon_usb3otg: extcon-usb3otg {
+			      compatible = "linux,extcon-usb-gpio";
+
+			      status = "disabled";
 			};
 
 			usb2: usb2@35300000 {
@@ -3159,7 +3171,7 @@
 					dr_mode = "otg"; // peripheral/host
 					usb-role-switch;
 					maximum-speed = "high-speed";
-					phy_type = "utmi";
+					// usb-phy = <&usb2phy>;
 					snps,dis_enblslpm_quirk;
 					snps,dis_u2_susphy_quirk;
 					snps,quirk-frame-length-adjustment = <0x20>;
@@ -3170,13 +3182,13 @@
 				};
 			};
 
-			extcon_usb2otg: extcon-usb2otg {
-			      compatible = "linux,extcon-usb-gpio";
-
-			      status = "disabled";
+			usb2phy: usb2phy {
+				compatible = "d-robotics,sunrise5-usb-phy";
+				#phy-cells = <0>;
+				status = "disabled";
 			};
 
-			extcon_usb3otg: extcon-usb3otg {
+			extcon_usb2otg: extcon-usb2otg {
 			      compatible = "linux,extcon-usb-gpio";
 
 			      status = "disabled";
