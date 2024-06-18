@@ -588,58 +588,6 @@
 	status = "okay";
 };
 
-&vin_node0 {
-	status = "okay";
-};
-
-&vin_node1 {
-	status = "okay";
-};
-
-&vin_node2 {
-	status = "okay";
-};
-
-&vin_node3 {
-	status = "okay";
-};
-
-&vin_vcon0 {
-	status = "okay";
-};
-
-&vin_vcon1 {
-	status = "okay";
-};
-
-&vin_vcon2 {
-	status = "okay";
-};
-
-&vin_vcon3 {
-	status = "okay";
-};
-
-&mipi_dphy {
-	status = "okay";
-};
-
-&mipi_host0 {
-	status = "okay";
-};
-
-&mipi_host1 {
-	status = "okay";
-};
-
-&mipi_host2 {
-	status = "okay";
-};
-
-&mipi_host3 {
-	status = "okay";
-};
-
 &sif0 {
 	cam-ctrl = <&cam_ctrl>;
 	status = "okay";
@@ -927,12 +875,12 @@
 &vin_vcon0 {
 	status = "okay";
 	/* camera sensor
-	   reset gpio:	   AON_GPIO_PIN1:	  498
-	   pwd gpio:	   AON_GPIO_PIN0:	  497
+	   reset gpio:	   AON_GPIO_PIN1:	  499
+	   pwd gpio:	   AON_GPIO_PIN0:	  498
 	*/
 	pinctrl-names = "default";
 	pinctrl-0 = <&aon_gpio_0 &aon_gpio_1>;
-	gpio_oth = <497 498>;	//pwd gpio、reset gpio
+	gpio_oth = <498 499>;	//pwd gpio、reset gpio
 	bus = <0>;	//i2c-0
 	lpwm_chn = <0 1 2 3>;
 };
@@ -940,12 +888,12 @@
 &vin_vcon1 {
 	status = "okay";
 	/* camera sensor
-	   reset gpio:	   AON_GPIO_PIN5:	  502
-	   pwd gpio:	   AON_GPIO_PIN2:	  499
+	   reset gpio:	   AON_GPIO_PIN5:	  503
+	   pwd gpio:	   AON_GPIO_PIN2:	  500
 	*/
 	pinctrl-names = "default";
 	pinctrl-0 = <&aon_gpio_2 &aon_gpio_5>;
-	gpio_oth = <499 502>;	//pwd gpio、reset gpio
+	gpio_oth = <500 503>;	//pwd gpio、reset gpio
 	bus = <1>;	//i2c-1
 	lpwm_chn = <0 1 2 3>;
 };
@@ -953,12 +901,12 @@
 &vin_vcon2 {
 	status = "okay";
 	/* camera sensor
-	   reset gpio:	   AON_GPIO_PIN6:	  503
-	   pwd gpio:	   AON_GPIO_PIN7:	  504
+	   reset gpio:	   AON_GPIO_PIN6:	  504
+	   pwd gpio:	   AON_GPIO_PIN7:	  505
 	*/
 	pinctrl-names = "default";
 	pinctrl-0 = <&aon_gpio_7 &aon_gpio_6>;
-	gpio_oth = <504 503>;	//pwd gpio、reset gpio
+	gpio_oth = <505 504>;	//pwd gpio、reset gpio
 	bus = <7>;	//NOTICE i2c-7 same this hifi5
 	lpwm_chn = <0 1 2 3>;
 };
@@ -966,12 +914,12 @@
 &vin_vcon3 {
 	status = "okay";
 	/* camera sensor
-	   reset gpio:	   LSIO_GPIO0_23:	  393
-	   pwd gpio:	   LSIO_GPIO0_22:	  392
+	   reset gpio:	   LSIO_GPIO0_23:	  402
+	   pwd gpio:	   LSIO_GPIO0_22:	  401
 	*/
 	pinctrl-names = "default";
 	pinctrl-0 = <&lsio_gpio0_22 &lsio_gpio0_23>;
-	gpio_oth = <392 393>;	//pwd gpio、reset gpio
+	gpio_oth = <401 402>;	//pwd gpio、reset gpio
 	bus = <3>;	//i2c-3
 	lpwm_chn = <0 1 2 3>;
 };

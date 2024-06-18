@@ -470,7 +470,7 @@
 &vin_vcon0 {
 	status = "okay";
 	/* camera sensor
-	 * reset gpio:	AON_GPIO0_00:	497
+	 * reset gpio:	AON_GPIO0_00:	498
 	 * pwd gpio:	LSIO_GPIO1_00:	347
 	 */
 	pinctrl-names = "default";

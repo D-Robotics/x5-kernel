@@ -442,26 +442,26 @@
 &vin_vcon0 {
 	status = "okay";  //has enabled in x5.dtsi
 	/* camera sensor
-	   power_en gpio:  HSIO_GPIO0_07:       440
-	   reset gpio:	   HSIO_GPIO0_01:       434
-	   pwd gpio:       LSIO_GPIO1_02:       316
+	   power_en gpio:  HSIO_GPIO0_07:       473
+	   reset gpio:	   HSIO_GPIO0_01:       467
+	   pwd gpio:       LSIO_GPIO1_02:       349
 	*/
 	pinctrl-names = "default";
-	pinctrl-0 = <&hsio_gpio0_7 &hsio_gpio0_0 &lsio_gpio1_2>;
-	gpio_oth = <473 466 349>;   //power_en gpio、 reset gpio、pwd gpio
+	pinctrl-0 = <&hsio_gpio0_7 &hsio_gpio0_1 &lsio_gpio1_2>;
+	gpio_oth = <473 467 349>;   //power_en gpio、 reset gpio、pwd gpio
 	bus = <4>;	//i2c-4
 };
 
 &vin_vcon1 {
 	status = "okay";  //has enabled in x5.dtsi
 	/* camera sensor
-	   power_en gpio:  HSIO_GPIO0_08:       441
-           reset gpio:     HSIO_GPIO0_00:       433
-	   pwd gpio:       LSIO_GPIO1_02:       314
+	   power_en gpio:  HSIO_GPIO0_08:       474
+           reset gpio:     HSIO_GPIO0_00:       466
+	   pwd gpio:       LSIO_GPIO1_02:       347
 	*/
 	pinctrl-names = "default";
-	pinctrl-0 = <&hsio_gpio0_8 &hsio_gpio0_1 &lsio_gpio1_0>;
-	gpio_oth = <474 467 347>;   //power_en gpio、reset gpio、pwd gpio
+	pinctrl-0 = <&hsio_gpio0_8 &hsio_gpio0_0 &lsio_gpio1_0>;
+	gpio_oth = <474 466 347>;   //power_en gpio、reset gpio、pwd gpio
 	bus = <3>;	//i2c-3
 };
 
