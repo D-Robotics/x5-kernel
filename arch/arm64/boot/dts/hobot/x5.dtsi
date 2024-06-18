@@ -13,6 +13,7 @@
 #include <dt-bindings/arm/coresight-cti-dt.h>
 #include <dt-bindings/gpio/gpio.h>
 #include <dt-bindings/thermal/thermal.h>
+#include <dt-bindings/soc/drobot-x5-firewall.h>
 
 / {
 	aliases {
@@ -680,6 +681,16 @@
 		#size-cells = <1>;
 		ranges = <0x0 0x0 0x0 0x40000000>;
 
+		tee_regmap: tee_regmap_services {
+			/* TEE world Software will overlay this node */
+			compatible = "hobot,j5-sci", "syscon-tee", "simple-bus";
+			method = "smc";
+			fid = <0xC200000B>;
+			r_cmd = <0x00>;
+			w_cmd = <0x01>;
+			u_cmd = <0x02>;
+		};
+
 		ddrc_freq: ddrc-freq {
 			compatible = "horizon,x5-ddrc";
 			status = "okay";
@@ -770,6 +781,29 @@
 			reg = <0x31021008 0x4>;   /* ddr info reg */
 		};
 
+		firewall_ddr: firewall_ddr@38500000 {
+			compatible = "d-robotics,firewall","syscon-tee";
+			reg = <0x38500000 0x500000>;
+			interrupt-parent = <&gic>;
+			interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>;
+			services = <&tee_regmap>;
+			status = "okay";
+			range_1: range-1 {
+				region_name = "kernel";
+				region_start_31_0       = <0x04000000>;
+				region_start_63_32      = <0x0>;
+				region_end_31_0         = <0x0>;
+				region_end_63_32        = <0x0>;
+				disable_rd_userid_31_0  = <A55_NSAID_1>;
+				disable_rd_userid_63_32 = <0xffffffff>;
+				disable_wr_userid_31_0  = <A55_NSAID_1>;
+				disable_wr_userid_63_32 = <0xffffffff>;
+				disable_ns              = <0>;
+				lock                    = <1>;
+				region_number           = <1>;
+				base                    = <HORIZON_DDR_MPU_0>;
+			};
+		};
 
 		/* Sunrise5 codecs subsystem */
 		vpu_iommu: vpu_iommu@3b020004 {

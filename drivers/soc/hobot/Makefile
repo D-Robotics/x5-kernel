@@ -7,3 +7,4 @@ obj-$(CONFIG_HOBOT_BPU)                 += bpu/
 obj-y                                   += socinfo/
 obj-y                                   += reboot_reason/
 obj-y                                   += ddr_monitor/
+obj-y                                   += firewall/

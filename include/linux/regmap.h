@@ -702,6 +702,22 @@ struct regmap *
 __devm_regmap_init_tee(struct device *dev, struct device_node *np,
 		       void __iomem *regs, const struct regmap_config *config,
 		       struct lock_class_key *lock_key, const char *lock_name);
+/*
+ * HB_REGMAP VERSION
+ */
+#define REGMAP_TEE_VER_MAJOR (1U)
+#define REGMAP_TEE_VER_MINOR (0U)
+#define REGMAP_TEE_VER_PATCH (0U)
+
+#define REGMAP_TEE_MAJOR_VERSION(ver) (((ver) >> (24)) & (0xffU))
+#define REGMAP_TEE_MINOR_VERSION(ver) (((ver) >> (16)) & (0xffU))
+#define REGMAP_TEE_PATCH_VERSION(ver) (((ver) >> (0)) & (0xffU))
+
+#define REGMAP_TEE_VERSION_MATCH(_major, _minor) \
+        (((_major) == REGMAP_TEE_VER_MAJOR) && ((_minor) >= REGMAP_TEE_VER_MINOR))
+
+#define MAKE_TEE_REGMAP_VERSION(_major, _minor, _patch) \
+        ((((_major)) << (24)) | (((_minor)) << (16)) | (_patch))
 
 /*
  * Wrapper for regmap_init macros to include a unique lockdep key and name

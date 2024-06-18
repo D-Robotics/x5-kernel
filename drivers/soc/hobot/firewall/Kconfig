@@ -1,0 +1,8 @@
+# SPDX-License-Identifier: GPL-2.0-only
+
+config DROBOT_FIREWALL
+	tristate "Drobot MPU firewall "
+	depends on ARCH_HOBOT
+	default y
+	help
+	  Say y here to support drobot soc mpu firewall.
