@@ -1884,6 +1884,8 @@
 				reg = <X5_GPU>;
 				#power-domain-cells = <0>;
 				gpu-supply = <&vdd08_gpu_reg>;
+				clocks = <&hpsclks X5_GPU_PCLK>,
+					 <&hpsclks X5_GPU_GC8000L_CLK>;
 			};
 			x5_isp_pd@x5-isp-pd {
 				reg = <X5_ISP>;
