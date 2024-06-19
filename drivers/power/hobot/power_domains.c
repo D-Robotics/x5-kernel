@@ -10,6 +10,8 @@
 #include <linux/regulator/consumer.h>
 #include <linux/debugfs.h>
 #include <dt-bindings/power/drobot-x5-power.h>
+#include <linux/of_clk.h>
+#include <linux/clk.h>
 #include "pmu.h"
 #include "idle.h"
 
@@ -198,15 +200,24 @@ static int __pd_power_on(struct drobot_pm_domain *pd)
 		}
 	}
 
+	ret = clk_bulk_prepare_enable(pd->num_clks, pd->clks);
+	if (ret) {
+		pr_err("failed to enable clocks\n");
+		goto err_clk;
+	}
+
 	ret = __pcu_on(pd);
 	if (ret)
 		goto err_pcu;
-
+	
+	clk_bulk_disable_unprepare(pd->num_clks, pd->clks);
 	return 0;
 
 err_pcu:
 	if (pd->regulator)
 		regulator_disable(pd->regulator);
+err_clk:
+	clk_bulk_disable_unprepare(pd->num_clks, pd->clks);
 
 	return ret;
 }
@@ -323,7 +334,7 @@ static int drobot_pm_add_one_domain(struct drobot_pmu *pmu, struct device_node *
 	struct drobot_pm_domain *pd;
 	u32 id;
 	bool boot_on;
-	int ret;
+	int i, error, ret;
 
 	ret = of_property_read_u32(node, "reg", &id);
 	if (ret) {
@@ -365,6 +376,29 @@ static int drobot_pm_add_one_domain(struct drobot_pmu *pmu, struct device_node *
 		ret = regulator_enable(pd->regulator);
 		if (ret)
 			return ret;
+	}
+
+	pd->num_clks = of_clk_get_parent_count(node);
+	if (pd->num_clks > 0) {
+		pd->clks = devm_kcalloc(pmu->dev, pd->num_clks,
+					sizeof(*pd->clks), GFP_KERNEL);
+		if (!pd->clks)
+			return -ENOMEM;
+	} else {
+		dev_dbg(pmu->dev, "%pOFn: doesn't have clocks: %d\n",
+			node, pd->num_clks);
+		pd->num_clks = 0;
+	}
+
+	for (i = 0; i < pd->num_clks; i++) {
+		pd->clks[i].clk = of_clk_get(node, i);
+		if (IS_ERR(pd->clks[i].clk)) {
+			error = PTR_ERR(pd->clks[i].clk);
+			dev_err(pmu->dev,
+				"%pOFn: failed to get clk at index %d: %d\n",
+				node, i, error);
+			return error;
+		}
 	}
 
 	pd->genpd.name	    = pd_info->name;

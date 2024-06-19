@@ -57,6 +57,8 @@ struct drobot_pm_domain {
 	const struct drobot_pm_info *info;
 	struct drobot_pmu *pmu;
 	struct regulator *regulator;
+	struct clk_bulk_data *clks;
+	int num_clks;
 #ifdef CONFIG_DEBUG_FS
 	struct dentry *dentry;
 #endif
