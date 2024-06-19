@@ -182,7 +182,6 @@ static gceSTATUS gpu_put_opp_table(gcsPLATFORM *platform)
 
 gceSTATUS _set_clock(gcsPLATFORM *Platform, gctUINT32 DevIndex, gceCORE GPU, gctBOOL Enable)
 {
-#if 0
 	int i = 0;
 
 	if (Enable) {
@@ -200,7 +199,6 @@ gceSTATUS _set_clock(gcsPLATFORM *Platform, gctUINT32 DevIndex, gceCORE GPU, gct
 			}
 		}
 	}
-#endif
 
 	return gcvSTATUS_OK;
 }
@@ -270,8 +268,6 @@ static int gpu_add_power_domains(gcsPLATFORM *platform)
 			gpd->core_clk[i] = NULL;
 			break;
 		}
-		clk_prepare(gpd->core_clk[i]);
-		clk_enable(gpd->core_clk[i]);
 	}
 	gpd->clk_num = i;
 	if (gpd->clk_num == 0)
