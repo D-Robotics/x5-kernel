@@ -208,11 +208,15 @@ struct device *drobot_idle_get_dev(const struct device_node *of_node)
 }
 EXPORT_SYMBOL_GPL(drobot_idle_get_dev);
 
-int drobot_idle_request(struct device *dev, u8 idle_id, bool is_idle)
+int drobot_idle_request(struct device *dev, u8 idle_id, bool is_idle, bool skip_wait_idle)
 {
 	struct drobot_idle *idle = dev_get_drvdata(dev);
 
 	__send_request(idle, idle_id, is_idle);
+
+	if (!is_idle)
+		if (skip_wait_idle)
+			return 0;
 
 	return __wait_idle(idle, idle_id, is_idle);
 }

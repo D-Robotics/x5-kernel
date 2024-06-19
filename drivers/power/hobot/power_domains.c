@@ -80,15 +80,14 @@ static int pcu_set_domain(struct drobot_pm_domain *pd, bool on)
 static inline int __connect_noc(struct drobot_pm_domain *pd)
 {
 	if (pd->info->noc_id != 0xff)
-		return drobot_idle_request(pd->pmu->idle, pd->info->noc_id, false);
-
+		return drobot_idle_request(pd->pmu->idle, pd->info->noc_id, false, false);
 	return 0;
 }
 
 static inline int __disconnect_noc(struct drobot_pm_domain *pd)
 {
 	if (pd->info->noc_id != 0xff)
-		return drobot_idle_request(pd->pmu->idle, pd->info->noc_id, true);
+		return drobot_idle_request(pd->pmu->idle, pd->info->noc_id, true, false);
 
 	return 0;
 }
@@ -96,7 +95,7 @@ static inline int __disconnect_noc(struct drobot_pm_domain *pd)
 static inline int __connect_apb(struct drobot_pm_domain *pd)
 {
 	if (pd->info->apb_id != 0xff)
-		return drobot_idle_request(pd->pmu->idle, pd->info->apb_id, false);
+		return drobot_idle_request(pd->pmu->idle, pd->info->apb_id, false, false);
 
 	return 0;
 }
@@ -104,7 +103,7 @@ static inline int __connect_apb(struct drobot_pm_domain *pd)
 static inline int __disconnect_apb(struct drobot_pm_domain *pd)
 {
 	if (pd->info->apb_id != 0xff)
-		return drobot_idle_request(pd->pmu->idle, pd->info->apb_id, true);
+		return drobot_idle_request(pd->pmu->idle, pd->info->apb_id, true, false);
 
 	return 0;
 }
