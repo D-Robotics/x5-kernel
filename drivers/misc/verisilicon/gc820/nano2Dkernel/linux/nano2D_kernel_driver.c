@@ -1966,8 +1966,11 @@ static int __devinit gpu_probe(struct platform_device *pdev)
 	ONERROR(sync_param(&global_param));
 
 	if (global_param.iommu)
+#if IS_ENABLED(CONFIG_DROBOT_LITE_MMU)
+		dma_mask = DMA_BIT_MASK(40);
+#else
 		dma_mask = DMA_BIT_MASK(32);
-
+#endif
 	dev_p->dma_mask		 = &dma_mask;
 	dev_p->coherent_dma_mask = dma_mask;
 

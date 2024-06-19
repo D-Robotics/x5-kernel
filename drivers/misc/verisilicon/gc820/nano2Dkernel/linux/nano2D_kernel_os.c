@@ -76,6 +76,10 @@
 #include <asm/set_memory.h>
 #endif
 
+#if IS_ENABLED(CONFIG_DROBOT_LITE_MMU)
+#include <hobot_ion_iommu.h>
+#endif
+
 #include "nano2D_types.h"
 #include "nano2D_dispatch.h"
 #include "nano2D_kernel_platform.h"
@@ -1225,7 +1229,11 @@ n2d_error_t n2d_kernel_os_map_gpu(n2d_os_t *os, n2d_uint32_t core, n2d_uint64_t 
 {
 	n2d_error_t error	  = N2D_SUCCESS;
 	n2d_uint32_t contiguous	  = flag & N2D_ALLOC_FLAG_CONTIGUOUS;
+
+#if !IS_ENABLED(CONFIG_DROBOT_LITE_MMU)
 	n2d_uint64_t cpu_physical = N2D_INVALID_ADDRESS;
+#endif
+
 	n2d_uint64_t gpu_physical = N2D_INVALID_ADDRESS;
 
 #if NANO2D_MMU_ENABLE
@@ -1250,12 +1258,18 @@ n2d_error_t n2d_kernel_os_map_gpu(n2d_os_t *os, n2d_uint32_t core, n2d_uint64_t 
 #endif
 
 	if (contiguous) {
+
+#if IS_ENABLED(CONFIG_DROBOT_LITE_MMU)
+	ion_iommu_map_ion_phys(&os->device->platform->device->dev, (phys_addr_t)handle, ALIGN(size,PAGE_SIZE), (dma_addr_t *)&gpu_physical, 0);
+	pr_debug("%s: handle = 0x%llx, gpu_physical = 0x%llx.\n", __func__, handle, gpu_physical);
+#else
 		/*
 		 * Map contiguous memory. return physical if disable MMU,
 		 * otherwise, write MMU page table.
 		 */
 		ONERROR(n2d_kernel_os_get_physical_from_handle(handle, 0, flag, &cpu_physical));
 		ONERROR(n2d_kernel_os_cpu_to_gpu_phy(os, cpu_physical, &gpu_physical));
+#endif
 #if NANO2D_MMU_ENABLE
 		offset = gpu_physical & (page_size - 1);
 		gpu_physical -= offset;
