@@ -186,16 +186,16 @@ int32_t bpu_core_clk_on(const struct bpu_core *core)
 		}
 	}
 
-	// if (core->mclk != NULL) {
-	// 	if (!__clk_is_enabled(core->mclk)) {
-	// 		ret = clk_prepare_enable(core->mclk);
-	// 		if (ret != 0) {
-	// 			dev_err(core->dev,
-	// 					"bpu core[%d] mclk enable failed\n",
-	// 					core->index);
-	// 		}
-	// 	}
-	// }
+	if (core->mclk != NULL) {
+		if (!__clk_is_enabled(core->mclk)) {
+			ret = clk_prepare_enable(core->mclk);
+			if (ret != 0) {
+				dev_err(core->dev,
+						"bpu core[%d] mclk enable failed\n",
+						core->index);
+			}
+		}
+	}
 	if (core->pe0clk != NULL) {
 		if (!__clk_is_enabled(core->pe0clk)) {
 			ret = clk_prepare_enable(core->pe0clk);

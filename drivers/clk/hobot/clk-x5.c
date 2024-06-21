@@ -521,7 +521,7 @@ static int crm_hps_clk_init(struct platform_device *pdev)
 
 	hws[X5_BPU_APB_CLK] = drobot_clk_hw_register_gate_no_idle("bpu_apb_clk", "bpu_mclk_2x", base + HPS_MIX_CLK_ENB, 17, gate_flags | CLK_IGNORE_UNUSED);
 	hws[X5_BPU_MCLK_1X_CLK] = drobot_clk_hw_register_gate("bpu_mclk_1x_clk", "bpu_mclk_2x", base + HPS_MIX_CLK_ENB, 18, gate_flags | CLK_IGNORE_UNUSED, ctx->idle, ISO_PD_BPU, false);
-	hws[X5_BPU_MCLK_2X_CLK] = drobot_clk_hw_register_gate("bpu_mclk_2x_clk", "bpu_mclk_2x", base + HPS_MIX_CLK_ENB, 19, gate_flags | CLK_IGNORE_UNUSED, ctx->idle, ISO_PD_BPU, false);
+	hws[X5_BPU_MCLK_2X_CLK] = drobot_clk_hw_register_gate("bpu_mclk_2x_clk", "bpu_mclk_2x", base + HPS_MIX_CLK_ENB, 19, gate_flags, ctx->idle, ISO_PD_BPU, false);
 
 	hws[X5_VIDEO_CODEC_CORE_CLK] = drobot_clk_register_generator_no_idle("codec_core_clk", soc_gen_src_sels, ARRAY_SIZE(soc_gen_src_sels), base + HPS_CLK_GEN + 0x600);
 	hws[X5_VIDEO_CODEC_BCLK] = drobot_clk_register_gen_no_flags("codec_bclk", soc_gen_src_sels, ARRAY_SIZE(soc_gen_src_sels), base + HPS_CLK_GEN + 0x620, ctx->idle, ISO_CG_VIDEO);

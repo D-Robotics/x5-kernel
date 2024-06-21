@@ -2067,7 +2067,7 @@
 			cnn-id = <0>;
 			resets = <&socrst BPU_RESET>;
 			reset-names = "cnn_rst";
-			clocks = <&hpsclks X5_BPU_MCLK_2X>;
+			clocks = <&hpsclks X5_BPU_MCLK_2X_CLK>;
 			clock-names = "cnn_mclk";
 			power-domains = <&power X5_BPU>;
 			operating-points-v2 = <&bpu_opp_table>;
