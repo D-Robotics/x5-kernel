@@ -130,6 +130,7 @@ static const struct genpd_lock_ops genpd_spin_ops = {
 #define genpd_is_active_wakeup(genpd)	(genpd->flags & GENPD_FLAG_ACTIVE_WAKEUP)
 #define genpd_is_cpu_domain(genpd)	(genpd->flags & GENPD_FLAG_CPU_DOMAIN)
 #define genpd_is_rpm_always_on(genpd)	(genpd->flags & GENPD_FLAG_RPM_ALWAYS_ON)
+#define genpd_irq_on(genpd)		(genpd->flags & GENPD_FLAG_IRQ_ON)
 
 static inline bool irq_safe_dev_in_sleep_domain(struct device *dev,
 		const struct generic_pm_domain *genpd)
@@ -2062,8 +2063,6 @@ int pm_genpd_init(struct generic_pm_domain *genpd,
 	genpd->domain.ops.runtime_suspend = genpd_runtime_suspend;
 	genpd->domain.ops.runtime_resume = genpd_runtime_resume;
 	genpd->domain.ops.prepare = genpd_prepare;
-	genpd->domain.ops.suspend_noirq = genpd_suspend_noirq;
-	genpd->domain.ops.resume_noirq = genpd_resume_noirq;
 	genpd->domain.ops.freeze_noirq = genpd_freeze_noirq;
 	genpd->domain.ops.thaw_noirq = genpd_thaw_noirq;
 	genpd->domain.ops.poweroff_noirq = genpd_poweroff_noirq;
@@ -2074,6 +2073,14 @@ int pm_genpd_init(struct generic_pm_domain *genpd,
 	if (genpd->flags & GENPD_FLAG_PM_CLK) {
 		genpd->dev_ops.stop = pm_clk_suspend;
 		genpd->dev_ops.start = pm_clk_resume;
+	}
+
+	if (genpd_irq_on(genpd)) {
+		genpd->domain.ops.suspend_late = genpd_suspend_noirq;
+		genpd->domain.ops.resume_early = genpd_resume_noirq;
+	} else {
+		genpd->domain.ops.suspend_noirq = genpd_suspend_noirq;
+		genpd->domain.ops.resume_noirq = genpd_resume_noirq;
 	}
 
 	/* The always-on governor works better with the corresponding flag. */
