@@ -2546,13 +2546,26 @@
 					 <&hpsclks X5_HSIO_ENET_PTP_REFCLK>;
 				clock-names = "axi_clk", "rgmii_clk", "stmmaceth",
 					      "pclk", "ptp_ref";
+				resets = <&socrst HSIO_ENET_RESET>;
+				reset-names = "enet_rst";
 				snps,burst-map = <5>;
 				snps,force_sf_dma_mode = <1>;
 				phy-mode = "rgmii-id";
 				phy-handle = <&ethphy0>;
+
 				snps,mtl-tx-config = <&txnode>;
 				snps,mtl-rx-config = <&rxnode>;
-				resets = <&socrst HSIO_ENET_RESET>;
+
+				mdio {
+					compatible = "snps,dwmac-mdio";
+					#address-cells = <1>;
+					#size-cells = <0>;
+					ethphy0: ethernet-phy@1 {
+						compatible =
+							"ethernet-phy-ieee802.3-c22";
+						reg = <1>;
+					};
+				};
 
 				txnode:txnode@1 {
 					snps,tx-queues-to-use = <1>;
@@ -2607,17 +2620,6 @@
 					};
 					rxqueue7: rxqueue@8 {
 						snps,dcb-algorithm;
-					};
-				};
-
-				mdio {
-					compatible = "snps,dwmac-mdio";
-					#address-cells = <1>;
-					#size-cells = <0>;
-					ethphy0: ethernet-phy@1 {
-						compatible =
-							"ethernet-phy-ieee802.3-c22";
-						reg = <1>;
 					};
 				};
 			};

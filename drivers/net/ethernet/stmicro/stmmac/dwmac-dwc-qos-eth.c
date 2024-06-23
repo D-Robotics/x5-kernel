@@ -41,6 +41,7 @@ struct x5_eqos {
 	struct device *dev;
 	void __iomem *regs;
 
+	struct reset_control *rst;
 	struct clk *clk_axi;
 	struct clk *clk_rgmii;
 
@@ -429,9 +430,9 @@ static int x5_qos_init(struct platform_device *pdev, void *priv)
 	clk_prepare_enable(x5_qos->clk_axi);
 	if (!IS_ERR_OR_NULL(x5_qos->phyreset)) {
 		gpiod_set_value(x5_qos->phyreset, 0);
-		msleep(20);
+		msleep(1);
 		gpiod_set_value(x5_qos->phyreset, 1);
-		msleep(100);
+		msleep(32);
 	}
 
 	return 0;
@@ -491,16 +492,23 @@ static int x5_eqos_probe(struct platform_device *pdev,
 	}
 
 	x5_eqos->phyreset = devm_gpiod_get_optional(&pdev->dev, "phyreset", GPIOD_OUT_HIGH);
-	if (IS_ERR_OR_NULL(x5_eqos->phyreset)) {
-		err = PTR_ERR(x5_eqos->phyreset);
+	if (!IS_ERR_OR_NULL(x5_eqos->phyreset)) {
+		/* do phy pulse reset, otherwise, ethernet not work.. */
+		gpiod_set_value(x5_eqos->phyreset, 0);
+		msleep(1);
+		gpiod_set_value(x5_eqos->phyreset, 1);
+		msleep(25);
+	}
+
+	x5_eqos->rst = devm_reset_control_get_optional(&pdev->dev, "enet_rst");
+	if (IS_ERR(x5_eqos->rst)) {
+		err = PTR_ERR(x5_eqos->rst);
 		goto disable_axi;
 	}
 
-	/* do phy pulse reset, otherwise, ethernet not work.. */
-	gpiod_set_value(x5_eqos->phyreset, 0);
-	msleep(20);
-	gpiod_set_value(x5_eqos->phyreset, 1);
-	msleep(100);
+	reset_control_assert(x5_eqos->rst);
+	udelay(1);
+	reset_control_deassert(x5_eqos->rst);
 
 bypass_clk_reset_gpio:
 	data->clks_config = x5_qos_clks_config;
