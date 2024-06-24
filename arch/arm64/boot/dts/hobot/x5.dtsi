@@ -2535,7 +2535,8 @@
 			gmac_tsn: gmac-tsn@35010000 {
 				compatible = "x5,dwc-qos-ethernet-4.10";
 				status = "disabled";
-				reg = <0x35010000 0x10000>;
+				reg = <0x35010000 0x10000>,
+					<0x35050000 0x4>;
 				interrupt-parent = <&gic>;
 				interrupts = <GIC_SPI 24 IRQ_TYPE_LEVEL_HIGH>;
 				interrupt-names = "macirq";
