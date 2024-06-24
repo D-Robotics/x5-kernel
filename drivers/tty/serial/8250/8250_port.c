@@ -1917,7 +1917,9 @@ static bool handle_rx_dma(struct uart_8250_port *up, unsigned int iir)
 		fallthrough;
 	case UART_IIR_RLSI:
 	case UART_IIR_RX_TIMEOUT:
-		serial8250_rx_dma_flush(up);
+		up->ier = serial_port_in(&up->port, UART_IER);
+		up->ier &= ~(UART_IER_RLSI | UART_IER_RDI);
+		serial_port_out(&up->port, UART_IER, up->ier);
 		return false;
 	}
 	return up->dma->rx_dma(up);
