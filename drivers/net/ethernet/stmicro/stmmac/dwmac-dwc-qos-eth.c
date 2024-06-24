@@ -569,6 +569,7 @@ bypass_clk_reset_gpio:
 	data->init = x5_qos_init;
 	data->exit = x5_qos_exit;
 	data->bsp_priv = x5_eqos;
+	data->sph_disable = 1;
 
 	return 0;
 
