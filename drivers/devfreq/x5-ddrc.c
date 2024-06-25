@@ -76,7 +76,7 @@ static void x5_ddrc_smc_set_freq(struct device *dev, int target_freq)
 	}
 
 	start = ktime_get();
-	arm_smccc_smc(HORIZON_SIP_DDR_DVFS_SET, target_freq, online_cpus, 0, 0, 0, 0, 0, &res);
+	arm_smccc_smc(HORIZON_SIP_DDR_DVFS_SET, target_freq/1000000, online_cpus, 0, 0, 0, 0, 0, &res);
 	end = ktime_get();
 	elapsed_time = ktime_to_ns(ktime_sub(end, start));
 
@@ -145,7 +145,7 @@ static int x5_ddrc_get_initial_freq(struct device *dev, unsigned long *freq)
 
 	/* get current ddr freq reported by firmware */
 	arm_smccc_smc(HORIZON_SIP_DDR_DVFS_GET, 0, 0, 0, 0, 0, 0, 0, &res);
-	*freq = res.a0;
+	*freq = res.a0 * 1000000;
 	return 0;
 }
 
@@ -178,7 +178,7 @@ static int x5_ddrc_init_freq_info(struct device *dev)
 		if ((long)res.a0 <= 0)
 			return -ENODEV;
 
-		freq->rate = res.a0;
+		freq->rate = res.a0 * 1000000;
 		freq->smcarg = index;
 	}
 
@@ -210,7 +210,7 @@ static int x5_ddrc_check_opps(struct device *dev)
 		freq_info = x5_ddrc_find_freq(priv, freq);
 		if (!freq_info) {
 			dev_dbg(dev, "Disable unsupported OPP %luHz %luMT/s\n",
-					freq, DIV_ROUND_CLOSEST(freq, 250000));
+					freq, freq/1000000);
 			dev_pm_opp_disable(dev, freq);
 		}
 	}
