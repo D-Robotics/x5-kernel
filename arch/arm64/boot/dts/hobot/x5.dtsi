@@ -1840,6 +1840,7 @@
 			clocks = <&osc>, <&clk_32k>, <&audio_externel_clk>;
 			clock-names = "osc", "32k", "audio_externel";
 			pll-table = <1>;
+			qspi-boot = <0>;
 			idle-dev = <&noc_idle>;
 			#clock-cells = <1>;
 			status = "disabled";
