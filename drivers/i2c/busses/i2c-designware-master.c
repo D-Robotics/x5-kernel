@@ -142,7 +142,7 @@ static int i2c_dw_set_timings_master(struct dw_i2c_dev *dev)
 			ic_clk = i2c_dw_clk_rate(dev);
 			dev->hs_hcnt =
 				i2c_dw_scl_hcnt(ic_clk,
-						25,	/* tHIGH = 25 ns */
+						35,	/* tHIGH = 35 ns */
 						sda_falling_time,
 						0,	/* DW default */
 						0);	/* No offset */
