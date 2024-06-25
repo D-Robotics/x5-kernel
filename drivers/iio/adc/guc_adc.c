@@ -198,6 +198,9 @@
 #define IGAV04_ADC_EFUSE_TRIM_MASK    GENMASK(31, 28)
 #define IGAV04_ADC_EFUSE_TRIM_OFFSET  28
 
+#define IGAV04_ADC_EFUSE_NEG_FLAG  BIT(5)
+#define IGAV04_ADC_EFUSE_NEG_MASK  GENMASK(5, 0)
+
 struct guc_adc_data {
 	struct device *dev;
 	const struct iio_chan_spec *channels;
@@ -220,7 +223,7 @@ struct guc_adc {
 	u32 last_val;
 	const struct iio_chan_spec *work_chan;
 	struct notifier_block nb;
-	u32 calibration_offset;
+	int32_t calibration_offset;
 	u32 trimming_value;
 	enum convert_mode guc_convert_mode;
 	struct reset_control	*reset;
@@ -335,6 +338,7 @@ static void guc_adc_nor_fifo_read(struct guc_adc *info, bool enable)
 	val = readl_relaxed(info->regs + GUC_CTRL_NOR_STS1) & SAMPLE_MASK;
 
 	info->last_val = (val >> SAMPLE_OFFSET);
+	info->last_val -= info->calibration_offset;
 }
 
 /*
@@ -505,7 +509,6 @@ static irqreturn_t guc_adc_trigger_handler(int irq, void *p)
 		if (ret)
 			goto out;
 
-		info->last_val -= info->calibration_offset;
 		data.values[j] = info->last_val;
 		j++;
 	}
@@ -685,6 +688,10 @@ static int guc_adc_probe(struct platform_device *pdev)
 	else
 		info->calibration_offset =
 			(val & IGAV04_ADC_EFUSE_CALIB_MASK) >> IGAV04_ADC_EFUSE_CALIB_OFFSET;
+
+	if (info->calibration_offset & IGAV04_ADC_EFUSE_NEG_FLAG)
+		info->calibration_offset |= ~IGAV04_ADC_EFUSE_NEG_MASK;
+
 	dev_info(&pdev->dev, "ADC calibration: %d\n", info->calibration_offset);
 
 	ret = adc_nvmem_cell_data(pdev, "adc-trimming", &val);

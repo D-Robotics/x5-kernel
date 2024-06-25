@@ -3648,8 +3648,8 @@
 				clock-names = "adc-clk","adc-pclk";
 				assigned-clock-rates = <32000000>;
 				/* disable efuse binding by default */
-				//nvmem-cells = <&efuse_adc_offset>, <&efuse_adc_trimming>;
-				//nvmem-cell-names = "adc-offset", "adc-trimming";
+				nvmem-cells = <&efuse_adc_offset>, <&efuse_adc_trimming>;
+				nvmem-cell-names = "adc-offset", "adc-trimming";
 				vref-supply = <&reg_adc_vref_1v8>;
 				#io-channel-cells = <1>;
 				guc,adc-channels = <0 1 2 3 4 5 6 7>;
