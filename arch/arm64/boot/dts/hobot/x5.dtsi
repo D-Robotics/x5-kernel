@@ -61,31 +61,31 @@
 		compatible = "operating-points-v2";
 
 		opp-266M {
-			opp-hz = /bits/ 64 <266>;
+			opp-hz = /bits/ 64 <266000000>;
 		};
 
 		opp-1066M {
-			opp-hz = /bits/ 64 <1066>;
+			opp-hz = /bits/ 64 <1066000000>;
 		};
 
 		opp-2133M {
-			opp-hz = /bits/ 64 <2133>;
+			opp-hz = /bits/ 64 <2133000000>;
 		};
 
 		opp-3200M {
-			opp-hz = /bits/ 64 <3200>;
+			opp-hz = /bits/ 64 <3200000000>;
 		};
 
 		opp-2844M {
-				opp-hz = /bits/ 64 <2844>;
+				opp-hz = /bits/ 64 <2844000000>;
 		};
 
 		opp-3733M {
-				opp-hz = /bits/ 64 <3733>;
+				opp-hz = /bits/ 64 <3733000000>;
 		};
 
 		opp-4266M {
-				opp-hz = /bits/ 64 <4266>;
+				opp-hz = /bits/ 64 <4266000000>;
 		};
 
 	};
