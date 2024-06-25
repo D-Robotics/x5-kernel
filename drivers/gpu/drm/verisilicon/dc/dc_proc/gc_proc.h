@@ -40,9 +40,6 @@ struct gpu_plane_info {
 	u32 features;
 	/** processor id. */
 	u8 id;
-
-	unsigned int width;
-	unsigned int height;
 	u32 fourcc;
 };
 
