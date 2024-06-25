@@ -190,6 +190,19 @@ static n2d_orientation_t to_gc_rotation(unsigned int rotation)
 	return orientation;
 }
 
+static void update_iommu(struct device *dev, dma_addr_t phys, size_t size)
+{
+	struct iommu_domain *domain = NULL;
+
+	domain = iommu_get_domain_for_dev(dev);
+	if (!domain) {
+		dev_err(dev, "failed to get iommu domain.\n");
+		return;
+	}
+
+	iommu_map(domain, phys, phys, PAGE_ALIGN(size), 0);
+}
+
 static void aux_rotate(struct vs_n2d_aux *aux, unsigned int rotation, n2d_rectangle_t *rect)
 {
 	n2d_buffer_t src = {0}, dst = {0};
@@ -210,6 +223,7 @@ static void aux_rotate(struct vs_n2d_aux *aux, unsigned int rotation, n2d_rectan
 	memDesc.physical = config->in_buffer_addr[0][0]; /* assume the buffer is contiguous */
 	memDesc.size	 = gcmALIGN(config->input_stride[0] * config->input_height[0] + 64,
 				    64); /* assume buffer is aligned */
+	update_iommu(aux->dev, memDesc.physical, memDesc.size);
 	N2D_ON_ERROR(n2d_wrap(&memDesc, &handle));
 
 	src.width    = config->input_width[0];
@@ -229,6 +243,7 @@ static void aux_rotate(struct vs_n2d_aux *aux, unsigned int rotation, n2d_rectan
 	memDesc.flag	 = N2D_WRAP_FROM_USERMEMORY;
 	memDesc.physical = config->out_buffer_addr[0];
 	memDesc.size	 = gcmALIGN(config->output_stride * config->output_height + 64, 64);
+	update_iommu(aux->dev, memDesc.physical, memDesc.size);
 	N2D_ON_ERROR(n2d_wrap(&memDesc, &handle));
 
 	dst.width    = config->output_width;
@@ -277,10 +292,11 @@ static void update_cfg(struct vs_n2d_aux *aux, struct drm_framebuffer *dst,
 	get_buffer_addr(src, dma_addr);
 	cfg->in_buffer_addr[0][0] = dma_addr[0]; /* assume the buffer is continuous */
 	cfg->ninputs		  = to_gc_format(src->format->format);
-	pr_info("%s: src_format = %d.\n", __func__, cfg->ninputs);
-	pr_info("%s: src_width = %d.\n", __func__, cfg->input_width[0]);
-	pr_info("%s: src_height = %d.\n", __func__, cfg->input_height[0]);
-	pr_info("%s: src_stride = %d.\n", __func__, cfg->input_stride[0]);
+	pr_debug("%s: src_format = %d.\n", __func__, cfg->ninputs);
+	pr_debug("%s: src_width = %d.\n", __func__, cfg->input_width[0]);
+	pr_debug("%s: src_height = %d.\n", __func__, cfg->input_height[0]);
+	pr_debug("%s: src_stride = %d.\n", __func__, cfg->input_stride[0]);
+	pr_debug("%s: src addr = 0x%llx.\n", __func__, dma_addr[0]);
 
 	cfg->output_width  = dst->width;
 	cfg->output_height = dst->height;
@@ -288,10 +304,11 @@ static void update_cfg(struct vs_n2d_aux *aux, struct drm_framebuffer *dst,
 	get_buffer_addr(dst, dma_addr);
 	cfg->out_buffer_addr[0] = dma_addr[0];
 	cfg->output_format	= to_gc_format(dst->format->format);
-	pr_info("%s: out_format = %d.\n", __func__, cfg->output_format);
-	pr_info("%s: out_width = %d.\n", __func__, cfg->output_width);
-	pr_info("%s: out_height = %d.\n", __func__, cfg->output_height);
-	pr_info("%s: out_stride = %d.\n", __func__, cfg->output_stride);
+	pr_debug("%s: out_format = %d.\n", __func__, cfg->output_format);
+	pr_debug("%s: out_width = %d.\n", __func__, cfg->output_width);
+	pr_debug("%s: out_height = %d.\n", __func__, cfg->output_height);
+	pr_debug("%s: out_stride = %d.\n", __func__, cfg->output_stride);
+	pr_debug("%s: out addr = 0x%llx.\n", __func__, dma_addr[0]);
 }
 
 static int create_fb(struct dc_proc *dc_proc)
