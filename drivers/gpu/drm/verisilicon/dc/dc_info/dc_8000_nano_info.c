@@ -734,5 +734,5 @@ const struct dc_info dc_8000_nano_info = {
 	.max_height	 = 4096,
 	.cursor_width	 = 256,
 	.cursor_height	 = 256,
-	.pitch_alignment = 64,
+	.pitch_alignment = 192,
 };

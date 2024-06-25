@@ -316,12 +316,13 @@ static const struct drm_gem_object_funcs vs_gem_default_funcs = {
 int vs_gem_dumb_create(struct drm_file *file, struct drm_device *dev,
 		       struct drm_mode_create_dumb *args)
 {
-	struct vs_drm_private *priv = drm_to_vs_priv(dev);
+	const struct vs_drm_private *priv = drm_to_vs_priv(dev);
 	struct vs_gem_object *vs_obj;
 	unsigned int pitch = args->width * DIV_ROUND_UP(args->bpp, 8);
 
-	args->pitch = ALIGN(pitch, priv->pitch_alignment);
-	args->size  = PAGE_ALIGN(args->pitch * args->height);
+	args->pitch = num_align(pitch, priv->pitch_alignment);
+
+	args->size = PAGE_ALIGN(args->pitch * args->height);
 
 	vs_obj = vs_gem_create_with_handle(dev, file, args->size, &args->handle);
 	return PTR_ERR_OR_ZERO(vs_obj);
