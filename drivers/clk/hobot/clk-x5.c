@@ -119,7 +119,6 @@ static struct x5_rate_list soc_gen_rates[] = {
 	{X5_CODEC_NOC_CLK,		750000000},
 	{X5_GPU_NOC_CLK,		750000000},
 	{X5_ROM_ACLK,			400000000},
-	{X5_TOP_APB_CLK,		200000000},
 	{X5_CPU_CORE_CLK,		1500000000},
 	{X5_CPU_PCLK,			300000000},
 	{X5_CPU_ATCLK,			300000000},
@@ -155,7 +154,6 @@ static struct x5_rate_list soc_gen_rates[] = {
 	{X5_VIDEO_CODEC_CORE_CLK,	600000000},
 	{X5_VIDEO_CODEC_BCLK,		500000000},
 	{X5_VIDEO_JPEG_CORE_CLK,	500000000},
-	{X5_HSIO_QSPI_BUS_CLK,		200000000},
 	{X5_HSIO_QSPI_CORE_CLK,		200000000},
 	{X5_HSIO_ENET_AXI_CLK,		400000000},
 	{X5_HSIO_ENET_RGMII_CLK,	125000000},
@@ -202,6 +200,7 @@ static const char *i2s1_s_src_sels[] = { "dsp_i2s1_child_sclk", "audio_externel"
 static const char *dsp_noc_gen_src_sels[] = { "osc", "dsp_pll_p", "dsp_pll_r" };
 static const char *soc_gen_src_sels[] = { "osc", "cpu_pll_p", "cpu_pll_r", "sys0_pll_p", "sys0_pll_r", "sys1_pll_p", "sys1_pll_r" , "pixel_pll_r" };
 static const char *apb_gen_src_sels[] = { "osc", "cpu_pll_p", "osc", "osc", "osc", "osc", "osc" , "osc" };
+static const char *qspi_apb_gen_src_sels[] = { "osc", "osc", "cpu_pll_r", "osc", "osc", "osc", "osc" , "osc" };
 static const char *disp_gen_src_sels[] = { "osc", "disp_pll_p", "pixel_pll_p", "disp_pll_r", "pixel_pll_r" };
 
 /* use osc clock to disable parent selection */
@@ -366,6 +365,7 @@ static int crm_hps_clk_init(struct platform_device *pdev)
 	void __iomem *base;
 	int ret, i;
 	u32 pll_match = 0;
+	u32 qspi_boot = 0;
 
 	ctx = devm_kzalloc(dev, struct_size(ctx, clk_hw_data.hws, X5_HPS_END_CLK), GFP_KERNEL);
 	if (!ctx)
@@ -377,6 +377,7 @@ static int crm_hps_clk_init(struct platform_device *pdev)
 	hws = ctx->clk_hw_data.hws;
 
 	device_property_read_u32(dev, "pll-table", &pll_match);
+	device_property_read_u32(dev, "qspi-boot", &qspi_boot);
 
 	ctx->idle = drobot_idle_get_dev(dev->of_node);
 	if (IS_ERR(ctx->idle)) {
@@ -428,7 +429,10 @@ static int crm_hps_clk_init(struct platform_device *pdev)
 	hws[X5_CODEC_NOC_CLK] = drobot_clk_register_generator_flags_no_idle("codec_noc_clk", soc_gen_src_sels, ARRAY_SIZE(soc_gen_src_sels), base + HPS_CLK_GEN + 0x40, CLK_IS_CRITICAL);
 	hws[X5_GPU_NOC_CLK] = drobot_clk_register_generator_flags_no_idle("gpu_noc_clk", soc_gen_src_sels, ARRAY_SIZE(soc_gen_src_sels), base + HPS_CLK_GEN + 0x60, CLK_IS_CRITICAL);
 	hws[X5_ROM_ACLK] = drobot_clk_register_generator_flags_no_idle("rom_aclk", soc_gen_src_sels, ARRAY_SIZE(soc_gen_src_sels), base + HPS_CLK_GEN + 0x80, CLK_IS_CRITICAL);
-	hws[X5_TOP_APB_CLK] = drobot_clk_register_generator_flags_no_idle("top_apb_clk", apb_gen_src_sels, ARRAY_SIZE(apb_gen_src_sels), base + HPS_CLK_GEN + 0xA0, CLK_IS_CRITICAL);
+	if (qspi_boot)
+		hws[X5_TOP_APB_CLK] = drobot_clk_register_generator_flags_no_idle("top_apb_clk", qspi_apb_gen_src_sels, ARRAY_SIZE(qspi_apb_gen_src_sels), base + HPS_CLK_GEN + 0xA0, CLK_IS_CRITICAL);
+	else
+		hws[X5_TOP_APB_CLK] = drobot_clk_register_generator_flags_no_idle("top_apb_clk", apb_gen_src_sels, ARRAY_SIZE(apb_gen_src_sels), base + HPS_CLK_GEN + 0xA0, CLK_IS_CRITICAL);
 
 	hws[X5_WDT_PCLK] = drobot_clk_hw_register_gate_no_idle("wdt_pclk", "top_apb_clk", base + TOP_CLK_ENB, 4, 0);
 	hws[X5_DMA_PCLK] = drobot_clk_hw_register_gate_no_idle("dma_pclk", "top_apb_clk", base + TOP_CLK_ENB, 5, 0);
@@ -535,7 +539,11 @@ static int crm_hps_clk_init(struct platform_device *pdev)
  	hws[X5_VIDEO_CODEC_PCLK] = drobot_clk_hw_register_gate_no_idle("codec_pclk", "top_apb_clk", base + HPS_MIX_CLK_ENB, 29, 0);
 	hws[X5_VIDEO_NOC_PCLK] = drobot_clk_hw_register_gate_no_idle("video_noc_pclk", "top_apb_clk", base + HPS_MIX_CLK_ENB, 30, CLK_IS_CRITICAL);
 
-	hws[X5_HSIO_QSPI_BUS_CLK] = drobot_clk_register_gen_no_flags("qspi_bus_clk", apb_gen_src_sels, ARRAY_SIZE(apb_gen_src_sels), base + HPS_CLK_GEN + 0x660, ctx->idle, ISO_CG_QSPI_AXIS);
+	if (qspi_boot)
+		hws[X5_HSIO_QSPI_BUS_CLK] = drobot_clk_register_gen_no_flags("qspi_bus_clk", qspi_apb_gen_src_sels, ARRAY_SIZE(qspi_apb_gen_src_sels), base + HPS_CLK_GEN + 0x660, ctx->idle, ISO_CG_QSPI_AXIS);
+	else
+		hws[X5_HSIO_QSPI_BUS_CLK] = drobot_clk_register_gen_no_flags("qspi_bus_clk", apb_gen_src_sels, ARRAY_SIZE(apb_gen_src_sels), base + HPS_CLK_GEN + 0x660, ctx->idle, ISO_CG_QSPI_AXIS);
+
 	hws[X5_HSIO_QSPI_CORE_CLK] = drobot_clk_register_gen_no_flags("qspi_core_clk", apb_gen_src_sels, ARRAY_SIZE(apb_gen_src_sels), base + HPS_CLK_GEN + 0x680, ctx->idle, ISO_CG_QSPI_AXIS);
 
 	hws[X5_HSIO_ENET_AXI_CLK] = drobot_clk_register_gen_no_flags("enet_axi_clk", soc_gen_src_sels, ARRAY_SIZE(soc_gen_src_sels), base + HPS_CLK_GEN + 0x6A0, ctx->idle, ISO_CG_GMAC);
@@ -648,7 +656,14 @@ static int crm_hps_clk_init(struct platform_device *pdev)
 		clk_set_rate(hws[X5_CPU_SCLK]->clk, 1200000000);
 	} else {
 		clk_set_rate(hws[X5_CPU_SCLK]->clk, 1200000000);
-		// clk_set_rate(hws[X5_CPU_PLL_P]->clk, 1800000000);
+	}
+
+	if (qspi_boot) {
+		clk_set_rate(hws[X5_TOP_APB_CLK]->clk, 100000000);
+		clk_set_rate(hws[X5_HSIO_QSPI_BUS_CLK]->clk, 100000000);
+	} else {
+		clk_set_rate(hws[X5_TOP_APB_CLK]->clk, 200000000);
+		clk_set_rate(hws[X5_HSIO_QSPI_BUS_CLK]->clk, 200000000);
 	}
 
 	ret = devm_of_clk_add_hw_provider(dev, of_clk_hw_onecell_get, &ctx->clk_hw_data);
