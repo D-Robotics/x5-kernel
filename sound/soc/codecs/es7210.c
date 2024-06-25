@@ -2718,7 +2718,8 @@ static int es7210_i2c_probe(struct i2c_client *i2c,
 
 static void es7210_i2c_remove(struct i2c_client *i2c)
 {
-	kfree(i2c_get_clientdata(i2c));
+	sysfs_remove_group(&i2c->dev.kobj, &es7210_debug_attr_group);
+	snd_soc_unregister_component(&i2c->dev);
 }
 
 #if !ES7210_MATCH_DTS_EN

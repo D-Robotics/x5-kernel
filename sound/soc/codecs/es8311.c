@@ -1321,6 +1321,11 @@ static int es8311_i2c_probe(struct i2c_client *i2c_client,
 	return ret;
 }
 
+static void es8311_i2c_remove(struct i2c_client *i2c) {
+	sysfs_remove_group(&i2c->dev.kobj, &es8311_debug_attr_group);
+	snd_soc_unregister_component(&i2c->dev);
+}
+
 static const struct i2c_device_id es8311_i2c_id[] = {
 	{"es8311", 0 },
 	{ }
@@ -1335,6 +1340,7 @@ static struct i2c_driver es8311_i2c_driver = {
 	},
 	.shutdown = es8311_i2c_shutdown,
 	.probe = es8311_i2c_probe,
+	.remove = es8311_i2c_remove,
 	.id_table	= es8311_i2c_id,
 };
 
