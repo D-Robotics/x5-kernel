@@ -225,6 +225,28 @@
 		goodix,driver-send-cfg = <1>;
 		goodix,int-sync = <1>;
 	};
+
+	lt8618: lt8618@3b{
+		status = "okay";
+		compatible = "lontium,lt8618";
+		reg = <0x3b>;
+		pinctrl-names = "default";
+ 		//LSIO_GPIO1_PIN13
+		pinctrl-0 = <&lsio_gpio1_13>;
+		reset-gpios = <&ls_gpio1_porta 13 GPIO_ACTIVE_LOW>;
+		ports {
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			port@0 {
+				reg = <0>;
+				hdmi_bridge_in_4k: endpoint {
+					remote-endpoint =
+						<&bt1120_bridge_out>;
+				};
+			};
+		};
+	};
 };
 
 &i2c7 {
@@ -561,9 +583,16 @@
 
 /*For boards that do not need display module,
 the following ports need to be deleted*/
+
+/*EVB V2 has one bt1120 to hdmi bridge*/
 &bt1120_bridge {
 	ports {
-		/delete-node/ port@1;
+		port@1 {
+			reg = <1>;
+			bt1120_bridge_out: endpoint {
+				remote-endpoint = <&hdmi_bridge_in_4k>;
+			};
+		};
 	};
 };
 

@@ -34,6 +34,7 @@ obj-$(CONFIG_DRM_TI_TFP410) += ti-tfp410.o
 obj-$(CONFIG_DRM_TI_TPD12S015) += ti-tpd12s015.o
 obj-$(CONFIG_DRM_NWL_MIPI_DSI) += nwl-dsi.o
 obj-$(CONFIG_DRM_ITE_IT66121) += ite-it66121.o
+obj-$(CONFIG_DRM_LONTIUM_LT8618) += lontium-lt8618.o
 
 obj-y += analogix/
 obj-y += cadence/
