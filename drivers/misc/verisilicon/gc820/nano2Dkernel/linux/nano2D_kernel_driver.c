@@ -1178,9 +1178,6 @@ static int do_csc(struct vio_node *vnode, struct n2d_config *config)
 	N2D_ON_ERROR(n2d_blit(&dst, N2D_NULL, &src, N2D_NULL, N2D_BLEND_NONE));
 	N2D_ON_ERROR(n2d_commit());
 
-	vio_frame_done(vnode->ich_subdev[0]);
-	vio_frame_done(vnode->och_subdev[0]);
-
 on_error:
 	n2d_free(&src);
 	n2d_free(&dst);
@@ -1298,11 +1295,9 @@ static int do_stitch(struct vio_node *vnode, struct n2d_config *config)
 on_error:
 	for (i = 0; i < srcNum; i++) {
 		n2d_free(&src[i]);
-		vio_frame_done(vnode->ich_subdev[i]);
 	}
 
 	n2d_free(&dst);
-	vio_frame_done(vnode->och_subdev[0]);
 
 	return error;
 }
@@ -1371,10 +1366,6 @@ static int do_overlay(struct vio_node *vnode, struct n2d_config *config)
 	N2D_ON_ERROR(n2d_blit(&dst, &rect, &src1, N2D_NULL, N2D_BLEND_NONE));
 	N2D_ON_ERROR(n2d_commit());
 
-    vio_frame_done(vnode->ich_subdev[0]);
-	vio_frame_done(vnode->ich_subdev[1]);
-	vio_frame_done(vnode->och_subdev[0]);
-
 on_error:
 	n2d_free(&src);
 	n2d_free(&src1);
@@ -1430,9 +1421,6 @@ static int do_scale(struct vio_node *vnode, struct n2d_config *config)
 
 	N2D_ON_ERROR(n2d_blit(&dst, N2D_NULL, &src, N2D_NULL, N2D_BLEND_NONE));
 	N2D_ON_ERROR(n2d_commit());
-
-	vio_frame_done(vnode->ich_subdev[0]);
-	vio_frame_done(vnode->och_subdev[0]);
 
 on_error:
 	n2d_free(&src);
@@ -1615,10 +1603,13 @@ static void n2d_frame_work(struct vio_node *vnode)
 		goto err;
 	}
 
+	for (j = 0; j < i; j++) /* shall transfer frame to complete */
+		vio_frame_done(vnode->ich_subdev[j]);
+
 	vdev = vnode->ich_subdev[0];
 	if (!osal_test_bit((s32)VIO_SUBDEV_BIND_DONE, &vdev->state) && !osal_test_bit((s32)VIO_SUBDEV_BIND_DONE, &och_vdev->state)) {
 		vio_info("[S%d][C%d] %s feedback mode.\n", vnode->flow_id, vnode->ctx_id, __func__);
-		for (j = 0; j < i; j++) {
+		for (j = 0; j < i; j++) { /* transfer frame to used */
 			vdev = vnode->ich_subdev[j];
 			framemgr = &vdev->framemgr;
 			vio_e_barrier_irqs(framemgr, flags);
@@ -1627,6 +1618,8 @@ static void n2d_frame_work(struct vio_node *vnode)
 			vio_x_barrier_irqr(framemgr, flags);
 		}
 	}
+
+	vio_frame_done(vnode->och_subdev[0]);
 
 	vio_set_hw_free(vnode);
 
