@@ -240,7 +240,9 @@ n2d_error_t n2d_kernel_os_vidmem_export(n2d_os_t *os, n2d_vidmem_node_t *node, n
 n2d_error_t n2d_kernel_os_get_physical_from_handle(n2d_uint64_t handle, n2d_size_t offset,
 						   n2d_uint32_t flag, n2d_uint64_t *physical_addr);
 
-n2d_error_t n2d_kernel_os_cpu_to_gpu_phy(n2d_os_t *os, n2d_uint64_t cpu_phy, n2d_uint64_t *gpu_phy);
+n2d_error_t n2d_kernel_os_cpu_to_gpu_phy(n2d_os_t *os, n2d_uint64_t cpu_phy, uint32_t size, n2d_uint64_t *gpu_phy);
+
+n2d_error_t n2d_kernel_os_iova_to_gpu_phy(n2d_os_t *os, n2d_uint64_t cpu_phy, uint32_t size, n2d_uint64_t *gpu_phy);
 
 n2d_error_t n2d_kernel_os_gpu_to_cpu_phy(n2d_os_t *os, n2d_uint64_t gpu_phy, n2d_uint64_t *cpu_phy);
 

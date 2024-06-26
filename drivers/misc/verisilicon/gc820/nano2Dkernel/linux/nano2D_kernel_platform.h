@@ -226,7 +226,7 @@ typedef struct n2d_linux_operations {
 	**  different.
 	*/
 	n2d_error_t (*get_gpu_physical)(IN n2d_linux_platform_t *Platform,
-					IN n2d_uint64_t CPUPhysical, OUT n2d_uint64_t *GPUPhysical);
+					IN n2d_uint64_t CPUPhysical, IN n2d_uint32_t size, n2d_uint64_t *GPUPhysical);
 
 	/*******************************************************************************
 	**
