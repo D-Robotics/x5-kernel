@@ -448,6 +448,8 @@
 
 &sdio_0 {
 	status = "okay";
+	no-1-8-v;
+
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_sd>;
 	max-frequency = <50000000>;
