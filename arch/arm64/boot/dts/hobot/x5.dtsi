@@ -2027,11 +2027,11 @@
 			power-domains = <&power X5_GPU>;
 			consumer-dev = <&gc8000>;
 
-			clocks-num = <6>;
-			clocks = <&hpsclks X5_GPU_PCLK>, <&hpsclks X5_GPU_GC8000L_ACLK>, <&hpsclks X5_GPU_GC8000L_CLK>,<&hpsclks X5_GPU_PCLK>, <&hpsclks X5_GPU_GC820_ACLK>, <&hpsclks X5_GPU_GC820_CLK>;
-			clock-names = "pclk", "aclk", "clk","pclk1", "aclk1", "clk1";
-			/* To do because GPU CLKs is not ready*/
-			status = "disabled";
+			clocks-num = <3>;
+			clocks = <&hpsclks X5_GPU_PCLK>, <&hpsclks X5_GPU_GC8000L_CLK>, <&hpsclks X5_GPU_GC820_CLK>;
+			clock-names = "gpu_pclk", "gpu3d_clk", "gpu2d_clk";
+
+			status = "okay";
 			ports-num = <2>;
 			ports-off = <0x0008 0x0088>;
 		};
@@ -2072,11 +2072,11 @@
 			power-domains = <&power X5_GPU>;
 			consumer-dev = <&gc820>;
 
-			clocks-num = <6>;
-			clocks = <&hpsclks X5_GPU_PCLK>, <&hpsclks X5_GPU_GC8000L_ACLK>, <&hpsclks X5_GPU_GC8000L_CLK>,<&hpsclks X5_GPU_PCLK>, <&hpsclks X5_GPU_GC820_ACLK>, <&hpsclks X5_GPU_GC820_CLK>;
-			clock-names = "pclk", "aclk", "clk","pclk1", "aclk1", "clk1";
-			/* To do because GPU CLKs is not ready*/
-			status = "disabled";
+			clocks-num = <2>;
+			clocks = <&hpsclks X5_GPU_PCLK>, <&hpsclks X5_GPU_GC820_CLK>;
+			clock-names = "gpu_pclk", "gpu2d_clk";
+
+			status = "okay";
 			ports-num = <1>;
 			ports-off = <0x0008>;
 		};
