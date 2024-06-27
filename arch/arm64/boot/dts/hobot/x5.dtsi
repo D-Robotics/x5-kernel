@@ -727,6 +727,21 @@
 			};
 		};
 
+		noc_qos: noc_qos {
+			compatible = "d-robotics,noc_qos";
+			status = "okay";
+			reg = <0x20500000 0x300>,
+				  <0x20510000 0x900>,
+				  <0x20520000 0x200>,
+				  <0x20530000 0x200>,
+				  <0x20540000 0x300>,
+				  <0x20550000 0x600>,
+				  <0x20560000 0x200>;
+
+			qos-num = <7>;
+			qos-names = "cpu", "vin", "bpu", "codec", "gpu", "hsio", "hifi5";
+		};
+
 		axi_mon: axi-mon@38100000 {
 			compatible = "d-robotics,axi-monitor";
 			status = "okay";
@@ -786,21 +801,6 @@
 			status = "okay";
 		};
 
-		video_qos: video_qos@20530000 {
-			compatible = "d-robotics,noc_qos";
-			reg = <0x20530000 0x80>;
-			power-domains = <&power X5_VIDEO>;
-			consumer-dev = <&vpu>;
-
-			clocks-num = <1>;
-			clocks =<&hpsclks X5_VIDEO_CODEC_CCLK>;
-			clock-names = "codec_cclk";
-
-			status = "okay";
-			ports-num = <1>;
-			ports-off = <0x0008>;
-		};
-
 		vpu: vpu@3B000000 {
 			compatible = "cm, vpu";
 			reg = <0x3b000000 0x10000>;
@@ -828,21 +828,6 @@
 			#iommu-cells = <0>;
 			power-domains = <&power X5_VIDEO>;
 			status = "okay";
-		};
-
-		jpeg_qos: jpeg_qos@20530080 {
-			compatible = "d-robotics,noc_qos";
-			reg = <0x20530080 0x80>;
-			power-domains = <&power X5_VIDEO>;
-			consumer-dev = <&jpu>;
-
-			clocks-num = <1>;
-			clocks = <&hpsclks X5_VIDEO_JPEG_CCLK>;
-			clock-names = "jpeg_cclk";
-
-			status = "okay";
-			ports-num = <1>;
-			ports-off = <0x0008>;
 		};
 
 		jpu: jpu@3B010000 {
@@ -930,19 +915,6 @@
 				#iommu-cells = <0>;
 				power-domains = <&power X5_ISP>;
 				status = "okay";
-			};
-
-			isp_qos: isp_qos@20510280 {
-				compatible = "d-robotics,noc_qos";
-				reg = <0x20510280 0x280>;
-				power-domains = <&power X5_ISP>;
-				consumer-dev = <&isp>;
-
-				clocks-num = <0>;
-
-				status = "okay";
-				ports-num = <4>;
-				ports-off = <0x0008 0x0088 0x108 0x208>;
 			};
 
 			isp: isp@3d000000 {
@@ -2022,21 +1994,6 @@
 
 		/* Sunrise5 gpu subsystem */
 
-		gpu3d_qos: gpu3d_qos@20540080 {
-			compatible = "d-robotics,noc_qos";
-			reg = <0x20540080 0x100>;
-			power-domains = <&power X5_GPU>;
-			consumer-dev = <&gc8000>;
-
-			clocks-num = <6>;
-			clocks = <&hpsclks X5_GPU_PCLK>, <&hpsclks X5_GPU_GC8000L_ACLK>, <&hpsclks X5_GPU_GC8000L_CLK>,<&hpsclks X5_GPU_PCLK>, <&hpsclks X5_GPU_GC820_ACLK>, <&hpsclks X5_GPU_GC820_CLK>;
-			clock-names = "pclk", "aclk", "clk","pclk1", "aclk1", "clk1";
-			/* To do because GPU CLKs is not ready*/
-			status = "disabled";
-			ports-num = <2>;
-			ports-off = <0x0008 0x0088>;
-		};
-
 		gc8000: gc8000@3c000000 {
 			compatible = "verisilicon,galcore";
 			reg = <0x3c000000 0x10000>;
@@ -2067,21 +2024,6 @@
 			status = "okay";
 		};
 
-		gpu2d_qos: gpu2d_qos@20540000 {
-			compatible = "d-robotics,noc_qos";
-			reg = <0x20540000 0x80>;
-			power-domains = <&power X5_GPU>;
-			consumer-dev = <&gc820>;
-
-			clocks-num = <6>;
-			clocks = <&hpsclks X5_GPU_PCLK>, <&hpsclks X5_GPU_GC8000L_ACLK>, <&hpsclks X5_GPU_GC8000L_CLK>,<&hpsclks X5_GPU_PCLK>, <&hpsclks X5_GPU_GC820_ACLK>, <&hpsclks X5_GPU_GC820_CLK>;
-			clock-names = "pclk", "aclk", "clk","pclk1", "aclk1", "clk1";
-			/* To do because GPU CLKs is not ready*/
-			status = "disabled";
-			ports-num = <1>;
-			ports-off = <0x0008>;
-		};
-
 		gc820: gc820@3c010000 {
 			compatible = "verisilicon,gc820";
 			reg = <0x3c010000 0x10000>;
@@ -2110,19 +2052,6 @@
 			#iommu-cells = <0>;
 			power-domains = <&power X5_BPU>;
 			status = "okay";
-		};
-
-		bpu_qos: bpu_qos@20520000 {
-			compatible = "d-robotics,noc_qos";
-			reg = <0x20520000 0x80>;
-			power-domains = <&power X5_BPU>;
-			consumer-dev = <&bpu>;
-
-			clocks-num = <0>;
-
-			status = "okay";
-			ports-num = <1>;
-			ports-off = <0x0008>;
 		};
 
 		bpu: bpu@3a000000 {
@@ -2574,164 +2503,6 @@
 			};
 		};
 
-		cpu_qos: cpu_qos@20500000 {
-			compatible = "d-robotics,noc_qos";
-			reg = <0x20500000 0x200>;
-			clocks-num = <0>;
-			status = "okay";
-			ports-num = <3>;
-			ports-off = <0x0008 0x0088 0x0108>;
-		};
-
-		bt1120_qos: bt1120_qos@20510000 {
-			compatible = "d-robotics,noc_qos";
-			reg = <0x20510000 0x80>;
-			clocks-num = <1>;
-			clocks = <&hpsclks X5_DISP_BT1120_ACLK>;
-			clock-names = "bt1120_aclk";
-			status = "okay";
-			ports-num = <1>;
-			ports-off = <0x0008>;
-		};
-
-		dc8000_qos: dc8000_qos@20510080 {
-			compatible = "d-robotics,noc_qos";
-			reg = <0x20510080 0x80>;
-			clocks-num = <1>;
-			clocks = <&hpsclks X5_DISP_DC8000_ACLK>;
-			clock-names = "dc8000_aclk";
-			status = "okay";
-			ports-num = <1>;
-			ports-off = <0x0008>;
-		};
-
-		dw230_qos: dw230_qos@20510100 {
-			compatible = "d-robotics,noc_qos";
-			reg = <0x20510100 0x180>;
-			clocks-num = <2>;
-			clocks =<&hpsclks X5_CAM_VSE_AXI_CLK>,
-					<&hpsclks X5_CAM_DEWARP_AXI_CLK>;
-			clock-names ="vse_axi_clk", "dewarp_axi_clk";
-			status = "okay";
-			ports-num = <3>;
-			ports-off = <0x0008 0x0088 0x0108>;
-		};
-
-		sif_qos: sif_qos@20510500 {
-			compatible = "d-robotics,noc_qos";
-			reg = <0x20510500 0x200>;
-			clocks-num = <1>;
-			clocks = <&hpsclks X5_CAM_SIF_AXI_CLK>;
-			clock-names = "axi_clk";
-			status = "okay";
-			ports-num = <4>;
-			ports-off = <0x0008 0x0088 0x0108 0x0188>;
-		};
-
-		sif_disp_qos: sif_disp_qos@20510700 {
-			compatible = "d-robotics,noc_qos";
-			reg = <0x20510700 0x80>;
-			clocks-num = <1>;
-			clocks = <&hpsclks X5_DISP_SIF_ACLK>;
-			clock-names = "sif_aclk";
-			status = "okay";
-			ports-num = <1>;
-			ports-off = <0x0008>;
-		};
-
-		dma0_qos: dma0_qos@20550000 {
-			compatible = "d-robotics,noc_qos";
-			reg = <0x20550000 0x80>;
-			clocks-num = <1>;
-			clocks = <&hpsclks X5_HPS_DMA_AXI_CLK>;
-			clock-names = "axi_clk";
-			status = "okay";
-			ports-num = <1>;
-			ports-off = <0x0008>;
-		};
-
-		emmc_qos: emmc_qos@20550080 {
-			compatible = "d-robotics,noc_qos";
-			reg = <0x20550080 0x80>;
-			clocks-num = <1>;
-			clocks =<&hpsclks X5_HSIO_EMMC_ACLK>;
-			clock-names ="emmc_aclk";
-			status = "okay";
-			ports-num = <1>;
-			ports-off = <0x0008>;
-		};
-
-		gmac_qos: gmac_qos@20550100 {
-			compatible = "d-robotics,noc_qos";
-			reg = <0x20550100 0x80>;
-			dma-coherent;
-			clocks-num = <0>;
-			status = "okay";
-			ports-num = <1>;
-			ports-off = <0x0008>;
-		};
-
-		sd_qos: sd_qos@20550180 {
-			compatible = "d-robotics,noc_qos";
-			reg = <0x20550180 0x80>;
-			clocks-num = <1>;
-			clocks =<&hpsclks X5_HSIO_SDIO0_ACLK>;
-			clock-names = "sdio0_aclk";
-			status = "okay";
-			ports-num = <1>;
-			ports-off = <0x0008>;
-		};
-
-		sdio_qos: sdio_qos@20550200 {
-			compatible = "d-robotics,noc_qos";
-			reg = <0x20550200 0x80>;
-			clocks-num = <1>;
-			clocks =<&hpsclks X5_HSIO_SDIO1_ACLK>;
-			clock-names = "sdio1_aclk";
-			status = "okay";
-			ports-num = <1>;
-			ports-off = <0x0008>;
-		};
-
-		security_qos: security_qos@20550280 {
-			compatible = "d-robotics,noc_qos";
-			reg = <0x20550280 0x80>;
-			clocks-num = <0>;
-			status = "okay";
-			ports-num = <1>;
-			ports-off = <0x0008>;
-		};
-
-		usb2_qos: usb2_qos@20550300 {
-			compatible = "d-robotics,noc_qos";
-			reg = <0x20550300 0x80>;
-			clocks-num = <1>;
-			clocks = <&hpsclks X5_HSIO_USB2_AXI_CLK>;
-			clock-names = "axi_clk";
-			status = "okay";
-			ports-num = <1>;
-			ports-off = <0x0008>;
-		};
-
-		usb3_qos: usb3_qos@20550380 {
-			compatible = "d-robotics,noc_qos";
-			reg = <0x20550380 0x80>;
-			clocks-num = <1>;
-			clocks = <&hpsclks X5_HSIO_USB3_AXI_CLK>;
-			clock-names = "axi_clk";
-			status = "okay";
-			ports-num = <1>;
-			ports-off = <0x0008>;
-		};
-
-		etr_qos: etr_qos@20550400 {
-			compatible = "d-robotics,noc_qos";
-			reg = <0x20550400 0x80>;
-			clocks-num = <0>;
-			status = "okay";
-			ports-num = <1>;
-			ports-off = <0x0008>;
-		};
 
 		/* Sunrise5 high-speed I/O subsystem */
 		hsio_apb {
@@ -3375,27 +3146,6 @@
 				clock-frequency = <24000000>;
 				clock-output-names = "audio_externel";
 			};
-		};
-
-		dsp_qos: dsp_qos@20560080 {
-			compatible = "d-robotics,noc_qos";
-			reg = <0x20560080 0x80>;
-			//power-domains = <&power X5_DSP>;
-			//consumer-dev = <&bpu>;
-			status = "disabled";
-			ports-num = <1>;
-			ports-off = <0x0008>;
-		};
-
-		hifi5_qos: hifi5_qos@20560000 {
-			compatible = "d-robotics,noc_qos";
-			reg = <0x20560000 0x80>;
-			power-domains = <&power X5_DSP_HIFI5>;
-			consumer-dev = <&remoteproc_hifi5>;
-			clocks-num = <0>;
-			status = "okay";
-			ports-num = <1>;
-			ports-off = <0x0008>;
 		};
 
 		remoteproc_hifi5: remoteproc_hifi5 {
