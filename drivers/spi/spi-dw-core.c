@@ -271,6 +271,8 @@ static irqreturn_t dw_spi_irq(int irq, void *dev_id)
 static u32 dw_spi_prepare_cr0(struct dw_spi *dws, struct spi_device *spi)
 {
 	u32 cr0 = 0;
+	u32 current_cr0 = 0;
+	bool enabled = false;
 
 	if (dw_spi_ip_is(dws, PSSI)) {
 		/* CTRLR0[ 5: 4] Frame Format */
@@ -314,6 +316,25 @@ static u32 dw_spi_prepare_cr0(struct dw_spi *dws, struct spi_device *spi)
 			} else {
 				cr0 |= DW_HSSI_CTRLR0_MST;
 			}
+		}
+
+		/* SCPOL should be configured before CS is asserted to prevent
+		 * clk polarity change after CS is asserted which will
+		 * cause erroneous bit transfer.
+		 */
+		current_cr0 = dw_readl(dws, DW_SPI_CTRLR0);
+		if ((cr0 & DW_HSSI_CTRLR0_SCPOL) != (current_cr0 & DW_HSSI_CTRLR0_SCPOL)) {
+			enabled = (dw_readl(dws, DW_SPI_SSIENR) & BIT(0));
+			if (cr0 & DW_HSSI_CTRLR0_SCPOL)
+				current_cr0 |= DW_HSSI_CTRLR0_SCPOL;
+			else
+				current_cr0 &= ~DW_HSSI_CTRLR0_SCPOL;
+
+			if(enabled)
+				dw_spi_enable_chip(dws, 0);
+			dw_writel(dws, DW_SPI_CTRLR0, current_cr0);
+			if(enabled)
+			dw_spi_enable_chip(dws, 1);
 		}
 	}
 
