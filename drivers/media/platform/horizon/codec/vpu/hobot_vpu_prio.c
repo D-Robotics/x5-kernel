@@ -18,6 +18,8 @@
 //coverity[HIS_metric_violation:SUPPRESS]
 static int32_t vpu_prio_check_and_run(hb_vpu_prio_queue_t *vpq, hb_vpu_prio_cmd_data_t *prio_cmd, uint32_t prio)
 {
+	hb_vpu_filp_list_t *vpq_filp, *n;
+	uint32_t in_list = 0;
 	hb_vpu_dev_t *dev;
 
 	if (vpq == NULL || prio_cmd == NULL || vpq->dev == NULL) {
@@ -29,13 +31,27 @@ static int32_t vpu_prio_check_and_run(hb_vpu_prio_queue_t *vpq, hb_vpu_prio_cmd_
 	dev = vpq->dev;
 
 	if (osal_fifo_out_spinlocked(&(vpq->prio_fifo[prio]), prio_cmd,
-		(uint32_t)sizeof(hb_vpu_prio_cmd_data_t), &vpq->vpu_prio_lock) > 0U) {
-		osal_spin_lock(&vpq->vpu_prio_lock);
-		vpq->prio_done_flags[prio_cmd->priority][prio_cmd->inst_idx] = 1;
-		osal_spin_unlock(&vpq->vpu_prio_lock);
-		VPU_INFO_DEV(dev->device, "wakeup prio:%d, inst:%d\n",
-			prio_cmd->priority, prio_cmd->inst_idx);
-		osal_wake_up(&vpq->cmd_wait_q[prio_cmd->priority]);
+			(uint32_t)sizeof(hb_vpu_prio_cmd_data_t), &vpq->vpu_prio_lock) > 0U) {
+		//coverity[misra_c_2012_rule_18_4_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
+		//coverity[misra_c_2012_rule_11_5_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
+		//coverity[misra_c_2012_rule_20_7_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
+		osal_list_for_each_entry_safe(vpq_filp, n, &vpq->vpq_filp_head, list) {
+			if (vpq_filp->filp == prio_cmd->filp) {
+				in_list = 1;
+				break;
+			}
+		}
+		if (in_list != 0U) {
+			osal_spin_lock(&vpq->vpu_prio_lock);
+			vpq->prio_done_flags[prio_cmd->priority][prio_cmd->inst_idx] = 1;
+			osal_spin_unlock(&vpq->vpu_prio_lock);
+			VPU_INFO_DEV(dev->device, "wakeup prio:%d, inst:%d\n",
+				prio_cmd->priority, prio_cmd->inst_idx);
+			osal_wake_up(&vpq->cmd_wait_q[prio_cmd->priority]);
+		} else {
+			VPU_INFO_DEV(dev->device, "The command host process has quit, priority=%d, filp=%p.\n",
+				prio_cmd->priority, prio_cmd->filp);
+		}
 	} else {
 		VPU_INFO_DEV(dev->device, "Kfifo out prio: %d command failed.\n", prio);
 	}
@@ -62,7 +78,6 @@ int32_t vpu_prio_set_command_to_fw(hb_vpu_prio_queue_t *vpq)
 		if (osal_fifo_is_empty(&vpq->prio_fifo[i]) != 0) {
 			continue;
 		} else {
-			VPU_INFO_DEV(dev->device, "find prio %d.\n", i);
 			ret = vpu_prio_check_and_run(vpq, &prio_cmd, (uint32_t)i);
 			if (ret != 0) {
 				VPU_INFO_DEV(dev->device, "vpu_prio_check_and_run failed, ret=%d.\n", ret);
@@ -85,7 +100,7 @@ int32_t vpu_prio_set_enc_dec_pic(struct file *filp, void *vpu, u_long arg)
 	hb_vpu_dev_t *dev = (hb_vpu_dev_t *)vpu;
 
 	if (dev == NULL || filp == NULL) {
-		VPU_ERR("Invalid vpu device(%pK) or filp(%pK)\n", dev, filp);
+		VPU_ERR("Invalid vpu device(%p) or filp(%p)\n", dev, filp);
 		return -EINVAL;
 	}
 	//coverity[misra_c_2012_rule_11_6_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
@@ -106,7 +121,7 @@ int32_t vpu_prio_set_enc_dec_pic(struct file *filp, void *vpu, u_long arg)
 		prio_cmd.inst_idx = enc_cmd.inst_idx;
 		prio_cmd.priority = enc_cmd.priority;
 		vpq = dev->prio_queue;
-		VPU_INFO_DEV(dev->device, "enc_cmd.inst_idx %d, enc_cmd.priority %d.\n", enc_cmd.inst_idx, enc_cmd.priority);
+
 		if (osal_fifo_is_full(&vpq->prio_fifo[prio_cmd.priority]) != (bool)0) {
 			VPU_INFO_DEV(dev->device, "Prio command fifo is full, prio=%d, inst_idx=%d.\n",
 				prio_cmd.priority, prio_cmd.inst_idx);
@@ -122,7 +137,7 @@ int32_t vpu_prio_set_enc_dec_pic(struct file *filp, void *vpu, u_long arg)
 	//coverity[misra_c_2012_rule_10_1_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
 	//coverity[misra_c_2012_rule_10_3_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
 	ret = (int32_t)osal_wait_event_interruptible_timeout(vpq->cmd_wait_q[prio_cmd.priority],
-		vpq->prio_done_flags[prio_cmd.priority][prio_cmd.inst_idx] == 1U, msecs_to_jiffies(30));
+		vpq->prio_done_flags[prio_cmd.priority][prio_cmd.inst_idx] == 1U, msecs_to_jiffies(5000));
 	if (ret == 0) {
 		VPU_INFO_DEV(dev->device, "Wait cmd finish timeout, prio=%d, inst_idx=%d.\n",
 				prio_cmd.priority, prio_cmd.inst_idx);
@@ -131,22 +146,6 @@ int32_t vpu_prio_set_enc_dec_pic(struct file *filp, void *vpu, u_long arg)
 	}
 
 	vpq->prio_done_flags[prio_cmd.priority][prio_cmd.inst_idx] = 0;
-
-	return 0;
-}
-
-int32_t vpu_prio_reset_fifo(void *vpu, int32_t inst_idx)
-{
-	hb_vpu_dev_t *dev = (hb_vpu_dev_t *)vpu;
-	hb_vpu_prio_queue_t *vpq = NULL;
-
-	if (dev == NULL) {
-		VPU_ERR("Invalid vpu device(%pK)\n", dev);
-		return -EINVAL;
-	}
-
-	vpq = dev->prio_queue;
-	osal_fifo_reset(&(vpq->prio_fifo[inst_idx]));
 
 	return 0;
 }
@@ -242,5 +241,5 @@ void vpu_prio_deinit(void *vpu)
 		osal_fifo_free(&vpq->prio_fifo[i]);
 	}
 
-	return;
+	osal_kfree(vpq);
 }
