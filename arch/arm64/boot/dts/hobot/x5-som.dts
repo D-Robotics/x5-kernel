@@ -504,18 +504,3 @@
 &bpu {
 	cnn-supply = <&vdd08_bpu_1_reg>;
 };
-
-/*For boards that do not need display module,
-the following ports need to be deleted*/
-
-&mipi_dsi0 {
-	ports {
-		/delete-node/ port@1;
-	};
-};
-
-&bt1120_bridge {
-	ports {
-		/delete-node/ port@1;
-	};
-};
