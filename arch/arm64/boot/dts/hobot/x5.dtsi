@@ -369,7 +369,6 @@
 			next-level-cache = <&cpu_0_l2>;
 			cpu-idle-states = <&CPU_IDLE>;
 			clocks = <&hpsclks X5_CPU_CORE_CLK>;
-			cpu-supply = <&vdd08_cpu_reg>;
 			#cooling-cells = <2>;
 		};
 
@@ -391,7 +390,6 @@
 			next-level-cache = <&cpu_1_l2>;
 			cpu-idle-states = <&CPU_IDLE>;
 			clocks = <&hpsclks X5_CPU_CORE_CLK>;
-			cpu-supply = <&vdd08_cpu_reg>;
 			#cooling-cells = <2>;
 		};
 
@@ -413,7 +411,6 @@
 			next-level-cache = <&cpu_2_l2>;
 			cpu-idle-states = <&CPU_IDLE>;
 			clocks = <&hpsclks X5_CPU_CORE_CLK>;
-			cpu-supply = <&vdd08_cpu_reg>;
 			#cooling-cells = <2>;
 		};
 
@@ -435,7 +432,6 @@
 			next-level-cache = <&cpu_3_l2>;
 			cpu-idle-states = <&CPU_IDLE>;
 			clocks = <&hpsclks X5_CPU_CORE_CLK>;
-			cpu-supply = <&vdd08_cpu_reg>;
 			#cooling-cells = <2>;
 		};
 
@@ -457,7 +453,6 @@
 			next-level-cache = <&cpu_4_l2>;
 			cpu-idle-states = <&CPU_IDLE>;
 			clocks = <&hpsclks X5_CPU_CORE_CLK>;
-			cpu-supply = <&vdd08_cpu_reg>;
 			#cooling-cells = <2>;
 		};
 
@@ -479,7 +474,6 @@
 			next-level-cache = <&cpu_5_l2>;
 			cpu-idle-states = <&CPU_IDLE>;
 			clocks = <&hpsclks X5_CPU_CORE_CLK>;
-			cpu-supply = <&vdd08_cpu_reg>;
 			#cooling-cells = <2>; /* min followed by max */
 		};
 
@@ -501,7 +495,6 @@
 			next-level-cache = <&cpu_6_l2>;
 			cpu-idle-states = <&CPU_IDLE>;
 			clocks = <&hpsclks X5_CPU_CORE_CLK>;
-			cpu-supply = <&vdd08_cpu_reg>;
 			#cooling-cells = <2>;
 		};
 
@@ -523,7 +516,6 @@
 			next-level-cache = <&cpu_7_l2>;
 			cpu-idle-states = <&CPU_IDLE>;
 			clocks = <&hpsclks X5_CPU_CORE_CLK>;
-			cpu-supply = <&vdd08_cpu_reg>;
 			#cooling-cells = <2>;
 		};
 
@@ -1888,35 +1880,37 @@
 			#address-cells = <1>;
 			#size-cells = <0>;
 
-			x5_dsp_pd@x5-dsp-pd {
+			x5_dsp_pd: x5-dsp-pd {
 				reg = <X5_DSP>;
 				#power-domain-cells = <0>;
 				#address-cells = <1>;
 				#size-cells = <0>;
 				boot-on;
 
-				x5_hifi5_pd@x5-hifi5-pd {
+				x5_hifi5_pd: x5-hifi5-pd {
 					reg = <X5_DSP_HIFI5>;
 					#power-domain-cells = <0>;
 				};
 			};
-			x5_video_pd@x5-video-pd {
+
+			x5_video_pd: x5-video-pd {
 				reg = <X5_VIDEO>;
 				#power-domain-cells = <0>;
 			};
-			x5_bpu_pd@x5-bpu-pd {
+
+			x5_bpu_pd: x5-bpu-pd {
 				reg = <X5_BPU>;
 				#power-domain-cells = <0>;
-				bpu-supply = <&vdd08_bpu_1_reg>;
 			};
-			x5_gpu_pd@x5-gpu-pd {
+
+			x5_gpu_pd: x5-gpu-pd {
 				reg = <X5_GPU>;
 				#power-domain-cells = <0>;
-				gpu-supply = <&vdd08_gpu_reg>;
 				clocks = <&hpsclks X5_GPU_PCLK>,
 					 <&hpsclks X5_GPU_GC8000L_CLK>;
 			};
-			x5_isp_pd@x5-isp-pd {
+
+			x5_isp_pd: x5-isp-pd {
 				reg = <X5_ISP>;
 				#power-domain-cells = <0>;
 			};
@@ -2047,7 +2041,6 @@
 			interrupt-names = "core_major";
 			clocks = <&hpsclks X5_GPU_PCLK>, <&hpsclks X5_GPU_GC8000L_ACLK>, <&hpsclks X5_GPU_GC8000L_CLK>;
 			operating-points-v2 = <&gpu_opp_table>;
-			gpu-supply = <&vdd08_gpu_reg>;
 			power-domains = <&power X5_GPU>;
 			#cooling-cells = <2>;
 
