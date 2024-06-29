@@ -157,6 +157,17 @@ struct drm_gem_object *vs_gem_prime_import_sg_table(struct drm_device *dev,
 						    struct dma_buf_attachment *attach,
 						    struct sg_table *sgt);
 
+static inline unsigned int num_align(unsigned int a, unsigned int b)
+{
+	unsigned int ret = a / b;
+	unsigned int rem = a % b;
+
+	if (rem)
+		ret++;
+
+	return b * ret;
+}
+
 /** @} */
 
 #endif /* __VS_GEM_H__ */

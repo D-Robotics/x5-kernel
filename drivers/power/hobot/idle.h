@@ -21,7 +21,8 @@ struct device *drobot_idle_get_dev(const struct device_node *of_node);
  * @param dev idle device pointer
  * @param idle_id idle item index
  * @param idle request state
+ * @param skip_wait_idle flag to skip check idle status
  */
-int drobot_idle_request(struct device *dev, u8 idle_id, bool idle);
+int drobot_idle_request(struct device *dev, u8 idle_id, bool idle, bool skip_wait_idle);
 
 #endif

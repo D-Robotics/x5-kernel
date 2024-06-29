@@ -76,6 +76,10 @@
 #include <asm/set_memory.h>
 #endif
 
+#if IS_ENABLED(CONFIG_DROBOT_LITE_MMU)
+#include <hobot_ion_iommu.h>
+#endif
+
 #include "nano2D_types.h"
 #include "nano2D_dispatch.h"
 #include "nano2D_kernel_platform.h"
@@ -1250,12 +1254,18 @@ n2d_error_t n2d_kernel_os_map_gpu(n2d_os_t *os, n2d_uint32_t core, n2d_uint64_t 
 #endif
 
 	if (contiguous) {
+
 		/*
 		 * Map contiguous memory. return physical if disable MMU,
 		 * otherwise, write MMU page table.
 		 */
 		ONERROR(n2d_kernel_os_get_physical_from_handle(handle, 0, flag, &cpu_physical));
-		ONERROR(n2d_kernel_os_cpu_to_gpu_phy(os, cpu_physical, &gpu_physical));
+		if (flag & N2D_ALLOC_FLAG_FROM_USER)
+			ONERROR(n2d_kernel_os_cpu_to_gpu_phy(os, cpu_physical, size, &gpu_physical));
+		else
+			ONERROR(n2d_kernel_os_iova_to_gpu_phy(os, cpu_physical, size,
+							      &gpu_physical));
+
 #if NANO2D_MMU_ENABLE
 		offset = gpu_physical & (page_size - 1);
 		gpu_physical -= offset;
@@ -1640,7 +1650,7 @@ on_error:
 	return error;
 }
 
-n2d_error_t n2d_kernel_os_cpu_to_gpu_phy(n2d_os_t *os, n2d_uint64_t cpu_phy, n2d_uint64_t *gpu_phy)
+n2d_error_t n2d_kernel_os_cpu_to_gpu_phy(n2d_os_t *os, n2d_uint64_t cpu_phy, uint32_t size, n2d_uint64_t *gpu_phy)
 {
 	n2d_error_t error	       = N2D_SUCCESS;
 	n2d_linux_platform_t *platform = N2D_NULL;
@@ -1648,9 +1658,30 @@ n2d_error_t n2d_kernel_os_cpu_to_gpu_phy(n2d_os_t *os, n2d_uint64_t cpu_phy, n2d
 	platform = os->device->platform;
 
 	if (platform && platform->ops->get_gpu_physical)
-		ONERROR(platform->ops->get_gpu_physical(platform, cpu_phy, gpu_phy));
+		ONERROR(platform->ops->get_gpu_physical(platform, cpu_phy, size, gpu_phy));
 	else
 		*gpu_phy = cpu_phy;
+
+on_error:
+	return error;
+}
+
+n2d_error_t n2d_kernel_os_iova_to_gpu_phy(n2d_os_t *os, n2d_uint64_t cpu_phy, uint32_t size,  n2d_uint64_t *gpu_phy)
+{
+	n2d_error_t error	       = N2D_SUCCESS;
+	struct lite_mmu_iommu *iommu = N2D_NULL;
+
+	phys_addr_t mapped_phys;
+
+	iommu = dev_iommu_priv_get(os->device->dev);
+	if (iommu) {
+		mapped_phys = iommu_iova_to_phys(iommu->domain, (dma_addr_t)cpu_phy);
+		pr_debug("%s: cpu_phy = %llx, mapped_phys = %llx.\n", __func__, cpu_phy,
+			mapped_phys);
+		ONERROR(iommu_map(iommu->domain, cpu_phy, mapped_phys, size, 0));
+	}
+
+	*gpu_phy = cpu_phy;
 
 on_error:
 	return error;

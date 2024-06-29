@@ -837,8 +837,9 @@ static int dwapb_gpio_resume(struct device *dev)
 }
 #endif
 
-static SIMPLE_DEV_PM_OPS(dwapb_gpio_pm_ops, dwapb_gpio_suspend,
-			 dwapb_gpio_resume);
+static const struct dev_pm_ops dwapb_gpio_pm_ops = {
+	SET_LATE_SYSTEM_SLEEP_PM_OPS(dwapb_gpio_suspend, dwapb_gpio_resume)
+};
 
 static struct platform_driver dwapb_gpio_driver = {
 	.driver		= {

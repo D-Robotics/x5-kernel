@@ -1010,8 +1010,8 @@ static int lt8618_hdmi_output_mode(struct lt8618 *lt8618, enum hdmi_mode mode)
  */
 static int lt8618_hdmi_csc(struct lt8618 *lt8618)
 {
-	/* enable ycbcr convert to rgb*/
-	regmap_write(lt8618->regmap, 0x82B9, 0x18);
+	/* disable csc*/
+	regmap_write(lt8618->regmap, 0x82B9, 0x00);
 
 	return 0;
 }
@@ -1054,7 +1054,7 @@ static int lt8618_bridge_attach(struct drm_bridge *bridge,
 	struct lt8618 *lt8618 = bridge_to_lt8618(bridge);
 	struct drm_device *drm = bridge->dev;
 	int ret;
-
+	dev_dbg(&lt8618->client->dev,"attach start 00!\n");
 	regmap_write(lt8618->regmap, 0x80ee, 0x01); // enable IIC
 
 	if (!bridge->encoder) {

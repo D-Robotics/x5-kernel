@@ -537,9 +537,9 @@ struct plat_config_data *xj3_probe_config_dt(struct platform_device *pdev,
 	plat->phyreset = devm_gpiod_get_optional(&pdev->dev, "phyreset", GPIOD_OUT_HIGH);
 	if (!IS_ERR_OR_NULL(plat->phyreset)) {
 		gpiod_set_value(plat->phyreset, 0);
-		msleep(20);
+		msleep(1);
 		gpiod_set_value(plat->phyreset, 1);
-		msleep(100);
+		msleep(25);
 	}
 
     plat->rst = devm_reset_control_get_optional(&pdev->dev, "enet_rst");
@@ -5981,9 +5981,9 @@ static int hobot_eth_resume(struct device *dev) {
     clk_prepare_enable(priv->plat->clk_ptp_ref);
 	if (!IS_ERR_OR_NULL(priv->plat->phyreset)) {
 		gpiod_set_value(priv->plat->phyreset, 0);
-		msleep(20);
+		msleep(1);
 		gpiod_set_value(priv->plat->phyreset, 1);
-		msleep(100);
+		msleep(32);
 	}
     hobot_reset_queues_param(priv);
 

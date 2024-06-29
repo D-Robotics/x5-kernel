@@ -177,7 +177,7 @@ void hbipc_data_chan_rx_cb(uint8_t *arg, int32_t instance, int32_t chan_id, uint
 
 	if ((AUDIO_HBIPC_INSTANCE_ID_0 != instance)
 		|| (AUDIO_HBIPC_CHANNEL_ID_0 != chan_id)) {
-		dev_err(NULL, "AUDIO[%s][%d] : HB-IPC instance(%d) ch(%d) unsupportted!\n", __func__, __LINE__, instance, chan_id);
+		dev_dbg(NULL, "AUDIO[%s][%d] : HB-IPC instance(%d) ch(%d) unsupportted!\n", __func__, __LINE__, instance, chan_id);
 		return;
 	}
 
@@ -189,7 +189,7 @@ void hbipc_data_chan_rx_cb(uint8_t *arg, int32_t instance, int32_t chan_id, uint
 	}
 
 	if (size <= 0) {
-		dev_err(NULL, "AUDIO[%s][%d]: size invalid parameter: %#llx\n", __func__,__LINE__, size);
+		dev_dbg(NULL, "AUDIO[%s][%d]: size invalid parameter: %#llx\n", __func__,__LINE__, size);
 		return;
 	}
 

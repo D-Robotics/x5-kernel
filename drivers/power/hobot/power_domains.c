@@ -10,6 +10,8 @@
 #include <linux/regulator/consumer.h>
 #include <linux/debugfs.h>
 #include <dt-bindings/power/drobot-x5-power.h>
+#include <linux/of_clk.h>
+#include <linux/clk.h>
 #include "pmu.h"
 #include "idle.h"
 
@@ -80,15 +82,14 @@ static int pcu_set_domain(struct drobot_pm_domain *pd, bool on)
 static inline int __connect_noc(struct drobot_pm_domain *pd)
 {
 	if (pd->info->noc_id != 0xff)
-		return drobot_idle_request(pd->pmu->idle, pd->info->noc_id, false);
-
+		return drobot_idle_request(pd->pmu->idle, pd->info->noc_id, false, false);
 	return 0;
 }
 
 static inline int __disconnect_noc(struct drobot_pm_domain *pd)
 {
 	if (pd->info->noc_id != 0xff)
-		return drobot_idle_request(pd->pmu->idle, pd->info->noc_id, true);
+		return drobot_idle_request(pd->pmu->idle, pd->info->noc_id, true, false);
 
 	return 0;
 }
@@ -96,7 +97,7 @@ static inline int __disconnect_noc(struct drobot_pm_domain *pd)
 static inline int __connect_apb(struct drobot_pm_domain *pd)
 {
 	if (pd->info->apb_id != 0xff)
-		return drobot_idle_request(pd->pmu->idle, pd->info->apb_id, false);
+		return drobot_idle_request(pd->pmu->idle, pd->info->apb_id, false, false);
 
 	return 0;
 }
@@ -104,7 +105,7 @@ static inline int __connect_apb(struct drobot_pm_domain *pd)
 static inline int __disconnect_apb(struct drobot_pm_domain *pd)
 {
 	if (pd->info->apb_id != 0xff)
-		return drobot_idle_request(pd->pmu->idle, pd->info->apb_id, true);
+		return drobot_idle_request(pd->pmu->idle, pd->info->apb_id, true, false);
 
 	return 0;
 }
@@ -189,25 +190,29 @@ static int __pd_power_on(struct drobot_pm_domain *pd)
 	int ret;
 
 	if (pd->regulator) {
-		if (pd->pmu->flag & SUSPEND_IN_PROGRESS) {
-			pd->defer_poweron = true;
-			return 0;
-		} else {
-			ret = regulator_enable(pd->regulator);
-			if (ret)
-				return ret;
-		}
+		ret = regulator_enable(pd->regulator);
+		if (ret)
+			return ret;
+	}
+
+	ret = clk_bulk_prepare_enable(pd->num_clks, pd->clks);
+	if (ret) {
+		pr_err("failed to enable clocks\n");
+		goto err_clk;
 	}
 
 	ret = __pcu_on(pd);
 	if (ret)
 		goto err_pcu;
-
+	
+	clk_bulk_disable_unprepare(pd->num_clks, pd->clks);
 	return 0;
 
 err_pcu:
 	if (pd->regulator)
 		regulator_disable(pd->regulator);
+err_clk:
+	clk_bulk_disable_unprepare(pd->num_clks, pd->clks);
 
 	return ret;
 }
@@ -255,14 +260,9 @@ static int __pd_power_off(struct drobot_pm_domain *pd)
 		return ret;
 
 	if (pd->regulator) {
-		if (pd->pmu->flag & SUSPEND_IN_PROGRESS) {
-			return 0;
-		} else {
-			ret = regulator_disable(pd->regulator);
-			if (ret)
-				goto err_regulator;
-		}
-
+		ret = regulator_disable(pd->regulator);
+		if (ret)
+			goto err_regulator;
 	}
 
 	return 0;
@@ -324,7 +324,7 @@ static int drobot_pm_add_one_domain(struct drobot_pmu *pmu, struct device_node *
 	struct drobot_pm_domain *pd;
 	u32 id;
 	bool boot_on;
-	int ret;
+	int i, error, ret;
 
 	ret = of_property_read_u32(node, "reg", &id);
 	if (ret) {
@@ -366,6 +366,29 @@ static int drobot_pm_add_one_domain(struct drobot_pmu *pmu, struct device_node *
 		ret = regulator_enable(pd->regulator);
 		if (ret)
 			return ret;
+	}
+
+	pd->num_clks = of_clk_get_parent_count(node);
+	if (pd->num_clks > 0) {
+		pd->clks = devm_kcalloc(pmu->dev, pd->num_clks,
+					sizeof(*pd->clks), GFP_KERNEL);
+		if (!pd->clks)
+			return -ENOMEM;
+	} else {
+		dev_dbg(pmu->dev, "%pOFn: doesn't have clocks: %d\n",
+			node, pd->num_clks);
+		pd->num_clks = 0;
+	}
+
+	for (i = 0; i < pd->num_clks; i++) {
+		pd->clks[i].clk = of_clk_get(node, i);
+		if (IS_ERR(pd->clks[i].clk)) {
+			error = PTR_ERR(pd->clks[i].clk);
+			dev_err(pmu->dev,
+				"%pOFn: failed to get clk at index %d: %d\n",
+				node, i, error);
+			return error;
+		}
 	}
 
 	pd->genpd.name	    = pd_info->name;
@@ -554,53 +577,12 @@ err_out:
 	return ret;
 }
 
-#ifdef CONFIG_PM_SLEEP
-static __maybe_unused int pd_suspend(struct device *dev)
-{
-	struct drobot_pmu *pmu;
-
-	pmu = dev_get_drvdata(dev);
-	pmu->flag |= SUSPEND_IN_PROGRESS;
-
-	return 0;
-}
-
-static __maybe_unused int pd_resume(struct device *dev)
-{
-	struct drobot_pmu *pmu;
-	int i;
-
-	pmu = dev_get_drvdata(dev);
-
-	if (pmu->flag & SUSPEND_IN_PROGRESS)
-		pmu->flag &= (~SUSPEND_IN_PROGRESS);
-	else
-		return 0;
-
-	for (i = 0; i < pmu->info->num_domains; i++) {
-		struct generic_pm_domain *genpd = pmu->genpd_data.domains[i];
-		struct drobot_pm_domain *pd = to_drobot_pd(genpd);
-
-		if (pd->defer_poweron == true) {
-			__pd_power_on(pd);
-			pd->defer_poweron = false;
-		}
-	}
-
-	return 0;
-}
-#endif
-
-static const struct dev_pm_ops pd_pm_ops = {
-	SET_SYSTEM_SLEEP_PM_OPS(pd_suspend, pd_resume)
-};
-
 static const struct drobot_pm_info x5_pm_domains[] = {
 	[X5_DSP]       = DOMAIN("dsp", 0x580, ISO_PD_DSP_TOP, 0xff, GENPD_FLAG_ALWAYS_ON),
 	[X5_DSP_HIFI5] = DOMAIN("hifi5", 0x600, ISO_PD_DSP_HIFI5, 0xff, GENPD_FLAG_ACTIVE_WAKEUP),
 	[X5_VIDEO]     = DOMAIN("video", 0x680, ISO_PD_VIDEO, ISO_Q_VIDEO, 0),
-	[X5_BPU]       = DOMAIN("bpu", 0x700, ISO_PD_BPU, ISO_Q_BPU, 0),
-	[X5_GPU]       = DOMAIN("gpu", 0x780, ISO_PD_GPU, ISO_Q_GPU, 0),
+	[X5_BPU]       = DOMAIN("bpu", 0x700, ISO_PD_BPU, ISO_Q_BPU, GENPD_FLAG_IRQ_ON),
+	[X5_GPU]       = DOMAIN("gpu", 0x780, ISO_PD_GPU, ISO_Q_GPU, GENPD_FLAG_IRQ_ON),
 	[X5_ISP]       = DOMAIN("isp", 0x800, ISO_CG_ISP, 0xff, 0),
 };
 
@@ -623,7 +605,6 @@ static struct platform_driver drobot_pm_domain_driver = {
 		.name   = "dr-power-domain",
 		.of_match_table = drobot_pm_domain_dt_match,
 		.suppress_bind_attrs = true,
-		.pm = &pd_pm_ops,
 	},
 };
 

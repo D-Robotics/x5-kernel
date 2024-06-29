@@ -10,16 +10,16 @@
 #include "pmu.h"
 
 #define drobot_clk_hw_register_gate_no_idle(name, parent_name, reg, bit_idx, flags) \
-	drobot_clk_hw_register_gate(name, parent_name, reg, bit_idx, flags, NULL, 0xff)
+	drobot_clk_hw_register_gate(name, parent_name, reg, bit_idx, flags, NULL, 0xff, false)
 
 #define drobot_clk_register_generator_no_idle(name, parent_names, num_parents, reg) \
-	drobot_clk_register_generator(name, parent_names, num_parents, reg, 0, NULL, 0xff)
+	drobot_clk_register_generator(name, parent_names, num_parents, reg, 0, NULL, 0xff, false)
 
 #define drobot_clk_register_generator_flags_no_idle(name, parent_names, num_parents, reg, flags) \
-	drobot_clk_register_generator(name, parent_names, num_parents, reg, flags, NULL, 0xff)
+	drobot_clk_register_generator(name, parent_names, num_parents, reg, flags, NULL, 0xff, false)
 
 #define drobot_clk_register_gen_no_flags(name, parent_names, num_parents, reg, idle, iso_id) \
-	drobot_clk_register_generator(name, parent_names, num_parents, reg, 0, idle, iso_id)
+	drobot_clk_register_generator(name, parent_names, num_parents, reg, 0, idle, iso_id, false)
 
 static inline struct clk_hw *drobot_clk_hw_mux(const char *name, const char * const *parents,
 		int num_parents, unsigned long flags, void __iomem *reg, u8 shift, u8 width)
@@ -38,11 +38,11 @@ static inline struct clk_hw *drobot_clk_hw_divider(const char *name, const char 
 
 struct clk_hw *drobot_clk_hw_register_gate(const char *name, const char *parent_name, void __iomem *reg,
 				       u8 bit_idx, unsigned long flags, struct device *idle,
-				       u32 iso_id);
+				       u32 iso_id, bool skip_wait_idle);
 
 struct clk_hw *drobot_clk_register_generator(const char *name, const char *const *parent_names,
 					 u8 num_parents, void __iomem *reg, unsigned long flags,
-					 struct device *idle, u32 iso_id);
+					 struct device *idle, u32 iso_id, bool skip_wait_idle);
 
 struct clk_hw *drobot_clk_register_i2s_generator(const char *name, const char *const *parent_names,
 					     u8 num_parents, void __iomem *reg,

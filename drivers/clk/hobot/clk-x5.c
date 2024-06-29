@@ -119,7 +119,6 @@ static struct x5_rate_list soc_gen_rates[] = {
 	{X5_CODEC_NOC_CLK,		750000000},
 	{X5_GPU_NOC_CLK,		750000000},
 	{X5_ROM_ACLK,			400000000},
-	{X5_TOP_APB_CLK,		200000000},
 	{X5_CPU_CORE_CLK,		1500000000},
 	{X5_CPU_PCLK,			300000000},
 	{X5_CPU_ATCLK,			300000000},
@@ -155,7 +154,6 @@ static struct x5_rate_list soc_gen_rates[] = {
 	{X5_VIDEO_CODEC_CORE_CLK,	600000000},
 	{X5_VIDEO_CODEC_BCLK,		500000000},
 	{X5_VIDEO_JPEG_CORE_CLK,	500000000},
-	{X5_HSIO_QSPI_BUS_CLK,		200000000},
 	{X5_HSIO_QSPI_CORE_CLK,		200000000},
 	{X5_HSIO_ENET_AXI_CLK,		400000000},
 	{X5_HSIO_ENET_RGMII_CLK,	125000000},
@@ -202,6 +200,7 @@ static const char *i2s1_s_src_sels[] = { "dsp_i2s1_child_sclk", "audio_externel"
 static const char *dsp_noc_gen_src_sels[] = { "osc", "dsp_pll_p", "dsp_pll_r" };
 static const char *soc_gen_src_sels[] = { "osc", "cpu_pll_p", "cpu_pll_r", "sys0_pll_p", "sys0_pll_r", "sys1_pll_p", "sys1_pll_r" , "pixel_pll_r" };
 static const char *apb_gen_src_sels[] = { "osc", "cpu_pll_p", "osc", "osc", "osc", "osc", "osc" , "osc" };
+static const char *qspi_apb_gen_src_sels[] = { "osc", "osc", "cpu_pll_r", "osc", "osc", "osc", "osc" , "osc" };
 static const char *disp_gen_src_sels[] = { "osc", "disp_pll_p", "pixel_pll_p", "disp_pll_r", "pixel_pll_r" };
 
 /* use osc clock to disable parent selection */
@@ -252,7 +251,7 @@ static int crm_dsp_clk_init(struct platform_device *pdev)
 	clk_get_rate(hws[X5_DSP_PLL_R]->clk);
 
 	hws[X5_DSP_NOC_CLK] = drobot_clk_register_generator_flags_no_idle("dsp_noc_clk", dsp_noc_gen_src_sels, ARRAY_SIZE(dsp_noc_gen_src_sels), base + 0x800, CLK_IS_CRITICAL);
-	hws[X5_DSP_APB_CLK] = drobot_clk_register_generator("dsp_apb_clk", dsp_gen_src_sels, ARRAY_SIZE(dsp_gen_src_sels), base + 0x820, CLK_IS_CRITICAL, NULL, 0xff);
+	hws[X5_DSP_APB_CLK] = drobot_clk_register_generator("dsp_apb_clk", dsp_gen_src_sels, ARRAY_SIZE(dsp_gen_src_sels), base + 0x820, CLK_IS_CRITICAL, NULL, 0xff, false);
 	hws[X5_DSP_HIFI5_GCLK] = drobot_clk_register_generator_no_idle("dsp_hifi5_gclk", dsp_gen_src_sels, ARRAY_SIZE(dsp_gen_src_sels), base + 0x840);
 	hws[X5_DSP_HIFI5_APB_CLK] = drobot_clk_register_generator_no_idle("dsp_hifi5_apb_clk", dsp_gen_src_sels, ARRAY_SIZE(dsp_gen_src_sels), base + 0x860);
 	hws[X5_DSP_DMA_AXI_CLK] = drobot_clk_register_gen_no_flags("dsp_dma_axi_clk", dsp_gen_src_sels, ARRAY_SIZE(dsp_gen_src_sels), base + 0x880, ctx->idle, ISO_CG_DSP_DMA);
@@ -275,8 +274,8 @@ static int crm_dsp_clk_init(struct platform_device *pdev)
 	hws[X5_DSP_I2S1_CHILD_SCLK] = drobot_clk_hw_divider("dsp_i2s1_child_sclk", "dsp_i2s1_gen_sclk", CLK_SET_RATE_PARENT, base + 0x910, 0, 5);
 	hws[X5_DSP_I2S1_CHILD_MCLK] = drobot_clk_hw_divider("dsp_i2s1_child_mclk", "dsp_i2s1_gen_mclk", CLK_SET_RATE_PARENT, base + 0x930, 0, 5);
 
-	hws[X5_DSP_SRAM0_CLK] = drobot_clk_hw_register_gate("dsp_sram0_clk", "dsp_noc_clk", base + DSP_CLK_ENB, 0, CLK_IS_CRITICAL, ctx->idle, ISO_CG_SRAM0);
-	hws[X5_DSP_SRAM1_CLK] = drobot_clk_hw_register_gate("dsp_sram1_clk", "dsp_noc_clk", base + DSP_CLK_ENB, 1, CLK_IS_CRITICAL, ctx->idle, ISO_CG_SRAM1);
+	hws[X5_DSP_SRAM0_CLK] = drobot_clk_hw_register_gate("dsp_sram0_clk", "dsp_noc_clk", base + DSP_CLK_ENB, 0, CLK_IS_CRITICAL, ctx->idle, ISO_CG_SRAM0, false);
+	hws[X5_DSP_SRAM1_CLK] = drobot_clk_hw_register_gate("dsp_sram1_clk", "dsp_noc_clk", base + DSP_CLK_ENB, 1, CLK_IS_CRITICAL, ctx->idle, ISO_CG_SRAM1, false);
 
 	hws[X5_DSP_HIFI5_CLK] = drobot_clk_hw_register_gate_no_idle("dsp_hifi5_clk", "dsp_hifi5_gclk", base + DSP_CLK_ENB, 2, gate_flags | CLK_IS_CRITICAL);
 	hws[X5_DSP_HIFI5_BUS_CLK] = drobot_clk_hw_register_gate_no_idle("dsp_hifi5_bus_clk", "dsp_hifi5_child_clk", base + DSP_CLK_ENB, 3, gate_flags | CLK_IS_CRITICAL);
@@ -366,6 +365,7 @@ static int crm_hps_clk_init(struct platform_device *pdev)
 	void __iomem *base;
 	int ret, i;
 	u32 pll_match = 0;
+	u32 qspi_boot = 0;
 
 	ctx = devm_kzalloc(dev, struct_size(ctx, clk_hw_data.hws, X5_HPS_END_CLK), GFP_KERNEL);
 	if (!ctx)
@@ -377,6 +377,7 @@ static int crm_hps_clk_init(struct platform_device *pdev)
 	hws = ctx->clk_hw_data.hws;
 
 	device_property_read_u32(dev, "pll-table", &pll_match);
+	device_property_read_u32(dev, "qspi-boot", &qspi_boot);
 
 	ctx->idle = drobot_idle_get_dev(dev->of_node);
 	if (IS_ERR(ctx->idle)) {
@@ -428,7 +429,10 @@ static int crm_hps_clk_init(struct platform_device *pdev)
 	hws[X5_CODEC_NOC_CLK] = drobot_clk_register_generator_flags_no_idle("codec_noc_clk", soc_gen_src_sels, ARRAY_SIZE(soc_gen_src_sels), base + HPS_CLK_GEN + 0x40, CLK_IS_CRITICAL);
 	hws[X5_GPU_NOC_CLK] = drobot_clk_register_generator_flags_no_idle("gpu_noc_clk", soc_gen_src_sels, ARRAY_SIZE(soc_gen_src_sels), base + HPS_CLK_GEN + 0x60, CLK_IS_CRITICAL);
 	hws[X5_ROM_ACLK] = drobot_clk_register_generator_flags_no_idle("rom_aclk", soc_gen_src_sels, ARRAY_SIZE(soc_gen_src_sels), base + HPS_CLK_GEN + 0x80, CLK_IS_CRITICAL);
-	hws[X5_TOP_APB_CLK] = drobot_clk_register_generator_flags_no_idle("top_apb_clk", apb_gen_src_sels, ARRAY_SIZE(apb_gen_src_sels), base + HPS_CLK_GEN + 0xA0, CLK_IS_CRITICAL);
+	if (qspi_boot)
+		hws[X5_TOP_APB_CLK] = drobot_clk_register_generator_flags_no_idle("top_apb_clk", qspi_apb_gen_src_sels, ARRAY_SIZE(qspi_apb_gen_src_sels), base + HPS_CLK_GEN + 0xA0, CLK_IS_CRITICAL);
+	else
+		hws[X5_TOP_APB_CLK] = drobot_clk_register_generator_flags_no_idle("top_apb_clk", apb_gen_src_sels, ARRAY_SIZE(apb_gen_src_sels), base + HPS_CLK_GEN + 0xA0, CLK_IS_CRITICAL);
 
 	hws[X5_WDT_PCLK] = drobot_clk_hw_register_gate_no_idle("wdt_pclk", "top_apb_clk", base + TOP_CLK_ENB, 4, 0);
 	hws[X5_DMA_PCLK] = drobot_clk_hw_register_gate_no_idle("dma_pclk", "top_apb_clk", base + TOP_CLK_ENB, 5, 0);
@@ -462,8 +466,8 @@ static int crm_hps_clk_init(struct platform_device *pdev)
 	hws[X5_CAM_VSE_UPSCALE_CLK] = drobot_clk_register_gen_no_flags("vse_upscale_clk", soc_gen_src_sels, ARRAY_SIZE(soc_gen_src_sels), base + HPS_CLK_GEN + 0x460, ctx->idle, ISO_CG_DW230);
 	hws[X5_CAM_VSE_AXI_CLK] = drobot_clk_register_gen_no_flags("vse_axi_clk", soc_gen_src_sels, ARRAY_SIZE(soc_gen_src_sels), base + HPS_CLK_GEN + 0x480, ctx->idle, ISO_CG_DW230);
 
-	hws[X5_CAM_ISP8000_CLK] = drobot_clk_hw_register_gate("isp_clk", "isp_core_clk", base + CAMERA_CLK_ENB, 0, gate_flags, ctx->idle, ISO_CG_ISP);
-	hws[X5_CAM_ISP8000_MCM_CLK] = drobot_clk_hw_register_gate("isp_mcm_clk", "isp_core_clk", base + CAMERA_CLK_ENB, 1, gate_flags, ctx->idle, ISO_CG_ISP);
+	hws[X5_CAM_ISP8000_CLK] = drobot_clk_hw_register_gate("isp_clk", "isp_core_clk", base + CAMERA_CLK_ENB, 0, gate_flags, ctx->idle, ISO_CG_ISP, false);
+	hws[X5_CAM_ISP8000_MCM_CLK] = drobot_clk_hw_register_gate("isp_mcm_clk", "isp_core_clk", base + CAMERA_CLK_ENB, 1, gate_flags, ctx->idle, ISO_CG_ISP, false);
 	hws[X5_CAM_ISP8000_S_HCLK] = drobot_clk_hw_register_gate_no_idle("isp8000_s_hclk", "top_apb_clk", base + CAMERA_CLK_ENB, 3, 0);
 	hws[X5_CAM_CSI0_PCLK] = drobot_clk_hw_register_gate_no_idle("csi0_pclk", "top_apb_clk", base + CAMERA_CLK_ENB, 8, 0);
 	hws[X5_CAM_CSI1_PCLK] = drobot_clk_hw_register_gate_no_idle("csi1_pclk", "top_apb_clk", base + CAMERA_CLK_ENB, 9, 0);
@@ -478,14 +482,14 @@ static int crm_hps_clk_init(struct platform_device *pdev)
 
 	if (pll_match == 0) {
 		hws[X5_DISP_BT1120_PIXEL_CLK] = drobot_clk_register_generator("bt1120_pixel_clk", disp_gen_src_sels, ARRAY_SIZE(disp_gen_src_sels),
-			base + HPS_CLK_GEN + 0x4A0, CLK_SET_RATE_PARENT | CLK_SET_RATE_NO_REPARENT, ctx->idle, ISO_CG_BT1120);
+			base + HPS_CLK_GEN + 0x4A0, CLK_SET_RATE_PARENT | CLK_SET_RATE_NO_REPARENT, ctx->idle, ISO_CG_BT1120, false);
 		hws[X5_DISP_DC8000_PIXEL_CLK] = drobot_clk_register_generator("dc8000_pixel_clk", disp_gen_src_sels, ARRAY_SIZE(disp_gen_src_sels),
-			base + HPS_CLK_GEN + 0x4C0, CLK_SET_RATE_PARENT | CLK_SET_RATE_NO_REPARENT, ctx->idle, ISO_CG_DC8000);
+			base + HPS_CLK_GEN + 0x4C0, CLK_SET_RATE_PARENT | CLK_SET_RATE_NO_REPARENT, ctx->idle, ISO_CG_DC8000, false);
 	} else {
 		hws[X5_DISP_BT1120_PIXEL_CLK] = drobot_clk_register_generator("bt1120_pixel_clk", disp_no_pix_gen_src_sels, ARRAY_SIZE(disp_no_pix_gen_src_sels),
-			base + HPS_CLK_GEN + 0x4A0, CLK_SET_RATE_PARENT | CLK_SET_RATE_NO_REPARENT, ctx->idle, ISO_CG_BT1120);
+			base + HPS_CLK_GEN + 0x4A0, CLK_SET_RATE_PARENT | CLK_SET_RATE_NO_REPARENT, ctx->idle, ISO_CG_BT1120, false);
 		hws[X5_DISP_DC8000_PIXEL_CLK] = drobot_clk_register_generator("dc8000_pixel_clk", disp_no_pix_gen_src_sels, ARRAY_SIZE(disp_no_pix_gen_src_sels),
-			base + HPS_CLK_GEN + 0x4C0, CLK_SET_RATE_PARENT | CLK_SET_RATE_NO_REPARENT, ctx->idle, ISO_CG_DC8000);
+			base + HPS_CLK_GEN + 0x4C0, CLK_SET_RATE_PARENT | CLK_SET_RATE_NO_REPARENT, ctx->idle, ISO_CG_DC8000, false);
 	}
 
 	hws[X5_DISP_SIF_ACLK] = drobot_clk_register_gen_no_flags("disp_sif_aclk", soc_gen_src_sels, ARRAY_SIZE(soc_gen_src_sels), base + HPS_CLK_GEN + 0x4E0, ctx->idle, ISO_CG_DISP_SIF);
@@ -509,7 +513,7 @@ static int crm_hps_clk_init(struct platform_device *pdev)
 	hws[X5_DISP_GPIO_PCLK] = drobot_clk_hw_register_gate_no_idle("disp_gpio_pclk", "top_apb_clk", base + HPS_MIX_CLK_ENB, 9, 0);
 
 	hws[X5_GPU_GC820_CLK] = drobot_clk_register_gen_no_flags("gc820_clk", soc_gen_src_sels, ARRAY_SIZE(soc_gen_src_sels), base + HPS_CLK_GEN + 0x540, ctx->idle, ISO_CG_GPU2D);
-	hws[X5_GPU_GC8000L_CLK] = drobot_clk_register_gen_no_flags("gc8000l_clk", soc_gen_src_sels, ARRAY_SIZE(soc_gen_src_sels), base + HPS_CLK_GEN + 0x560, ctx->idle, ISO_CG_GPU3D);
+	hws[X5_GPU_GC8000L_CLK] = drobot_clk_register_generator("gc8000l_clk", soc_gen_src_sels, ARRAY_SIZE(soc_gen_src_sels), base + HPS_CLK_GEN + 0x560, 0, ctx->idle, ISO_CG_GPU3D, true);
 	hws[X5_GPU_GC820_ACLK] = drobot_clk_register_generator_flags_no_idle("gc820_aclk", soc_gen_src_sels, ARRAY_SIZE(soc_gen_src_sels), base + HPS_CLK_GEN + 0x580, CLK_IS_CRITICAL);
 	hws[X5_GPU_GC8000L_ACLK] = drobot_clk_register_generator_flags_no_idle("gc8000l_aclk", soc_gen_src_sels, ARRAY_SIZE(soc_gen_src_sels), base + HPS_CLK_GEN + 0x5A0, CLK_IS_CRITICAL);
 
@@ -517,25 +521,29 @@ static int crm_hps_clk_init(struct platform_device *pdev)
 	hws[X5_GPU_NOC_PCLK] = drobot_clk_hw_register_gate_no_idle("gpu_noc_pclk", "top_apb_clk", base + HPS_MIX_CLK_ENB, 16, CLK_IS_CRITICAL);
 
 	hws[X5_BPU_MCLK_2X] = drobot_clk_register_generator_flags_no_idle("bpu_mclk_2x", soc_gen_src_sels, ARRAY_SIZE(soc_gen_src_sels), base + HPS_CLK_GEN + 0x5C0, CLK_IS_CRITICAL);
-	hws[X5_BPU_SYS_TIMER_CLK] = drobot_clk_register_generator("bpu_timer_clk", soc_gen_src_sels, ARRAY_SIZE(soc_gen_src_sels), base + HPS_CLK_GEN + 0x5E0, CLK_IGNORE_UNUSED, ctx->idle, ISO_PD_BPU);
+	hws[X5_BPU_SYS_TIMER_CLK] = drobot_clk_register_generator("bpu_timer_clk", soc_gen_src_sels, ARRAY_SIZE(soc_gen_src_sels), base + HPS_CLK_GEN + 0x5E0, CLK_IGNORE_UNUSED, ctx->idle, ISO_PD_BPU, false);
 
 	hws[X5_BPU_APB_CLK] = drobot_clk_hw_register_gate_no_idle("bpu_apb_clk", "bpu_mclk_2x", base + HPS_MIX_CLK_ENB, 17, gate_flags | CLK_IGNORE_UNUSED);
-	hws[X5_BPU_MCLK_1X_CLK] = drobot_clk_hw_register_gate("bpu_mclk_1x_clk", "bpu_mclk_2x", base + HPS_MIX_CLK_ENB, 18, gate_flags | CLK_IGNORE_UNUSED, ctx->idle, ISO_PD_BPU);
-	hws[X5_BPU_MCLK_2X_CLK] = drobot_clk_hw_register_gate("bpu_mclk_2x_clk", "bpu_mclk_2x", base + HPS_MIX_CLK_ENB, 19, gate_flags | CLK_IGNORE_UNUSED, ctx->idle, ISO_PD_BPU);
+	hws[X5_BPU_MCLK_1X_CLK] = drobot_clk_hw_register_gate("bpu_mclk_1x_clk", "bpu_mclk_2x", base + HPS_MIX_CLK_ENB, 18, gate_flags | CLK_IGNORE_UNUSED, ctx->idle, ISO_PD_BPU, false);
+	hws[X5_BPU_MCLK_2X_CLK] = drobot_clk_hw_register_gate("bpu_mclk_2x_clk", "bpu_mclk_2x", base + HPS_MIX_CLK_ENB, 19, gate_flags, ctx->idle, ISO_PD_BPU, false);
 
 	hws[X5_VIDEO_CODEC_CORE_CLK] = drobot_clk_register_generator_no_idle("codec_core_clk", soc_gen_src_sels, ARRAY_SIZE(soc_gen_src_sels), base + HPS_CLK_GEN + 0x600);
 	hws[X5_VIDEO_CODEC_BCLK] = drobot_clk_register_gen_no_flags("codec_bclk", soc_gen_src_sels, ARRAY_SIZE(soc_gen_src_sels), base + HPS_CLK_GEN + 0x620, ctx->idle, ISO_CG_VIDEO);
 	hws[X5_VIDEO_JPEG_CORE_CLK] = drobot_clk_register_generator_no_idle("jpeg_core_clk", soc_gen_src_sels, ARRAY_SIZE(soc_gen_src_sels), base + HPS_CLK_GEN + 0x640);
 
-	hws[X5_VIDEO_JPEG_CCLK] = drobot_clk_hw_register_gate("jpeg_cclk", "jpeg_core_clk", base + HPS_MIX_CLK_ENB, 23, gate_flags, ctx->idle, ISO_CG_JPEG);
+	hws[X5_VIDEO_JPEG_CCLK] = drobot_clk_hw_register_gate("jpeg_cclk", "jpeg_core_clk", base + HPS_MIX_CLK_ENB, 23, gate_flags, ctx->idle, ISO_CG_JPEG, false);
 	hws[X5_VIDEO_JPEG_ACLK] = drobot_clk_hw_register_gate_no_idle("jpeg_aclk", "jpeg_core_clk", base + HPS_MIX_CLK_ENB, 24, gate_flags | CLK_IS_CRITICAL);
 	hws[X5_VIDEO_JPEG_PCLK] = drobot_clk_hw_register_gate_no_idle("jpeg_pclk", "top_apb_clk", base + HPS_MIX_CLK_ENB, 25, 0);
-	hws[X5_VIDEO_CODEC_CCLK] = drobot_clk_hw_register_gate("codec_cclk", "codec_core_clk", base + HPS_MIX_CLK_ENB, 26, gate_flags, ctx->idle, ISO_CG_VIDEO);
+	hws[X5_VIDEO_CODEC_CCLK] = drobot_clk_hw_register_gate("codec_cclk", "codec_core_clk", base + HPS_MIX_CLK_ENB, 26, gate_flags, ctx->idle, ISO_CG_VIDEO, false);
 	hws[X5_VIDEO_CODEC_ACLK] = drobot_clk_hw_register_gate_no_idle("codec_aclk", "codec_core_clk", base + HPS_MIX_CLK_ENB, 28, gate_flags | CLK_IS_CRITICAL);
  	hws[X5_VIDEO_CODEC_PCLK] = drobot_clk_hw_register_gate_no_idle("codec_pclk", "top_apb_clk", base + HPS_MIX_CLK_ENB, 29, 0);
 	hws[X5_VIDEO_NOC_PCLK] = drobot_clk_hw_register_gate_no_idle("video_noc_pclk", "top_apb_clk", base + HPS_MIX_CLK_ENB, 30, CLK_IS_CRITICAL);
 
-	hws[X5_HSIO_QSPI_BUS_CLK] = drobot_clk_register_gen_no_flags("qspi_bus_clk", apb_gen_src_sels, ARRAY_SIZE(apb_gen_src_sels), base + HPS_CLK_GEN + 0x660, ctx->idle, ISO_CG_QSPI_AXIS);
+	if (qspi_boot)
+		hws[X5_HSIO_QSPI_BUS_CLK] = drobot_clk_register_gen_no_flags("qspi_bus_clk", qspi_apb_gen_src_sels, ARRAY_SIZE(qspi_apb_gen_src_sels), base + HPS_CLK_GEN + 0x660, ctx->idle, ISO_CG_QSPI_AXIS);
+	else
+		hws[X5_HSIO_QSPI_BUS_CLK] = drobot_clk_register_gen_no_flags("qspi_bus_clk", apb_gen_src_sels, ARRAY_SIZE(apb_gen_src_sels), base + HPS_CLK_GEN + 0x660, ctx->idle, ISO_CG_QSPI_AXIS);
+
 	hws[X5_HSIO_QSPI_CORE_CLK] = drobot_clk_register_gen_no_flags("qspi_core_clk", apb_gen_src_sels, ARRAY_SIZE(apb_gen_src_sels), base + HPS_CLK_GEN + 0x680, ctx->idle, ISO_CG_QSPI_AXIS);
 
 	hws[X5_HSIO_ENET_AXI_CLK] = drobot_clk_register_gen_no_flags("enet_axi_clk", soc_gen_src_sels, ARRAY_SIZE(soc_gen_src_sels), base + HPS_CLK_GEN + 0x6A0, ctx->idle, ISO_CG_GMAC);
@@ -549,41 +557,41 @@ static int crm_hps_clk_init(struct platform_device *pdev)
 	hws[X5_HSIO_EMMC_AXI_CLK] = drobot_clk_register_generator_no_idle("emmc_axi_clk", apb_gen_src_sels, ARRAY_SIZE(apb_gen_src_sels), base + HPS_CLK_GEN + 0x720);
 	hws[X5_HSIO_EMMC_CCLK] = drobot_clk_register_gen_no_flags("emmc_cclk", apb_gen_src_sels, ARRAY_SIZE(apb_gen_src_sels), base + HPS_CLK_GEN + 0x740, ctx->idle, ISO_CG_EMMC);
 
-	hws[X5_HSIO_EMMC_ACLK] = drobot_clk_hw_register_gate("emmc_aclk", "emmc_axi_clk", base + HSIO_CLK_ENB, 8, gate_flags, ctx->idle, ISO_CG_EMMC);
+	hws[X5_HSIO_EMMC_ACLK] = drobot_clk_hw_register_gate("emmc_aclk", "emmc_axi_clk", base + HSIO_CLK_ENB, 8, gate_flags, ctx->idle, ISO_CG_EMMC, false);
 	hws[X5_HSIO_EMMC_HCLK] = drobot_clk_hw_register_gate_no_idle("emmc_hclk", "top_apb_clk", base + HSIO_CLK_ENB, 9, 0);
-	hws[X5_HSIO_EMMC_BCLK] = drobot_clk_hw_register_gate("emmc_bclk", "emmc_axi_clk", base + HSIO_CLK_ENB, 10, gate_flags, ctx->idle, ISO_CG_EMMC);
-	hws[X5_HSIO_EMMC_TCLK] = drobot_clk_hw_register_gate("emmc_tclk", "hsio_24m_clk", base + HSIO_CLK_ENB, 12, gate_flags, ctx->idle, ISO_CG_EMMC);
+	hws[X5_HSIO_EMMC_BCLK] = drobot_clk_hw_register_gate("emmc_bclk", "emmc_axi_clk", base + HSIO_CLK_ENB, 10, gate_flags, ctx->idle, ISO_CG_EMMC, false);
+	hws[X5_HSIO_EMMC_TCLK] = drobot_clk_hw_register_gate("emmc_tclk", "hsio_24m_clk", base + HSIO_CLK_ENB, 12, gate_flags, ctx->idle, ISO_CG_EMMC, false);
 
 	hws[X5_HSIO_SDIO0_AXI_CLK] = drobot_clk_register_generator_no_idle("sdio0_axi_clk", apb_gen_src_sels, ARRAY_SIZE(apb_gen_src_sels), base + HPS_CLK_GEN + 0x760);
 	hws[X5_HSIO_SDIO0_CCLK] = drobot_clk_register_gen_no_flags("sdio0_cclk", apb_gen_src_sels, ARRAY_SIZE(apb_gen_src_sels), base + HPS_CLK_GEN + 0x780, ctx->idle, ISO_CG_SD);
 
-	hws[X5_HSIO_SDIO0_ACLK] = drobot_clk_hw_register_gate("sdio0_aclk", "sdio0_axi_clk", base + HSIO_CLK_ENB, 13, gate_flags, ctx->idle, ISO_CG_SD);
+	hws[X5_HSIO_SDIO0_ACLK] = drobot_clk_hw_register_gate("sdio0_aclk", "sdio0_axi_clk", base + HSIO_CLK_ENB, 13, gate_flags, ctx->idle, ISO_CG_SD, false);
 	hws[X5_HSIO_SDIO0_HCLK] = drobot_clk_hw_register_gate_no_idle("sdio0_hclk", "top_apb_clk", base + HSIO_CLK_ENB, 14, 0);
-	hws[X5_HSIO_SDIO0_BCLK] = drobot_clk_hw_register_gate("sdio0_bclk", "sdio0_axi_clk", base + HSIO_CLK_ENB, 15, gate_flags, ctx->idle, ISO_CG_SD);
-	hws[X5_HSIO_SDIO0_TCLK] = drobot_clk_hw_register_gate("sdio0_tclk", "hsio_24m_clk", base + HSIO_CLK_ENB, 17, gate_flags, ctx->idle, ISO_CG_SD);
+	hws[X5_HSIO_SDIO0_BCLK] = drobot_clk_hw_register_gate("sdio0_bclk", "sdio0_axi_clk", base + HSIO_CLK_ENB, 15, gate_flags, ctx->idle, ISO_CG_SD, false);
+	hws[X5_HSIO_SDIO0_TCLK] = drobot_clk_hw_register_gate("sdio0_tclk", "hsio_24m_clk", base + HSIO_CLK_ENB, 17, gate_flags, ctx->idle, ISO_CG_SD, false);
 
 	hws[X5_HSIO_SDIO1_AXI_CLK] = drobot_clk_register_generator_no_idle("sdio1_axi_clk", apb_gen_src_sels, ARRAY_SIZE(apb_gen_src_sels), base + HPS_CLK_GEN + 0x7A0);
 	hws[X5_HSIO_SDIO1_CCLK] = drobot_clk_register_gen_no_flags("sdio1_cclk", apb_gen_src_sels, ARRAY_SIZE(apb_gen_src_sels), base + HPS_CLK_GEN + 0x7C0, ctx->idle, ISO_CG_SDIO);
 
-	hws[X5_HSIO_SDIO1_ACLK] = drobot_clk_hw_register_gate("sdio1_aclk", "sdio1_axi_clk", base + HSIO_CLK_ENB, 18, gate_flags, ctx->idle, ISO_CG_SDIO);
+	hws[X5_HSIO_SDIO1_ACLK] = drobot_clk_hw_register_gate("sdio1_aclk", "sdio1_axi_clk", base + HSIO_CLK_ENB, 18, gate_flags, ctx->idle, ISO_CG_SDIO, false);
 	hws[X5_HSIO_SDIO1_HCLK] = drobot_clk_hw_register_gate_no_idle("sdio1_hclk", "top_apb_clk", base + HSIO_CLK_ENB, 19, 0);
-	hws[X5_HSIO_SDIO1_BCLK] = drobot_clk_hw_register_gate("sdio1_bclk", "sdio1_axi_clk", base + HSIO_CLK_ENB, 20, gate_flags, ctx->idle, ISO_CG_SDIO);
-	hws[X5_HSIO_SDIO1_TCLK] = drobot_clk_hw_register_gate("sdio1_tclk", "hsio_24m_clk", base + HSIO_CLK_ENB, 22, gate_flags, ctx->idle, ISO_CG_SDIO);
+	hws[X5_HSIO_SDIO1_BCLK] = drobot_clk_hw_register_gate("sdio1_bclk", "sdio1_axi_clk", base + HSIO_CLK_ENB, 20, gate_flags, ctx->idle, ISO_CG_SDIO, false);
+	hws[X5_HSIO_SDIO1_TCLK] = drobot_clk_hw_register_gate("sdio1_tclk", "hsio_24m_clk", base + HSIO_CLK_ENB, 22, gate_flags, ctx->idle, ISO_CG_SDIO, false);
 
 	hws[X5_HSIO_USB2_AXI_CLK] = drobot_clk_register_gen_no_flags("usb2_axi_clk", soc_gen_src_sels, ARRAY_SIZE(soc_gen_src_sels), base + HPS_CLK_GEN + 0x800, ctx->idle, ISO_CG_USB2);
 	hws[X5_HSIO_USB3_AXI_CLK] = drobot_clk_register_gen_no_flags("usb3_axi_clk", soc_gen_src_sels, ARRAY_SIZE(soc_gen_src_sels), base + HPS_CLK_GEN + 0x820, ctx->idle, ISO_CG_USB3);
 
 	hws[X5_HSIO_USB2_PCLK] = drobot_clk_hw_register_gate_no_idle("usb2_pclk", "top_apb_clk", base + HSIO_CLK_ENB, 24, 0);
 	hws[X5_HSIO_USB3_PCLK] = drobot_clk_hw_register_gate_no_idle("usb3_pclk", "top_apb_clk", base + HSIO_CLK_ENB, 26, 0);
-	hws[X5_HSIO_USB2_CTRL_REF_CLK] = drobot_clk_hw_register_gate("usb2_ctrl_ref_clk", "osc", base + HSIO_CLK_ENB, 27, 0, ctx->idle, ISO_CG_USB2);
-	hws[X5_HSIO_USB3_CTRL_REF_CLK] = drobot_clk_hw_register_gate("usb3_ctrl_ref_clk", "osc", base + HSIO_CLK_ENB, 28, 0, ctx->idle, ISO_CG_USB3);
-	hws[X5_HSIO_USB3_SUSPEND_CLK] = drobot_clk_hw_register_gate("usb3_suspend_clk", "osc", base + HSIO_CLK_ENB, 29, 0, ctx->idle, ISO_CG_USB3);
+	hws[X5_HSIO_USB2_CTRL_REF_CLK] = drobot_clk_hw_register_gate("usb2_ctrl_ref_clk", "osc", base + HSIO_CLK_ENB, 27, 0, ctx->idle, ISO_CG_USB2, false);
+	hws[X5_HSIO_USB3_CTRL_REF_CLK] = drobot_clk_hw_register_gate("usb3_ctrl_ref_clk", "osc", base + HSIO_CLK_ENB, 28, 0, ctx->idle, ISO_CG_USB3, false);
+	hws[X5_HSIO_USB3_SUSPEND_CLK] = drobot_clk_hw_register_gate("usb3_suspend_clk", "osc", base + HSIO_CLK_ENB, 29, 0, ctx->idle, ISO_CG_USB3, false);
 
 	hws[X5_HSIO_GPIO0_PCLK] = drobot_clk_hw_register_gate_no_idle("hsio_gpio0_pclk", "top_apb_clk", base + HSIO_CLK_ENB, 30, 0);
 	hws[X5_HSIO_GPIO1_PCLK] = drobot_clk_hw_register_gate_no_idle("hsio_gpio1_pclk", "top_apb_clk", base + HSIO_CLK_ENB, 31, 0);
 
-	hws[X5_SEC_AXI_CLK] = drobot_clk_register_generator("sec_axi_clk", soc_gen_src_sels, ARRAY_SIZE(soc_gen_src_sels), base + HPS_CLK_GEN + 0x840, CLK_IS_CRITICAL, ctx->idle, ISO_CG_SECURE);
-	hws[X5_SEC_APB_CLK] = drobot_clk_register_generator("sec_apb_clk", soc_gen_src_sels, ARRAY_SIZE(soc_gen_src_sels), base + HPS_CLK_GEN + 0x860, CLK_IS_CRITICAL, ctx->idle, ISO_CG_SECURE);
+	hws[X5_SEC_AXI_CLK] = drobot_clk_register_generator("sec_axi_clk", soc_gen_src_sels, ARRAY_SIZE(soc_gen_src_sels), base + HPS_CLK_GEN + 0x840, CLK_IS_CRITICAL, ctx->idle, ISO_CG_SECURE, false);
+	hws[X5_SEC_APB_CLK] = drobot_clk_register_generator("sec_apb_clk", soc_gen_src_sels, ARRAY_SIZE(soc_gen_src_sels), base + HPS_CLK_GEN + 0x860, CLK_IS_CRITICAL, ctx->idle, ISO_CG_SECURE, false);
 	hws[X5_LSIO_LPWM0_CLK] = drobot_clk_register_generator_no_idle("lpwm0_clk", soc_gen_src_sels, ARRAY_SIZE(soc_gen_src_sels), base + HPS_CLK_GEN + 0x880);
 	hws[X5_LSIO_LPWM1_CLK] = drobot_clk_register_generator_no_idle("lpwm1_clk", soc_gen_src_sels, ARRAY_SIZE(soc_gen_src_sels), base + HPS_CLK_GEN + 0x8A0);
 	hws[X5_HPS_DMA_AXI_CLK] = drobot_clk_register_gen_no_flags("hps_dma_axi_clk", soc_gen_src_sels, ARRAY_SIZE(soc_gen_src_sels), base + HPS_CLK_GEN + 0x8C0, ctx->idle, ISO_CG_DMA);
@@ -648,7 +656,14 @@ static int crm_hps_clk_init(struct platform_device *pdev)
 		clk_set_rate(hws[X5_CPU_SCLK]->clk, 1200000000);
 	} else {
 		clk_set_rate(hws[X5_CPU_SCLK]->clk, 1200000000);
-		// clk_set_rate(hws[X5_CPU_PLL_P]->clk, 1800000000);
+	}
+
+	if (qspi_boot) {
+		clk_set_rate(hws[X5_TOP_APB_CLK]->clk, 100000000);
+		clk_set_rate(hws[X5_HSIO_QSPI_BUS_CLK]->clk, 100000000);
+	} else {
+		clk_set_rate(hws[X5_TOP_APB_CLK]->clk, 200000000);
+		clk_set_rate(hws[X5_HSIO_QSPI_BUS_CLK]->clk, 200000000);
 	}
 
 	ret = devm_of_clk_add_hw_provider(dev, of_clk_hw_onecell_get, &ctx->clk_hw_data);

@@ -13,6 +13,7 @@
 
 #define RX_DMA_SIZE	(256)
 #define RX_DMA_PERIODS	(16)
+#define TX_DMA_SIZE	(RX_DMA_SIZE / RX_DMA_PERIODS)
 
 static void __dma_tx_complete(void *param)
 {
@@ -110,6 +111,7 @@ int serial8250_tx_dma(struct uart_8250_port *p)
 	}
 
 	dma->tx_size = CIRC_CNT_TO_END(xmit->head, xmit->tail, UART_XMIT_SIZE);
+	dma->tx_size = min_t(unsigned int, dma->tx_size , TX_DMA_SIZE);
 
 	serial8250_do_prepare_tx_dma(p);
 

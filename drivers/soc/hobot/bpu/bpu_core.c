@@ -761,7 +761,7 @@ static void bpu_core_make_sure_close(struct bpu_core *core)
 	}
 
 	if (bpu_clock_quirk) {
-		//bpu_core_clk_off_quirk(core);
+		bpu_core_clk_off_quirk(core);
 		bpu_core_power_off_quirk(core);
 	}
 }

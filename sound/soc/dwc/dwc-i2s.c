@@ -972,7 +972,6 @@ err_clk_disable:
 	if (dev->capability & DW_I2S_MASTER) {
 		clk_disable_unprepare(dev->pclk);
 		clk_disable_unprepare(dev->mclk);
-		clk_disable_unprepare(dev->sclk);
 	}
 	return ret;
 }
@@ -984,7 +983,6 @@ static int dw_i2s_remove(struct platform_device *pdev)
 	if (dev->capability & DW_I2S_MASTER) {
 		clk_disable_unprepare(dev->pclk);
 		clk_disable_unprepare(dev->mclk);
-		clk_disable_unprepare(dev->sclk);
 	}
 
 	pm_runtime_disable(&pdev->dev);

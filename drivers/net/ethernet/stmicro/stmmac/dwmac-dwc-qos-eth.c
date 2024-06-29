@@ -40,7 +40,10 @@ struct tegra_eqos {
 struct x5_eqos {
 	struct device *dev;
 	void __iomem *regs;
+	void __iomem *sub_addr;
+	phy_interface_t interface;
 
+	struct reset_control *rst;
 	struct clk *clk_axi;
 	struct clk *clk_rgmii;
 
@@ -425,13 +428,28 @@ static int x5_qos_clks_config(void *priv, bool enabled)
 static int x5_qos_init(struct platform_device *pdev, void *priv)
 {
 	struct x5_eqos *x5_qos = priv;
+	u32 val;
+
+	if (x5_qos->interface == PHY_INTERFACE_MODE_RMII) {
+		// set enet rmii and clk turn on
+		val = ioread32(x5_qos->sub_addr);
+		val &= 0xFFFFFFF0;
+		val |= 0xC;
+		iowrite32(val, x5_qos->sub_addr);
+	} else {
+		// set enet rgmii and clk turn on
+		val = ioread32(x5_qos->sub_addr);
+		val &= 0xFFFFFFF0;
+		val |= 0x9;
+		iowrite32(val, x5_qos->sub_addr);
+	}
 
 	clk_prepare_enable(x5_qos->clk_axi);
 	if (!IS_ERR_OR_NULL(x5_qos->phyreset)) {
 		gpiod_set_value(x5_qos->phyreset, 0);
-		msleep(20);
+		msleep(1);
 		gpiod_set_value(x5_qos->phyreset, 1);
-		msleep(100);
+		msleep(32);
 	}
 
 	return 0;
@@ -452,6 +470,9 @@ static int x5_eqos_probe(struct platform_device *pdev,
 {
 	struct device *dev = &pdev->dev;
 	struct x5_eqos *x5_eqos;
+	struct resource *res_sub;
+	struct device_node *np = pdev->dev.of_node;
+	u32 val;
 	int err;
 
 	x5_eqos = devm_kzalloc(&pdev->dev, sizeof(struct x5_eqos), GFP_KERNEL);
@@ -463,6 +484,40 @@ static int x5_eqos_probe(struct platform_device *pdev,
 
 	if (!is_of_node(dev->fwnode))
 		goto bypass_clk_reset_gpio;
+
+	res_sub = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+	if (!res_sub) {
+		dev_err(&pdev->dev, "%s, get plat resouce failed\n", __func__);
+		err = -EPROBE_DEFER;
+		goto error;
+	}
+
+	x5_eqos->sub_addr = devm_ioremap(&pdev->dev, res_sub->start, resource_size(res_sub));
+	if (IS_ERR(x5_eqos->sub_addr)) {
+		dev_err(&pdev->dev, "%s, error ioremap\n", __func__);
+		err = -EPROBE_DEFER;
+		goto error;
+	}
+
+	err = of_get_phy_mode(np,  &x5_eqos->interface);
+	if (err) {
+		dev_err(&pdev->dev, "missing required property 'phy-mode'\n");
+		goto error;
+	}
+
+	if (x5_eqos->interface == PHY_INTERFACE_MODE_RMII) {
+		// set enet rmii and clk turn on
+		val = ioread32(x5_eqos->sub_addr);
+		val &= 0xFFFFFFF0;
+		val |= 0xC;
+		iowrite32(val, x5_eqos->sub_addr);
+	} else {
+		// set enet rgmii and clk turn on
+		val = ioread32(x5_eqos->sub_addr);
+		val &= 0xFFFFFFF0;
+		val |= 0x9;
+		iowrite32(val, x5_eqos->sub_addr);
+	}
 
 	x5_eqos->clk_axi = devm_clk_get(&pdev->dev, "axi_clk");
 	if (IS_ERR(x5_eqos->clk_axi)) {
@@ -491,22 +546,30 @@ static int x5_eqos_probe(struct platform_device *pdev,
 	}
 
 	x5_eqos->phyreset = devm_gpiod_get_optional(&pdev->dev, "phyreset", GPIOD_OUT_HIGH);
-	if (IS_ERR_OR_NULL(x5_eqos->phyreset)) {
-		err = PTR_ERR(x5_eqos->phyreset);
+	if (!IS_ERR_OR_NULL(x5_eqos->phyreset)) {
+		/* do phy pulse reset, otherwise, ethernet not work.. */
+		gpiod_set_value(x5_eqos->phyreset, 0);
+		msleep(1);
+		gpiod_set_value(x5_eqos->phyreset, 1);
+		msleep(25);
+	}
+
+	x5_eqos->rst = devm_reset_control_get_optional(&pdev->dev, "enet_rst");
+	if (IS_ERR(x5_eqos->rst)) {
+		err = PTR_ERR(x5_eqos->rst);
 		goto disable_axi;
 	}
 
-	/* do phy pulse reset, otherwise, ethernet not work.. */
-	gpiod_set_value(x5_eqos->phyreset, 0);
-	msleep(20);
-	gpiod_set_value(x5_eqos->phyreset, 1);
-	msleep(100);
+	reset_control_assert(x5_eqos->rst);
+	udelay(1);
+	reset_control_deassert(x5_eqos->rst);
 
 bypass_clk_reset_gpio:
 	data->clks_config = x5_qos_clks_config;
 	data->init = x5_qos_init;
 	data->exit = x5_qos_exit;
 	data->bsp_priv = x5_eqos;
+	data->sph_disable = 1;
 
 	return 0;
 

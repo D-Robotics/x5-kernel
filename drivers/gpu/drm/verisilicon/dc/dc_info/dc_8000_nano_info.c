@@ -68,6 +68,29 @@ static const u32 primary_overlay_formats[] = {
 	DRM_FORMAT_NV21,     //
 };
 
+static const u32 gc_overlay_formats[] = {
+	DRM_FORMAT_ARGB4444, //
+	DRM_FORMAT_ARGB1555, //
+	DRM_FORMAT_RGB565,   //
+	// DRM_FORMAT_RGB888,   //
+	DRM_FORMAT_ARGB8888, //
+	DRM_FORMAT_RGBA4444, //
+	DRM_FORMAT_RGBA5551, //
+	DRM_FORMAT_RGBA8888, //
+	DRM_FORMAT_ABGR4444, //
+	DRM_FORMAT_ABGR1555, //
+	DRM_FORMAT_BGR565,   //
+	// DRM_FORMAT_BGR888,   //
+	DRM_FORMAT_ABGR8888, //
+	DRM_FORMAT_BGRA4444, //
+	DRM_FORMAT_BGRA5551, //
+	DRM_FORMAT_BGRA8888, //
+	DRM_FORMAT_YUYV,     //
+	// DRM_FORMAT_YVYU,     //
+	DRM_FORMAT_NV12, //
+	DRM_FORMAT_NV21, //
+};
+
 static const u32 cursor_formats[] = {DRM_FORMAT_ARGB8888};
 
 static const struct vs_color_format_mapping format_map[] = {
@@ -255,9 +278,6 @@ static const struct dc_proc_info dc_proc_info_gpu_0[] = {
 		.info  = &((struct gpu_plane_info){
 			 .features = GPU_PLANE_OUT,
 			 .id	   = 0,
-			 .height   = 480,
-			 .width	   = 640,
-			 .fourcc   = DRM_FORMAT_ARGB8888,
 		 }),
 		.funcs = &gpu_plane_funcs,
 	},
@@ -278,6 +298,7 @@ static const struct dc_proc_info dc_proc_info_gpu_0[] = {
 		.info  = &((struct gpu_plane_info){
 			 .features = GPU_PLANE_IN | GPU_PLANE_SCALE | GPU_PLANE_ROTATION,
 			 .id	   = 0,
+			 .fourcc   = DRM_FORMAT_ARGB8888,
 		 }),
 		.funcs = &gpu_plane_funcs,
 	},
@@ -433,6 +454,7 @@ static struct dc_plane_info dc_plane_info[] = {
 					      BIT(DRM_MODE_BLEND_PREMULTI) |
 					      BIT(DRM_MODE_BLEND_COVERAGE),
 #ifdef CONFIG_VERISILICON_GC_PROC_SUPPORT
+				.rotation   = DRM_MODE_ROTATE_MASK | DRM_MODE_REFLECT_MASK,
 				.min_scale = FRAC_16_16(1, 3),
 				.max_scale = FRAC_16_16(3, 1),
 #else
@@ -459,8 +481,8 @@ static struct dc_plane_info dc_plane_info[] = {
 				.type	       = DRM_PLANE_TYPE_OVERLAY,
 				.modifiers     = format_modifiers,
 				.num_modifiers = NUM_MODIFIERS,
-				.num_formats   = ARRAY_SIZE(primary_overlay_formats),
-				.formats       = primary_overlay_formats,
+				.num_formats   = ARRAY_SIZE(gc_overlay_formats),
+				.formats       = gc_overlay_formats,
 				.min_width     = 0,
 				.min_height    = 0,
 				.max_width     = 2560,
@@ -485,8 +507,8 @@ static struct dc_plane_info dc_plane_info[] = {
 				.type	       = DRM_PLANE_TYPE_OVERLAY,
 				.modifiers     = format_modifiers,
 				.num_modifiers = NUM_MODIFIERS,
-				.num_formats   = ARRAY_SIZE(primary_overlay_formats),
-				.formats       = primary_overlay_formats,
+				.num_formats   = ARRAY_SIZE(gc_overlay_formats),
+				.formats       = gc_overlay_formats,
 				.min_width     = 0,
 				.min_height    = 0,
 				.max_width     = 2560,
@@ -511,8 +533,8 @@ static struct dc_plane_info dc_plane_info[] = {
 				.type	       = DRM_PLANE_TYPE_OVERLAY,
 				.modifiers     = format_modifiers,
 				.num_modifiers = NUM_MODIFIERS,
-				.num_formats   = ARRAY_SIZE(primary_overlay_formats),
-				.formats       = primary_overlay_formats,
+				.num_formats   = ARRAY_SIZE(gc_overlay_formats),
+				.formats       = gc_overlay_formats,
 				.min_width     = 0,
 				.min_height    = 0,
 				.max_width     = 2560,
@@ -537,8 +559,8 @@ static struct dc_plane_info dc_plane_info[] = {
 				.type	       = DRM_PLANE_TYPE_OVERLAY,
 				.modifiers     = format_modifiers,
 				.num_modifiers = NUM_MODIFIERS,
-				.num_formats   = ARRAY_SIZE(primary_overlay_formats),
-				.formats       = primary_overlay_formats,
+				.num_formats   = ARRAY_SIZE(gc_overlay_formats),
+				.formats       = gc_overlay_formats,
 				.min_width     = 0,
 				.min_height    = 0,
 				.max_width     = 2560,
@@ -563,8 +585,8 @@ static struct dc_plane_info dc_plane_info[] = {
 				.type	       = DRM_PLANE_TYPE_OVERLAY,
 				.modifiers     = format_modifiers,
 				.num_modifiers = NUM_MODIFIERS,
-				.num_formats   = ARRAY_SIZE(primary_overlay_formats),
-				.formats       = primary_overlay_formats,
+				.num_formats   = ARRAY_SIZE(gc_overlay_formats),
+				.formats       = gc_overlay_formats,
 				.min_width     = 0,
 				.min_height    = 0,
 				.max_width     = 2560,
@@ -589,8 +611,8 @@ static struct dc_plane_info dc_plane_info[] = {
 				.type	       = DRM_PLANE_TYPE_OVERLAY,
 				.modifiers     = format_modifiers,
 				.num_modifiers = NUM_MODIFIERS,
-				.num_formats   = ARRAY_SIZE(primary_overlay_formats),
-				.formats       = primary_overlay_formats,
+				.num_formats   = ARRAY_SIZE(gc_overlay_formats),
+				.formats       = gc_overlay_formats,
 				.min_width     = 0,
 				.min_height    = 0,
 				.max_width     = 2560,
@@ -615,8 +637,8 @@ static struct dc_plane_info dc_plane_info[] = {
 				.type	       = DRM_PLANE_TYPE_OVERLAY,
 				.modifiers     = format_modifiers,
 				.num_modifiers = NUM_MODIFIERS,
-				.num_formats   = ARRAY_SIZE(primary_overlay_formats),
-				.formats       = primary_overlay_formats,
+				.num_formats   = ARRAY_SIZE(gc_overlay_formats),
+				.formats       = gc_overlay_formats,
 				.min_width     = 0,
 				.min_height    = 0,
 				.max_width     = 2560,
@@ -712,5 +734,5 @@ const struct dc_info dc_8000_nano_info = {
 	.max_height	 = 4096,
 	.cursor_width	 = 256,
 	.cursor_height	 = 256,
-	.pitch_alignment = 64,
+	.pitch_alignment = 192,
 };

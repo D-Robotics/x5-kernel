@@ -10,13 +10,14 @@
 #include <linux/clk-provider.h>
 #include <linux/pm_runtime.h>
 #include <linux/mod_devicetable.h>
+#include <hobot_ion_iommu.h>
 #include "nano2D_kernel_platform.h"
 
 static n2d_error_t _adjust_param(IN n2d_linux_platform_t *Platform,
 				 OUT n2d_linux_module_parameters_t *Args);
 
 static n2d_error_t _get_gpu_physical(IN n2d_linux_platform_t *Platform, IN n2d_uint64_t CPUPhysical,
-				     OUT n2d_uint64_t *GPUPhysical);
+				     IN n2d_uint32_t size, OUT n2d_uint64_t *GPUPhysical);
 
 static n2d_error_t _get_cpu_physical(IN n2d_linux_platform_t *Platform, IN n2d_uint64_t GPUPhysical,
 				     OUT n2d_uint64_t *CPUPhysical);
@@ -163,9 +164,19 @@ n2d_error_t _adjust_param(IN n2d_linux_platform_t *Platform,
 }
 
 n2d_error_t _get_gpu_physical(IN n2d_linux_platform_t *Platform, IN n2d_uint64_t CPUPhysical,
-			      OUT n2d_uint64_t *GPUPhysical)
+			      IN n2d_uint32_t size, OUT n2d_uint64_t *GPUPhysical)
 {
+#if IS_ENABLED(CONFIG_DROBOT_LITE_MMU)
+	struct device *dev = &Platform->device->dev;
+	n2d_uint64_t gpu_physical = 0;
+
+	ion_iommu_map_ion_phys(dev, (phys_addr_t)CPUPhysical, ALIGN(size, PAGE_SIZE), (dma_addr_t *)&gpu_physical, 0);
+	pr_debug("%s: CPUPhysical = 0x%llx, gpu_physical = 0x%llx.\n", __func__, CPUPhysical, gpu_physical);
+
+	*GPUPhysical = gpu_physical;
+#else
 	*GPUPhysical = CPUPhysical;
+#endif
 
 	return N2D_SUCCESS;
 }

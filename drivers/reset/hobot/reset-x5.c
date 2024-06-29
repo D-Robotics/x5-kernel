@@ -200,7 +200,7 @@ static int drobot_rst_set_signal(struct drobot_rst *drobot_rst, const struct dro
 
 	if (assert) {
 		if (signal->iso_id != 0xff) {
-			ret = drobot_idle_request(drobot_rst->idle, signal->iso_id, true);
+			ret = drobot_idle_request(drobot_rst->idle, signal->iso_id, true, false);
 			if (ret) {
 				pr_err("%s: idle request failed\n", __func__);
 				return ret;
@@ -212,7 +212,7 @@ static int drobot_rst_set_signal(struct drobot_rst *drobot_rst, const struct dro
 		drobot_rst_clear_bits(drobot_rst, signal->offset, signal->mask);
 
 		if (signal->iso_id != 0xff) {
-			ret = drobot_idle_request(drobot_rst->idle, signal->iso_id, false);
+			ret = drobot_idle_request(drobot_rst->idle, signal->iso_id, false, false);
 			if (ret) {
 				pr_err("%s: idle connect failed\n", __func__);
 				return ret;

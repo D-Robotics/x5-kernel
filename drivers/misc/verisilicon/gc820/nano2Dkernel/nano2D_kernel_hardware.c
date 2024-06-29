@@ -571,8 +571,8 @@ n2d_error_t n2d_kernel_hardware_start(n2d_hardware_t *hardware)
 						      cmd_buf_start_address, &size));
 
 		dcache_clean_poc(
-			(unsigned long)phys_to_virt(cmd_buf_start_address),
-			(unsigned long)phys_to_virt(cmd_buf_start_address) + 16);
+			(unsigned long)phys_to_virt(cmd_buf->address),
+			(unsigned long)phys_to_virt(cmd_buf->address) + 16);
 
 		cmd_buf->wl_current_logical = cmd_buf_start_logical;
 		cmd_buf->wl_current_address = cmd_buf_start_address;

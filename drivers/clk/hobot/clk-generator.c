@@ -43,6 +43,7 @@ struct clk_generator {
 	u8 offset;
 	struct device *idle;
 	u32 iso_id;
+	bool skip_wait_idle;
 };
 
 static void gen_set_clear(struct clk_generator *gen, u32 set, u32 clear)
@@ -75,13 +76,13 @@ static int clk_gen_endisable(struct clk_hw *hw, int enable)
 
 	if (!enable)
 		if (gen->iso_id != 0xff)
-			ret = drobot_idle_request(gen->idle, gen->iso_id, true);
+			ret = drobot_idle_request(gen->idle, gen->iso_id, true, gen->skip_wait_idle);
 
 	writel(reg, gen->reg);
 
 	if (enable)
 		if (gen->iso_id != 0xff)
-			ret = drobot_idle_request(gen->idle, gen->iso_id, false);
+			ret = drobot_idle_request(gen->idle, gen->iso_id, false, gen->skip_wait_idle);
 
 	return ret;
 }
@@ -464,7 +465,7 @@ static const struct clk_ops clk_generator_i2s_ops = {
  */
 struct clk_hw *drobot_clk_register_generator(const char *name, const char *const *parent_names,
 					 u8 num_parents, void __iomem *reg, unsigned long flags,
-					 struct device *idle, u32 iso_id)
+					 struct device *idle, u32 iso_id, bool skip_wait_idle)
 {
 	struct clk_init_data init;
 	struct clk_hw *hw = ERR_PTR(-ENOMEM);
@@ -485,6 +486,7 @@ struct clk_hw *drobot_clk_register_generator(const char *name, const char *const
 	gen->hw.init = &init;
 	gen->idle = idle;
 	gen->iso_id = iso_id;
+	gen->skip_wait_idle = skip_wait_idle;
 
 	hw = &gen->hw;
 	ret = clk_hw_register(NULL, hw);

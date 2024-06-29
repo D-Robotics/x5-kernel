@@ -63,7 +63,7 @@ static struct drm_framebuffer *vs_create_fb_internal(struct drm_device *dev,
 		size   = height * mode_cmd->pitches[i] + mode_cmd->offsets[i];
 
 		objs[i] = vs_gem_create_object(dev, size);
-		if (!objs[i]) {
+		if (IS_ERR(objs[i])) {
 			dev_err(dev->dev, "Failed to create GEM object.\n");
 			ret = -ENXIO;
 			goto err;
@@ -85,6 +85,78 @@ err:
 }
 
 static void gpu_proc_disable_plane(struct dc_proc *dc_proc, void *old_state) {}
+
+static n2d_buffer_format_t to_gc_format(u32 format)
+{
+	n2d_buffer_format_t f = 0;
+	switch (format) {
+	case DRM_FORMAT_ARGB4444:
+		f = N2D_ARGB4444;
+		break;
+	case DRM_FORMAT_ARGB1555:
+		f = N2D_A1R5G5B5;
+		break;
+	case DRM_FORMAT_RGB565:
+		f = N2D_RGB565;
+		break;
+	// case DRM_FORMAT_RGB888:
+	//	f = N2D_RGB888;
+	//	break;
+	case DRM_FORMAT_ARGB8888:
+		f = N2D_ARGB8888;
+		break;
+	case DRM_FORMAT_RGBA4444:
+		f = N2D_RGBA4444;
+		break;
+	case DRM_FORMAT_RGBA5551:
+		f = N2D_R5G5B5A1;
+		break;
+	case DRM_FORMAT_RGBA8888:
+		f = N2D_RGBA8888;
+		break;
+	case DRM_FORMAT_ABGR4444:
+		f = N2D_ABGR4444;
+		break;
+	case DRM_FORMAT_ABGR1555:
+		f = N2D_A1B5G5R5;
+		break;
+	case DRM_FORMAT_BGR565:
+		f = N2D_BGR565;
+		break;
+	// case DRM_FORMAT_BGR888:
+	//	f = N2D_BGR888;
+	//	break;
+	case DRM_FORMAT_ABGR8888:
+		f = N2D_ABGR8888;
+		break;
+	case DRM_FORMAT_BGRA4444:
+		f = N2D_BGRA4444;
+		break;
+	case DRM_FORMAT_BGRA5551:
+		f = N2D_B5G5R5A1;
+		break;
+	case DRM_FORMAT_BGRA8888:
+		f = N2D_BGRA8888;
+		break;
+	case DRM_FORMAT_YUYV:
+		f = N2D_YUYV;
+		break;
+	// case DRM_FORMAT_YVYU:
+	//	f = N2D_YUYV;
+	//	break;
+	case DRM_FORMAT_NV12:
+		f = N2D_NV12;
+		break;
+	case DRM_FORMAT_NV21:
+		f = N2D_NV21;
+		break;
+	default:
+		f = N2D_ARGB8888;
+		break;
+	}
+
+	return f;
+}
 
 static n2d_orientation_t to_gc_rotation(unsigned int rotation)
 {
@@ -118,6 +190,19 @@ static n2d_orientation_t to_gc_rotation(unsigned int rotation)
 	return orientation;
 }
 
+static void update_iommu(struct device *dev, dma_addr_t phys, size_t size)
+{
+	struct iommu_domain *domain = NULL;
+
+	domain = iommu_get_domain_for_dev(dev);
+	if (!domain) {
+		dev_err(dev, "failed to get iommu domain.\n");
+		return;
+	}
+
+	iommu_map(domain, phys, phys, PAGE_ALIGN(size), 0);
+}
+
 static void aux_rotate(struct vs_n2d_aux *aux, unsigned int rotation, n2d_rectangle_t *rect)
 {
 	n2d_buffer_t src = {0}, dst = {0};
@@ -136,33 +221,41 @@ static void aux_rotate(struct vs_n2d_aux *aux, unsigned int rotation, n2d_rectan
 	/* check size based on format/width, height */
 	memDesc.flag	 = N2D_WRAP_FROM_USERMEMORY;
 	memDesc.physical = config->in_buffer_addr[0][0]; /* assume the buffer is contiguous */
-	memDesc.size =
-		config->input_stride[0] * config->input_height[0]; /* assume buffer is aligned */
+	memDesc.size	 = gcmALIGN(config->input_stride[0] * config->input_height[0] + 64,
+				    64); /* assume buffer is aligned */
+	update_iommu(aux->dev, memDesc.physical, memDesc.size);
 	N2D_ON_ERROR(n2d_wrap(&memDesc, &handle));
 
-	src.width	= config->input_width[0];
-	src.height	= config->input_height[0];
-	src.stride	= config->input_stride[0];
-	src.format	= N2D_ARGB8888;
-	src.handle	= handle;
-	src.alignedh	= config->input_height[0];
-	src.alignedw	= config->input_width[0];
+	src.width    = config->input_width[0];
+	src.height   = config->input_height[0];
+	src.stride   = config->input_stride[0];
+	src.format   = config->ninputs;
+	src.handle   = handle;
+	src.alignedh = config->input_height[0];
+	src.alignedw = config->input_stride[0];
+	if (src.format == N2D_NV12 || src.format == N2D_NV21) {
+		src.alignedw = gcmALIGN(src.alignedw, 64);
+	}
 	src.orientation = to_gc_rotation(rotation);
 	N2D_ON_ERROR(n2d_map(&src));
 	src.tiling = N2D_LINEAR;
 
 	memDesc.flag	 = N2D_WRAP_FROM_USERMEMORY;
 	memDesc.physical = config->out_buffer_addr[0];
-	memDesc.size	 = config->output_stride * config->output_height;
+	memDesc.size	 = gcmALIGN(config->output_stride * config->output_height + 64, 64);
+	update_iommu(aux->dev, memDesc.physical, memDesc.size);
 	N2D_ON_ERROR(n2d_wrap(&memDesc, &handle));
 
 	dst.width    = config->output_width;
 	dst.height   = config->output_height;
 	dst.stride   = config->output_stride;
-	dst.format   = N2D_ARGB8888;
+	dst.format   = config->output_format;
 	dst.handle   = handle;
 	dst.alignedh = config->output_height;
 	dst.alignedw = config->output_stride;
+	if (dst.format == N2D_NV12 || dst.format == N2D_NV21) {
+		dst.alignedw = gcmALIGN(dst.alignedw, 64);
+	}
 	N2D_ON_ERROR(n2d_map(&dst));
 	dst.tiling = N2D_LINEAR;
 
@@ -195,49 +288,27 @@ static void update_cfg(struct vs_n2d_aux *aux, struct drm_framebuffer *dst,
 	struct n2d_config *cfg = &aux->config;
 	cfg->input_width[0]    = src->width;
 	cfg->input_height[0]   = src->height;
-	cfg->input_stride[0]   = src->width * 4; /* default format is argb */
+	cfg->input_stride[0]   = src->pitches[0]; /* default format is argb */
 	get_buffer_addr(src, dma_addr);
 	cfg->in_buffer_addr[0][0] = dma_addr[0]; /* assume the buffer is continuous */
+	cfg->ninputs		  = to_gc_format(src->format->format);
+	pr_debug("%s: src_format = %d.\n", __func__, cfg->ninputs);
+	pr_debug("%s: src_width = %d.\n", __func__, cfg->input_width[0]);
+	pr_debug("%s: src_height = %d.\n", __func__, cfg->input_height[0]);
+	pr_debug("%s: src_stride = %d.\n", __func__, cfg->input_stride[0]);
+	pr_debug("%s: src addr = 0x%llx.\n", __func__, dma_addr[0]);
 
 	cfg->output_width  = dst->width;
 	cfg->output_height = dst->height;
-	cfg->output_stride = dst->width * 4;
+	cfg->output_stride = dst->pitches[0];
 	get_buffer_addr(dst, dma_addr);
 	cfg->out_buffer_addr[0] = dma_addr[0];
-	cfg->output_format	= dst->format->format;
-}
-
-static void gpu_proc_update_plane(struct dc_proc *dc_proc, void *old_drm_plane_state)
-{
-	struct vs_plane *vs_plane		= proc_to_vs_plane(dc_proc);
-	struct gpu_plane_proc *hw_plane		= to_gpu_plane_proc(dc_proc);
-	const struct gpu_plane_info *plane_info = hw_plane->base.info->info;
-	struct drm_plane_state *plane_state	= vs_plane->base.state;
-	struct vs_n2d_aux *aux			= hw_plane->aux;
-	struct drm_rect *dst			= &plane_state->dst;
-	n2d_rectangle_t rect;
-
-	if (plane_info->features & GPU_PLANE_OUT) {
-		drm_framebuffer_assign(&context.priv_fb, plane_state->fb);
-		drm_framebuffer_assign(&plane_state->fb, context.in_fb);
-		return;
-	}
-
-	//GPU process plane_state->fb
-	rect.x	    = dst->x1;
-	rect.y	    = dst->y1;
-	rect.width  = drm_rect_width(dst);
-	rect.height = drm_rect_height(dst);
-
-	update_cfg(aux, context.priv_fb, plane_state->fb);
-	if (plane_state->rotation & (DRM_MODE_ROTATE_MASK | DRM_MODE_REFLECT_MASK)) {
-		aux_rotate(aux, plane_state->rotation, &rect);
-	} else {
-		aux_overlay(aux);
-	}
-
-	drm_framebuffer_assign(&context.in_fb, plane_state->fb);
-	drm_framebuffer_assign(&plane_state->fb, context.priv_fb);
+	cfg->output_format	= to_gc_format(dst->format->format);
+	pr_debug("%s: out_format = %d.\n", __func__, cfg->output_format);
+	pr_debug("%s: out_width = %d.\n", __func__, cfg->output_width);
+	pr_debug("%s: out_height = %d.\n", __func__, cfg->output_height);
+	pr_debug("%s: out_stride = %d.\n", __func__, cfg->output_stride);
+	pr_debug("%s: out addr = 0x%llx.\n", __func__, dma_addr[0]);
 }
 
 static int create_fb(struct dc_proc *dc_proc)
@@ -245,17 +316,27 @@ static int create_fb(struct dc_proc *dc_proc)
 	struct gpu_plane_proc *hw_plane		= to_gpu_plane_proc(dc_proc);
 	struct drm_plane *plane			= to_drm_plane(dc_proc);
 	const struct gpu_plane_info *plane_info = hw_plane->base.info->info;
-
+	struct drm_device *drm_dev		= plane->dev;
+	const struct vs_drm_private *priv	= drm_to_vs_priv(drm_dev);
+	struct drm_plane_state *plane_state	= plane->state;
+	struct drm_rect *dst			= &plane_state->dst;
 	struct drm_framebuffer *fb;
 	struct drm_mode_fb_cmd2 fbreq = {
-		.width	      = plane_info->width,
-		.height	      = plane_info->height,
+		.width	      = drm_rect_width(dst),
+		.height	      = drm_rect_height(dst),
 		.pixel_format = plane_info->fourcc,
-		.pitches      = {plane_info->width * 4},
+		.pitches      = {drm_rect_width(dst) * 4},
 	};
 
-	if (!(plane_info->features & GPU_PLANE_OUT) || context.priv_fb)
-		return 0;
+	fbreq.pitches[0] = num_align(fbreq.pitches[0], priv->pitch_alignment);
+
+	if (context.priv_fb) { /* if size changes, realloc the buffer */
+		if (context.priv_fb->width != fbreq.width ||
+		    context.priv_fb->height != fbreq.height)
+			drm_gem_fb_destroy(context.priv_fb);
+		else
+			return 0;
+	}
 
 	fb = vs_create_fb_internal(plane->dev, &fbreq);
 	if (IS_ERR(fb))
@@ -266,6 +347,35 @@ static int create_fb(struct dc_proc *dc_proc)
 	return 0;
 }
 
+static void gpu_proc_update_plane(struct dc_proc *dc_proc, void *old_drm_plane_state)
+{
+	struct vs_plane *vs_plane		= proc_to_vs_plane(dc_proc);
+	struct gpu_plane_proc *hw_plane		= to_gpu_plane_proc(dc_proc);
+	const struct gpu_plane_info *plane_info = hw_plane->base.info->info;
+	struct drm_plane_state *plane_state	= vs_plane->base.state;
+	struct vs_n2d_aux *aux			= hw_plane->aux;
+
+	if (plane_info->features & GPU_PLANE_IN) {
+		create_fb(dc_proc);
+	}
+
+	if (plane_info->features & GPU_PLANE_OUT) {
+		drm_framebuffer_assign(&context.priv_fb, plane_state->fb);
+		drm_framebuffer_assign(&plane_state->fb, context.in_fb);
+		return;
+	}
+
+	update_cfg(aux, context.priv_fb, plane_state->fb);
+	if (plane_state->rotation & (DRM_MODE_ROTATE_MASK | DRM_MODE_REFLECT_MASK)) {
+		aux_rotate(aux, plane_state->rotation, NULL);
+	} else {
+		aux_overlay(aux);
+	}
+
+	drm_framebuffer_assign(&context.in_fb, plane_state->fb);
+	drm_framebuffer_assign(&plane_state->fb, context.priv_fb);
+}
+
 static int gpu_proc_check_plane(struct dc_proc *dc_proc, void *_state)
 {
 	const struct drm_plane_state *state = _state;
@@ -273,7 +383,7 @@ static int gpu_proc_check_plane(struct dc_proc *dc_proc, void *_state)
 	if (!state->fb)
 		return 0;
 
-	return create_fb(dc_proc);
+	return 0;
 }
 
 static void gpu_proc_commit_plane(struct dc_proc *dc_proc) {}

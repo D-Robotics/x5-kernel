@@ -61,31 +61,31 @@
 		compatible = "operating-points-v2";
 
 		opp-266M {
-			opp-hz = /bits/ 64 <266>;
+			opp-hz = /bits/ 64 <266000000>;
 		};
 
 		opp-1066M {
-			opp-hz = /bits/ 64 <1066>;
+			opp-hz = /bits/ 64 <1066000000>;
 		};
 
 		opp-2133M {
-			opp-hz = /bits/ 64 <2133>;
+			opp-hz = /bits/ 64 <2133000000>;
 		};
 
 		opp-3200M {
-			opp-hz = /bits/ 64 <3200>;
+			opp-hz = /bits/ 64 <3200000000>;
 		};
 
 		opp-2844M {
-				opp-hz = /bits/ 64 <2844>;
+				opp-hz = /bits/ 64 <2844000000>;
 		};
 
 		opp-3733M {
-				opp-hz = /bits/ 64 <3733>;
+				opp-hz = /bits/ 64 <3733000000>;
 		};
 
 		opp-4266M {
-				opp-hz = /bits/ 64 <4266>;
+				opp-hz = /bits/ 64 <4266000000>;
 		};
 
 	};
@@ -1812,6 +1812,7 @@
 			clocks = <&osc>, <&clk_32k>, <&audio_externel_clk>;
 			clock-names = "osc", "32k", "audio_externel";
 			pll-table = <1>;
+			qspi-boot = <0>;
 			idle-dev = <&noc_idle>;
 			#clock-cells = <1>;
 			status = "disabled";
@@ -1884,6 +1885,8 @@
 				reg = <X5_GPU>;
 				#power-domain-cells = <0>;
 				gpu-supply = <&vdd08_gpu_reg>;
+				clocks = <&hpsclks X5_GPU_PCLK>,
+					 <&hpsclks X5_GPU_GC8000L_CLK>;
 			};
 			x5_isp_pd@x5-isp-pd {
 				reg = <X5_ISP>;
@@ -2065,7 +2068,7 @@
 			cnn-id = <0>;
 			resets = <&socrst BPU_RESET>;
 			reset-names = "cnn_rst";
-			clocks = <&hpsclks X5_BPU_MCLK_2X>;
+			clocks = <&hpsclks X5_BPU_MCLK_2X_CLK>;
 			clock-names = "cnn_mclk";
 			power-domains = <&power X5_BPU>;
 			operating-points-v2 = <&bpu_opp_table>;
@@ -2533,7 +2536,8 @@
 			gmac_tsn: gmac-tsn@35010000 {
 				compatible = "x5,dwc-qos-ethernet-4.10";
 				status = "disabled";
-				reg = <0x35010000 0x10000>;
+				reg = <0x35010000 0x10000>,
+					<0x35050000 0x4>;
 				interrupt-parent = <&gic>;
 				interrupts = <GIC_SPI 24 IRQ_TYPE_LEVEL_HIGH>;
 				interrupt-names = "macirq";
@@ -2544,13 +2548,26 @@
 					 <&hpsclks X5_HSIO_ENET_PTP_REFCLK>;
 				clock-names = "axi_clk", "rgmii_clk", "stmmaceth",
 					      "pclk", "ptp_ref";
+				resets = <&socrst HSIO_ENET_RESET>;
+				reset-names = "enet_rst";
 				snps,burst-map = <5>;
 				snps,force_sf_dma_mode = <1>;
 				phy-mode = "rgmii-id";
 				phy-handle = <&ethphy0>;
+
 				snps,mtl-tx-config = <&txnode>;
 				snps,mtl-rx-config = <&rxnode>;
-				resets = <&socrst HSIO_ENET_RESET>;
+
+				mdio {
+					compatible = "snps,dwmac-mdio";
+					#address-cells = <1>;
+					#size-cells = <0>;
+					ethphy0: ethernet-phy@1 {
+						compatible =
+							"ethernet-phy-ieee802.3-c22";
+						reg = <1>;
+					};
+				};
 
 				txnode:txnode@1 {
 					snps,tx-queues-to-use = <1>;
@@ -2605,17 +2622,6 @@
 					};
 					rxqueue7: rxqueue@8 {
 						snps,dcb-algorithm;
-					};
-				};
-
-				mdio {
-					compatible = "snps,dwmac-mdio";
-					#address-cells = <1>;
-					#size-cells = <0>;
-					ethphy0: ethernet-phy@1 {
-						compatible =
-							"ethernet-phy-ieee802.3-c22";
-						reg = <1>;
 					};
 				};
 			};
@@ -3643,8 +3649,8 @@
 				clock-names = "adc-clk","adc-pclk";
 				assigned-clock-rates = <32000000>;
 				/* disable efuse binding by default */
-				//nvmem-cells = <&efuse_adc_offset>, <&efuse_adc_trimming>;
-				//nvmem-cell-names = "adc-offset", "adc-trimming";
+				nvmem-cells = <&efuse_adc_offset>, <&efuse_adc_trimming>;
+				nvmem-cell-names = "adc-offset", "adc-trimming";
 				vref-supply = <&reg_adc_vref_1v8>;
 				#io-channel-cells = <1>;
 				guc,adc-channels = <0 1 2 3 4 5 6 7>;
