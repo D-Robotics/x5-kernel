@@ -813,14 +813,14 @@ mvneta_get_stats64(struct net_device *dev,
 
 		cpu_stats = per_cpu_ptr(pp->stats, cpu);
 		do {
-			start = u64_stats_fetch_begin(&cpu_stats->syncp);
+			start = u64_stats_fetch_begin_irq(&cpu_stats->syncp);
 			rx_packets = cpu_stats->es.ps.rx_packets;
 			rx_bytes   = cpu_stats->es.ps.rx_bytes;
 			rx_dropped = cpu_stats->rx_dropped;
 			rx_errors  = cpu_stats->rx_errors;
 			tx_packets = cpu_stats->es.ps.tx_packets;
 			tx_bytes   = cpu_stats->es.ps.tx_bytes;
-		} while (u64_stats_fetch_retry(&cpu_stats->syncp, start));
+		} while (u64_stats_fetch_retry_irq(&cpu_stats->syncp, start));
 
 		stats->rx_packets += rx_packets;
 		stats->rx_bytes   += rx_bytes;
@@ -1505,7 +1505,7 @@ static void mvneta_defaults_set(struct mvneta_port *pp)
 			 */
 			if (txq_number == 1)
 				txq_map = (cpu == pp->rxq_def) ?
-					MVNETA_CPU_TXQ_ACCESS(1) : 0;
+					MVNETA_CPU_TXQ_ACCESS(0) : 0;
 
 		} else {
 			txq_map = MVNETA_CPU_TXQ_ACCESS_ALL_MASK;
@@ -4294,7 +4294,7 @@ static void mvneta_percpu_elect(struct mvneta_port *pp)
 		 */
 		if (txq_number == 1)
 			txq_map = (cpu == elected_cpu) ?
-				MVNETA_CPU_TXQ_ACCESS(1) : 0;
+				MVNETA_CPU_TXQ_ACCESS(0) : 0;
 		else
 			txq_map = mvreg_read(pp, MVNETA_CPU_MAP(cpu)) &
 				MVNETA_CPU_TXQ_ACCESS_ALL_MASK;
@@ -4730,14 +4730,17 @@ static void mvneta_ethtool_get_strings(struct net_device *netdev, u32 sset,
 				       u8 *data)
 {
 	if (sset == ETH_SS_STATS) {
+		struct mvneta_port *pp = netdev_priv(netdev);
 		int i;
 
 		for (i = 0; i < ARRAY_SIZE(mvneta_statistics); i++)
 			memcpy(data + i * ETH_GSTRING_LEN,
 			       mvneta_statistics[i].name, ETH_GSTRING_LEN);
 
-		data += ETH_GSTRING_LEN * ARRAY_SIZE(mvneta_statistics);
-		page_pool_ethtool_stats_get_strings(data);
+		if (!pp->bm_priv) {
+			data += ETH_GSTRING_LEN * ARRAY_SIZE(mvneta_statistics);
+			page_pool_ethtool_stats_get_strings(data);
+		}
 	}
 }
 
@@ -4762,7 +4765,7 @@ mvneta_ethtool_update_pcpu_stats(struct mvneta_port *pp,
 
 		stats = per_cpu_ptr(pp->stats, cpu);
 		do {
-			start = u64_stats_fetch_begin(&stats->syncp);
+			start = u64_stats_fetch_begin_irq(&stats->syncp);
 			skb_alloc_error = stats->es.skb_alloc_error;
 			refill_error = stats->es.refill_error;
 			xdp_redirect = stats->es.ps.xdp_redirect;
@@ -4772,7 +4775,7 @@ mvneta_ethtool_update_pcpu_stats(struct mvneta_port *pp,
 			xdp_xmit_err = stats->es.ps.xdp_xmit_err;
 			xdp_tx = stats->es.ps.xdp_tx;
 			xdp_tx_err = stats->es.ps.xdp_tx_err;
-		} while (u64_stats_fetch_retry(&stats->syncp, start));
+		} while (u64_stats_fetch_retry_irq(&stats->syncp, start));
 
 		es->skb_alloc_error += skb_alloc_error;
 		es->refill_error += refill_error;
@@ -4855,8 +4858,10 @@ static void mvneta_ethtool_pp_stats(struct mvneta_port *pp, u64 *data)
 	struct page_pool_stats stats = {};
 	int i;
 
-	for (i = 0; i < rxq_number; i++)
-		page_pool_get_stats(pp->rxqs[i].page_pool, &stats);
+	for (i = 0; i < rxq_number; i++) {
+		if (pp->rxqs[i].page_pool)
+			page_pool_get_stats(pp->rxqs[i].page_pool, &stats);
+	}
 
 	page_pool_ethtool_stats_get(data, &stats);
 }
@@ -4872,14 +4877,21 @@ static void mvneta_ethtool_get_stats(struct net_device *dev,
 	for (i = 0; i < ARRAY_SIZE(mvneta_statistics); i++)
 		*data++ = pp->ethtool_stats[i];
 
-	mvneta_ethtool_pp_stats(pp, data);
+	if (!pp->bm_priv)
+		mvneta_ethtool_pp_stats(pp, data);
 }
 
 static int mvneta_ethtool_get_sset_count(struct net_device *dev, int sset)
 {
-	if (sset == ETH_SS_STATS)
-		return ARRAY_SIZE(mvneta_statistics) +
-		       page_pool_ethtool_stats_get_count();
+	if (sset == ETH_SS_STATS) {
+		int count = ARRAY_SIZE(mvneta_statistics);
+		struct mvneta_port *pp = netdev_priv(dev);
+
+		if (!pp->bm_priv)
+			count += page_pool_ethtool_stats_get_count();
+
+		return count;
+	}
 
 	return -EOPNOTSUPP;
 }

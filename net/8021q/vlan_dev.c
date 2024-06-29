@@ -108,8 +108,8 @@ static netdev_tx_t vlan_dev_hard_start_xmit(struct sk_buff *skb,
 	 * NOTE: THIS ASSUMES DIX ETHERNET, SPECIFICALLY NOT SUPPORTING
 	 * OTHER THINGS LIKE FDDI/TokenRing/802.3 SNAPs...
 	 */
-	if (veth->h_vlan_proto != vlan->vlan_proto ||
-	    vlan->flags & VLAN_FLAG_REORDER_HDR) {
+	if (vlan->flags & VLAN_FLAG_REORDER_HDR ||
+	    veth->h_vlan_proto != vlan->vlan_proto) {
 		u16 vlan_tci;
 		vlan_tci = vlan->vlan_id;
 		vlan_tci |= vlan_dev_get_egress_qos_mask(dev, skb->priority);
@@ -365,7 +365,7 @@ static int vlan_dev_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 
 	switch (cmd) {
 	case SIOCSHWTSTAMP:
-		if (!net_eq(dev_net(dev), &init_net))
+		if (!net_eq(dev_net(dev), dev_net(real_dev)))
 			break;
 		fallthrough;
 	case SIOCGMIIPHY:
@@ -712,13 +712,13 @@ static void vlan_dev_get_stats64(struct net_device *dev,
 
 		p = per_cpu_ptr(vlan_dev_priv(dev)->vlan_pcpu_stats, i);
 		do {
-			start = u64_stats_fetch_begin(&p->syncp);
+			start = u64_stats_fetch_begin_irq(&p->syncp);
 			rxpackets	= u64_stats_read(&p->rx_packets);
 			rxbytes		= u64_stats_read(&p->rx_bytes);
 			rxmulticast	= u64_stats_read(&p->rx_multicast);
 			txpackets	= u64_stats_read(&p->tx_packets);
 			txbytes		= u64_stats_read(&p->tx_bytes);
-		} while (u64_stats_fetch_retry(&p->syncp, start));
+		} while (u64_stats_fetch_retry_irq(&p->syncp, start));
 
 		stats->rx_packets	+= rxpackets;
 		stats->rx_bytes		+= rxbytes;

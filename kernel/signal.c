@@ -561,6 +561,10 @@ bool unhandled_signal(struct task_struct *tsk, int sig)
 	if (handler != SIG_IGN && handler != SIG_DFL)
 		return false;
 
+	/* If dying, we handle all new signals by ignoring them */
+	if (fatal_signal_pending(tsk))
+		return false;
+
 	/* if ptraced, let the tracer determine */
 	return !tsk->ptrace;
 }
@@ -2298,13 +2302,13 @@ static int ptrace_stop(int exit_code, int why, unsigned long message,
 	/*
 	 * Don't want to allow preemption here, because
 	 * sys_ptrace() needs this task to be inactive.
+	 *
+	 * XXX: implement read_unlock_no_resched().
 	 */
-	if (!IS_ENABLED(CONFIG_PREEMPT_RT))
-		preempt_disable();
+	preempt_disable();
 	read_unlock(&tasklist_lock);
 	cgroup_enter_frozen();
-	if (!IS_ENABLED(CONFIG_PREEMPT_RT))
-		preempt_enable_no_resched();
+	preempt_enable_no_resched();
 	schedule();
 	cgroup_leave_frozen(true);
 

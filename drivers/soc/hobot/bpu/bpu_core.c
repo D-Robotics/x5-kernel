@@ -687,9 +687,11 @@ static int32_t bpu_core_check_to_open(struct bpu_core *core)
 static void bpu_core_clear_reset_run_fifos(struct bpu_core *core)
 {
 	struct bpu_fc tmp_bpu_fc;
+	unsigned long flags;
 	int32_t i, prio_num;
 	int32_t ret;
 
+	spin_lock_irqsave(&core->spin_lock, flags);
 	prio_num = BPU_CORE_PRIO_NUM(core);
 	for (i = 0; i < prio_num; i++) {
 		while (!kfifo_is_empty(&core->run_fc_fifo[i])) {
@@ -697,10 +699,14 @@ static void bpu_core_clear_reset_run_fifos(struct bpu_core *core)
 			if (ret < 1) {
 				continue;
 			}
+
+			spin_unlock_irqrestore(&core->spin_lock, flags);
 			bpu_fc_clear(&tmp_bpu_fc);
+			spin_lock_irqsave(&core->spin_lock, flags);
 		}
 		kfifo_reset(&core->run_fc_fifo[i]);
 	}
+	spin_unlock_irqrestore(&core->spin_lock, flags);
 }
 
 /* break E1, no need error return inside the function */
@@ -741,8 +747,9 @@ static void bpu_core_make_sure_close(struct bpu_core *core)
 	spin_lock_irqsave(&core->spin_lock, flags);
 	core->p_run_time = 0;
 	core->ratio = 0;
-	bpu_core_clear_reset_run_fifos(core);
 	spin_unlock_irqrestore(&core->spin_lock, flags);
+
+	bpu_core_clear_reset_run_fifos(core);
 
  	// FIXME: sunrise5 needs bpu core reset, the last close operation needs to reset bpu ip
 	if (!bpu_reset_bypass) {

@@ -63,7 +63,7 @@
 #define HSIO_GPIO0_RESET			34
 #define HSIO_GPIO1_RESET			35
 
-#define	LSIO_UART0_RESET			36
+#define	LSIO_UART7_RESET			36
 #define LSIO_UART1_RESET			37
 #define	LSIO_UART2_RESET			38
 #define LSIO_UART3_RESET			39

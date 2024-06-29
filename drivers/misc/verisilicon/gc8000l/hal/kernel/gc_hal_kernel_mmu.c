@@ -4209,10 +4209,14 @@ gceSTATUS gckMMU_ConstructMmuCopy(gckKERNEL Kernel, gckMMU *MmuCopy)
 
 	gcmkONERROR(_CopyUsedDynamicArea(Kernel->os, area, areaCopy));
 
-	if (MmuCopy)
-		*MmuCopy = mmuCopy;
+	*MmuCopy = mmuCopy;
+
+	return gcvSTATUS_OK;
 
 OnError:
+	if (pointer)
+		gcmkVERIFY_OK(gcmkOS_SAFE_FREE(Kernel->os, pointer));
+
 	return status;
 }
 
@@ -4400,7 +4404,13 @@ gceSTATUS gckMMU_ConstructProcessMMU(gckKERNEL Kernel, gctUINT32 ProcessID, gckM
 
 	*Mmu = mmu;
 
+	gcmkFOOTER();
+	return gcvSTATUS_OK;
+
 OnError:
+	if (mmu)
+		gcmkVERIFY_OK(gckMMU_DestroyProcessMMU(mmu));
+
 	gcmkFOOTER();
 	return status;
 }

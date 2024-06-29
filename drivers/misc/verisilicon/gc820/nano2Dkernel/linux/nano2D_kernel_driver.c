@@ -958,6 +958,7 @@ int aux_open(struct vs_n2d_aux *aux)
 
 	gcmkASSERT(dev == global_device->dev);
 
+	gpu_resume(N2D_NULL);
 	ONERROR(n2d_kernel_dispatch(global_device->kernel, N2D_KERNEL_COMMAND_OPEN, 0, 0,
 				    N2D_NULL));
 on_error:
@@ -969,6 +970,7 @@ int aux_close(struct vs_n2d_aux *aux)
 {
 	struct device *dev = aux->dev;
 	int allocate_count = 0;
+	pm_message_t state = {0};
 
 	gcmkASSERT(dev == global_device->dev);
 
@@ -976,6 +978,8 @@ int aux_close(struct vs_n2d_aux *aux)
 	n2d_check_allocate_count(&allocate_count);
 	if (allocate_count)
 		n2d_kernel_os_print("Allocated %d memory\n", allocate_count);
+
+	gpu_suspend(N2D_NULL, state);
 
 	return 0;
 }
@@ -1189,23 +1193,11 @@ static int do_stitch(struct vio_node *vnode, struct n2d_config *config)
 	n2d_uintptr_t handle = 0;
 	n2d_user_memory_desc_t memDesc = {0};
 	n2d_error_t error	       = N2D_SUCCESS;
-	// n2d_rectangle_t rectSrc, rectDst;
 	n2d_rectangle_t rectDst;
 	n2d_int32_t vOffset = 0, hOffset = 0;
-	// n2d_state_config_t clipRect = {N2D_SET_CLIP_RECTANGLE, {0}};
-    // n2d_state_config_t srcIndex = {N2D_SET_MULTISOURCE_INDEX, {0}};
-    // n2d_state_config_t blend = {N2D_SET_ALPHABLEND_MODE, {0}};
-    // n2d_state_config_t multisrcAndDstRect = {N2D_SET_MULTISRC_DST_RECTANGLE, {0}};
-    // n2d_state_config_t rop = {N2D_SET_ROP, {0}};
-    // n2d_state_config_t globalAlpha = {N2D_SET_GLOBAL_ALPHA, {0}};
-    n2d_int32_t i = 0, srcNum = N2D_IN_MAX;
+	n2d_bool_t isVertical = N2D_FALSE;
 
-	// blend.config.alphablendMode = N2D_BLEND_NONE;
-	// globalAlpha.config.globalAlpha.dstMode = N2D_GLOBAL_ALPHA_ON;
-	// globalAlpha.config.globalAlpha.srcMode = N2D_GLOBAL_ALPHA_ON;
-	// globalAlpha.config.globalAlpha.srcValue = 0xAA;
-	// globalAlpha.config.globalAlpha.dstValue = 0xAA;
-	// rop.config.rop.bg_rop = rop.config.rop.fg_rop = 0xCC;
+	n2d_int32_t i = 0, srcNum = config->ninputs;
 
 	for (i = 0; i < srcNum; i++) {
 		memDesc.flag = N2D_WRAP_FROM_USERMEMORY;
@@ -1227,7 +1219,6 @@ static int do_stitch(struct vio_node *vnode, struct n2d_config *config)
 	}
 
 	memDesc.flag = N2D_WRAP_FROM_USERMEMORY;
-	// memDesc.logical = N2D_NULL;
 	memDesc.physical = config->out_buffer_addr[0];
 	memDesc.size	 = config->output_stride * config->output_height;
 	N2D_ON_ERROR(n2d_wrap(&memDesc, &handle));
@@ -1244,23 +1235,30 @@ static int do_stitch(struct vio_node *vnode, struct n2d_config *config)
 	dst.tile_status_config = N2D_TSC_DISABLE;
 	N2D_ON_ERROR(n2d_map(&dst));
 
-	// clipRect.config.clipRect.x = clipRect.config.clipRect.y = 0;
-    // clipRect.config.clipRect.width = dst.width;
-    // clipRect.config.clipRect.height = dst.height;
+	isVertical = (config->output_width < config->output_height) ? N2D_TRUE : N2D_FALSE;
 
-    hOffset = dst.width / 2;
-    vOffset = dst.height / 2;
+	if (config->ninputs == 4) {
+		hOffset = dst.width / 2;
+		vOffset = dst.height / 2;
+	}
+
+	if (config->ninputs == 2) {
+		if (isVertical) {
+			hOffset = dst.width;
+			vOffset = dst.height / 2;
+		} else {
+			hOffset = dst.width / 2;
+			vOffset = dst.height;
+		}
+	}
+
     for (i = 0; i < srcNum; i++) {
-	    // srcIndex.config.multisourceIndex = i;
-	    // N2D_ON_ERROR(n2d_set(&srcIndex));
-
 	    switch (i % N2D_IN_MAX) {
 	    case 0:
 		    rectDst.x			= 0;
 		    rectDst.y			= 0;
 		    rectDst.width		= hOffset;
 		    rectDst.height		= vOffset;
-		    // blend.config.alphablendMode = N2D_BLEND_NONE;
 		    break;
 
 	    case 1:
@@ -1268,7 +1266,6 @@ static int do_stitch(struct vio_node *vnode, struct n2d_config *config)
 		    rectDst.y			= 0;
 		    rectDst.width		= hOffset;
 		    rectDst.height		= vOffset;
-		    // blend.config.alphablendMode = N2D_BLEND_NONE;
 		    break;
 
 	    case 2:
@@ -1276,7 +1273,6 @@ static int do_stitch(struct vio_node *vnode, struct n2d_config *config)
 		    rectDst.y			= vOffset;
 		    rectDst.width		= hOffset;
 		    rectDst.height		= vOffset;
-		    // blend.config.alphablendMode = N2D_BLEND_NONE;
 		    break;
 
 	    case 3:
@@ -1284,30 +1280,18 @@ static int do_stitch(struct vio_node *vnode, struct n2d_config *config)
 		    rectDst.y			= vOffset;
 		    rectDst.width		= hOffset;
 		    rectDst.height		= vOffset;
-		    // blend.config.alphablendMode = N2D_BLEND_NONE;
 		    break;
 	    }
 
-	    // rectSrc.x = rectSrc.y = 0;
-	    // rectSrc.width	  = src[i].width;
-	    // rectSrc.height	  = src[i].height;
-
-	    // multisrcAndDstRect.config.multisrcAndDstRect.source = &src[i];
-	    // memcpy(&multisrcAndDstRect.config.multisrcAndDstRect.srcRect, &rectSrc,
-		//    N2D_SIZEOF(n2d_rectangle_t));
-	    // memcpy(&multisrcAndDstRect.config.multisrcAndDstRect.dstRect, &rectDst,
-		//    N2D_SIZEOF(n2d_rectangle_t));
-
-	    // N2D_ON_ERROR(n2d_set(&globalAlpha));
-	    // N2D_ON_ERROR(n2d_set(&clipRect));
-	    // N2D_ON_ERROR(n2d_set(&blend));
-	    // N2D_ON_ERROR(n2d_set(&multisrcAndDstRect));
-	    // N2D_ON_ERROR(n2d_set(&rop));
+		if (isVertical && i) {
+			rectDst.x = 0;
+			rectDst.y = vOffset;
+			rectDst.width = hOffset;
+			rectDst.height = vOffset;
+		}
 
 		N2D_ON_ERROR(n2d_blit(&dst, &rectDst, &src[i], N2D_NULL, N2D_BLEND_NONE));
     }
-
-	// N2D_ON_ERROR(n2d_multisource_blit(&dst,0x0F));
 
 	N2D_ON_ERROR(n2d_commit());
 
@@ -1661,14 +1645,17 @@ static void n2d_trigger_frame_work(struct vio_node *vnode)
 	n2d_uint32_t ctx_id = vnode->ctx_id;
 	struct horizon_n2d_dev *n2d = global_n2d;
 
-	if (ctx_id > VIO_MAX_STREAM) {
+	if (ctx_id >= VIO_MAX_STREAM) {
 		vio_err("[S%d][C%d] %s: invalid ctx_id %d.\n", vnode->flow_id, vnode->ctx_id,
 			__func__, ctx_id);
+
+		return;
 	}
 
 	if (&n2d->vnode[ctx_id] != vnode) {
 		vio_err("[S%d][C%d] %s: incompatible vnode.\n", vnode->flow_id, vnode->ctx_id,
 			__func__);
+		return;
 	}
 
 	up(&n2d->vsemas[ctx_id]);
@@ -1679,9 +1666,10 @@ static int frame_work_routine(void *ctxt)
 	struct horizon_n2d_dev *n2d = global_n2d;
 	n2d_uint32_t ctx_id = gcmPTR2INT(ctxt);
 
-	vio_info("%s: ctx_id %d.\n", __func__, ctx_id);
-	if (ctx_id < 0 || ctx_id > VIO_MAX_STREAM)
+	if (ctx_id >= VIO_MAX_STREAM) {
 		vio_err("%s: invalid ctx_id %d.\n", __func__, ctx_id);
+		return -1;
+	}
 
 	for (;;) {
 		int down;

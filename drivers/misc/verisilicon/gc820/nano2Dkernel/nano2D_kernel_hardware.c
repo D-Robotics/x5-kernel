@@ -1788,7 +1788,12 @@ static n2d_error_t n2d_kernel_hardware_command_construct(n2d_hardware_t *hardwar
 	cmd_buf->executed_cmd_fifo = (n2d_cmd_info_t *)pointer;
 	cmd_buf->fifo_index	   = 0;
 
+	return N2D_SUCCESS;
+
 on_error:
+	if (node)
+		n2d_kernel_vidmem_free(hardware->kernel, node);
+
 	return error;
 }
 
@@ -1915,10 +1920,10 @@ n2d_error_t n2d_kernel_hardware_construct(n2d_kernel_t *kernel, n2d_uint32_t cor
 	_hardware->monitor_timer_stop = N2D_FALSE;
 #endif
 
-	return error;
+	return N2D_SUCCESS;
 on_error:
-	if (pointer)
-		n2d_kernel_os_free(kernel->os, pointer);
+	if (_hardware)
+		n2d_kernel_hardware_destroy(_hardware);
 	return error;
 }
 

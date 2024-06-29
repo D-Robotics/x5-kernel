@@ -362,8 +362,8 @@ static struct {
 	const int mode;
 	const char *param;
 } _raid456_journal_mode[] = {
-	{ R5C_JOURNAL_MODE_WRITE_THROUGH , "writethrough" },
-	{ R5C_JOURNAL_MODE_WRITE_BACK    , "writeback" }
+	{ R5C_JOURNAL_MODE_WRITE_THROUGH, "writethrough" },
+	{ R5C_JOURNAL_MODE_WRITE_BACK,    "writeback" }
 };
 
 /* Return MD raid4/5/6 journal mode for dm @journal_mode one */
@@ -1114,7 +1114,7 @@ too_many:
  *    [stripe_cache <sectors>]		Stripe cache size for higher RAIDs
  *    [region_size <sectors>]		Defines granularity of bitmap
  *    [journal_dev <dev>]		raid4/5/6 journaling deviice
- *    					(i.e. write hole closing log)
+ *					(i.e. write hole closing log)
  *
  * RAID10-only options:
  *    [raid10_copies <# copies>]	Number of copies.  (Default: 2)
@@ -3254,8 +3254,7 @@ size_check:
 	r = md_start(&rs->md);
 	if (r) {
 		ti->error = "Failed to start raid array";
-		mddev_unlock(&rs->md);
-		goto bad_md_start;
+		goto bad_unlock;
 	}
 
 	/* If raid4/5/6 journal mode explicitly requested (only possible with journal dev) -> set it */
@@ -3263,8 +3262,7 @@ size_check:
 		r = r5c_journal_mode_set(&rs->md, rs->journal_dev.mode);
 		if (r) {
 			ti->error = "Failed to set raid4/5/6 journal mode";
-			mddev_unlock(&rs->md);
-			goto bad_journal_mode_set;
+			goto bad_unlock;
 		}
 	}
 
@@ -3275,14 +3273,14 @@ size_check:
 	if (rs_is_raid456(rs)) {
 		r = rs_set_raid456_stripe_cache(rs);
 		if (r)
-			goto bad_stripe_cache;
+			goto bad_unlock;
 	}
 
 	/* Now do an early reshape check */
 	if (test_bit(RT_FLAG_RESHAPE_RS, &rs->runtime_flags)) {
 		r = rs_check_reshape(rs);
 		if (r)
-			goto bad_check_reshape;
+			goto bad_unlock;
 
 		/* Restore new, ctr requested layout to perform check */
 		rs_config_restore(rs, &rs_layout);
@@ -3291,7 +3289,7 @@ size_check:
 			r = rs->md.pers->check_reshape(&rs->md);
 			if (r) {
 				ti->error = "Reshape check failed";
-				goto bad_check_reshape;
+				goto bad_unlock;
 			}
 		}
 	}
@@ -3302,11 +3300,9 @@ size_check:
 	mddev_unlock(&rs->md);
 	return 0;
 
-bad_md_start:
-bad_journal_mode_set:
-bad_stripe_cache:
-bad_check_reshape:
+bad_unlock:
 	md_stop(&rs->md);
+	mddev_unlock(&rs->md);
 bad:
 	raid_set_free(rs);
 
@@ -3317,7 +3313,9 @@ static void raid_dtr(struct dm_target *ti)
 {
 	struct raid_set *rs = ti->private;
 
+	mddev_lock_nointr(&rs->md);
 	md_stop(&rs->md);
+	mddev_unlock(&rs->md);
 	raid_set_free(rs);
 }
 
@@ -3327,14 +3325,14 @@ static int raid_map(struct dm_target *ti, struct bio *bio)
 	struct mddev *mddev = &rs->md;
 
 	/*
-	 * If we're reshaping to add disk(s)), ti->len and
+	 * If we're reshaping to add disk(s), ti->len and
 	 * mddev->array_sectors will differ during the process
 	 * (ti->len > mddev->array_sectors), so we have to requeue
 	 * bios with addresses > mddev->array_sectors here or
 	 * there will occur accesses past EOD of the component
 	 * data images thus erroring the raid set.
 	 */
-	if (unlikely(bio_end_sector(bio) > mddev->array_sectors))
+	if (unlikely(bio_has_data(bio) && bio_end_sector(bio) > mddev->array_sectors))
 		return DM_MAPIO_REQUEUE;
 
 	md_handle_request(mddev, bio);
@@ -3712,7 +3710,7 @@ static void raid_status(struct dm_target *ti, status_type_t type,
 }
 
 static int raid_message(struct dm_target *ti, unsigned int argc, char **argv,
-			char *result, unsigned maxlen)
+			char *result, unsigned int maxlen)
 {
 	struct raid_set *rs = ti->private;
 	struct mddev *mddev = &rs->md;
@@ -4001,7 +3999,7 @@ static int raid_preresume(struct dm_target *ti)
 	}
 
 	/* Resize bitmap to adjust to changed region size (aka MD bitmap chunksize) or grown device size */
-        if (test_bit(RT_FLAG_RS_BITMAP_LOADED, &rs->runtime_flags) && mddev->bitmap &&
+	if (test_bit(RT_FLAG_RS_BITMAP_LOADED, &rs->runtime_flags) && mddev->bitmap &&
 	    (test_bit(RT_FLAG_RS_GROW, &rs->runtime_flags) ||
 	     (rs->requested_bitmap_chunk_sectors &&
 	       mddev->bitmap_info.chunksize != to_bytes(rs->requested_bitmap_chunk_sectors)))) {

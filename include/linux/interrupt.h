@@ -569,8 +569,12 @@ enum
  * 	2) rcu_report_dead() reports the final quiescent states.
  *
  * _ IRQ_POLL: irq_poll_cpu_dead() migrates the queue
+ *
+ * _ (HR)TIMER_SOFTIRQ: (hr)timers_dead_cpu() migrates the queue
  */
-#define SOFTIRQ_HOTPLUG_SAFE_MASK (BIT(RCU_SOFTIRQ) | BIT(IRQ_POLL_SOFTIRQ))
+#define SOFTIRQ_HOTPLUG_SAFE_MASK (BIT(TIMER_SOFTIRQ) | BIT(IRQ_POLL_SOFTIRQ) |\
+				   BIT(HRTIMER_SOFTIRQ) | BIT(RCU_SOFTIRQ))
+
 
 /* map softirq index to softirq name. update 'softirq_to_name' in
  * kernel/softirq.c when adding a new softirq.
@@ -604,35 +608,6 @@ extern void __raise_softirq_irqoff(unsigned int nr);
 
 extern void raise_softirq_irqoff(unsigned int nr);
 extern void raise_softirq(unsigned int nr);
-
-#ifdef CONFIG_PREEMPT_RT
-DECLARE_PER_CPU(struct task_struct *, timersd);
-DECLARE_PER_CPU(unsigned long, pending_timer_softirq);
-
-extern void raise_timer_softirq(void);
-extern void raise_hrtimer_softirq(void);
-
-static inline unsigned int local_pending_timers(void)
-{
-        return __this_cpu_read(pending_timer_softirq);
-}
-
-#else
-static inline void raise_timer_softirq(void)
-{
-	raise_softirq(TIMER_SOFTIRQ);
-}
-
-static inline void raise_hrtimer_softirq(void)
-{
-	raise_softirq_irqoff(HRTIMER_SOFTIRQ);
-}
-
-static inline unsigned int local_pending_timers(void)
-{
-        return local_softirq_pending();
-}
-#endif
 
 DECLARE_PER_CPU(struct task_struct *, ksoftirqd);
 

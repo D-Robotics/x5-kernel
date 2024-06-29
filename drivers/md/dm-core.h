@@ -21,6 +21,8 @@
 #include "dm-ima.h"
 
 #define DM_RESERVED_MAX_IOS		1024
+#define DM_MAX_TARGETS			1048576
+#define DM_MAX_TARGET_PARAMS		1024
 
 struct dm_io;
 
@@ -119,7 +121,7 @@ struct mapped_device {
 	struct dm_stats stats;
 
 	/* the number of internal suspends */
-	unsigned internal_suspend_count;
+	unsigned int internal_suspend_count;
 
 	int swap_bios;
 	struct semaphore swap_bios_semaphore;
@@ -214,6 +216,7 @@ struct dm_table {
 
 	/* a list of devices used by this table */
 	struct list_head devices;
+	struct rw_semaphore devices_lock;
 
 	/* events get handed up using this callback */
 	void (*event_fn)(void *);
@@ -326,9 +329,9 @@ static inline struct completion *dm_get_completion_from_kobject(struct kobject *
 	return &container_of(kobj, struct dm_kobject_holder, kobj)->completion;
 }
 
-unsigned __dm_get_module_param(unsigned *module_param, unsigned def, unsigned max);
+unsigned int __dm_get_module_param(unsigned int *module_param, unsigned int def, unsigned int max);
 
-static inline bool dm_message_test_buffer_overflow(char *result, unsigned maxlen)
+static inline bool dm_message_test_buffer_overflow(char *result, unsigned int maxlen)
 {
 	return !maxlen || strlen(result) + 1 >= maxlen;
 }

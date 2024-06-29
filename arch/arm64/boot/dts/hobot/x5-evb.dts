@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
- * dts for Sunrise5 som platform
+ * dts for Sunrise5 EVB platform
  *
  * Copyright (C) 2024 Horizon Robotics Inc.
  *
@@ -39,13 +39,14 @@
 	gua_audio_rpc_wrapper:audio-rpc-wrapper {
 		compatible = "gua,audio-rpc-wrapper";
 		rpmsg-enable;
-		status = "disabled";
+		status = "okay";
 	};
 
 	ipc_wrapper:ipc-wrapper {
 		compatible = "gua,ipc-wrapper";
 		rpmsg-enable;
-		status = "disabled";
+		status = "okay";
+		gua-ipc = <&ipc_instance0>;
 	};
 
 	sound_misc_0:misc-hifi {
@@ -55,7 +56,7 @@
 										>;
 		msg-wrapper = <&ipc_wrapper>;
 		memory-region = <&adsp_bsp_reserved>;
-		status = "disabled";
+		status = "okay";
 	};
 
 	sound_cpu:cpu-dai {
@@ -63,7 +64,7 @@
 		msg-wrapper = <&ipc_wrapper>;
 		gua,pcm-buffer-size = <0x1E000>;
 		pcm-rpmsg-channel-mapping = <0x00>, <0x00>, <0x00>, <0x00>, <0x00>;
-		status = "disabled";
+		status = "okay";
 	};
 
 	sound-machine {
@@ -71,7 +72,7 @@
 		model = "gua-audio";
 		cpu-dai = <&sound_cpu>;
 		memory-region = <&audio_reserved>;
-		status = "disabled";
+		status = "okay";
 	};
 
 	vdd08_gpu_reg: vdd08_gpu_reg@3 {
@@ -102,7 +103,8 @@
 
 &ls_gpio0_porta {
 	pinctrl-names = "default";
-	pinctrl-0 = < &lsio_gpio0_1
+	pinctrl-0 = < &lsio_gpio0_0
+				  &lsio_gpio0_1
 				  &lsio_gpio0_2
 				  &lsio_gpio0_3
 				  &lsio_gpio0_4
@@ -126,12 +128,18 @@
 	status = "okay";
 };
 
-&uart3 {
+&uart2 {
 	status = "okay";
 	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_uart3>;
+	pinctrl-0 = <&pinctrl_uart2>;
 	dma-names = "tx", "rx";
 	dmas = <&axi_dmac 5>, <&axi_dmac 4>;
+};
+
+&uart5 {
+	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_uart5>;
 };
 
 &axi_dmac {
@@ -250,6 +258,7 @@
 /* SD Card */
 &sdio_0 {
 	status = "okay";
+	no-1-8-v;
 
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_sd &hsio_gpio0_26 &hsio_gpio1_1>;
@@ -358,19 +367,28 @@
 };
 
 &mailbox0 {
-	status = "disabled";
+	status = "okay";
 };
 
 &ipc_instance0 {
-	status = "disabled";
+	status = "okay";
+	shm-addr = <&adsp_ipc_reserved>;
+	local-offset = <0x0>;
+	remote-offset = <0x400>;
 };
 
 &ipc_instance1 {
-	status = "disabled";
+	status = "okay";
+	shm-addr = <&adsp_ipc_reserved>;
+	local-offset = <0x800>;
+	remote-offset = <0xc00>;
 };
 
 &ipc_instance2 {
-	status = "disabled";
+	status = "okay";
+	shm-addr = <&adsp_ipc_reserved>;
+	local-offset = <0x1000>;
+	remote-offset = <0x4000>;
 };
 
 &pvt {
@@ -378,9 +396,11 @@
 };
 
 &remoteproc_hifi5 {
-	status = "disabled";
+	status = "okay";
 	hifi5-rpmsg-channel-mapping = <0x00>, <0x00>;
 	msg-wrapper = <&ipc_wrapper>;
+	shm-addr = <&adsp_bsp_reserved>;
+	remoteproc-ipc = <&ipc_instance1>;
 };
 
 &hpsclks {
@@ -463,12 +483,12 @@
 &vin_vcon0 {
 	status = "okay";
 	/* camera sensor
-	 * reset gpio:	AON_GPIO0_00:	497
-	 * pwd gpio:	LSIO_GPIO1_00:	314
+	 * reset gpio:	AON_GPIO0_00:	498
+	 * pwd gpio:	LSIO_GPIO1_00:	347
 	 */
 	pinctrl-names = "default";
 	pinctrl-0 = <&aon_gpio_0>;
-	gpio_oth = <497>;   //reset gpio
+	gpio_oth = <498>;   //reset gpio
 	bus = <4>; //i2c4
 	lpwm_chn = <0>;  //open lpwm0 - channel0
 };
@@ -484,12 +504,12 @@
 &vin_vcon2 {
 	status = "okay";
 	/* camera sensor
-	 * reset gpio:	AON_GPIO_PIN4:	501
-	 * pwd gpio:	LSIO_GPIO1_02:	316
+	 * reset gpio:	AON_GPIO_PIN4:	502
+	 * pwd gpio:	LSIO_GPIO1_02:	349
 	 */
 	pinctrl-names = "default";
 	pinctrl-0 = <&aon_gpio_4>;
-	gpio_oth = <501>;   //reset gpio
+	gpio_oth = <502>;   //reset gpio
 	bus = <2>;  //i2c2
 	lpwm_chn = <2>; //open lpwm0 - channel2
 };
@@ -497,12 +517,12 @@
 &vin_vcon3 {
 	status = "okay";
 	/* camera sensor
-	 * reset gpio:	LSIO_GPIO1_06:	320
-	 * pwd gpio:	LSIO_GPIO1_03:	317
+	 * reset gpio:	LSIO_GPIO1_06:	353
+	 * pwd gpio:	LSIO_GPIO1_03:	350
 	 */
 	pinctrl-names = "default";
 	pinctrl-0 = <&lsio_gpio1_6>;
-	gpio_oth = <320>;   //reset gpio
+	gpio_oth = <353>;   //reset gpio
 	bus = <3>;  //i2c3
 	lpwm_chn = <3>; //open lpwm0 - channel3
 };

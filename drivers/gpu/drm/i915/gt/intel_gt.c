@@ -691,11 +691,11 @@ int intel_gt_init(struct intel_gt *gt)
 	if (err)
 		goto err_gt;
 
-	intel_uc_init_late(&gt->uc);
-
 	err = i915_inject_probe_error(gt->i915, -EIO);
 	if (err)
 		goto err_gt;
+
+	intel_uc_init_late(&gt->uc);
 
 	intel_migrate_init(&gt->migrate, gt);
 
@@ -903,8 +903,6 @@ int intel_gt_probe_all(struct drm_i915_private *i915)
 
 err:
 	i915_probe_error(i915, "Failed to initialize %s! (%d)\n", gtdef->name, ret);
-	intel_gt_release_all(i915);
-
 	return ret;
 }
 
@@ -921,15 +919,6 @@ int intel_gt_tiles_init(struct drm_i915_private *i915)
 	}
 
 	return 0;
-}
-
-void intel_gt_release_all(struct drm_i915_private *i915)
-{
-	struct intel_gt *gt;
-	unsigned int id;
-
-	for_each_gt(gt, i915, id)
-		i915->gt[id] = NULL;
 }
 
 void intel_gt_info_print(const struct intel_gt_info *info,

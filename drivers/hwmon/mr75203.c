@@ -410,8 +410,8 @@ static int pvt_read_pd(struct device *dev, u32 attr, int channel, long *val)
 		/*
 		 * f_loop = (N BS * A * B * F CLK) / W
 		 */
-		freq = pvt->ip_freq/1000000;
-		f_loop = (n * 4 * 4 * freq) / 127;
+		freq = pvt->ip_freq / 1000;
+		f_loop = (n * 4 * 4 * freq) / 127 / 1000;
 		*val = f_loop;
 		return 0;
 	default:

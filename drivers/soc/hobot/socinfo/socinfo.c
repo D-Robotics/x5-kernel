@@ -28,12 +28,18 @@
 #define SOCINFO_NAME		"socinfo"
 #define BUF_LEN		128
 
+struct _reg_info {
+	void __iomem *map;
+	/* addr, size, offset, mask */
+	u32 reg_info[4];
+};
+
 const char *soc_id;
 const char *bootmode;
 const char *socuid;
 const char *origin_board_id;
 const char *board_id;
-const char *ddr_vender;
+const char *ddr_vendor;
 const char *ddr_type;
 const char *ddr_freq;
 const char *ddr_size;
@@ -43,9 +49,20 @@ const char *base_board_name;
 const char *board_name;
 const char *chip_id;
 static unsigned int secure_chip = 0;
-static unsigned int efuse_bit_cnt = 0;
 static void __iomem *sec_flag_addr;
-static void __iomem *boot_count_addr;
+struct _reg_info g_bak_slot_info;
+struct _reg_info g_boot_count;
+const static char *ddr_vendor_array[] = {"unkown", "Samsung", "unkown",
+                                         "unkown", "unkown", "Nanya",
+                                         "SK hynix", "unkown", "Winbond",
+                                         "ESMT", "unkown", "unkown",
+                                         "unkown", "unkown", "unkown",
+                                         "unkown", "unkown", "unkown",
+                                         "unkown", "cxmt"};
+const char *ddr_freq_array[] = {"unkown", "3200", "3733", "4266"};
+const char *ddr_type_array[] = {"unkown", "lpddr4", "lpddr4x"};
+const char *ddr_size_array[] = {"1G", "2G", "4G", "8G"};
+
 EXPORT_SYMBOL_GPL(base_board_name);
 
 #if 0
@@ -160,7 +177,7 @@ ssize_t name_show(struct class *class,
 	}
 
 	/* add ddr vender */
-	index = simple_strtoul(ddr_vender, NULL, 16);
+	index = simple_strtoul(ddr_vendor, NULL, 16);
 	switch (index) {
 	case DDR_MANU_HYNIX:
 		snprintf(name + strlen(name), sizeof(name) - strlen(name), "-hynix");
@@ -257,7 +274,7 @@ ssize_t ddr_vender_show(struct class *class,
 {
 	if (!buf)
 		return 0;
-	snprintf(buf, BUF_LEN, "%s\n", ddr_vender);
+	snprintf(buf, BUF_LEN, "%s\n", ddr_vendor);
 
 	return strlen(buf);
 }
@@ -342,40 +359,34 @@ ssize_t secure_chip_show(struct class *class,
 	return strlen(buf);
 }
 
-ssize_t efuse_bit_cnt_show(struct class *class,
+ssize_t bak_slot_show(struct class *class,
 			struct class_attribute *attr, char *buf)
 {
+	uint32_t bak_slot = 0;
 	if (!buf)
 		return 0;
-	snprintf(buf, BUF_LEN, "%d\n", efuse_bit_cnt);
+	bak_slot = (readl(g_bak_slot_info.map) & g_bak_slot_info.reg_info[3]) >> g_bak_slot_info.reg_info[2];
+	snprintf(buf, BUF_LEN, "%d\n", bak_slot);
 
 	return strlen(buf);
 }
 
-ssize_t boot_count_show(struct class *class,
-			struct class_attribute *attr, char *buf)
-{
-	uint32_t boot_count = 0;
-	if (!buf)
-		return 0;
-	//boot_count = (readl(boot_count_addr) >> 16) & 0xffff;
-	snprintf(buf, BUF_LEN, "%d\n", boot_count);
-
-	return strlen(buf);
-}
 ssize_t soc_store(struct class *class, struct class_attribute *attr,
 				const char *buf, size_t count)
 {
 	return count;
 }
 
-ssize_t boot_count_store(struct class *class, struct class_attribute *attr,
+ssize_t bak_slot_store(struct class *class, struct class_attribute *attr,
 				const char *buf, size_t count)
 {
-	uint32_t boot_count = 0;
-	sscanf(buf, "%du", &boot_count);
-	//boot_count = (boot_count << 16) | (readl(boot_count_addr) & 0xffff);
-	writel(boot_count, boot_count_addr);
+	uint32_t cur_boot_count = 0;
+	uint32_t old_boot_count = 0;
+
+	sscanf(buf, "%du", &cur_boot_count);
+	old_boot_count = readl(g_boot_count.map) & ~g_boot_count.reg_info[3];
+	cur_boot_count = old_boot_count | (cur_boot_count << g_boot_count.reg_info[2]);
+	writel(cur_boot_count, g_boot_count.map);
 	return count;
 }
 
@@ -389,7 +400,7 @@ static struct class_attribute origin_id_attribute =
 	__ATTR(origin_board_id, 0644, origin_id_show, soc_store);
 
 static struct class_attribute ddr_vender_attribute =
-	__ATTR(ddr_vender, 0644, ddr_vender_show, soc_store);
+	__ATTR(ddr_vendor, 0644, ddr_vender_show, soc_store);
 
 static struct class_attribute ddr_name_attribute =
 	__ATTR(ddr_type, 0644, ddr_name_show, soc_store);
@@ -421,11 +432,8 @@ static struct class_attribute chip_id_attribute =
 static struct class_attribute secure_chip_attribute =
 	__ATTR(secure_chip, 0444, secure_chip_show, NULL);
 
-static struct class_attribute efuse_bit_cnt_attribute =
-	__ATTR(efuse_bit_cnt, 0444, efuse_bit_cnt_show, NULL);
-
-static struct class_attribute boot_count_attribute =
-	__ATTR(boot_count, 0644, boot_count_show, boot_count_store);
+static struct class_attribute bak_slot_attribute =
+	__ATTR(bak_slot, 0644, bak_slot_show, bak_slot_store);
 
 static struct attribute *socinfo_attributes[] = {
 	&name_attribute.attr,
@@ -442,8 +450,7 @@ static struct attribute *socinfo_attributes[] = {
 	&socuid_attribute.attr,
 	&chip_id_attribute.attr,
 	&secure_chip_attribute.attr,
-	&efuse_bit_cnt_attribute.attr,
-	&boot_count_attribute.attr,
+	&bak_slot_attribute.attr,
 	NULL
 };
 
@@ -471,6 +478,10 @@ MODULE_DEVICE_TABLE(of, socinfo_of_match);
 static int socinfo_probe(struct platform_device *pdev)
 {
 	int ret = 0;
+	struct resource *resource = NULL;
+	static void __iomem *ddr_info_addr = NULL;
+	uint32_t ddr_info = 0;
+
 	dev_info(&pdev->dev, "Start socinfo probe.\n");
 
 	ret = of_property_read_string(pdev->dev.of_node, "board_name",
@@ -489,41 +500,6 @@ static int socinfo_probe(struct platform_device *pdev)
 
 	ret = of_property_read_string(pdev->dev.of_node, "origin_board_id",
 		&origin_board_id);
-	if (ret != 0) {
-		pr_err("of_property_read_string error\n");
-		return ret;
-	}
-
-	ret = of_property_read_string(pdev->dev.of_node, "ddr_vender",
-		&ddr_vender);
-	if (ret != 0) {
-		pr_err("of_property_read_string error\n");
-		return ret;
-	}
-
-	ret = of_property_read_string(pdev->dev.of_node, "ddr_type",
-		&ddr_type);
-	if (ret != 0) {
-		pr_err("of_property_read_string error\n");
-		return ret;
-	}
-
-	ret = of_property_read_string(pdev->dev.of_node, "ddr_freq",
-		&ddr_freq);
-	if (ret != 0) {
-		pr_err("of_property_read_string error\n");
-		return ret;
-	}
-
-	ret = of_property_read_string(pdev->dev.of_node, "ddr_size",
-		&ddr_size);
-	if (ret != 0) {
-		pr_err("of_property_read_string error\n");
-		return ret;
-	}
-
-	ret = of_property_read_string(pdev->dev.of_node, "ddr_part_num",
-		&ddr_part_num);
 	if (ret != 0) {
 		pr_err("of_property_read_string error\n");
 		return ret;
@@ -562,14 +538,51 @@ static int socinfo_probe(struct platform_device *pdev)
 		return ret;
 	}
 
-	// boot_count_addr = ioremap(BOOT_COUNT_REG_ADDR, BOOT_COUNT_SIZE);
-	// if (!boot_count_addr)
-	// 	return -ENOMEM;
-	// sec_flag_addr = ioremap(SEC_FLAG_REG_ADDR, SEC_FLAG_SIZE);
-	// if (!sec_flag_addr)
-	// 	return -ENOMEM;
-	// secure_chip = readl(sec_flag_addr) & 0x1;
-	// efuse_bit_cnt = (readl(sec_flag_addr) >> 4) & 0xfff;
+	ret = of_property_read_u32_array(pdev->dev.of_node,
+					 "bak_slot_reg",
+					 g_bak_slot_info.reg_info,
+					 ARRAY_SIZE(g_bak_slot_info.reg_info));
+	if (ret != 0) {
+		pr_err("of_property_read_u32_array error\n");
+		return ret;
+	}
+
+	g_bak_slot_info.map = ioremap(g_bak_slot_info.reg_info[0],
+					 g_bak_slot_info.reg_info[1]);
+	if (!g_bak_slot_info.map)
+		return -ENOMEM;
+
+	ret = of_property_read_u32_array(pdev->dev.of_node,
+					 "boot_count_reg",
+					 g_boot_count.reg_info,
+					 ARRAY_SIZE(g_boot_count.reg_info));
+	if (ret != 0) {
+		pr_err("of_property_read_u32_array error\n");
+		return ret;
+	}
+
+	g_boot_count.map = ioremap(g_boot_count.reg_info[0],
+					 g_boot_count.reg_info[1]);
+	if (!g_boot_count.map)
+		return -ENOMEM;
+
+	resource = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+	if (resource == NULL) {
+		dev_err(&pdev->dev, "Can't get ddr info resource error\n");
+		return -ENODEV;
+	}
+
+	ddr_info_addr = devm_ioremap_resource(&pdev->dev, resource);
+	if (IS_ERR(ddr_info_addr)) {
+		dev_err(&pdev->dev, "Can't get ddr info resource\n");
+		return (int32_t)PTR_ERR(ddr_info_addr);
+	}
+	ddr_info = readl(ddr_info_addr);
+	ddr_vendor = ddr_vendor_array[DR_DDR_VENDOR(ddr_info)];
+	ddr_freq = ddr_freq_array[DR_DDR_FREQ(ddr_info)];
+	ddr_size = ddr_size_array[DR_DDR_SIZE(ddr_info)];
+	ddr_type = ddr_type_array[DR_DDR_TYPE(ddr_info)];
+
 	ret = class_register(&socinfo_class);
 	dev_info(&pdev->dev, "Socinfo probe end with retval: %d\n", ret);
 
@@ -582,7 +595,8 @@ static int socinfo_probe(struct platform_device *pdev)
 static int socinfo_remove(struct platform_device *pdev)
 {
 	iounmap(sec_flag_addr);
-	iounmap(boot_count_addr);
+	iounmap(g_boot_count.map);
+	iounmap(g_bak_slot_info.map);
 	class_unregister(&socinfo_class);
 	return 0;
 }

@@ -1846,7 +1846,9 @@ current_restore_flags(unsigned long orig_flags, unsigned long flags)
 }
 
 extern int cpuset_cpumask_can_shrink(const struct cpumask *cur, const struct cpumask *trial);
-extern int task_can_attach(struct task_struct *p, const struct cpumask *cs_effective_cpus);
+extern int task_can_attach(struct task_struct *p);
+extern int dl_bw_alloc(int cpu, u64 dl_bw);
+extern void dl_bw_free(int cpu, u64 dl_bw);
 #ifdef CONFIG_SMP
 extern void do_set_cpus_allowed(struct task_struct *p, const struct cpumask *new_mask);
 extern int set_cpus_allowed_ptr(struct task_struct *p, const struct cpumask *new_mask);
@@ -2058,43 +2060,6 @@ static inline int test_tsk_need_resched(struct task_struct *tsk)
 {
 	return unlikely(test_tsk_thread_flag(tsk,TIF_NEED_RESCHED));
 }
-
-#ifdef CONFIG_PREEMPT_LAZY
-static inline void set_tsk_need_resched_lazy(struct task_struct *tsk)
-{
-	set_tsk_thread_flag(tsk,TIF_NEED_RESCHED_LAZY);
-}
-
-static inline void clear_tsk_need_resched_lazy(struct task_struct *tsk)
-{
-	clear_tsk_thread_flag(tsk,TIF_NEED_RESCHED_LAZY);
-}
-
-static inline int test_tsk_need_resched_lazy(struct task_struct *tsk)
-{
-	return unlikely(test_tsk_thread_flag(tsk,TIF_NEED_RESCHED_LAZY));
-}
-
-static inline int need_resched_lazy(void)
-{
-	return test_thread_flag(TIF_NEED_RESCHED_LAZY);
-}
-
-static inline int need_resched_now(void)
-{
-	return test_thread_flag(TIF_NEED_RESCHED);
-}
-
-#else
-static inline void clear_tsk_need_resched_lazy(struct task_struct *tsk) { }
-static inline int need_resched_lazy(void) { return 0; }
-
-static inline int need_resched_now(void)
-{
-	return test_thread_flag(TIF_NEED_RESCHED);
-}
-
-#endif
 
 /*
  * cond_resched() and cond_resched_lock(): latency reduction via

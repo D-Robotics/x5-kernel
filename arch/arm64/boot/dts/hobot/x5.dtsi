@@ -84,8 +84,8 @@
 				opp-hz = /bits/ 64 <3733>;
 		};
 
-		opp-4267M {
-				opp-hz = /bits/ 64 <4267>;
+		opp-4266M {
+				opp-hz = /bits/ 64 <4266>;
 		};
 
 	};
@@ -259,7 +259,7 @@
 					type = "passive";
 				};
 				cpu_alert1: cpu-alert1 {
-					temperature = <85000>;
+					temperature = <95000>;
 					hysteresis = <1000>;
 					type = "passive";
 				};
@@ -302,7 +302,7 @@
 
 			trips {
 				ddr_alert0: ddr-alert0 {
-					temperature = <85000>;
+					temperature = <95000>;
 					hysteresis = <1000>;
 					type = "passive";
 				};
@@ -785,6 +785,9 @@
 			boot_mode = "0";
 			socuid = "00000000000000000000000000000000";
 			chip_id = "00000000";
+			bak_slot_reg = <0x31021000 4 8 0x0000ff00>;
+			boot_count_reg = <0x31021000 4 0 0x000000ff>;
+			reg = <0x31021008 0x4>;   /* ddr info reg */
 		};
 
 
@@ -794,7 +797,6 @@
 			reg = <0x3b020004 0x14>;
 
 			#iommu-cells = <0>;
-			dma-coherent;
 			power-domains = <&power X5_VIDEO>;
 			status = "okay";
 		};
@@ -824,7 +826,6 @@
 			reg = <0x3b020018 0x14>;
 
 			#iommu-cells = <0>;
-			dma-coherent;
 			power-domains = <&power X5_VIDEO>;
 			status = "okay";
 		};
@@ -912,7 +913,6 @@
 				reg = <0x3d0b0038 0x14>;
 
 				#iommu-cells = <0>;
-				dma-coherent;
 				power-domains = <&power X5_ISP>;
 				status = "okay";
 			};
@@ -937,7 +937,6 @@
 				reset-names = "rst";
 				instances = <6>;
 				cam-ctrl = <&cam_ctrl>;
-				// TODO: iommu depends on power-domain, if no-power, it will hung.
 				iommus = <&isp_iommu>;
 				power-domains = <&power X5_ISP>;
 				status = "okay";
@@ -948,7 +947,6 @@
 				reg = <0x3d0b0010 0x14>;
 
 				#iommu-cells = <0>;
-				dma-coherent;
 				status = "okay";
 			};
 
@@ -972,8 +970,12 @@
 				reset-names = "rst";
 				instances = <7>;
 				cam-ctrl = <&cam_ctrl>;
-				// TODO: iommu depends on power-domain, if no-power, it will hung.
 				iommus = <&vse_iommu>;
+				status = "okay";
+			};
+
+			osd: osd {
+				compatible = "hobot,osd";
 				status = "okay";
 			};
 
@@ -1061,7 +1063,6 @@
 				reg = <0x3d0b0024 0x14>;
 
 				#iommu-cells = <0>;
-				dma-coherent;
 				status = "okay";
 			};
 
@@ -1087,7 +1088,6 @@
 				instances = <4>;
 				cam-ctrl = <&cam_ctrl>;
 				status = "okay";
-				// TODO: iommu depends on power-domain, if no-power, it will hung.
 				iommus = <&cam_sif_iommu>;
 			};
 
@@ -1113,7 +1113,6 @@
 				instances = <2>;
 				cam-ctrl = <&cam_ctrl>;
 				status = "okay";
-				// TODO: iommu depends on power-domain, if no-power, it will hung.
 				iommus = <&cam_sif_iommu>;
 			};
 
@@ -1139,7 +1138,6 @@
 				instances = <4>;
 				cam-ctrl = <&cam_ctrl>;
 				status = "okay";
-				// TODO: iommu depends on power-domain, if no-power, it will hung.
 				iommus = <&cam_sif_iommu>;
 			};
 
@@ -1165,7 +1163,6 @@
 				instances = <2>;
 				cam-ctrl = <&cam_ctrl>;
 				status = "okay";
-				// TODO: iommu depends on power-domain, if no-power, it will hung.
 				iommus = <&cam_sif_iommu>;
 			};
 
@@ -1276,7 +1273,6 @@
 				reg = <0x3d0b004c 0x14>;
 
 				#iommu-cells = <0>;
-				dma-coherent;
 				status = "okay";
 			};
 
@@ -1298,7 +1294,6 @@
 				id = <0>;
 				instances = <2>;
 				cam-ctrl = <&cam_ctrl>;
-				// TODO: iommu depends on power-domain, if no-power, it will hung.
 				iommus = <&gdc_iommu>;
 				status = "okay";
 			};
@@ -1995,26 +1990,6 @@
 
 
 		/* Sunrise5 gpu subsystem */
-		gc8000_a0_iommu: gc8000_a0_iommu@3c020018 {
-			compatible = "d-robotics,lite_mmu";
-			reg = <0x3c020018 0x14>;
-
-			#iommu-cells = <0>;
-			dma-coherent;
-			power-domains = <&power X5_GPU>;
-			status = "okay";
-		};
-
-		gc8000_a1_iommu: gc8000_a1_iommu@3c02002c {
-			compatible = "d-robotics,lite_mmu";
-			reg = <0x3c02002c 0x14>;
-
-			#iommu-cells = <0>;
-			dma-coherent;
-			power-domains = <&power X5_GPU>;
-
-			status = "okay";
-		};
 
 		gc8000: gc8000@3c000000 {
 			compatible = "verisilicon,galcore";
@@ -2030,8 +2005,6 @@
 			power-domains = <&power X5_GPU>;
 			#cooling-cells = <2>;
 
-			// TODO: iommu depends on power-domain, if no-power, it will hung.
-			// iommus = <&gc8000_a0_iommu &gc8000_a1_iommu>;
 			resets = <&socrst GPU_GC8000_RESET>;
 			reset-names = "gc8000l_sw_rst";
 
@@ -2043,7 +2016,6 @@
 			reg = <0x3c020040 0x14>;
 
 			#iommu-cells = <0>;
-			dma-coherent;
 			power-domains = <&power X5_GPU>;
 
 			status = "okay";
@@ -2063,7 +2035,6 @@
 			assigned-clock-rates = <200000000>, <750000000>, <750000000>;
 			power-domains = <&power X5_GPU>;
 
-			// TODO: iommu depends on power-domain, if no-power, it will hung.
 			iommus = <&gc820_iommu>;
 			resets = <&socrst GPU_GC820_RESET>;
 			reset-names = "gc820_sw_rst";
@@ -2076,7 +2047,6 @@
 			reg = <0x3a010030 0x14>;
 
 			#iommu-cells = <0>;
-			dma-coherent;
 			power-domains = <&power X5_BPU>;
 			status = "okay";
 		};
@@ -2090,7 +2060,6 @@
 				<GIC_SPI 31 IRQ_TYPE_LEVEL_HIGH>;
 			interrupt-names = "bpu";
 
-			// TODO: iommu depends on power-domain, if no-power, it will hung.
 			iommus = <&bpu_iommu>;
 
 			cnn-id = <0>;
@@ -2116,29 +2085,6 @@
 			#size-cells = <1>;
 			ranges;
 
-			disp_gpio: gpio@3e040000 {
-				compatible = "snps,dw-apb-gpio";
-				status = "okay";
-				reg = <0x3e040000 0x10000>;
-				#address-cells = <1>;
-				#size-cells = <0>;
-				clocks = <&hpsclks X5_DISP_GPIO_PCLK>;
-				clock-names = "bus";
-				resets = <&socrst DISP_GPIO_P_RESET>;
-				disp_gpio_porta: gpio@0 {
-					compatible = "snps,dw-apb-gpio-port";
-					gpio-controller;
-					snps,nr-gpios = <32>;
-					reg = <0>;
-					#gpio-cells = <2>;
-					interrupt-parent = <&gic>;
-					interrupts = <GIC_SPI 67 IRQ_TYPE_LEVEL_HIGH>;
-					interrupt-controller;
-					#interrupt-cells = <2>;
-					gpio-ranges = <&disp_iomuxc 0 0 17>;
-				};
-			};
-
 			disp_sys_con: syscon@3e0a0000 {
 				compatible = "syscon";
 				reg = <0x3e0a0000 0x130>;
@@ -2147,7 +2093,6 @@
 			disp_iomuxc: disp_iomuxc@3e0a0054 {
 				compatible = "d-robotics,x5-disp-iomuxc";
 				reg = <0x3e0a0054 0x4c>;
-				horizon,gpio-banks = <&disp_gpio>;
 			};
 
 			dsi_backlight: backlight {
@@ -2279,7 +2224,6 @@
 				reg = <0x3e0a0158 0x14>;
 
 				#iommu-cells = <0>;
-				dma-coherent;
 				status = "okay";
 			};
 
@@ -2351,7 +2295,6 @@
 				reg = <0x3e0a0130 0x14>;
 
 				#iommu-cells = <0>;
-				dma-coherent;
 				status = "okay";
 			};
 
@@ -2397,7 +2340,6 @@
 				reg = <0x3e0a0144 0x14>;
 
 				#iommu-cells = <0>;
-				dma-coherent;
 				status = "okay";
 			};
 
@@ -2778,7 +2720,6 @@
 					 <&hpsclks X5_HSIO_SDIO0_CCLK>,
 					 <&hpsclks X5_HSIO_SDIO0_TCLK>;
 				clock-names = "core", "bus", "axi", "card", "timer";
-				no-1-8-v;
 				no-mmc;
 				no-sdio;
 				cap-sd-highspeed;
@@ -3006,7 +2947,7 @@
 				clocks = <&dspclks X5_DSP_UART_CLK>;
 				clock-frequency = <202752000>;
 				pinctrl-names = "default";
-				pinctrl-0 = <&pinctrl_dsp_uart5>;
+				pinctrl-0 = <&pinctrl_dsp_uart0>;
 				interrupt-parent = <&gic>;
 				interrupts = <GIC_SPI 146 IRQ_TYPE_LEVEL_HIGH>;
 				resets = <&dsprst DSP_UART_RESET>;
@@ -3032,7 +2973,7 @@
 				clocks = <&dspclks X5_DSP_I2C_PCLK>, <&dspclks X5_DSP_I2C_PCLK>;
 				clock-names = "i2c_clk", "pclk";
 				pinctrl-names = "default";
-				pinctrl-0 = <&pinctrl_dsp_i2c5>;
+				pinctrl-0 = <&pinctrl_dsp_i2c7>;
 				#address-cells = <1>;
 				#size-cells = <0>;
 				clock-frequency = <100000>;
@@ -3206,13 +3147,12 @@
 			status = "disabled";
 			interrupt-parent = <&gic>;
 			interrupts = <0 19 4>, <0 217 0x4>;
-			log-addr = <0xd3ffe000>;
+			log-offset = <0x7fe000>;
 			log-size = <4096>;
-			log-write-index-reg = <0xd3ffff10>;
-			log-read-index-reg = <0xd3ffff10>;
-			timesync-sec-reg = <0xd3ffff00>;
-			timesync-sec-diff-reg = <0xd3ffff08>;
-			timesync-nanosec-reg = <0xd3ffff04>;
+			log-write-index-offset = <0x7fff10>;
+			timesync-sec-offset = <0x7fff00>;
+			timesync-sec-diff-offset = <0x7fff08>;
+			timesync-nanosec-offset = <0x7fff04>;
 			clocks = <&dspclks X5_DSP_HIFI5_CLK>, <&dspclks X5_DSP_HIFI5_APB_CLK>;
 			clock-names = "hifi5_clk", "hifi5_pbclk";
 			power-domains = <&power X5_DSP_HIFI5>;
@@ -3252,8 +3192,6 @@
 			def_mode = <1>;
 			num_chans = <2>;
 			shm_size = <0x400>;
-			local_shm_addr = /bits/ 64 <0xd3000000>;//note big-endian and little-endian
-			remote_shm_addr = /bits/ 64 <0xd3000400>;//note big-endian and little-endian
 			ipc_channel0 {
 				num_pools = <1>;
 				ipc_pool0 {
@@ -3277,14 +3215,12 @@
 			mboxes = <&mailbox0 0 1 0 1 0 1 0 1 0>;
 			instance = <1>;
 			def_mode = <1>;
-			num_chans = <2>;
+			num_chans = <1>;
 			shm_size = <0x400>;
-			local_shm_addr = /bits/ 64 <0xd3000800>;//note big-endian and little-endian
-			remote_shm_addr = /bits/ 64 <0xd3000c00>;//note big-endian and little-endian
 			ipc_channel0 {
 				num_pools = <1>;
 				ipc_pool0 {
-					num_bufs = /bits/ 16 <8>;//note big-endian and little-endian
+					num_bufs = /bits/ 16 <2>;//note big-endian and little-endian
 					buf_size = <32>;
 				};
 			};
@@ -3306,8 +3242,6 @@
 			def_mode = <1>;
 			num_chans = <2>;
 			shm_size = <0x3000>;
-			local_shm_addr = /bits/ 64 <0xd3001000>;//note big-endian and little-endian
-			remote_shm_addr = /bits/ 64 <0xd3004000>;//note big-endian and little-endian
 			ipc_channel0 {
 				num_pools = <1>;
 				ipc_pool0 {
@@ -3440,20 +3374,7 @@
 				reset-names = "spi";
 			};
 
-			uart1: serial@34060000 {
-				compatible = "snps,dw-apb-uart";
-				status = "disabled";
-				reg = <0x34060000 0x10000>;
-				reg-shift = <2>;
-				clocks = <&hpsclks X5_LSIO_UART0_CLK>,
-						<&hpsclks X5_LSIO_UART0_PCLK>;
-				clock-names = "clk","apb_pclk";
-				interrupt-parent = <&gic>;
-				interrupts = <GIC_SPI 81 IRQ_TYPE_LEVEL_HIGH>;
-				resets = <&socrst LSIO_UART0_RESET>;
-			};
-
-			uart2: serial@34070000 {
+			uart1: serial@34070000 {
 				compatible = "snps,dw-apb-uart";
 				status = "disabled";
 				reg = <0x34070000 0x10000>;
@@ -3466,7 +3387,7 @@
 				resets = <&socrst LSIO_UART1_RESET>;
 			};
 
-			uart3: serial@34080000 {
+			uart2: serial@34080000 {
 				compatible = "snps,dw-apb-uart";
 				status = "disabled";
 				reg = <0x34080000 0x10000>;
@@ -3479,7 +3400,7 @@
 				resets = <&socrst LSIO_UART2_RESET>;
 			};
 
-			uart4: serial@34090000 {
+			uart3: serial@34090000 {
 				compatible = "snps,dw-apb-uart";
 				status = "disabled";
 				reg = <0x34090000 0x10000>;
@@ -3492,7 +3413,7 @@
 				resets = <&socrst LSIO_UART3_RESET>;
 			};
 
-			uart5: serial@340a0000 {
+			uart4: serial@340a0000 {
 				compatible = "snps,dw-apb-uart";
 				status = "disabled";
 				reg = <0x340a0000 0x10000>;
@@ -3734,7 +3655,7 @@
 				reset-names = "guc-adc";
 			};
 
-			uart6: serial@341a0000 {
+			uart5: serial@341a0000 {
 				compatible = "snps,dw-apb-uart";
 				status = "disabled";
 				reg = <0x341a0000 0x10000>;
@@ -3747,7 +3668,7 @@
 				resets = <&socrst LSIO_UART5_RESET>;
 			};
 
-			uart7: serial@341b0000 {
+			uart6: serial@341b0000 {
 				compatible = "snps,dw-apb-uart";
 				status = "disabled";
 				reg = <0x341b0000 0x10000>;
@@ -3758,6 +3679,19 @@
 				interrupt-parent = <&gic>;
 				interrupts = <GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH>;
 				resets = <&socrst LSIO_UART6_RESET>;
+			};
+
+			uart7: serial@34060000 {
+				compatible = "snps,dw-apb-uart";
+				status = "disabled";
+				reg = <0x34060000 0x10000>;
+				reg-shift = <2>;
+				clocks = <&hpsclks X5_LSIO_UART7_CLK>,
+						<&hpsclks X5_LSIO_UART7_PCLK>;
+				clock-names = "clk","apb_pclk";
+				interrupt-parent = <&gic>;
+				interrupts = <GIC_SPI 81 IRQ_TYPE_LEVEL_HIGH>;
+				resets = <&socrst LSIO_UART7_RESET>;
 			};
 
 			i2c5: i2c@341c0000 {

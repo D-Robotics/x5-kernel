@@ -2079,7 +2079,13 @@ n2d_error_t n2d_kernel_os_get_sgt(n2d_os_t *os, n2d_vidmem_node_t *node, n2d_poi
 
 	*sgt_p = (n2d_pointer)sgt;
 
+	return N2D_SUCCESS;
+
 on_error:
+	if (sgt) {
+		sg_free_table(sgt);
+		kfree(sgt);
+	}
 	return error;
 }
 
@@ -2402,6 +2408,8 @@ n2d_error_t n2d_kernel_os_wrap_memory(n2d_os_t *os, n2d_vidmem_node_t **r_node,
 	n2d_wrap_desc_t *w_desc;
 	n2d_size_t size	 = 0;
 	n2d_bool_t found = N2D_FALSE;
+	n2d_vidmem_node_t *node = N2D_NULL;
+
 
 	/* allocate um_desc and init */
 	ONERROR(n2d_kernel_os_allocate(os, sizeof(*w_desc), (n2d_pointer *)&w_desc));
@@ -2455,8 +2463,6 @@ n2d_error_t n2d_kernel_os_wrap_memory(n2d_os_t *os, n2d_vidmem_node_t **r_node,
 	}
 
 	if (!found) {
-		n2d_vidmem_node_t *node = N2D_NULL;
-
 		ONERROR(n2d_kernel_vidmem_node_construct(os->kernel, &node));
 
 		if (u->flag & N2D_ALLOC_FLAG_DMABUF) {
@@ -2575,6 +2581,9 @@ n2d_error_t n2d_kernel_os_wrap_memory(n2d_os_t *os, n2d_vidmem_node_t **r_node,
 on_error:
 	if (w_desc)
 		n2d_kernel_os_free(os, w_desc);
+	if (node)
+		n2d_kernel_vidmem_node_destroy(os->kernel, node);
+
 	return error;
 }
 
@@ -2857,8 +2866,14 @@ n2d_error_t n2d_kernel_os_construct(n2d_device_t *device, n2d_os_t **os)
 #endif
 
 	*os = _os;
+	return N2D_SUCCESS;
 
 on_error:
+	if (_os) {
+		if (_os->alloc_mutex)
+			n2d_kernel_os_mutex_delete(N2D_NULL, _os->alloc_mutex);
+		n2d_kfree(_os);
+	}
 	return error;
 }
 

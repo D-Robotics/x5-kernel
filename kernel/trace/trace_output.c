@@ -442,7 +442,6 @@ int trace_print_lat_fmt(struct trace_seq *s, struct trace_entry *entry)
 {
 	char hardsoft_irq;
 	char need_resched;
-	char need_resched_lazy;
 	char irqs_off;
 	int hardirq;
 	int softirq;
@@ -463,26 +462,19 @@ int trace_print_lat_fmt(struct trace_seq *s, struct trace_entry *entry)
 
 	switch (entry->flags & (TRACE_FLAG_NEED_RESCHED |
 				TRACE_FLAG_PREEMPT_RESCHED)) {
-#ifndef CONFIG_PREEMPT_LAZY
 	case TRACE_FLAG_NEED_RESCHED | TRACE_FLAG_PREEMPT_RESCHED:
 		need_resched = 'N';
 		break;
-#endif
 	case TRACE_FLAG_NEED_RESCHED:
 		need_resched = 'n';
 		break;
-#ifndef CONFIG_PREEMPT_LAZY
 	case TRACE_FLAG_PREEMPT_RESCHED:
 		need_resched = 'p';
 		break;
-#endif
 	default:
 		need_resched = '.';
 		break;
 	}
-
-	need_resched_lazy =
-		(entry->flags & TRACE_FLAG_NEED_RESCHED_LAZY) ? 'L' : '.';
 
 	hardsoft_irq =
 		(nmi && hardirq)     ? 'Z' :
@@ -492,17 +484,11 @@ int trace_print_lat_fmt(struct trace_seq *s, struct trace_entry *entry)
 		softirq              ? 's' :
 		                       '.' ;
 
-	trace_seq_printf(s, "%c%c%c%c",
-			 irqs_off, need_resched, need_resched_lazy,
-			 hardsoft_irq);
+	trace_seq_printf(s, "%c%c%c",
+			 irqs_off, need_resched, hardsoft_irq);
 
 	if (entry->preempt_count & 0xf)
 		trace_seq_printf(s, "%x", entry->preempt_count & 0xf);
-	else
-		trace_seq_putc(s, '.');
-
-	if (entry->preempt_lazy_count)
-		trace_seq_printf(s, "%x", entry->preempt_lazy_count);
 	else
 		trace_seq_putc(s, '.');
 
@@ -1459,11 +1445,12 @@ static enum print_line_t trace_print_print(struct trace_iterator *iter,
 {
 	struct print_entry *field;
 	struct trace_seq *s = &iter->seq;
+	int max = iter->ent_size - offsetof(struct print_entry, buf);
 
 	trace_assign_type(field, iter->ent);
 
 	seq_print_ip_sym(s, field->ip, flags);
-	trace_seq_printf(s, ": %s", field->buf);
+	trace_seq_printf(s, ": %.*s", max, field->buf);
 
 	return trace_handle_return(s);
 }
@@ -1472,10 +1459,11 @@ static enum print_line_t trace_print_raw(struct trace_iterator *iter, int flags,
 					 struct trace_event *event)
 {
 	struct print_entry *field;
+	int max = iter->ent_size - offsetof(struct print_entry, buf);
 
 	trace_assign_type(field, iter->ent);
 
-	trace_seq_printf(&iter->seq, "# %lx %s", field->ip, field->buf);
+	trace_seq_printf(&iter->seq, "# %lx %.*s", field->ip, max, field->buf);
 
 	return trace_handle_return(&iter->seq);
 }

@@ -59,6 +59,32 @@
 #define BOOT_COUNT_REG_ADDR     0xA600025c
 #define BOOT_COUNT_SIZE         4
 
+#define DDR_SIZE_BIT_OFFSET (4)
+#define DDR_SIZE_MASK       (0xfL << DDR_SIZE_BIT_OFFSET)
+#define DR_DDR_SIZE(x)      ((x & DDR_SIZE_MASK) >> DDR_SIZE_BIT_OFFSET)
+
+#define DDR_TYPE_BIT_OFFSET (8)
+#define DDR_TYPE_MASK       (0x3L << DDR_TYPE_BIT_OFFSET)
+#define DR_DDR_TYPE(x)      ((x & DDR_TYPE_MASK) >> DDR_TYPE_BIT_OFFSET)
+
+#define DDR_ECC_BIT_OFFSET (10)
+#define DDR_ECC_MASK       (0x1L << DDR_ECC_BIT_OFFSET)
+#define DR_DDR_ECC(x)      ((x & DDR_ECC_MASK) & DDR_ECC_BIT_OFFSET)
+
+#define DDR_FREQ_BIT_OFFSET (12)
+#define DDR_FREQ_MASK       (0xfL << DDR_FREQ_BIT_OFFSET)
+#define DR_DDR_FREQ(x)      ((x & DDR_FREQ_MASK) >> DDR_FREQ_BIT_OFFSET)
+
+#define DDR_RANK_BIT_OFFSET (16)
+#define DDR_RANK_MASK       (0x3L << DDR_RANK_BIT_OFFSET)
+#define DR_DDR_RANK(x)      ((x & DDR_RANK_MASK) >> DDR_RANK_BIT_OFFSET)
+
+#define DDR_VENDOR_BIT_OFFSET (20)
+#define DDR_VENDOR_MASK       (0xffl << DDR_VENDOR_BIT_OFFSET)
+#define DR_DDR_VENDOR(x)      ((x & DDR_VENDOR_MASK) >> DDR_VENDOR_BIT_OFFSET)
+
+#define DDR_INFO_VALID_BIT_OFFSET (31)
+#define DDR_INFO_VALID_MASK       (0x1L << DDR_INFO_VALID_BIT_OFFSET)
 enum hobot_board {
 	X2_SVB = 100,
 	J2_SVB = 200,

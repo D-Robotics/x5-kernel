@@ -36,17 +36,6 @@
 #define DEV_MEM_END		(0x3fffffffu)/**< device memory end address*/
 
 /**
- * @struct ipc_dev_instance
- * Define the descriptor of ipc device
- * @NO{S17E09C06}
- */
-struct ipc_dev_instance {
-	int32_t instance;/**< instance id*/
-	struct device *dev;/**< deivce pointer*/
-	struct ipc_instance_cfg ipc_info;/**< ipc instance information*/
-};
-
-/**
  * @struct ipc_os_priv_instance
  * Define the descriptor of OS specific private data each instance
  * @NO{S17E09C06}
@@ -69,7 +58,6 @@ struct ipc_os_priv_instance {
 };
 
 struct mbox_share_res {
-	spinlock_t lock;
 	int32_t user_cnt;
 	struct mbox_chan *mchan;
 } g_mbox_res[MAX_MBOX_IDX];
@@ -393,7 +381,6 @@ int32_t ipc_os_mbox_open(int32_t instance)
 		cfg->mchan = g_mbox_res->mchan;
 		return 0;
 	}
-	spin_lock_init(&g_mbox_res[cfg->mbox_chan_idx].lock);
 
 	pmclient->rx_callback = ipc_os_handler;
 	pmclient->tx_prepare = NULL;
@@ -479,7 +466,6 @@ int32_t ipc_os_mbox_notify(int32_t instance)
 {
 	int err = 0;
 	uint32_t tmp_data[NUM_DATA] = {0, 0, 0, 0, 0, 0, NUM_DATA};
-	unsigned long flags;
 
 	if (priv.id[instance].mbox_chan_idx == IPC_MBOX_NONE) {
 		return 0;//unused mailbox
@@ -491,14 +477,11 @@ int32_t ipc_os_mbox_notify(int32_t instance)
 		return -EINVAL;
 	}
 
-	spin_lock_irqsave(&g_mbox_res[priv.id[instance].mbox_chan_idx].lock, flags);
-
 	mutex_lock(&priv.id[instance].notify_mutex_lock);
 	err = mbox_send_message(priv.id[instance].mchan, tmp_data);
 	if (err < 0) {
 		mutex_unlock(&priv.id[instance].notify_mutex_lock);
 		ipc_err("ipc instance %d: mailbox notify failed: %d\n", instance, err);
-		spin_unlock_irqrestore(&g_mbox_res[priv.id[instance].mbox_chan_idx].lock, flags);
 		return err;
 	}
 
@@ -508,12 +491,10 @@ int32_t ipc_os_mbox_notify(int32_t instance)
 		if (err < 0) {
 			ipc_err("ipc instance %d: mailbox no ack : %d\n", instance, err);
 			mutex_unlock(&priv.id[instance].notify_mutex_lock);
-			spin_unlock_irqrestore(&g_mbox_res[priv.id[instance].mbox_chan_idx].lock, flags);
 			return err;
 		}
 	}
 	mutex_unlock(&priv.id[instance].notify_mutex_lock);
-	spin_unlock_irqrestore(&g_mbox_res[priv.id[instance].mbox_chan_idx].lock, flags);
 	return 0;
 }
 
@@ -528,6 +509,10 @@ static int32_t get_ipc_def_resource(struct platform_device *pdev,
 	char node_name[NODE_NAME_MAX_LEN];
 	struct ipc_channel_info *chans, *chancfg;
 	struct ipc_pool_info *pools, *poolcfg;
+	struct device_node *node;
+	struct resource res;
+	uint32_t local_offset;
+	uint32_t remote_offset;
 
 	if (!dev || !ipc_node || !def_info) {
 		dev_err(dev,"%s invalid parameter\n", __func__);
@@ -561,31 +546,29 @@ static int32_t get_ipc_def_resource(struct platform_device *pdev,
 
 		return -EINVAL;
 	}
-	err = of_property_read_u64(ipc_node, "local_shm_addr", &def_info->local_shm_addr);
-	if (err != 0) {
-		dev_err(dev, "ipc local_shm_addr read failed %d\n", err);
 
+	node = of_parse_phandle(ipc_node, "shm-addr", 0);
+	err = of_address_to_resource(node, 0, &res);
+	if (err) {
+		dev_err(dev, "Get adsp_ipc_reserved failed\n");
+		return err;
+	}
+	err = of_property_read_u32(ipc_node, "local-offset", &local_offset);
+	if (err) {
+		dev_err(dev, "Get local-offset failed\n");
+		return err;
+	}
+	err = of_property_read_u32(ipc_node, "remote-offset", &remote_offset);
+	if (err) {
+		dev_err(dev, "Get remote-offset failed\n");
 		return err;
 	}
 
-	if (def_info->local_shm_addr == 0) {
-		dev_err(dev, "ipc local_shm_addr invalid\n");
+	def_info->local_shm_addr = res.start + local_offset;
+	def_info->remote_shm_addr = res.start + remote_offset;
 
-		return -EINVAL;
-	}
-
-	err = of_property_read_u64(ipc_node, "remote_shm_addr", &def_info->remote_shm_addr);
-	if (err != 0) {
-		dev_err(dev, "ipc remote_shm_addr read failed %d\n", err);
-
-		return err;
-	}
-
-	if (def_info->remote_shm_addr == 0) {
-		dev_err(dev, "ipc remote_shm_addr invalid\n");
-
-		return -EINVAL;
-	}
+	dev_dbg(dev, "base(0x%llx) local(0x%llx) remote(0x%llx)\n",
+		res.start, def_info->local_shm_addr, def_info->remote_shm_addr);
 
 	chans = devm_kzalloc(dev, sizeof(*chans) * def_info->num_chans, GFP_KERNEL);
 	if (!chans) {
@@ -740,6 +723,7 @@ static int32_t hb_ipc_probe(struct platform_device *pdev)
 	if (err != 0 || def_mode != SUPPORT_DEF_MODE) {
 		ipc_dev->ipc_info.mode = NO_DEF_MODE;
 	} else {
+		ipc_dev->ipc_info.mode = def_mode;
 		def_info = &ipc_dev->ipc_info.info.custom_cfg;
 		err = get_ipc_def_resource(pdev, ipc_node, def_info);
 		if (err != 0) {

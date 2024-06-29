@@ -186,7 +186,7 @@ again:
 	ti_flags = read_thread_flags();
 	while (unlikely(ti_flags & (_TIF_USER_WORK_MASK & ~_TIF_RESTORE_TM))) {
 		local_irq_enable();
-		if (ti_flags & _TIF_NEED_RESCHED_MASK) {
+		if (ti_flags & _TIF_NEED_RESCHED) {
 			schedule();
 		} else {
 			/*
@@ -368,7 +368,6 @@ void preempt_schedule_irq(void);
 
 notrace unsigned long interrupt_exit_kernel_prepare(struct pt_regs *regs)
 {
-	unsigned long flags;
 	unsigned long ret = 0;
 	unsigned long kuap;
 	bool stack_store = read_thread_flags() & _TIF_EMULATE_STACK_STORE;
@@ -392,20 +391,16 @@ notrace unsigned long interrupt_exit_kernel_prepare(struct pt_regs *regs)
 
 	kuap = kuap_get_and_assert_locked();
 
-	local_irq_save(flags);
+	local_irq_disable();
 
 	if (!arch_irq_disabled_regs(regs)) {
 		/* Returning to a kernel context with local irqs enabled. */
 		WARN_ON_ONCE(!(regs->msr & MSR_EE));
 again:
-		if (IS_ENABLED(CONFIG_PREEMPTION)) {
+		if (IS_ENABLED(CONFIG_PREEMPT)) {
 			/* Return to preemptible kernel context */
 			if (unlikely(read_thread_flags() & _TIF_NEED_RESCHED)) {
 				if (preempt_count() == 0)
-					preempt_schedule_irq();
-			} else if (unlikely(current_thread_info()->flags & _TIF_NEED_RESCHED_LAZY)) {
-				if ((preempt_count() == 0) &&
-				    (current_thread_info()->preempt_lazy_count == 0))
 					preempt_schedule_irq();
 			}
 		}

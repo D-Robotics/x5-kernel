@@ -486,6 +486,11 @@ static int horizon_gpio_set_direction(struct pinctrl_dev *pctldev, int pin, bool
 	void __iomem *reg_base;
 	struct pinctrl_gpio_range *gpio_range;
 
+	if (IS_ERR_OR_NULL(ipctl->gpio_bank_base)) {
+		dev_dbg(ipctl->dev, "No gpio-bank attached, skip gpio set dir.\n");
+		return 0;
+	}
+
 	dev_dbg(ipctl->dev, "set pin = %d direction to %s\n", pin, input ? "input" : "output");
 	gpio_range = pinctrl_find_gpio_range_from_pin_nolock(pctldev, pin);
 	if (!gpio_range) {
@@ -867,7 +872,6 @@ static int horizon_pinctrl_parse_gpio_bank(struct platform_device *pdev,
 
 	phandle = of_get_property(np, "horizon,gpio-banks", &size);
 	if (!phandle || !size) {
-		dev_err(ipctl->dev, "no horizon,gpio-banks in node %pOF\n", np);
 		return -EINVAL;
 	}
 	bank_num = size / sizeof(*phandle);
@@ -978,8 +982,19 @@ int horizon_pinctrl_probe(struct platform_device *pdev, const struct horizon_pin
 	/* parse horizon gpio bank */
 	ret = horizon_pinctrl_parse_gpio_bank(pdev, ipctl);
 	if (ret) {
-		dev_err(ipctl->dev, "horizon parse gpio bank err\n");
-		return -EINVAL;
+		dev_info(ipctl->dev, "No gpio bank attached\n");
+		ipctl->gpio_bank_base = NULL;
+	} else {
+		/* register gpio chip use gpiolib */
+		ipctl->gpio_chip	= horizon_gpio_chip;
+		ipctl->gpio_chip.ngpio	= ipctl->gpio_bank_num;
+		ipctl->gpio_chip.label	= dev_name(&pdev->dev);
+		ipctl->gpio_chip.parent = &pdev->dev;
+		ipctl->gpio_chip.base	= -1;
+
+		ret = gpiochip_add_data(&ipctl->gpio_chip, ipctl);
+		if (ret)
+			return -EINVAL;
 	}
 
 	ipctl->npins = info->npins;
@@ -1016,17 +1031,6 @@ int horizon_pinctrl_probe(struct platform_device *pdev, const struct horizon_pin
 		dev_err(&pdev->dev, "Couldn't register D-Robotics pinctrl driver\n");
 		goto free;
 	}
-
-	/* register gpio chip use gpiolib */
-	ipctl->gpio_chip	= horizon_gpio_chip;
-	ipctl->gpio_chip.ngpio	= ipctl->gpio_bank_num;
-	ipctl->gpio_chip.label	= dev_name(&pdev->dev);
-	ipctl->gpio_chip.parent = &pdev->dev;
-	ipctl->gpio_chip.base	= -1;
-
-	ret = gpiochip_add_data(&ipctl->gpio_chip, ipctl);
-	if (ret)
-		return -EINVAL;
 
 	ret = horizon_pinctrl_probe_dt(pdev, ipctl);
 	if (ret) {

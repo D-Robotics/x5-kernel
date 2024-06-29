@@ -597,12 +597,12 @@ static int crm_hps_clk_init(struct platform_device *pdev)
 	hws[X5_BPU_NOC_PCLK] = drobot_clk_register_generator_flags_no_idle("bpu_noc_pclk", apb_gen_src_sels, ARRAY_SIZE(apb_gen_src_sels), base + HPS_CLK_GEN + 0x9A0, CLK_IS_CRITICAL);
  	hws[X5_LSIO_ADC_CLK] = drobot_clk_register_generator_no_idle("adc_clk", soc_gen_src_sels, ARRAY_SIZE(soc_gen_src_sels), base + HPS_CLK_GEN + 0x9C0);
 
-	hws[X5_LSIO_UART0_CLK] = drobot_clk_hw_register_gate_no_idle("uart0_clk", "top_apb_clk", base + LSIO_0_CLK_ENB, 0, 0);
+	hws[X5_LSIO_UART7_CLK] = drobot_clk_hw_register_gate_no_idle("uart7_clk", "top_apb_clk", base + LSIO_0_CLK_ENB, 0, 0);
 	hws[X5_LSIO_UART1_CLK] = drobot_clk_hw_register_gate_no_idle("uart1_clk", "top_apb_clk", base + LSIO_0_CLK_ENB, 1, 0);
 	hws[X5_LSIO_UART2_CLK] = drobot_clk_hw_register_gate_no_idle("uart2_clk", "top_apb_clk", base + LSIO_0_CLK_ENB, 2, 0);
 	hws[X5_LSIO_UART3_CLK] = drobot_clk_hw_register_gate_no_idle("uart3_clk", "top_apb_clk", base + LSIO_0_CLK_ENB, 3, 0);
 	hws[X5_LSIO_UART4_CLK] = drobot_clk_hw_register_gate_no_idle("uart4_clk", "top_apb_clk", base + LSIO_0_CLK_ENB, 4, 0);
-	hws[X5_LSIO_UART0_PCLK] = drobot_clk_hw_register_gate_no_idle("uart0_pclk", "top_apb_clk", base + LSIO_0_CLK_ENB, 5, 0);
+	hws[X5_LSIO_UART7_PCLK] = drobot_clk_hw_register_gate_no_idle("uart7_pclk", "top_apb_clk", base + LSIO_0_CLK_ENB, 5, 0);
 	hws[X5_LSIO_UART1_PCLK] = drobot_clk_hw_register_gate_no_idle("uart1_pclk", "top_apb_clk", base + LSIO_0_CLK_ENB, 6, 0);
 	hws[X5_LSIO_UART2_PCLK] = drobot_clk_hw_register_gate_no_idle("uart2_pclk", "top_apb_clk", base + LSIO_0_CLK_ENB, 7, 0);
 	hws[X5_LSIO_UART3_PCLK] = drobot_clk_hw_register_gate_no_idle("uart3_pclk", "top_apb_clk", base + LSIO_0_CLK_ENB, 8, 0);

@@ -330,7 +330,7 @@ extern void __getparam_dl(struct task_struct *p, struct sched_attr *attr);
 extern bool __checkparam_dl(const struct sched_attr *attr);
 extern bool dl_param_changed(struct task_struct *p, const struct sched_attr *attr);
 extern int  dl_cpuset_cpumask_can_shrink(const struct cpumask *cur, const struct cpumask *trial);
-extern int  dl_cpu_busy(int cpu, struct task_struct *p);
+extern int  dl_bw_check_overflow(int cpu);
 
 #ifdef CONFIG_CGROUP_SCHED
 
@@ -2349,15 +2349,6 @@ extern void reweight_task(struct task_struct *p, int prio);
 
 extern void resched_curr(struct rq *rq);
 extern void resched_cpu(int cpu);
-
-#ifdef CONFIG_PREEMPT_LAZY
-extern void resched_curr_lazy(struct rq *rq);
-#else
-static inline void resched_curr_lazy(struct rq *rq)
-{
-	resched_curr(rq);
-}
-#endif
 
 extern struct rt_bandwidth def_rt_bandwidth;
 extern void init_rt_bandwidth(struct rt_bandwidth *rt_b, u64 period, u64 runtime);

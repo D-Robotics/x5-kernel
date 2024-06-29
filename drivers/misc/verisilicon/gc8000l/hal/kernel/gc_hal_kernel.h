@@ -1185,6 +1185,9 @@ typedef struct _gcsCORE_LIST {
 	gctUINT32 num;
 } gcsCORE_LIST;
 
+/* Define the size of VIP_SRAM_SIZE_ARRAY[] in struct gcsFEATURE_DATABASE. */
+#define gcdVIP_SRAM_ARRAY_SIZE  9
+
 /* A gckDEVICE is a group of cores (gckKERNEL in software). */
 typedef struct _gcsDEVICE {
 	/* Global device id in all the platforms. */

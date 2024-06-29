@@ -13,6 +13,7 @@
 #define HOBOT_DSP_REMOTEPROC_H
 
 #include <linux/clk.h>
+#include "hb_ipc_interface.h"
 #include "ipc_wrapper.h"
 
 #define HIFI5_DEV_IDX  (0)
@@ -74,6 +75,7 @@ enum hifi5_runstall {
 
 //acore timesync notify
 #define TIMESYNC_ADSP_NOTIFY_ADDR	(0xd3ffff0cu)
+#define TIMESYNC_ADSP_NOTIFY_OFF	(0x7fff0cu)
 
 #define MAX_R_INDEX_NUM 16u
 
@@ -182,6 +184,8 @@ struct hobot_rproc_pdata {
 	struct completion completion_log;
 	spinlock_t w_index_lock;
 	uint32_t log_write_index;
+
+	struct ipc_instance_cfg *ipc_cfg;
 
 	// lite sleep
 	enum hb_sleep_mode sleep_mode;

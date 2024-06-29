@@ -13,138 +13,138 @@
 &dsp_iomuxc {
 	dsp_gpio0_0: dsp_gpio0_0 {
 		horizon,pins = <
-			HIFI_I2C5_SCL  DSP_PINMUX_0  BIT_OFFSET2  MUX_ALT1  &pconf_input_en_1v8
+			DSP_I2C7_SCL  DSP_PINMUX_0  BIT_OFFSET2  MUX_ALT1  &pconf_input_en_1v8
 		>;
 	};
 	dsp_gpio0_1: dsp_gpio0_1 {
 		horizon,pins = <
-			HIFI_I2C5_SDA  DSP_PINMUX_0  BIT_OFFSET0  MUX_ALT1  &pconf_input_en_1v8
+			DSP_I2C7_SDA  DSP_PINMUX_0  BIT_OFFSET0  MUX_ALT1  &pconf_input_en_1v8
 		>;
 	};
 
 	dsp_gpio0_2: dsp_gpio0_2 {
 		horizon,pins = <
-			HIFI_UART5_RXD  DSP_PINMUX_1  BIT_OFFSET10  MUX_ALT1  &pconf_input_en_1v8
+			DSP_UART0_RXD  DSP_PINMUX_1  BIT_OFFSET10  MUX_ALT1  &pconf_input_en_1v8
 		>;
 	};
 
 	dsp_gpio0_3: dsp_gpio0_3 {
 		horizon,pins = <
-			HIFI_UART5_TXD  DSP_PINMUX_1  BIT_OFFSET12  MUX_ALT1  &pconf_input_en_1v8
+			DSP_UART0_TXD  DSP_PINMUX_1  BIT_OFFSET12  MUX_ALT1  &pconf_input_en_1v8
 		>;
 	};
 
 	dsp_gpio0_4: dsp_gpio0_4 {
 		horizon,pins = <
-			HIFI_I2S0_MCLK  DSP_PINMUX_0  BIT_OFFSET8  MUX_ALT1  &pconf_input_en_1v8
+			DSP_I2S0_MCLK  DSP_PINMUX_0  BIT_OFFSET8  MUX_ALT1  &pconf_input_en_1v8
 		>;
 	};
 
 	dsp_gpio0_5: dsp_gpio0_5 {
 		horizon,pins = <
-			HIFI_I2S0_SCLK  DSP_PINMUX_0  BIT_OFFSET10  MUX_ALT1  &pconf_input_en_1v8
+			DSP_I2S0_SCLK  DSP_PINMUX_0  BIT_OFFSET10  MUX_ALT1  &pconf_input_en_1v8
 		>;
 	};
 
 	dsp_gpio0_6: dsp_gpio0_6 {
 		horizon,pins = <
-			HIFI_I2S0_WS  DSP_PINMUX_0  BIT_OFFSET12  MUX_ALT1  &pconf_input_en_1v8
+			DSP_I2S0_WS  DSP_PINMUX_0  BIT_OFFSET12  MUX_ALT1  &pconf_input_en_1v8
 		>;
 	};
 
 	dsp_gpio0_7: dsp_gpio0_7 {
 		horizon,pins = <
-			HIFI_I2S0_DI  DSP_PINMUX_0  BIT_OFFSET4  MUX_ALT1  &pconf_input_en_1v8
+			DSP_I2S0_DI  DSP_PINMUX_0  BIT_OFFSET4  MUX_ALT1  &pconf_input_en_1v8
 		>;
 	};
 
 	dsp_gpio0_8: dsp_gpio0_8 {
 		horizon,pins = <
-			HIFI_I2S0_DO  DSP_PINMUX_0  BIT_OFFSET6  MUX_ALT1  &pconf_input_en_1v8
+			DSP_I2S0_DO  DSP_PINMUX_0  BIT_OFFSET6  MUX_ALT1  &pconf_input_en_1v8
 		>;
 	};
 
 	dsp_gpio0_9: dsp_gpio0_9 {
 		horizon,pins = <
-			HIFI_I2S1_MCLK  DSP_PINMUX_0  BIT_OFFSET18  MUX_ALT1  &pconf_input_en_3v3
+			DSP_I2S1_MCLK  DSP_PINMUX_0  BIT_OFFSET18  MUX_ALT1  &pconf_input_en_3v3
 		>;
 	};
 
 	dsp_gpio0_10: dsp_gpio0_10 {
 		horizon,pins = <
-			HIFI_I2S1_SCLK  DSP_PINMUX_0  BIT_OFFSET20  MUX_ALT1  &pconf_input_en_3v3
+			DSP_I2S1_SCLK  DSP_PINMUX_0  BIT_OFFSET20  MUX_ALT1  &pconf_input_en_3v3
 		>;
 	};
 
 	dsp_gpio0_11: dsp_gpio0_11 {
 		horizon,pins = <
-			HIFI_I2S1_WS  DSP_PINMUX_0  BIT_OFFSET22  MUX_ALT1  &pconf_input_en_3v3
+			DSP_I2S1_WS  DSP_PINMUX_0  BIT_OFFSET22  MUX_ALT1  &pconf_input_en_3v3
 		>;
 	};
 
 	dsp_gpio0_12: dsp_gpio0_12 {
 		horizon,pins = <
-			HIFI_I2S1_DI  DSP_PINMUX_0  BIT_OFFSET14  MUX_ALT1  &pconf_input_en_3v3
+			DSP_I2S1_DI  DSP_PINMUX_0  BIT_OFFSET14  MUX_ALT1  &pconf_input_en_3v3
 		>;
 	};
 
 	dsp_gpio0_13: dsp_gpio0_13 {
 		horizon,pins = <
-			HIFI_I2S1_DO  DSP_PINMUX_0  BIT_OFFSET16  MUX_ALT1  &pconf_input_en_3v3
+			DSP_I2S1_DO  DSP_PINMUX_0  BIT_OFFSET16  MUX_ALT1  &pconf_input_en_3v3
 		>;
 	};
 
 	dsp_gpio0_14: dsp_gpio0_14 {
 		horizon,pins = <
-			HIFI_PDM_CKO  DSP_PINMUX_0  BIT_OFFSET24  MUX_ALT1  &pconf_input_en_1v8
+			DSP_PDM_CKO  DSP_PINMUX_0  BIT_OFFSET24  MUX_ALT1  &pconf_input_en_1v8
 		>;
 	};
 
 	dsp_gpio0_15: dsp_gpio0_15 {
 		horizon,pins = <
-			HIFI_PDM_IN0  DSP_PINMUX_0  BIT_OFFSET26  MUX_ALT1  &pconf_input_en_1v8
+			DSP_PDM_IN0  DSP_PINMUX_0  BIT_OFFSET26  MUX_ALT1  &pconf_input_en_1v8
 		>;
 	};
 
 	dsp_gpio0_16: dsp_gpio0_16 {
 		horizon,pins = <
-			HIFI_PDM_IN1  DSP_PINMUX_0  BIT_OFFSET28  MUX_ALT1  &pconf_input_en_1v8
+			DSP_PDM_IN1  DSP_PINMUX_0  BIT_OFFSET28  MUX_ALT1  &pconf_input_en_1v8
 		>;
 	};
 
 	dsp_gpio0_17: dsp_gpio0_17 {
 		horizon,pins = <
-			HIFI_PDM_IN2  DSP_PINMUX_0  BIT_OFFSET30  MUX_ALT1  &pconf_input_en_1v8
+			DSP_PDM_IN2  DSP_PINMUX_0  BIT_OFFSET30  MUX_ALT1  &pconf_input_en_1v8
 		>;
 	};
 
 	dsp_gpio0_18: dsp_gpio0_18 {
 		horizon,pins = <
-			HIFI_PDM_IN3  DSP_PINMUX_1  BIT_OFFSET0  MUX_ALT1  &pconf_input_en_1v8
+			DSP_PDM_IN3  DSP_PINMUX_1  BIT_OFFSET0  MUX_ALT1  &pconf_input_en_1v8
 		>;
 	};
 
 	dsp_gpio0_19: dsp_gpio0_19 {
 		horizon,pins = <
-			HIFI_SPI6_SCLK  DSP_PINMUX_1  BIT_OFFSET6  MUX_ALT1  &pconf_input_en_1v8
+			DSP_SPI6_SCLK  DSP_PINMUX_1  BIT_OFFSET6  MUX_ALT1  &pconf_input_en_1v8
 		>;
 	};
 
 	dsp_gpio0_20: dsp_gpio0_20 {
 		horizon,pins = <
-			HIFI_SPI6_SSN  DSP_PINMUX_1  BIT_OFFSET8  MUX_ALT1  &pconf_input_en_1v8
+			DSP_SPI6_SSN  DSP_PINMUX_1  BIT_OFFSET8  MUX_ALT1  &pconf_input_en_1v8
 		>;
 	};
 
 	dsp_gpio0_21: dsp_gpio0_21 {
 		horizon,pins = <
-			HIFI_SPI6_MISO  DSP_PINMUX_1  BIT_OFFSET2  MUX_ALT1  &pconf_input_en_1v8
+			DSP_SPI6_MISO  DSP_PINMUX_1  BIT_OFFSET2  MUX_ALT1  &pconf_input_en_1v8
 		>;
 	};
 
 	dsp_gpio0_22: dsp_gpio0_22 {
 		horizon,pins = <
-			HIFI_SPI6_MOSI  DSP_PINMUX_1  BIT_OFFSET4  MUX_ALT1  &pconf_input_en_1v8
+			DSP_SPI6_MOSI  DSP_PINMUX_1  BIT_OFFSET4  MUX_ALT1  &pconf_input_en_1v8
 		>;
 	};
 };
@@ -154,25 +154,25 @@
 	/* LSIO_GPIO0 0-31 */
 	lsio_gpio0_0: lsio_gpio0_0 {
 		horizon,pins = <
-			LSIO_UART0_RX	LSIO_PINMUX_3 BIT_OFFSET4	MUX_ALT2	&pconf_input_en_3v3
+			LSIO_UART7_RX	LSIO_PINMUX_3 BIT_OFFSET4	MUX_ALT2	&pconf_input_en_3v3
 		>;
 	};
 
 	lsio_gpio0_1: lsio_gpio0_1 {
 		horizon,pins = <
-			LSIO_UART0_TX	LSIO_PINMUX_3 BIT_OFFSET6	MUX_ALT2	&pconf_input_en_3v3
+			LSIO_UART7_TX	LSIO_PINMUX_3 BIT_OFFSET6	MUX_ALT2	&pconf_input_en_3v3
 		>;
 	};
 
 	lsio_gpio0_2: lsio_gpio0_2 {
 		horizon,pins = <
-			LSIO_UART0_CTS	LSIO_PINMUX_3 BIT_OFFSET8	MUX_ALT2	&pconf_input_en_3v3
+			LSIO_UART7_CTS	LSIO_PINMUX_3 BIT_OFFSET8	MUX_ALT2	&pconf_input_en_3v3
 		>;
 	};
 
 	lsio_gpio0_3: lsio_gpio0_3 {
 		horizon,pins = <
-			LSIO_UART0_RTS	LSIO_PINMUX_3 BIT_OFFSET10	MUX_ALT2	&pconf_input_en_3v3
+			LSIO_UART7_RTS	LSIO_PINMUX_3 BIT_OFFSET10	MUX_ALT2	&pconf_input_en_3v3
 		>;
 	};
 
@@ -743,111 +743,6 @@
 	hsio_gpio1_17: hsio_gpio1_17 {
 		horizon,pins = <
 			HSIO_EMMC_RSTN	HSIO_PINMUX_3	BIT_OFFSET0		MUX_ALT2	&pconf_input_en_1v8
-		>;
-	};
-};
-
-&disp_iomuxc {
-	/* DISP_GPIO 0-16 */
-	disp_gpio_0: disp_gpio_0 {
-		horizon,pins = <
-			DISP_BT1120_DATA0		DISP_PINMUX_0	BIT_OFFSET0		MUX_ALT2	&pconf_input_en_1v8
-		>;
-	};
-
-	disp_gpio_1: disp_gpio_1 {
-		horizon,pins = <
-			DISP_BT1120_DATA1		DISP_PINMUX_0	BIT_OFFSET2		MUX_ALT2	&pconf_input_en_1v8
-		>;
-	};
-
-	disp_gpio_2: disp_gpio_2 {
-		horizon,pins = <
-			DISP_BT1120_DATA2		DISP_PINMUX_0	BIT_OFFSET4		MUX_ALT2	&pconf_input_en_1v8
-		>;
-	};
-
-	disp_gpio_3: disp_gpio_3 {
-		horizon,pins = <
-			DISP_BT1120_DATA3		DISP_PINMUX_0	BIT_OFFSET6		MUX_ALT2	&pconf_input_en_1v8
-		>;
-	};
-
-	disp_gpio_4: disp_gpio_4 {
-		horizon,pins = <
-			DISP_BT1120_DATA4		DISP_PINMUX_0	BIT_OFFSET8		MUX_ALT2	&pconf_input_en_1v8
-		>;
-	};
-
-	disp_gpio_5: disp_gpio_5 {
-		horizon,pins = <
-			DISP_BT1120_DATA5		DISP_PINMUX_0	BIT_OFFSET10	MUX_ALT2	&pconf_input_en_1v8
-		>;
-	};
-
-	disp_gpio_6: disp_gpio_6 {
-		horizon,pins = <
-			DISP_BT1120_DATA6		DISP_PINMUX_0	BIT_OFFSET12	MUX_ALT2	&pconf_input_en_1v8
-		>;
-	};
-
-	disp_gpio_7: disp_gpio_7 {
-		horizon,pins = <
-			DISP_BT1120_DATA7		DISP_PINMUX_0	BIT_OFFSET14	MUX_ALT2	&pconf_input_en_1v8
-		>;
-	};
-
-	disp_gpio_8: disp_gpio_8 {
-		horizon,pins = <
-			DISP_BT1120_DATA8		DISP_PINMUX_0	BIT_OFFSET16	MUX_ALT2	&pconf_input_en_1v8
-		>;
-	};
-
-	disp_gpio_9: disp_gpio_9 {
-		horizon,pins = <
-			DISP_BT1120_DATA9		DISP_PINMUX_0	BIT_OFFSET18	MUX_ALT2	&pconf_input_en_1v8
-		>;
-	};
-
-	disp_gpio_10: disp_gpio_10 {
-		horizon,pins = <
-			DISP_BT1120_DATA10		DISP_PINMUX_0	BIT_OFFSET20	MUX_ALT2	&pconf_input_en_1v8
-		>;
-	};
-
-	disp_gpio_11: disp_gpio_11 {
-		horizon,pins = <
-			DISP_BT1120_DATA11		DISP_PINMUX_0	BIT_OFFSET22	MUX_ALT2	&pconf_input_en_1v8
-		>;
-	};
-
-	disp_gpio_12: disp_gpio_12 {
-		horizon,pins = <
-			DISP_BT1120_DATA12		DISP_PINMUX_0	BIT_OFFSET24	MUX_ALT2	&pconf_input_en_1v8
-		>;
-	};
-
-	disp_gpio_13: disp_gpio_13 {
-		horizon,pins = <
-			DISP_BT1120_DATA13		DISP_PINMUX_0	BIT_OFFSET26	MUX_ALT2	&pconf_input_en_1v8
-		>;
-	};
-
-	disp_gpio_14: disp_gpio_14 {
-		horizon,pins = <
-			DISP_BT1120_DATA14		DISP_PINMUX_0	BIT_OFFSET28	MUX_ALT2	&pconf_input_en_1v8
-		>;
-	};
-
-	disp_gpio_15: disp_gpio_15 {
-		horizon,pins = <
-			DISP_BT1120_DATA15		DISP_PINMUX_0	BIT_OFFSET30	MUX_ALT2	&pconf_input_en_1v8
-		>;
-	};
-
-	disp_gpio_16: disp_gpio_16 {
-		horizon,pins = <
-			DISP_BT1120_O_PIXELCLK	DISP_PINMUX_1	BIT_OFFSET0		MUX_ALT2	&pconf_input_en_1v8
 		>;
 	};
 };

@@ -223,7 +223,7 @@ struct log_c {
 	unsigned int region_count;
 	region_t sync_count;
 
-	unsigned bitset_uint32_count;
+	unsigned int bitset_uint32_count;
 	uint32_t *clean_bits;
 	uint32_t *sync_bits;
 	uint32_t *recovering_bits;	/* FIXME: this seems excessive */
@@ -255,20 +255,20 @@ struct log_c {
  * The touched member needs to be updated every time we access
  * one of the bitsets.
  */
-static inline int log_test_bit(uint32_t *bs, unsigned bit)
+static inline int log_test_bit(uint32_t *bs, unsigned int bit)
 {
 	return test_bit_le(bit, bs) ? 1 : 0;
 }
 
 static inline void log_set_bit(struct log_c *l,
-			       uint32_t *bs, unsigned bit)
+			       uint32_t *bs, unsigned int bit)
 {
 	__set_bit_le(bit, bs);
 	l->touched_cleaned = 1;
 }
 
 static inline void log_clear_bit(struct log_c *l,
-				 uint32_t *bs, unsigned bit)
+				 uint32_t *bs, unsigned int bit)
 {
 	__clear_bit_le(bit, bs);
 	l->touched_dirtied = 1;
@@ -295,7 +295,7 @@ static int rw_header(struct log_c *lc, enum req_op op)
 {
 	lc->io_req.bi_opf = op;
 
-	return dm_io(&lc->io_req, 1, &lc->header_location, NULL);
+	return dm_io(&lc->io_req, 1, &lc->header_location, NULL, IOPRIO_DEFAULT);
 }
 
 static int flush_header(struct log_c *lc)
@@ -308,7 +308,7 @@ static int flush_header(struct log_c *lc)
 
 	lc->io_req.bi_opf = REQ_OP_WRITE | REQ_PREFLUSH;
 
-	return dm_io(&lc->io_req, 1, &null_location, NULL);
+	return dm_io(&lc->io_req, 1, &null_location, NULL, IOPRIO_DEFAULT);
 }
 
 static int read_header(struct log_c *log)
@@ -382,8 +382,7 @@ static int create_log_context(struct dm_dirty_log *log, struct dm_target *ti,
 		else if (!strcmp(argv[1], "nosync"))
 			sync = NOSYNC;
 		else {
-			DMWARN("unrecognised sync argument to "
-			       "dirty region log: %s", argv[1]);
+			DMWARN("unrecognised sync argument to dirty region log: %s", argv[1]);
 			return -EINVAL;
 		}
 	}
@@ -582,7 +581,7 @@ static void fail_log_device(struct log_c *lc)
 static int disk_resume(struct dm_dirty_log *log)
 {
 	int r;
-	unsigned i;
+	unsigned int i;
 	struct log_c *lc = (struct log_c *) log->context;
 	size_t size = lc->bitset_uint32_count * sizeof(uint32_t);
 
@@ -757,8 +756,8 @@ static void core_set_region_sync(struct dm_dirty_log *log, region_t region,
 	log_clear_bit(lc, lc->recovering_bits, region);
 	if (in_sync) {
 		log_set_bit(lc, lc->sync_bits, region);
-                lc->sync_count++;
-        } else if (log_test_bit(lc->sync_bits, region)) {
+		lc->sync_count++;
+	} else if (log_test_bit(lc->sync_bits, region)) {
 		lc->sync_count--;
 		log_clear_bit(lc, lc->sync_bits, region);
 	}
@@ -766,9 +765,9 @@ static void core_set_region_sync(struct dm_dirty_log *log, region_t region,
 
 static region_t core_get_sync_count(struct dm_dirty_log *log)
 {
-        struct log_c *lc = (struct log_c *) log->context;
+	struct log_c *lc = (struct log_c *) log->context;
 
-        return lc->sync_count;
+	return lc->sync_count;
 }
 
 #define	DMEMIT_SYNC \

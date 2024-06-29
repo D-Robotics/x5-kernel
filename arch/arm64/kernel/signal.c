@@ -430,7 +430,7 @@ static int restore_za_context(struct user_ctxs *user)
 	fpsimd_flush_task_state(current);
 	/* From now, fpsimd_thread_switch() won't touch thread.sve_state */
 
-	sme_alloc(current);
+	sme_alloc(current, true);
 	if (!current->thread.za_state) {
 		current->thread.svcr &= ~SVCR_ZA_MASK;
 		clear_thread_flag(TIF_SME);
@@ -1108,7 +1108,7 @@ static void do_signal(struct pt_regs *regs)
 void do_notify_resume(struct pt_regs *regs, unsigned long thread_flags)
 {
 	do {
-		if (thread_flags & _TIF_NEED_RESCHED_MASK) {
+		if (thread_flags & _TIF_NEED_RESCHED) {
 			/* Unmask Debug and SError for the next task */
 			local_daif_restore(DAIF_PROCCTX_NOIRQ);
 

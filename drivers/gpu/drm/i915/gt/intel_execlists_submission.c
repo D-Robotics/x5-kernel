@@ -1302,7 +1302,7 @@ static void execlists_dequeue(struct intel_engine_cs *engine)
 	 * and context switches) submission.
 	 */
 
-	spin_lock_irq(&sched_engine->lock);
+	spin_lock(&sched_engine->lock);
 
 	/*
 	 * If the queue is higher priority than the last
@@ -1402,7 +1402,7 @@ static void execlists_dequeue(struct intel_engine_cs *engine)
 				 * Even if ELSP[1] is occupied and not worthy
 				 * of timeslices, our queue might be.
 				 */
-				spin_unlock_irq(&sched_engine->lock);
+				spin_unlock(&sched_engine->lock);
 				return;
 			}
 		}
@@ -1428,7 +1428,7 @@ static void execlists_dequeue(struct intel_engine_cs *engine)
 
 		if (last && !can_merge_rq(last, rq)) {
 			spin_unlock(&ve->base.sched_engine->lock);
-			spin_unlock_irq(&engine->sched_engine->lock);
+			spin_unlock(&engine->sched_engine->lock);
 			return; /* leave this for another sibling */
 		}
 
@@ -1590,7 +1590,7 @@ done:
 	 */
 	sched_engine->queue_priority_hint = queue_prio(sched_engine);
 	i915_sched_engine_reset_on_empty(sched_engine);
-	spin_unlock_irq(&sched_engine->lock);
+	spin_unlock(&sched_engine->lock);
 
 	/*
 	 * We can skip poking the HW if we ended up with exactly the same set
@@ -1614,6 +1614,13 @@ done:
 			i915_request_put(*port);
 		*execlists->pending = NULL;
 	}
+}
+
+static void execlists_dequeue_irq(struct intel_engine_cs *engine)
+{
+	local_irq_disable(); /* Suspend interrupts across request submission */
+	execlists_dequeue(engine);
+	local_irq_enable(); /* flush irq_work (e.g. breadcrumb enabling) */
 }
 
 static void clear_ports(struct i915_request **ports, int count)
@@ -2010,6 +2017,8 @@ process_csb(struct intel_engine_cs *engine, struct i915_request **inactive)
 	 * inspecting the queue to see if we need to resumbit.
 	 */
 	if (*prev != *execlists->active) { /* elide lite-restores */
+		struct intel_context *prev_ce = NULL, *active_ce = NULL;
+
 		/*
 		 * Note the inherent discrepancy between the HW runtime,
 		 * recorded as part of the context switch, and the CPU
@@ -2021,9 +2030,15 @@ process_csb(struct intel_engine_cs *engine, struct i915_request **inactive)
 		 * and correct overselves later when updating from HW.
 		 */
 		if (*prev)
-			lrc_runtime_stop((*prev)->context);
+			prev_ce = (*prev)->context;
 		if (*execlists->active)
-			lrc_runtime_start((*execlists->active)->context);
+			active_ce = (*execlists->active)->context;
+		if (prev_ce != active_ce) {
+			if (prev_ce)
+				lrc_runtime_stop(prev_ce);
+			if (active_ce)
+				lrc_runtime_start(active_ce);
+		}
 		new_timeslice(execlists);
 	}
 
@@ -2461,7 +2476,7 @@ static void execlists_submission_tasklet(struct tasklet_struct *t)
 	}
 
 	if (!engine->execlists.pending[0]) {
-		execlists_dequeue(engine);
+		execlists_dequeue_irq(engine);
 		start_timeslice(engine);
 	}
 
@@ -3530,6 +3545,8 @@ int intel_execlists_submission_setup(struct intel_engine_cs *engine)
 
 	logical_ring_default_vfuncs(engine);
 	logical_ring_default_irqs(engine);
+
+	seqcount_init(&engine->stats.execlists.lock);
 
 	if (engine->flags & I915_ENGINE_HAS_RCS_REG_STATE)
 		rcs_submission_override(engine);
