@@ -97,5 +97,4 @@ int32_t vpu_prio_set_enc_dec_pic(struct file *filp, void *dev, u_long arg);
 void vpu_prio_deinit(void *dev);
 int32_t vpu_prio_set_command_to_fw(hb_vpu_prio_queue_t *vpq);
 int32_t check_prio_flag(void *dev);
-int32_t vpu_prio_reset_fifo(void *vpu, int32_t inst_idx);
 #endif

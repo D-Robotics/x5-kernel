@@ -14,8 +14,7 @@
 #include <linux/eventpoll.h>
 #include <linux/debugfs.h>
 #include <linux/sched/signal.h>
-#define RESERVED_WORK_MEMORY
-#ifdef RESERVED_WORK_MEMORY
+#if defined(CONFIG_HOBOT_FPGA_J5) || defined(CONFIG_HOBOT_J5) || defined(CONFIG_HOBOT_FPGA_HAPS_J5)
 #include <linux/of_address.h>
 #endif
 #if defined(CONFIG_HOBOT_FUSA_DIAG)
@@ -60,7 +59,6 @@
 #define MAX_RETRY_ALLOC  5
 
 #define VPU_GET_SEM_TIMEOUT    (120UL * (unsigned long)HZ)
-#define VPU_GET_INST_SEM_TIMEOUT    (1UL * (unsigned long)HZ)
 
 /**
  * Purpose: VPU log debug information switch
@@ -170,10 +168,6 @@ static struct notifier_block vpu_pac_notifier = {
 #endif
 
 #if defined(CONFIG_HOBOT_FUSA_DIAG)
-#define MASK_8BIT 0xffu
-#define BIT_8 8u
-#define FUSA_SW_ERR_CODE 0xffffu
-#define FUSA_ENV_LEN 4u
 static void vpu_send_diag_error_event(u16 id, u8 sub_id, u8 pri_data, u16 line_num)
 {
 	s32 ret;
@@ -309,6 +303,7 @@ static int32_t vdi_lock_release(struct file *filp, hb_vpu_dev_t *dev, hb_vpu_ins
 	void *mutex;
 	volatile int32_t *sync_lock_ptr;
 	int32_t sync_val = current->tgid;
+	unsigned long timeout;
 	unsigned long flags_mp;
 
 	mutex = get_mutex_base(dev, core, type);
@@ -321,12 +316,12 @@ static int32_t vdi_lock_release(struct file *filp, hb_vpu_dev_t *dev, hb_vpu_ins
 	sync_lock_ptr = (volatile int32_t *)mutex;
 
 	if (*sync_lock_ptr == sync_val) {
-		VPU_INFO_DEV(dev->device, "Warning: Free core=%d, type=%d, sync_lock=%d, current_pid=%d, "
+		VPU_INFO_DEV(dev->device, "Free core=%d, type=%d, sync_lock=%d, current_pid=%d, "
 			"tgid=%d, sync_val=%d\n", core, type,
 			(volatile int32_t)*sync_lock_ptr, current->pid, current->tgid,
 			sync_val);
 		if (type == VPUDRV_MUTEX_VPU) {
-			VPU_INFO_DEV(dev->device, "Warning: Free pendingInst=%pK, pendingInstIdxPlus1=%d\n",
+			VPU_INFO_DEV(dev->device, "Free pendingInst=%p, pendingInstIdxPlus1=%d\n",
 				vip->pendingInst, vip->pendingInstIdxPlus1);
 			vip->pendingInst = NULL;
 			vip->pendingInstIdxPlus1 = 0;
@@ -340,12 +335,11 @@ static int32_t vdi_lock_release(struct file *filp, hb_vpu_dev_t *dev, hb_vpu_ins
 				if (dev->irq_trigger == 1) {
 					// PRQA S 3432,4543,4403,4558,4542,1861,3344 ++
 					//coverity[misra_c_2012_rule_8_6_violation:SUPPRESS]
-					VPU_DBG_DEV(dev->device, "Warning: vpu_lock_release ignore irq.\n");
+					VPU_DBG_DEV(dev->device, "vpu_lock_release ignore irq.\n");
 					// PRQA S 3432,4543,4403,4558,4542,1861,3344 --
 					enable_irq(dev->irq);
 					dev->irq_trigger = 0;
 					dev->poll_int_event[inst_idx]--;
-					dev->vpu_irqenable = 1;
 				}
 #ifdef SUPPORT_MULTI_INST_INTR
 				dev->interrupt_flag[inst_idx] = 0;
@@ -354,15 +348,11 @@ static int32_t vdi_lock_release(struct file *filp, hb_vpu_dev_t *dev, hb_vpu_ins
 #endif
 			} else {
 				//coverity[misra_c_2012_rule_18_4_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
-#ifndef SUPPORT_MULTI_INST_INTR
 				if ((VPU_READL(WAVE_VPU_BUSY_STATUS) != 0U) || (VPU_READL(WAVE_VPU_VPU_INT_STS) != 0U)) {
 					dev->ignore_irq = 1;
-					VPU_DBG_DEV(dev->device, "vpu_lock_release ignore irq.\n");
 				}
-#endif
 			}
 			osal_spin_unlock_irqrestore(&dev->irq_spinlock, (uint64_t *)&flags_mp);
-#ifndef SUPPORT_MULTI_INST_INTR
 			timeout = jiffies + (50UL * (unsigned long)HZ) / 1000UL;
 			//coverity[misra_c_2012_rule_18_4_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
 			while (VPU_READL(WAVE_VPU_BUSY_STATUS) != 0U) { /* PRQA S 1006,0497,1843,1021 */
@@ -374,7 +364,6 @@ static int32_t vdi_lock_release(struct file *filp, hb_vpu_dev_t *dev, hb_vpu_ins
 					break;
 				}
 			}
-#endif
 		}
 		(void)__sync_lock_release(sync_lock_ptr); /* PRQA S 3335 */
 	}
@@ -588,13 +577,13 @@ static int32_t vdi_lock_release(struct file *filp, hb_vpu_dev_t *dev, hb_vpu_ins
 	//coverity[misra_c_2012_rule_11_4_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
 	if (dev->current_vdi_lock_pid[type] == (int64_t)filp) {
 		// PRQA S 3432,4543,4403,4558,4542,1861,3344 ++
-		VPU_DBG_DEV(dev->device, "MUTEX_TYPE: %d, VDI_LOCK_PID: %lld, current->pid: %d, "
-			"current->tgid=%d, filp=%pK\n", type, dev->current_vdi_lock_pid[type],
+		VPU_INFO_DEV(dev->device, "MUTEX_TYPE: %d, VDI_LOCK_PID: %lld, current->pid: %d, "
+			"current->tgid=%d, filp=%px\n", type, dev->current_vdi_lock_pid[type],
 			current->pid, current->tgid, filp);
 
 		// PRQA S 3432,4543,4403,4558,4542,1861,3344 --
 		if (type == VPUDRV_MUTEX_VPU) {
-			VPU_DBG_DEV(dev->device, "Free pendingInst=%pK, pendingInstIdxPlus1=%d\n",
+			VPU_INFO_DEV(dev->device, "Free pendingInst=%p, pendingInstIdxPlus1=%d\n",
 				vip->pendingInst, vip->pendingInstIdxPlus1);
 			vip->pendingInst = NULL;
 			vip->pendingInstIdxPlus1 = 0;
@@ -615,7 +604,6 @@ static int32_t vdi_lock_release(struct file *filp, hb_vpu_dev_t *dev, hb_vpu_ins
 					enable_irq(dev->irq);
 					dev->irq_trigger = 0;
 					dev->poll_int_event[inst_idx]--;
-					dev->vpu_irqenable = 1;
 				}
 #ifdef SUPPORT_MULTI_INST_INTR
 				dev->interrupt_flag[inst_idx] = 0;
@@ -623,16 +611,12 @@ static int32_t vdi_lock_release(struct file *filp, hb_vpu_dev_t *dev, hb_vpu_ins
 				dev->interrupt_flag = 0;
 #endif
 			} else {
-#ifndef SUPPORT_MULTI_INST_INTR
 				//coverity[misra_c_2012_rule_18_4_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
 				if ((VPU_READL(WAVE_VPU_BUSY_STATUS) != 0U) || (VPU_READL(WAVE_VPU_VPU_INT_STS) != 0U)) {
 					dev->ignore_irq = 1;
-					VPU_DBG_DEV(dev->device, "vpu_lock_release ignore irq.\n");
 				}
-#endif
 			}
 			osal_spin_unlock_irqrestore(&dev->irq_spinlock, (uint64_t *)&flags_mp);
-#ifndef SUPPORT_MULTI_INST_INTR
 			timeout = jiffies + (50UL * (unsigned long)HZ) / 1000UL;
 			//coverity[misra_c_2012_rule_18_4_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
 			while (VPU_READL(WAVE_VPU_BUSY_STATUS) != 0U) { /* PRQA S 1006,0497,1843,1021 */
@@ -644,7 +628,6 @@ static int32_t vdi_lock_release(struct file *filp, hb_vpu_dev_t *dev, hb_vpu_ins
 					break;
 				}
 			}
-#endif
 		}
 		vdi_unlock(dev, type);
 	}
@@ -799,7 +782,7 @@ static int32_t vpuapi_wait_vpu_busy(hb_vpu_dev_t *dev, uint32_t core, unsigned l
 		//coverity[misra_c_2012_rule_10_1_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
 		//coverity[misra_c_2012_rule_10_8_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
 		if (time_after(jiffies, timeout)) {
-			VPU_ERR_DEV(dev->device, "vpuapi_wait_vpu_busy timeout cmd=0x%x, pc=0x%x\n", cmd, pc);
+			VPU_ERR_DEV(dev->device, "timeout cmd=0x%x, pc=0x%x\n", cmd, pc);
 			ret = (int32_t)VPUAPI_RET_TIMEOUT;
 			break;
 		}
@@ -831,7 +814,7 @@ static int32_t vpuapi_wait_bus_busy(hb_vpu_dev_t *dev, uint32_t core,
 		//coverity[misra_c_2012_rule_10_1_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
 		//coverity[misra_c_2012_rule_10_8_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
 		if (time_after(jiffies, timeout)) {
-			VPU_ERR_DEV(dev->device, "vpuapi_wait_bus_busy timeout\n");
+			VPU_ERR_DEV(dev->device, "timeout \n");
 			ret = (int32_t)VPUAPI_RET_TIMEOUT;
 			break;
 		}
@@ -944,7 +927,7 @@ static int32_t wave_sleep_wake(hb_vpu_dev_t *dev, uint32_t core, int32_t mode)
 
 		if (vpuapi_wait_vpu_busy(dev, core, timeout) == (int32_t)VPUAPI_RET_TIMEOUT) {
 			//coverity[misra_c_2012_rule_18_4_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
-			VPU_ERR_DEV(dev->device, "timeout pc=0x%x\n", VPU_READL(W5_VCPU_CUR_PC));
+			VPU_ERR_DEV(dev->device, "%s timeout pc=0x%x\n", __FUNCTION__, VPU_READL(W5_VCPU_CUR_PC));
 			return (int32_t)VPUAPI_RET_TIMEOUT;
 		}
 
@@ -952,7 +935,7 @@ static int32_t wave_sleep_wake(hb_vpu_dev_t *dev, uint32_t core, int32_t mode)
 		val = VPU_READL(W5_RET_SUCCESS);
 		if (val == 0U) {
 			//coverity[misra_c_2012_rule_18_4_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
-			VPU_ERR_DEV(dev->device, "VPUAPI_RET_FAILURE pc=0x%x \n", VPU_READL(W5_VCPU_CUR_PC));
+			VPU_ERR_DEV(dev->device, "%s  VPUAPI_RET_FAILURE pc=0x%x \n", __FUNCTION__, VPU_READL(W5_VCPU_CUR_PC));
 			return (int32_t)VPUAPI_RET_FAILURE;
 		}
 	}
@@ -966,40 +949,36 @@ static int32_t wave_close_instance(struct file *filp, hb_vpu_dev_t *dev, uint32_
 	uint32_t error_reason = 0;
 	unsigned long timeout = jiffies + (unsigned long)VPU_DEC_TIMEOUT;
 
-	VPU_DBG_DEV(dev->device, "[+][%02d] wave_close_instance\n", inst);
 	if (vpu_check_is_decoder(dev, core, inst) == 1) {
-		(void)vpuapi_dec_set_stream_end(filp, dev, core, inst);
-		(void)vpuapi_dec_clr_all_disp_flag(filp, dev, core, inst);
+		ret = vpuapi_dec_set_stream_end(filp, dev, core, inst);
+		ret = vpuapi_dec_clr_all_disp_flag(filp, dev, core, inst);
 	}
 	while ((ret = vpuapi_close(filp, dev, core, inst)) == (int32_t)VPUAPI_RET_STILL_RUNNING) {
 		ret = vpuapi_get_output_info(filp, dev, core, inst, &error_reason);
-		if (ret != (int32_t)VPUAPI_RET_SUCCESS) {
-			VPU_INFO_DEV(dev->device, "inst[%02d] vpuapi_get_output_info ret=%d\n", inst, ret);
-		} else {
+		if (ret == (int32_t)VPUAPI_RET_SUCCESS) {
 			if ((error_reason & 0xf0000000)) {
-				VPU_INFO_DEV(dev->device, "inst[%02d] need to do soft reset\n", inst);
-				//if (vpu_do_sw_reset(filp, dev, core, inst, error_reason) == VPUAPI_RET_TIMEOUT) {
+				//if (vpu_do_sw_reset(filp, dev, core, inst, error_reason)
+				//	== VPUAPI_RET_TIMEOUT) {
 					break;
 				//}
 			}
 		}
 
 		if (vpu_check_is_decoder(dev, core, inst) == 1) {
-			(void)vpuapi_dec_set_stream_end(filp, dev, core, inst);
-			(void)vpuapi_dec_clr_all_disp_flag(filp, dev, core, inst);
+			ret = vpuapi_dec_set_stream_end(filp, dev, core, inst);
+			ret = vpuapi_dec_clr_all_disp_flag(filp, dev, core, inst);
 		}
 
-		osal_msleep(10U);	// delay for vpuapi_close
+		osal_mdelay(10U);	// delay for vpuapi_close
 		//coverity[misra_c_2012_rule_10_1_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
 		//coverity[misra_c_2012_rule_10_8_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
 		if (time_after(jiffies, timeout)) {
-			VPU_ERR_DEV(dev->device, "inst[%02d] vpuapi_close flow timeout ret=%d\n", inst, ret);
+			VPU_ERR_DEV(dev->device, "vpuapi_close flow timeout ret=%d, inst=%d\n", ret, inst);
 			return 0;
 		}
 	}
-	VPU_DBG_DEV(dev->device, "[-][%02d] wave_close_instance, ret = %d\n", inst, ret);
 
-	return ret;
+	return 1;
 }
 
 int32_t vpu_check_is_decoder(hb_vpu_dev_t *dev, uint32_t core, uint32_t inst)
@@ -1032,7 +1011,7 @@ int32_t _vpu_close_instance(struct file *filp, hb_vpu_dev_t *dev, uint32_t core,
 		success = wave_close_instance(filp, dev, core, inst);
 	} else {
 		VPU_ERR_DEV(dev->device, "vpu_close_instance Unknown product id : %08x\n", product_code);
-		success = VPUAPI_RET_FAILURE;
+		success = 0;
 	}
 	return success;
 }
@@ -1113,11 +1092,21 @@ static int32_t vpuapi_sw_reset(struct file *filp, hb_vpu_dev_t *dev, uint32_t co
 // #if defined(SUPPORT_SW_UART) || defined(SUPPORT_SW_UART_V2)
 // 	uint32_t regSwUartStatus;
 // #endif
+#ifdef USE_SHARE_SEM_BT_KERNEL_AND_USER
+	vdi_lock(dev, core, VPUDRV_MUTEX_VPU);
+#else
+	vdi_lock_user(filp, dev, VPUDRV_MUTEX_VPU);
+#endif
 
 	//coverity[misra_c_2012_rule_18_4_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
 	product_code = VPU_READL(VPU_PRODUCT_CODE_REGISTER);
 	if (!PRODUCT_CODE_W_SERIES(product_code)) {
 		VPU_ERR_DEV(dev->device, "Doesn't support swreset for coda \n");
+#ifdef USE_SHARE_SEM_BT_KERNEL_AND_USER
+		vdi_unlock(dev, core, VPUDRV_MUTEX_VPU);
+#else
+		vdi_unlock(dev, VPUDRV_MUTEX_VPU);
+#endif
 		return (int32_t)VPUAPI_RET_INVALID_PARAM;
 	}
 
@@ -1128,6 +1117,11 @@ static int32_t vpuapi_sw_reset(struct file *filp, hb_vpu_dev_t *dev, uint32_t co
 		ret = wave_sleep_wake(dev, core, VPU_SLEEP_MODE);
 		VPU_DBG_DEV(dev->device, "Sleep done ret=%d\n", ret);
 		if (ret != (int32_t)VPUAPI_RET_SUCCESS) {
+#ifdef USE_SHARE_SEM_BT_KERNEL_AND_USER
+			vdi_unlock(dev, core, VPUDRV_MUTEX_VPU);
+#else
+			vdi_unlock(dev, VPUDRV_MUTEX_VPU);
+#endif
 			return ret;
 		}
 	}
@@ -1164,6 +1158,11 @@ static int32_t vpuapi_sw_reset(struct file *filp, hb_vpu_dev_t *dev, uint32_t co
 			if (vpuapi_wait_bus_busy(dev, core, W5_BACKBONE_BUS_STATUS_VCORE0) !=
 				(int32_t)VPUAPI_RET_SUCCESS) {
 				WriteVpuFIORegister(dev, core, W5_BACKBONE_BUS_CTRL_VCORE0, 0x00);
+#ifdef USE_SHARE_SEM_BT_KERNEL_AND_USER
+				vdi_unlock(dev, core, VPUDRV_MUTEX_VPU);
+#else
+				vdi_unlock(dev, VPUDRV_MUTEX_VPU);
+#endif
 				return (int32_t)VPUAPI_RET_TIMEOUT;
 			}
 
@@ -1171,6 +1170,11 @@ static int32_t vpuapi_sw_reset(struct file *filp, hb_vpu_dev_t *dev, uint32_t co
 			if (vpuapi_wait_bus_busy(dev, core, W5_BACKBONE_BUS_STATUS_VCORE1) !=
 				(int32_t)VPUAPI_RET_SUCCESS) {
 				WriteVpuFIORegister(dev, core, W5_BACKBONE_BUS_CTRL_VCORE1, 0x00);
+#ifdef USE_SHARE_SEM_BT_KERNEL_AND_USER
+				vdi_unlock(dev, core, VPUDRV_MUTEX_VPU);
+#else
+				vdi_unlock(dev, VPUDRV_MUTEX_VPU);
+#endif
 				return (int32_t)VPUAPI_RET_TIMEOUT;
 			}
 		} else {
@@ -1183,6 +1187,11 @@ static int32_t vpuapi_sw_reset(struct file *filp, hb_vpu_dev_t *dev, uint32_t co
 					if (vpuapi_wait_bus_busy(dev, core, W5_BACKBONE_BUS_STATUS_VCPU)
 						!= (int32_t)VPUAPI_RET_SUCCESS) {
 						WriteVpuFIORegister(dev, core, W5_BACKBONE_BUS_CTRL_VCPU, 0x00);
+#ifdef USE_SHARE_SEM_BT_KERNEL_AND_USER
+						vdi_unlock(dev, core, VPUDRV_MUTEX_VPU);
+#else
+						vdi_unlock(dev, VPUDRV_MUTEX_VPU);
+#endif
 						return (int32_t)VPUAPI_RET_TIMEOUT;
 					}
 				}
@@ -1193,6 +1202,11 @@ static int32_t vpuapi_sw_reset(struct file *filp, hb_vpu_dev_t *dev, uint32_t co
 				if (vpuapi_wait_bus_busy(dev, core, W5_BACKBONE_BUS_STATUS_VCORE0)
 					!= (int32_t)VPUAPI_RET_SUCCESS) {
 					WriteVpuFIORegister(dev, core, W5_BACKBONE_BUS_CTRL_VCORE0, 0x00);
+#ifdef USE_SHARE_SEM_BT_KERNEL_AND_USER
+					vdi_unlock(dev, core, VPUDRV_MUTEX_VPU);
+#else
+					vdi_unlock(dev, VPUDRV_MUTEX_VPU);
+#endif
 					return (int32_t)VPUAPI_RET_TIMEOUT;
 				}
 			} else {
@@ -1203,6 +1217,11 @@ static int32_t vpuapi_sw_reset(struct file *filp, hb_vpu_dev_t *dev, uint32_t co
 				if (vpuapi_wait_bus_busy(dev, core, W5_COMBINED_BACKBONE_BUS_STATUS)
 					!= (int32_t)VPUAPI_RET_SUCCESS) {
 					WriteVpuFIORegister(dev, core, W5_COMBINED_BACKBONE_BUS_CTRL, 0x00);
+#ifdef USE_SHARE_SEM_BT_KERNEL_AND_USER
+					vdi_unlock(dev, core, VPUDRV_MUTEX_VPU);
+#else
+					vdi_unlock(dev, VPUDRV_MUTEX_VPU);
+#endif
 					return (int32_t)VPUAPI_RET_TIMEOUT;
 				}
 			}
@@ -1214,6 +1233,11 @@ static int32_t vpuapi_sw_reset(struct file *filp, hb_vpu_dev_t *dev, uint32_t co
 		// Step2 : Waiting for completion of bus transaction
 		if (vpuapi_wait_bus_busy(dev, core, W5_GDI_BUS_STATUS) != (int32_t)VPUAPI_RET_SUCCESS) {
 			WriteVpuFIORegister(dev, core, W5_GDI_BUS_CTRL, 0x00);
+#ifdef USE_SHARE_SEM_BT_KERNEL_AND_USER
+			vdi_unlock(dev, core, VPUDRV_MUTEX_VPU);
+#else
+			vdi_unlock(dev, VPUDRV_MUTEX_VPU);
+#endif
 			return (int32_t)VPUAPI_RET_TIMEOUT;
 		}
 	}
@@ -1225,6 +1249,11 @@ static int32_t vpuapi_sw_reset(struct file *filp, hb_vpu_dev_t *dev, uint32_t co
 	if (vpuapi_wait_reset_busy(dev, core) != (int32_t)VPUAPI_RET_SUCCESS) {
 		//coverity[misra_c_2012_rule_18_4_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
 		VPU_WRITEL(W5_VPU_RESET_REQ, 0);
+#ifdef USE_SHARE_SEM_BT_KERNEL_AND_USER
+		vdi_unlock(dev, core, VPUDRV_MUTEX_VPU);
+#else
+		vdi_unlock(dev, VPUDRV_MUTEX_VPU);
+#endif
 		return (int32_t)VPUAPI_RET_TIMEOUT;
 	}
 
@@ -1250,7 +1279,14 @@ static int32_t vpuapi_sw_reset(struct file *filp, hb_vpu_dev_t *dev, uint32_t co
 		WriteVpuFIORegister(dev, core, W5_GDI_BUS_CTRL, 0x00);
 	}
 
+
 	ret = wave_sleep_wake(dev, core, VPU_WAKE_MODE);
+
+#ifdef USE_SHARE_SEM_BT_KERNEL_AND_USER
+	vdi_unlock(dev, core, VPUDRV_MUTEX_VPU);
+#else
+	vdi_unlock(dev, VPUDRV_MUTEX_VPU);
+#endif
 	return ret;
 }
 
@@ -1296,14 +1332,14 @@ static int32_t wave_send_query_command(hb_vpu_dev_t *dev,
 	VPU_WRITEL(W5_VPU_BUSY_STATUS, 1);
 	ret = wave_issue_command(dev, core, inst, (uint32_t)W5_QUERY, timeout);
 	if (ret != (int32_t)VPUAPI_RET_SUCCESS) {
-		VPU_DBG_DEV(dev->device, "inst[%02d] Query unsuccess for busy ret=%d\n", inst, ret);
+		VPU_ERR_DEV(dev->device, "fail1 ret=%d\n", ret);
 		return ret;
 	}
 
 	//coverity[misra_c_2012_rule_18_4_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
 	if (VPU_READL(W5_RET_SUCCESS) == 0U) {
 		//coverity[misra_c_2012_rule_18_4_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
-		VPU_DBG_DEV(dev->device, "inst[%02d] Query success but reason=%d\n", inst, VPU_READL(W5_RET_DEC_ERR_INFO));
+		VPU_ERR_DEV(dev->device, "success=%d\n", VPU_READL(W5_RET_SUCCESS));
 		return (int32_t)VPUAPI_RET_FAILURE;
 	}
 
@@ -1317,6 +1353,11 @@ int32_t vpuapi_get_output_info(struct file *filp, hb_vpu_dev_t *dev, uint32_t co
 	int32_t ret = (int32_t)VPUAPI_RET_SUCCESS;
 	uint32_t val;
 
+#ifdef USE_SHARE_SEM_BT_KERNEL_AND_USER
+	vdi_lock(dev, core, VPUDRV_MUTEX_VPU);
+#else
+	vdi_lock_user(filp, dev, VPUDRV_MUTEX_VPU);
+#endif
 	//coverity[misra_c_2012_rule_18_4_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
 	VPU_WRITEL(W5_CMD_DEC_ADDR_REPORT_BASE, 0);
 	//coverity[misra_c_2012_rule_18_4_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
@@ -1326,13 +1367,16 @@ int32_t vpuapi_get_output_info(struct file *filp, hb_vpu_dev_t *dev, uint32_t co
 
 	ret = wave_send_query_command(dev, core, inst, (uint32_t)GET_RESULT);
 	if (ret != (int32_t)VPUAPI_RET_SUCCESS) {
-		VPU_INFO_DEV(dev->device, "inst[%02d] query ret=%d\n", inst, ret);
+#ifdef USE_SHARE_SEM_BT_KERNEL_AND_USER
+		vdi_unlock(dev, core, VPUDRV_MUTEX_VPU);
+#else
+		vdi_unlock(dev, VPUDRV_MUTEX_VPU);
+#endif
 		return ret;
 	}
 
 	//coverity[misra_c_2012_rule_18_4_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
-	VPU_DBG_DEV(dev->device, "[+][%02d] success=%d, fail_reason=0x%x, error_reason=0x%x\n",
-		inst,
+	VPU_INFO_DEV(dev->device, "[+] success=%d, fail_reason=0x%x, error_reason=0x%x\n",
 		VPU_READL(W5_RET_DEC_DECODING_SUCCESS),
 		VPU_READL(W5_RET_FAIL_REASON),
 		VPU_READL(W5_RET_DEC_ERR_INFO));
@@ -1349,7 +1393,14 @@ int32_t vpuapi_get_output_info(struct file *filp, hb_vpu_dev_t *dev, uint32_t co
 		*error_reason = 0x00;
 	}
 
-	VPU_DBG_DEV(dev->device, "[-][%02d] ret=%d\n", inst, ret);
+	if (ret != (int32_t)VPUAPI_RET_SUCCESS) {
+		VPU_INFO_DEV(dev->device, "[-] ret=%d\n", ret);
+	}
+#ifdef USE_SHARE_SEM_BT_KERNEL_AND_USER
+	vdi_unlock(dev, core, VPUDRV_MUTEX_VPU);
+#else
+	vdi_unlock(dev, VPUDRV_MUTEX_VPU);
+#endif
 	return ret;
 }
 
@@ -1358,13 +1409,24 @@ int32_t vpuapi_dec_clr_all_disp_flag(struct file *filp, hb_vpu_dev_t *dev, uint3
 	int32_t ret = (int32_t)VPUAPI_RET_SUCCESS;
 	uint32_t val;
 
+#ifdef USE_SHARE_SEM_BT_KERNEL_AND_USER
+	vdi_lock(dev, core, VPUDRV_MUTEX_VPU);
+#else
+	vdi_lock_user(filp, dev, VPUDRV_MUTEX_VPU);
+#endif
+
 	//coverity[misra_c_2012_rule_18_4_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
 	VPU_WRITEL(W5_CMD_DEC_CLR_DISP_IDC, 0xffffffff);
 	//coverity[misra_c_2012_rule_18_4_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
 	VPU_WRITEL(W5_CMD_DEC_SET_DISP_IDC, 0);
 	ret = wave_send_query_command(dev, core, inst, (uint32_t)UPDATE_DISP_FLAG);
 	if (ret != (int32_t)VPUAPI_RET_SUCCESS) {
-		VPU_INFO_DEV(dev->device, "inst[%02d] query ret=%d\n", inst, ret);
+		VPU_ERR_DEV(dev->device, "ret=%d\n", ret);
+#ifdef USE_SHARE_SEM_BT_KERNEL_AND_USER
+		vdi_unlock(dev, core, VPUDRV_MUTEX_VPU);
+#else
+		vdi_unlock(dev, VPUDRV_MUTEX_VPU);
+#endif
 		return ret;
 	}
 
@@ -1375,8 +1437,13 @@ int32_t vpuapi_dec_clr_all_disp_flag(struct file *filp, hb_vpu_dev_t *dev, uint3
 	}
 
 	if (ret != (int32_t)VPUAPI_RET_SUCCESS) {
-		VPU_INFO_DEV(dev->device, "inst[%02d] ret=%d\n", inst, ret);
+		VPU_ERR_DEV(dev->device, "ret=%d\n", ret);
 	}
+#ifdef USE_SHARE_SEM_BT_KERNEL_AND_USER
+	vdi_unlock(dev, core, VPUDRV_MUTEX_VPU);
+#else
+	vdi_unlock(dev, VPUDRV_MUTEX_VPU);
+#endif
 	return ret;
 }
 
@@ -1386,6 +1453,12 @@ int32_t vpuapi_dec_set_stream_end(struct file *filp, hb_vpu_dev_t *dev, uint32_t
 	uint32_t val;
 	uint32_t product_code;
 	unsigned long timeout = jiffies + (unsigned long)VPU_BUSY_CHECK_TIMEOUT;
+
+#ifdef USE_SHARE_SEM_BT_KERNEL_AND_USER
+	vdi_lock(dev, core, VPUDRV_MUTEX_VPU);
+#else
+	vdi_lock_user(filp, dev, VPUDRV_MUTEX_VPU);
+#endif
 
 	//coverity[misra_c_2012_rule_18_4_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
 	product_code = VPU_READL(VPU_PRODUCT_CODE_REGISTER);
@@ -1397,7 +1470,12 @@ int32_t vpuapi_dec_set_stream_end(struct file *filp, hb_vpu_dev_t *dev, uint32_t
 
 		ret = wave_issue_command(dev, core, inst, (uint32_t)W5_UPDATE_BS, timeout);
 		if (ret != (int32_t)VPUAPI_RET_SUCCESS) {
-			VPU_INFO_DEV(dev->device, "inst[%02d] ret=%d\n", inst, ret);
+			VPU_ERR_DEV(dev->device, "ret=%d\n", ret);
+#ifdef USE_SHARE_SEM_BT_KERNEL_AND_USER
+			vdi_unlock(dev, core, VPUDRV_MUTEX_VPU);
+#else
+			vdi_unlock(dev, VPUDRV_MUTEX_VPU);
+#endif
 			return ret;
 		}
 
@@ -1405,7 +1483,12 @@ int32_t vpuapi_dec_set_stream_end(struct file *filp, hb_vpu_dev_t *dev, uint32_t
 		val = VPU_READL(W5_RET_SUCCESS);
 		if (val == 0U) {
 			ret = (int32_t)VPUAPI_RET_FAILURE;
-			VPU_ERR_DEV(dev->device, "inst[%02d] ret=%d\n", inst, ret);
+			VPU_ERR_DEV(dev->device, "ret=%d\n", ret);
+#ifdef USE_SHARE_SEM_BT_KERNEL_AND_USER
+			vdi_unlock(dev, core, VPUDRV_MUTEX_VPU);
+#else
+			vdi_unlock(dev, VPUDRV_MUTEX_VPU);
+#endif
 			return ret;
 		}
 	} else {
@@ -1413,8 +1496,13 @@ int32_t vpuapi_dec_set_stream_end(struct file *filp, hb_vpu_dev_t *dev, uint32_t
 	}
 
 	if (ret != (int32_t)VPUAPI_RET_SUCCESS) {
-		VPU_INFO_DEV(dev->device, "inst[%02d] ret=%d\n", inst, ret);
+		VPU_ERR_DEV(dev->device, "ret=%d\n", ret);
 	}
+#ifdef USE_SHARE_SEM_BT_KERNEL_AND_USER
+	vdi_unlock(dev, core, VPUDRV_MUTEX_VPU);
+#else
+	vdi_unlock(dev, VPUDRV_MUTEX_VPU);
+#endif
 	return ret;
 }
 
@@ -1426,13 +1514,23 @@ int32_t vpuapi_close(struct file *filp, hb_vpu_dev_t *dev, uint32_t core, uint32
 	uint32_t product_code;
 	unsigned long timeout = jiffies + (unsigned long)VPU_BUSY_CHECK_TIMEOUT;
 
+#ifdef USE_SHARE_SEM_BT_KERNEL_AND_USER
+	vdi_lock(dev, core, VPUDRV_MUTEX_VPU);
+#else
+	vdi_lock_user(filp, dev, VPUDRV_MUTEX_VPU);
+#endif
 	//coverity[misra_c_2012_rule_18_4_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
 	product_code = VPU_READL(VPU_PRODUCT_CODE_REGISTER);
 
 	if (PRODUCT_CODE_W_SERIES(product_code)) {
 		ret = wave_issue_command(dev, core, inst, (uint32_t)W5_DESTROY_INSTANCE, timeout);
 		if (ret != (int32_t)VPUAPI_RET_SUCCESS) {
-			VPU_DBG_DEV(dev->device, "inst[%02d] ret=%d\n", inst, ret);
+			VPU_ERR_DEV(dev->device, "ret=%d\n", ret);
+#ifdef USE_SHARE_SEM_BT_KERNEL_AND_USER
+			vdi_unlock(dev, core, VPUDRV_MUTEX_VPU);
+#else
+			vdi_unlock(dev, VPUDRV_MUTEX_VPU);
+#endif
 			return ret;
 		}
 
@@ -1444,7 +1542,7 @@ int32_t vpuapi_close(struct file *filp, hb_vpu_dev_t *dev, uint32_t core, uint32
 			if (val == WAVE5_SYSERR_VPU_STILL_RUNNING) {
 				ret = (int32_t)VPUAPI_RET_STILL_RUNNING;
 			} else {
-				VPU_ERR_DEV(dev->device, "inst[%02d] command result=%d\n", inst, val);
+				VPU_ERR_DEV(dev->device, "command result=%d\n", val);
 				ret = (int32_t)VPUAPI_RET_FAILURE;
 			}
 		} else {
@@ -1455,9 +1553,14 @@ int32_t vpuapi_close(struct file *filp, hb_vpu_dev_t *dev, uint32_t core, uint32
 	}
 
 	if (ret != (int32_t)VPUAPI_RET_SUCCESS) {
-		VPU_DBG_DEV(dev->device, "inst[%02d] ret=%d\n", inst, ret);
+		VPU_ERR_DEV(dev->device, "ret=%d\n", ret);
 	}
 
+#ifdef USE_SHARE_SEM_BT_KERNEL_AND_USER
+	vdi_unlock(dev, core, VPUDRV_MUTEX_VPU);
+#else
+	vdi_unlock(dev, VPUDRV_MUTEX_VPU);
+#endif
 	return ret;
 }
 
@@ -1475,9 +1578,9 @@ int32_t vpu_do_sw_reset(struct file *filp,
 	if (error_reason & 0xf0000000) {
 		ret = vpuapi_sw_reset(filp, dev, core, inst, 0);
 		if (ret == (int32_t)VPUAPI_RET_STILL_RUNNING) {
-			VPU_DBG_DEV(dev->device, "VPU is still running\n");
+			VPU_INFO_DEV(dev->device, "VPU is still running\n");
 		} else if (ret == (int32_t)VPUAPI_RET_SUCCESS) {
-			VPU_DBG_DEV(dev->device, "success\n");
+			VPU_INFO_DEV(dev->device, "success\n");
 		} else {
 			VPU_ERR_DEV(dev->device, "Fail result=0x%x\n", ret);
 		}
@@ -1509,51 +1612,6 @@ static int32_t vpu_check_physical_address(hb_vpu_dev_t *dev,
 	return 0;
 }
 
-#ifdef RESERVED_WORK_MEMORY
-#if defined(CONFIG_HOBOT_FPGA_J5) || defined(CONFIG_HOBOT_J5) || defined(CONFIG_HOBOT_FPGA_HAPS_J5)
-#else
-static void *vpu_vmap_work_buffer_memory(hb_vpu_work_resmem_t *reserved)
-{
-	void *vaddr = NULL;
-	struct page **pages;
-	uint32_t i, page_count = 0;
-	pgprot_t pgprot;
-
-	VPU_DEBUG("%s phys=0x%llx, size=%d\n", __func__, reserved->base, reserved->size);
-	page_count = reserved->size / PAGE_SIZE;	// must be align.
-	pages = kmalloc_array(page_count, sizeof(struct page *), GFP_KERNEL);
-	for (i = 0; i < page_count; i++) {
-		phys_addr_t addr = reserved->base + i * PAGE_SIZE;
-		pages[i] = pfn_to_page(addr >> PAGE_SHIFT);
-	}
-
-	pgprot = pgprot_writecombine(PAGE_KERNEL);	// nocached
-	vaddr = vmap(pages, page_count, VM_MAP, pgprot);
-	if (vaddr == NULL) {
-		VPU_ERR("%s Failed to vmap, page_num=%d\n", __func__, page_count);
-		kfree(pages);
-		return NULL;
-	}
-
-	kfree(pages);
-	return vaddr;
-}
-static void vpu_vunmap_work_buffer_memory(hb_vpu_work_resmem_t *reserved)
-{
-	if (reserved->vaddr != NULL) {
-		vunmap(reserved->vaddr);
-		reserved->vaddr = NULL;
-	}
-}
-// Notes: can't operate other instance work buffer
-static void vpu_reset_work_buffer_memory(hb_vpu_work_resmem_t *reserved, hb_vpu_drv_buffer_t *work_buf)
-{
-	uint64_t offset = work_buf->phys_addr - reserved->phys_addr;
-	memset(reserved->vaddr + (uint32_t)offset, 0, work_buf->size);
-}
-#endif
-#endif
-
 //coverity[HIS_metric_violation:SUPPRESS]
 static int32_t vpu_alloc_dma_buffer(hb_vpu_dev_t *dev, hb_vpu_drv_buffer_t * vb)
 {
@@ -1564,13 +1622,13 @@ static int32_t vpu_alloc_dma_buffer(hb_vpu_dev_t *dev, hb_vpu_drv_buffer_t * vb)
 	size_t size;
 	void * vaddr;
 	uint32_t memtypes;
-#ifdef RESERVED_WORK_MEMORY
+#if defined(CONFIG_HOBOT_FPGA_J5) || defined(CONFIG_HOBOT_J5) || defined(CONFIG_HOBOT_FPGA_HAPS_J5)
 	uint32_t inst_idx;
 #endif
 #endif
 
 	if ((vb == NULL) || (dev == NULL)) {
-		VPU_ERR("Invalid parameters.(dev=%pK, vb=%pK)\n", dev, vb);
+		VPU_ERR("Invalid parameters.(dev=%p, vb=%p)\n", dev, vb);
 		vpu_send_diag_error_event((u16)EventIdVPUDevAllocDMABufErr, (u8)ERR_SEQ_0, 0, __LINE__);
 		return -EINVAL;
 	}
@@ -1606,22 +1664,15 @@ static int32_t vpu_alloc_dma_buffer(hb_vpu_dev_t *dev, hb_vpu_drv_buffer_t * vb)
 		(memtypes == (uint32_t)ENC_SRC) || (memtypes == (uint32_t)DEC_FB_LINEAR)) {
 		vb->flags |= ((uint32_t)ION_FLAG_CACHED | (uint32_t)ION_FLAG_CACHED_NEEDS_SYNC);
 	}
-#ifdef RESERVED_WORK_MEMORY
+#if defined(CONFIG_HOBOT_FPGA_J5) || defined(CONFIG_HOBOT_J5) || defined(CONFIG_HOBOT_FPGA_HAPS_J5)
 	inst_idx = (vb->flags >> INST_IDX_OFFSET) & INST_IDX_MASK;
 #endif
 	do {
-#ifdef RESERVED_WORK_MEMORY
+#if defined(CONFIG_HOBOT_FPGA_J5) || defined(CONFIG_HOBOT_J5) || defined(CONFIG_HOBOT_FPGA_HAPS_J5)
 		if (memtypes == DEC_WORK) {
 			if (vb->size == dev->dec_work_memory[inst_idx].size) {
 				size = vb->size;
 				vb->phys_addr = dev->dec_work_memory[inst_idx].phys_addr;
-				vb->iova = dev->dec_work_memory[inst_idx].iova;
-				/* reset work buffer memory to zero */
-#if defined(CONFIG_HOBOT_FPGA_J5) || defined(CONFIG_HOBOT_J5) || defined(CONFIG_HOBOT_FPGA_HAPS_J5)
-#else
-				vpu_reset_work_buffer_memory(&dev->codec_mem_reserved2, &dev->dec_work_memory[inst_idx]);
-				VPU_DBG_DEV(dev->device, "inst[%02d] DEC_WORK memory reset.\n", inst_idx);
-#endif
 			} else {
 				VPU_ERR_DEV(dev->device, "Invalid DEC_WORK size, size = %d.\n", vb->size);
 				return -EINVAL;
@@ -1630,13 +1681,6 @@ static int32_t vpu_alloc_dma_buffer(hb_vpu_dev_t *dev, hb_vpu_drv_buffer_t * vb)
 			if (vb->size == dev->enc_work_memory[inst_idx].size) {
 				size = vb->size;
 				vb->phys_addr = dev->enc_work_memory[inst_idx].phys_addr;
-				vb->iova = dev->enc_work_memory[inst_idx].iova;
-				/* reset work buffer memory to zero */
-#if defined(CONFIG_HOBOT_FPGA_J5) || defined(CONFIG_HOBOT_J5) || defined(CONFIG_HOBOT_FPGA_HAPS_J5)
-#else
-				vpu_reset_work_buffer_memory(&dev->codec_mem_reserved2, &dev->enc_work_memory[inst_idx]);
-				VPU_DBG_DEV(dev->device, "inst[%02d] ENC_WORK memory reset.\n", inst_idx);
-#endif
 			} else {
 				VPU_ERR_DEV(dev->device, "Invalid ENC_WORK size, size = %d.\n", vb->size);
 				return -EINVAL;
@@ -1646,7 +1690,7 @@ static int32_t vpu_alloc_dma_buffer(hb_vpu_dev_t *dev, hb_vpu_drv_buffer_t * vb)
 			handle = ion_alloc(dev->vpu_ion_client, vb->size, 0,
 				ION_HEAP_TYPE_CMA_RESERVED_MASK, vb->flags);
 			if (IS_ERR_OR_NULL(handle)) {
-				VPU_ERR_DEV(dev->device, "failed to allocate ion memory, ret = %pK.\n", handle);
+				VPU_ERR_DEV(dev->device, "failed to allocate ion memory, ret = %p.\n", handle);
 				vpu_send_diag_error_event((u16)EventIdVPUDevAllocDMABufErr, (u8)ERR_SEQ_4, 0, __LINE__);
 				ret = (int32_t)PTR_ERR(handle);
 				break;
@@ -1660,7 +1704,7 @@ static int32_t vpu_alloc_dma_buffer(hb_vpu_dev_t *dev, hb_vpu_drv_buffer_t * vb)
 				ion_free(dev->vpu_ion_client, handle);
 				break;
 			}
-#ifdef RESERVED_WORK_MEMORY
+#if defined(CONFIG_HOBOT_FPGA_J5) || defined(CONFIG_HOBOT_J5) || defined(CONFIG_HOBOT_FPGA_HAPS_J5)
 		}
 #endif
 
@@ -1684,7 +1728,7 @@ static int32_t vpu_alloc_dma_buffer(hb_vpu_dev_t *dev, hb_vpu_drv_buffer_t * vb)
 		return ret;
 	}
 
-#ifdef RESERVED_WORK_MEMORY
+#if defined(CONFIG_HOBOT_FPGA_J5) || defined(CONFIG_HOBOT_J5) || defined(CONFIG_HOBOT_FPGA_HAPS_J5)
 	if ((memtypes != DEC_WORK) && (memtypes != ENC_WORK)) {
 #endif
 		vaddr = ion_map_kernel(dev->vpu_ion_client, handle);
@@ -1701,7 +1745,7 @@ static int32_t vpu_alloc_dma_buffer(hb_vpu_dev_t *dev, hb_vpu_drv_buffer_t * vb)
 		vb->handle = (int64_t)handle;
 		vb->fd = 0;
 		vb->share_id = handle->share_id;
-#ifdef RESERVED_WORK_MEMORY
+#if defined(CONFIG_HOBOT_FPGA_J5) || defined(CONFIG_HOBOT_J5) || defined(CONFIG_HOBOT_FPGA_HAPS_J5)
 	}
 #endif
 #endif
@@ -1713,12 +1757,12 @@ static int32_t vpu_free_dma_buffer(hb_vpu_dev_t *dev, hb_vpu_drv_buffer_t * vb)
 #ifndef VPU_SUPPORT_RESERVED_VIDEO_MEMORY
 	struct ion_handle *handle;
 #endif
-#ifdef RESERVED_WORK_MEMORY
+#if defined(CONFIG_HOBOT_FPGA_J5) || defined(CONFIG_HOBOT_J5) || defined(CONFIG_HOBOT_FPGA_HAPS_J5)
 	uint32_t memtypes;
 #endif
 
 	if ((vb == NULL) || (dev == NULL)) {
-		VPU_ERR("Invalid parameters.(dev=%pK, vb=%pK)\n", dev, vb);
+		VPU_ERR("Invalid parameters.(dev=%p, vb=%p)\n", dev, vb);
 		vpu_send_diag_error_event((u16)EventIdVPUDevAddrErr, (u8)ERR_SEQ_0, 0, __LINE__);
 		return -EINVAL;
 	}
@@ -1732,7 +1776,7 @@ static int32_t vpu_free_dma_buffer(hb_vpu_dev_t *dev, hb_vpu_drv_buffer_t * vb)
 		dma_free_coherent(dev->device, PAGE_ALIGN(vb->size), (void *)vb->base, /* PRQA S 3469,1840,1020,4491 */
 			vb->phys_addr);
 #endif
-#ifdef RESERVED_WORK_MEMORY
+#if defined(CONFIG_HOBOT_FPGA_J5) || defined(CONFIG_HOBOT_J5) || defined(CONFIG_HOBOT_FPGA_HAPS_J5)
 	memtypes = (vb->flags >> MEM_TYPE_OFFSET) & MEM_TYPE_MASK;
 	if ((memtypes != DEC_WORK) && (memtypes != ENC_WORK)) {
 #endif
@@ -1740,7 +1784,7 @@ static int32_t vpu_free_dma_buffer(hb_vpu_dev_t *dev, hb_vpu_drv_buffer_t * vb)
 		handle = (struct ion_handle *)vb->handle;
 		ion_unmap_kernel(dev->vpu_ion_client, handle);
 		ion_free(dev->vpu_ion_client, handle);
-#ifdef RESERVED_WORK_MEMORY
+#if defined(CONFIG_HOBOT_FPGA_J5) || defined(CONFIG_HOBOT_J5) || defined(CONFIG_HOBOT_FPGA_HAPS_J5)
 	}
 #endif
 #endif
@@ -1748,24 +1792,10 @@ static int32_t vpu_free_dma_buffer(hb_vpu_dev_t *dev, hb_vpu_drv_buffer_t * vb)
 	return 0;
 }
 
-static void vpu_test_interrupt_flag_and_enableirq(hb_vpu_dev_t *dev, uint32_t inst)
-{
-	// PRQA S 1021,3473,1020,3432,2996,3200 --
-	if (dev->interrupt_flag[inst] == 1) {
-		if (dev->irq_trigger == 1) {
-			enable_irq(dev->irq);
-			dev->irq_trigger = 0;
-			dev->vpu_irqenable = 1;
-			VPU_DBG_DEV(dev->device, "inst[%02d] "
-				"interrupt_flag not empty, turn on irqenable\n", inst);
-		}
-		dev->interrupt_flag[inst] = 0;
-	}
-}
-
 /* code review E1: No need to return value */
 //coverity[HIS_metric_violation:SUPPRESS]
-static void vpu_clear_instance_status(hb_vpu_dev_t *dev, hb_vpu_instance_list_t *vil)
+static void vpu_clear_instance_status(hb_vpu_dev_t *dev,
+				hb_vpu_instance_list_t *vil)
 {
 #ifdef SUPPORT_MULTI_INST_INTR
 	unsigned long flags_mp; /* PRQA S 5209 */
@@ -1776,10 +1806,7 @@ static void vpu_clear_instance_status(hb_vpu_dev_t *dev, hb_vpu_instance_list_t 
 	}
 	dev->inst_open_flag[vil->inst_idx] = 0;
 	osal_list_del(&vil->list);
-	if (osal_test_bit(vil->inst_idx, (const volatile uint64_t*)dev->vpu_crash_inst_bitmap) == 0) {
-		(void)osal_test_and_clear_bit(vil->inst_idx, (volatile uint64_t *)dev->vpu_inst_bitmap); /* PRQA S 4446 */
-		osal_sema_up(&dev->vpu_free_inst_sem);
-	}
+	(void)osal_test_and_clear_bit(vil->inst_idx, (volatile uint64_t *)dev->vpu_inst_bitmap); /* PRQA S 4446 */
 	//coverity[misra_c_2012_rule_10_8_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
 	dev->poll_event[vil->inst_idx] = LLONG_MIN;
 	osal_wake_up(&dev->poll_wait_q[vil->inst_idx]); /*PRQA S 3469*/
@@ -1790,10 +1817,17 @@ static void vpu_clear_instance_status(hb_vpu_dev_t *dev, hb_vpu_instance_list_t 
 	(void)memset((void *)&dev->vpu_status[vil->inst_idx], 0x00,
 		sizeof(dev->vpu_status[vil->inst_idx]));
 #ifdef SUPPORT_MULTI_INST_INTR
-	// PRQA S 1021,3473,1020,3432,2996,3200 ++
-	osal_spin_lock_irqsave(&dev->irq_spinlock, (uint64_t *)&flags_mp);
-	vpu_test_interrupt_flag_and_enableirq(dev, vil->inst_idx);
-	osal_spin_unlock_irqrestore(&dev->irq_spinlock, (uint64_t *)&flags_mp);
+	if (dev->interrupt_flag[vil->inst_idx] == 1) {
+		// PRQA S 1021,3473,1020,3432,2996,3200 ++
+		osal_spin_lock_irqsave(&dev->irq_spinlock, (uint64_t *)&flags_mp);
+		// PRQA S 1021,3473,1020,3432,2996,3200 --
+		if (dev->irq_trigger == 1) {
+			enable_irq(dev->irq);
+			dev->irq_trigger = 0;
+		}
+		dev->interrupt_flag[vil->inst_idx] = 0;
+		osal_spin_unlock_irqrestore(&dev->irq_spinlock, (uint64_t *)&flags_mp);
+	}
 #endif
 	osal_kfree((void *)vil);
 }
@@ -1847,8 +1881,8 @@ static void vpu_free_lock(struct file *filp, hb_vpu_dev_t *dev,
 	vdi_mutexes_base = (vip +
 		(instance_pool_size_per_core -
 		(uint32_t)PTHREAD_MUTEX_T_HANDLE_SIZE * VDI_NUM_LOCK_HANDLES));
-	VPU_DBG_DEV(dev->device, "force to destroy "
-		"vdi_mutexes_base=%pK in userspace \n",
+	VPU_INFO_DEV(dev->device, "force to destroy "
+		"vdi_mutexes_base=%p in userspace \n",
 		vdi_mutexes_base);
 	if (vdi_mutexes_base) {
 		uint32_t i;
@@ -1864,7 +1898,7 @@ static void vpu_free_lock(struct file *filp, hb_vpu_dev_t *dev,
 }
 
 //coverity[HIS_metric_violation:SUPPRESS]
-static int32_t vpu_free_instances(struct file *filp, uint64_t *crash_inst_mask)
+static int32_t vpu_free_instances(struct file *filp)
 {
 	hb_vpu_instance_list_t *vil, *n;
 	hb_vpu_instance_pool_t *vip = NULL;
@@ -1877,7 +1911,6 @@ static int32_t vpu_free_instances(struct file *filp, uint64_t *crash_inst_mask)
 #endif
 	hb_vpu_dev_t *dev;
 	hb_vpu_priv_t *priv;
-	uint32_t find_instance = 0U;
 #ifdef USE_VPU_CLOSE_INSTANCE_ONCE_ABNORMAL_RELEASE
 #else
 	int32_t product_code;
@@ -1908,21 +1941,20 @@ static int32_t vpu_free_instances(struct file *filp, uint64_t *crash_inst_mask)
 	//coverity[misra_c_2012_rule_20_7_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
 	osal_list_for_each_entry_safe(vil, n, &dev->inst_list_head, list) { /* PRQA S 3673,0497,2810,1020,3432,0306,1021,3418 */
 		if (vil->filp == filp) {
-			find_instance = 1U;
 			//coverity[misra_c_2012_rule_11_6_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
 			vip_base = (void *)(dev->instance_pool.base + /* PRQA S 1891 */
 						((uint64_t)instance_pool_size_per_core * (uint64_t)vil->core_idx));
 #ifdef SUPPORT_MULTI_INST_INTR
 			VPU_INFO_DEV(dev->device, "vpu_free_instances detect instance crash instIdx=%d, "
-				"coreIdx=%u, vip_base=%pK, instance_pool_size_per_core=%u, "
-				"interrupt_flag=%d, pid=%d, tgid=%d, filp=%pK\n",
+				"coreIdx=%u, vip_base=%p, instance_pool_size_per_core=%u, "
+				"interrupt_flag=%d, pid=%d, tgid=%d, filp=%px\n",
 				vil->inst_idx, vil->core_idx,
 				vip_base, instance_pool_size_per_core,
 				dev->interrupt_flag[vil->inst_idx], current->pid, current->tgid, filp);
 #else
 			VPU_INFO_DEV(dev->device, "vpu_free_instances detect instance crash instIdx=%d, "
-				"coreIdx=%u, vip_base=%pK, instance_pool_size_per_core=%u, "
-				"interrupt_flag=%d, pid=%d, tgid=%d, filp=%pK\n",
+				"coreIdx=%u, vip_base=%p, instance_pool_size_per_core=%u, "
+				"interrupt_flag=%d, pid=%d, tgid=%d, filp=%px\n",
 				vil->inst_idx, vil->core_idx,
 				vip_base, instance_pool_size_per_core,
 				dev->interrupt_flag, current->pid, current->tgid, filp);
@@ -1997,25 +2029,24 @@ static int32_t vpu_free_instances(struct file *filp, uint64_t *crash_inst_mask)
 				(void)memset((void *)&vip->codec_inst_pool[vil->inst_idx], 0x00, PTHREAD_MUTEX_T_HANDLE_SIZE);
 				(void)vpu_free_lock(filp, dev, vip, vil->core_idx, vil->inst_idx);
 #ifdef USE_VPU_CLOSE_INSTANCE_ONCE_ABNORMAL_RELEASE
-				if (dev->inst_open_flag[vil->inst_idx] != 0) {
-					osal_set_bit(vil->inst_idx, crash_inst_mask);
-					osal_set_bit(vil->inst_idx, (volatile uint64_t *)dev->vpu_crash_inst_bitmap); /* PRQA S 4446 */
-				}
+				_vpu_close_instance((struct file *)filp, dev, (u32)vil->core_idx, (u32)vil->inst_idx);
 #endif
 			}
 			vpu_clear_instance_status(dev, vil);
 		}
 	}
 
-	// only for core 0?
-	// Note clear the lock for the core index 0 during pre-initialzing.
-	vip_base = (void *)(dev->instance_pool.base);
-	//coverity[misra_c_2012_rule_11_5_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
-	vip = (hb_vpu_instance_pool_t *) vip_base;
-	if (find_instance == 1U && vip == NULL) {
+	if (vip == NULL) {
+		// Note clear the lock for the core index 0 during pre-initialzing.
+		//coverity[misra_c_2012_rule_11_5_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
 		//coverity[misra_c_2012_rule_11_6_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
+		vip_base = (void *)(dev->instance_pool.base + /* PRQA S 1891 */
+			((uint64_t)instance_pool_size_per_core * 0UL));
+		//coverity[misra_c_2012_rule_11_5_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
+		vip = (hb_vpu_instance_pool_t *) vip_base;
 		(void)vpu_free_lock(filp, dev, vip, 0, 0);
 	}
+
 	return 0;
 }
 
@@ -2136,23 +2167,9 @@ static uint32_t vpu_get_inst_idx(hb_vpu_dev_t * dev, uint32_t * reason,
 	//coverity[misra_c_2012_rule_8_6_violation:SUPPRESS]
 	//coverity[misra_c_2012_rule_10_1_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
 	//coverity[misra_c_2012_rule_10_3_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
-	VPU_DBG_DEV(dev->device, "int_reason=0x%x, empty_inst=0x%x, done_inst=0x%x, seq_inst=0x%x\n",
-		int_reason, empty_inst, done_inst, seq_inst);
+	VPU_DBG_DEV(dev->device, "int_reason=0x%x, empty_inst=0x%x, done_inst=0x%x\n",
+		int_reason, empty_inst, done_inst);
 	// PRQA S 3432,4543,4403,4558,4542,1861,3344 --
-
-	if (int_reason & (1U << INT_WAVE5_DEC_PIC)) {
-		reg_val = (done_inst & MAX_VPU_INSTANCE_IDX);
-		inst_idx = vpu_filter_inst_idx(reg_val);
-		*reason = (1U << INT_WAVE5_DEC_PIC);
-		// PRQA S 3432,4543,4403,4558,4542,1861,3344 ++
-		//coverity[misra_c_2012_rule_8_6_violation:SUPPRESS]
-		//coverity[misra_c_2012_rule_10_1_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
-		//coverity[misra_c_2012_rule_10_3_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
-		VPU_DBG_DEV(dev->device, "inst[%02d] W5_RET_QUEUE_CMD_DONE_INST"
-			" DEC_PIC reg_val=0x%x\n", inst_idx, reg_val);
-		// PRQA S 3432,4543,4403,4558,4542,1861,3344 --
-		return inst_idx;
-	}
 
 	if (int_reason & (1U << INT_WAVE5_BSBUF_EMPTY)) {
 		reg_val = (empty_inst & MAX_VPU_INSTANCE_IDX);
@@ -2162,8 +2179,8 @@ static uint32_t vpu_get_inst_idx(hb_vpu_dev_t * dev, uint32_t * reason,
 		//coverity[misra_c_2012_rule_8_6_violation:SUPPRESS]
 		//coverity[misra_c_2012_rule_10_1_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
 		//coverity[misra_c_2012_rule_10_3_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
-		VPU_DBG_DEV(dev->device, "inst[%02d] W5_RET_BS_EMPTY_INST"
-			" BSBUF_EMPTY reg_val=0x%x\n", inst_idx, reg_val);
+		VPU_DBG_DEV(dev->device, "W5_RET_BS_EMPTY_INST reg_val=0x%x, inst_idx=%d\n",
+			  reg_val, inst_idx);
 		// PRQA S 3432,4543,4403,4558,4542,1861,3344 --
 		return inst_idx;
 	}
@@ -2176,8 +2193,22 @@ static uint32_t vpu_get_inst_idx(hb_vpu_dev_t * dev, uint32_t * reason,
 		//coverity[misra_c_2012_rule_8_6_violation:SUPPRESS]
 		//coverity[misra_c_2012_rule_10_1_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
 		//coverity[misra_c_2012_rule_10_3_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
-		VPU_DBG_DEV(dev->device, "inst[%02d] W5_RET_QUEUE_CMD_DONE_INST"
-				" INIT_SEQ reg_val=0x%x\n", inst_idx, reg_val);
+		VPU_DBG_DEV(dev->device, "RET_SEQ_DONE_INSTANCE_INFO INIT_SEQ reg_val=0x%x,"
+			"inst_idx=%d\n", reg_val, inst_idx);
+		// PRQA S 3432,4543,4403,4558,4542,1861,3344 --
+		return inst_idx;
+	}
+
+	if (int_reason & (1U << INT_WAVE5_DEC_PIC)) {
+		reg_val = (done_inst & MAX_VPU_INSTANCE_IDX);
+		inst_idx = vpu_filter_inst_idx(reg_val);
+		*reason = (1U << INT_WAVE5_DEC_PIC);
+		// PRQA S 3432,4543,4403,4558,4542,1861,3344 ++
+		//coverity[misra_c_2012_rule_8_6_violation:SUPPRESS]
+		//coverity[misra_c_2012_rule_10_1_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
+		//coverity[misra_c_2012_rule_10_3_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
+		VPU_DBG_DEV(dev->device, "W5_RET_QUEUE_CMD_DONE_INST DEC_PIC reg_val=0x%x,"
+			"inst_idx=%d\n", reg_val, inst_idx);
 		// PRQA S 3432,4543,4403,4558,4542,1861,3344 --
 		return inst_idx;
 	}
@@ -2190,8 +2221,8 @@ static uint32_t vpu_get_inst_idx(hb_vpu_dev_t * dev, uint32_t * reason,
 		//coverity[misra_c_2012_rule_8_6_violation:SUPPRESS]
 		//coverity[misra_c_2012_rule_10_1_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
 		//coverity[misra_c_2012_rule_10_3_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
-		VPU_DBG_DEV(dev->device, "inst[%02d] W5_RET_QUEUE_CMD_DONE_INST"
-				" ENC_SET_PARAM reg_val=0x%x\n", inst_idx, reg_val);
+		VPU_DBG_DEV(dev->device, "RET_SEQ_DONE_INSTANCE_INFO ENC_SET_PARAM reg_val=0x%x,"
+			"inst_idx=%d\n", reg_val, inst_idx);
 		// PRQA S 3432,4543,4403,4558,4542,1861,3344 --
 		return inst_idx;
 	}
@@ -2203,8 +2234,8 @@ static uint32_t vpu_get_inst_idx(hb_vpu_dev_t * dev, uint32_t * reason,
 		*reason = (1 << INT_WAVE5_ENC_SRC_RELEASE);
 		// PRQA S 3432,4543,4403,4558,4542,1861,3344 ++
 		//coverity[misra_c_2012_rule_8_6_violation:SUPPRESS]
-		VPU_DBG_DEV(dev->device, "inst[%02d] W5_RET_QUEUE_CMD_DONE_INST"
-			"ENC_SRC_RELEASE reg_val=0x%x\n", inst_idx, reg_val);
+		VPU_DBG_DEV(dev->device, "W5_RET_QUEUE_CMD_DONE_INST ENC_SET_PARAM "
+			"reg_val=0x%x, inst_idx=%d\n", reg_val, inst_idx);
 		// PRQA S 3432,4543,4403,4558,4542,1861,3344 --
 		return inst_idx;
 	}
@@ -2213,6 +2244,11 @@ static uint32_t vpu_get_inst_idx(hb_vpu_dev_t * dev, uint32_t * reason,
 	inst_idx = MAX_VPU_INSTANCE_IDX;
 	*reason = 0;
 	VPU_ERR_DEV(dev->device, "UNKNOWN INTERRUPT REASON: %08x\n", int_reason);
+
+	// PRQA S 3432,4543,4403,4558,4542,1861,3344 ++
+	//coverity[misra_c_2012_rule_8_6_violation:SUPPRESS]
+	VPU_DBG_DEV(dev->device, "inst_idx=%d. *reason=0x%x\n", inst_idx, *reason);
+	// PRQA S 3432,4543,4403,4558,4542,1861,3344 --
 
 	return inst_idx;
 }
@@ -2238,15 +2274,13 @@ static irqreturn_t vpu_irq_handler(int32_t irq, void *dev_id) /* PRQA S 3206 */
 		uint32_t intr_reason = 0;
 		uint32_t intr_inst_index = 0;
 		int32_t inst_arr[MAX_NUM_VPU_INSTANCE] = {0, };
-		int32_t inst_reason[MAX_NUM_VPU_INSTANCE] = {0, };
-		uint32_t idx, inst_cnt = 0;
+		uint32_t idx;
 #endif
 
 #ifdef VPU_IRQ_CONTROL
 		osal_spin_lock(&dev->irq_spinlock);
 		disable_irq_nosync((uint32_t)dev->irq);
 		dev->irq_trigger = 1;
-		dev->vpu_irqenable = 0;
 		osal_spin_unlock(&dev->irq_spinlock);
 #endif
 
@@ -2259,7 +2293,6 @@ static irqreturn_t vpu_irq_handler(int32_t irq, void *dev_id) /* PRQA S 3206 */
 				osal_spin_lock(&dev->irq_spinlock);
 				enable_irq(dev->irq);
 				dev->irq_trigger = 0;
-				dev->vpu_irqenable = 1;
 				osal_spin_unlock(&dev->irq_spinlock);
 				return IRQ_HANDLED;
 			}
@@ -2299,7 +2332,7 @@ static irqreturn_t vpu_irq_handler(int32_t irq, void *dev_id) /* PRQA S 3206 */
 							break;
 						intr_reason = reason;
 						if (intr_reason == 0U) {
-							VPU_DBG_DEV(dev->device, "r=0x%x, e=0x%x, d=0x%x, o=0x%x \n",
+							VPU_ERR_DEV(dev->device, "r=0x%x, e=0x%x, d=0x%x, o=0x%x \n",
 								intr_reason, empty_inst, done_inst, seq_inst);
 							break;
 						}
@@ -2322,9 +2355,10 @@ static irqreturn_t vpu_irq_handler(int32_t irq, void *dev_id) /* PRQA S 3206 */
 								//coverity[misra_c_2012_rule_8_6_violation:SUPPRESS]
 								//coverity[misra_c_2012_rule_10_1_violation:SUPPRESS]
 								//coverity[misra_c_2012_rule_10_3_violation:SUPPRESS]
-								VPU_DBG_DEV(dev->device, "inst[%02d] "
-									"W5_RET_BS_EMPTY_INST Clear empty_inst=0x%x\n",
-									intr_inst_index, empty_inst);
+								VPU_DBG_DEV(dev->device, "W5_RET_BS_EMPTY_INST Clear "
+									"empty_inst=0x%x, intr_inst_index=%d\n",
+									empty_inst,
+									intr_inst_index);
 								// PRQA S 3432,4543,4403,4558,4542,1861,3344 --
 							}
 							if (intr_reason == (1U << INT_WAVE5_DEC_PIC)) {
@@ -2338,9 +2372,9 @@ static irqreturn_t vpu_irq_handler(int32_t irq, void *dev_id) /* PRQA S 3206 */
 								//coverity[misra_c_2012_rule_8_6_violation:SUPPRESS]
 								//coverity[misra_c_2012_rule_10_1_violation:SUPPRESS]
 								//coverity[misra_c_2012_rule_10_3_violation:SUPPRESS]
-								VPU_DBG_DEV(dev->device, "inst[%02d] "
-									"W5_RET_QUEUE_CMD_DONE_INST Clear done_inst=0x%x\n",
-									intr_inst_index, done_inst);
+								VPU_DBG_DEV(dev->device, "W5_RET_QUEUE_CMD_DONE_INST Clear "
+									"done_inst=0x%x, intr_inst_index=%d\n",
+									done_inst, intr_inst_index);
 								// PRQA S 3432,4543,4403,4558,4542,1861,3344 --
 							}
 							if ((intr_reason == (1U << INT_WAVE5_INIT_SEQ)) ||
@@ -2356,17 +2390,33 @@ static irqreturn_t vpu_irq_handler(int32_t irq, void *dev_id) /* PRQA S 3206 */
 								//coverity[misra_c_2012_rule_8_6_violation:SUPPRESS]
 								//coverity[misra_c_2012_rule_10_1_violation:SUPPRESS]
 								//coverity[misra_c_2012_rule_10_3_violation:SUPPRESS]
-								VPU_DBG_DEV(dev->device, "inst[%02d] "
-									"W5_RET_SEQ_DONE_INSTANCE_INFO Clear seq_inst=0x%x\n",
-									intr_inst_index, seq_inst);
+								VPU_DBG_DEV(dev->device, "W5_RET_QUEUE_CMD_DONE_INST "
+									"Clear done_inst=0x%x, intr_inst_index=%d\n",
+									done_inst,
+									intr_inst_index);
 								// PRQA S 3432,4543,4403,4558,4542,1861,3344 --
 							}
-							inst_arr[intr_inst_index]++;
-							inst_reason[intr_inst_index] = intr_reason;
-							inst_cnt++;
+							if (!osal_fifo_is_full(&dev->interrupt_pending_q[intr_inst_index])) {
+								if (intr_reason == (1U << INT_WAVE5_ENC_PIC)) {
+									uint32_t ll_intr_reason = ((uint32_t)1U <<
+										INT_WAVE5_ENC_PIC);
+									osal_fifo_in_spinlocked(&dev->interrupt_pending_q[intr_inst_index],
+										&ll_intr_reason,
+										(uint32_t)sizeof(uint32_t), &dev->vpu_kfifo_lock);
+								} else {
+									osal_fifo_in_spinlocked(&dev->interrupt_pending_q[intr_inst_index],
+										&intr_reason,
+										(uint32_t)sizeof(uint32_t), &dev->vpu_kfifo_lock);
+								}
+							} else {
+								VPU_ERR_DEV(dev->device, "kfifo_is_full kfifo_count=%d \n",
+									osal_fifo_len(&dev->interrupt_pending_q[intr_inst_index]));
+							}
+							inst_arr[intr_inst_index] = 1;
 						} else {
-							VPU_DBG_DEV(dev->device, "inst[%02d] "
-								"intr_inst_index is wrong\n", intr_inst_index);
+							VPU_ERR_DEV(dev->device, "intr_inst_index is wrong "
+								"intr_inst_index=%d \n",
+								intr_inst_index);
 						}
 					}
 					if (0U != reason)
@@ -2382,32 +2432,19 @@ static irqreturn_t vpu_irq_handler(int32_t irq, void *dev_id) /* PRQA S 3206 */
 #endif
 					//coverity[misra_c_2012_rule_18_4_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
 					VPU_WRITEL(WAVE_VPU_VINT_CLEAR, 0x1); /* PRQA S 0497,1021,1006 */
-				} else {
-					osal_spin_lock(&dev->irq_spinlock);
-					if (dev->irq_trigger == 1) {
-						enable_irq(dev->irq);
-						dev->irq_trigger = 0;
-						dev->vpu_irqenable = 1;
-						VPU_DBG_DEV(dev->device, "VPU_INT_STS is zero, turn on irqenable.\n");
-					}
-					osal_spin_unlock(&dev->irq_spinlock);
 				}
 			} else {
 				VPU_ERR_DEV(dev->device, "Unknown product id : %08x\n", product_code);
 				continue;
 			}
 #ifdef SUPPORT_MULTI_INST_INTR
-			for (idx = 0; idx < MAX_NUM_VPU_INSTANCE; idx++) {
-				if (inst_arr[idx] > 0) {
-					// PRQA S 3432,4543,4403,4558,4542,1861,3344 ++
-					//coverity[misra_c_2012_rule_8_6_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
-					//coverity[misra_c_2012_rule_10_1_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
-					//coverity[misra_c_2012_rule_10_3_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
-					VPU_DBG_DEV(dev->device, "inst[%02d] product: 0x%08x intr_reason: 0x%08x ignore_irq %d inst_cnt %d\n",
-						idx, product_code, inst_reason[idx], dev->ignore_irq, inst_cnt);
-					// PRQA S 3432,4543,4403,4558,4542,1861,3344 --
-				}
-			}
+			// PRQA S 3432,4543,4403,4558,4542,1861,3344 ++
+			//coverity[misra_c_2012_rule_8_6_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
+			//coverity[misra_c_2012_rule_10_1_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
+			//coverity[misra_c_2012_rule_10_3_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
+			VPU_DBG_DEV(dev->device, "product: 0x%08x intr_reason: 0x%08x intr_inst_index %d\n",
+				product_code, intr_reason, intr_inst_index);
+			// PRQA S 3432,4543,4403,4558,4542,1861,3344 --
 #else
 			// PRQA S 3432,4543,4403,4558,4542,1861,3344 ++
 			//coverity[misra_c_2012_rule_8_6_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
@@ -2423,68 +2460,43 @@ static irqreturn_t vpu_irq_handler(int32_t irq, void *dev_id) /* PRQA S 3206 */
 
 #ifdef SUPPORT_MULTI_INST_INTR
 		osal_spin_lock(&dev->irq_spinlock);
-		for (idx = 0; idx < MAX_NUM_VPU_INSTANCE; idx++) {
-			if ((inst_arr[idx] > 0) && (dev->ignore_irq == 0)) {
-				// dev->interrupt_flag[idx] = 1;
-				// osal_wake_up(&dev->interrupt_wait_q[idx]);
+		for (idx=0; idx < MAX_NUM_VPU_INSTANCE; idx++) {
+			if ((inst_arr[idx] == 1) && (dev->ignore_irq != 1)) {
+				dev->interrupt_flag[idx] = 1;
+				osal_wake_up(&dev->interrupt_wait_q[idx]);
 
 				osal_spin_lock(&dev->poll_int_wait_q[idx].lock);
-				dev->poll_int_event[idx] += inst_arr[idx];
-				dev->total_poll[idx] += inst_arr[idx];
+				dev->poll_int_event[idx]++;
+				dev->total_poll[idx]++;
 				//coverity[misra_c_2012_rule_8_6_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
 				//coverity[misra_c_2012_rule_10_1_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
 				//coverity[misra_c_2012_rule_10_3_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
-				VPU_DBG_DEV(dev->device, "inst[%02d] poll_int_event[%02d]=%lld, total_poll=%lld.\n",
-					idx, idx, dev->poll_int_event[idx], dev->total_poll[idx]);
+				VPU_DBG_DEV(dev->device, "vpu_irq_handler total_poll[%d]=%lld.\n",
+					idx, dev->total_poll[idx]);
 				osal_spin_unlock(&dev->poll_int_wait_q[idx].lock);
 				osal_wake_up(&dev->poll_int_wait_q[idx]);
-				if (!osal_fifo_is_full(&dev->interrupt_pending_q[idx])) {
-					if (inst_reason[idx] == (1U << INT_WAVE5_ENC_PIC)) {
-						uint32_t ll_intr_reason = ((uint32_t)1U <<
-							INT_WAVE5_ENC_PIC);
-						osal_fifo_in(&dev->interrupt_pending_q[idx],
-							&ll_intr_reason, (uint32_t)sizeof(uint32_t));
-					} else {
-						osal_fifo_in(&dev->interrupt_pending_q[idx],
-							&inst_reason[idx], (uint32_t)sizeof(uint32_t));
-					}
-					dev->interrupt_flag[idx] = 1;
-					osal_wake_up(&dev->interrupt_wait_q[idx]);
-				} else {
-					VPU_ERR_DEV(dev->device, "inst[%02d] kfifo_is_full kfifo_count=%d \n",
-						idx, osal_fifo_len(&dev->interrupt_pending_q[idx]));
-				}
-
 #ifdef SUPPORT_SET_PRIORITY_FOR_COMMAND
 				(void)vpu_prio_set_command_to_fw(dev->prio_queue);
 #endif
 			}
-
-			if ((inst_arr[idx] > 0) &&
-				((osal_test_bit(idx, (const volatile uint64_t*)dev->vpu_inst_bitmap) == 0) ||
-				 (osal_test_bit(idx, (const volatile uint64_t*)dev->vpu_crash_inst_bitmap) == 1))) {	// need vpu_lock?
-				dev->interrupt_flag[idx] = 0;
-				inst_cnt--;
-				if (inst_cnt <= 0) {
-					dev->ignore_irq = 1;
-					VPU_DBG_DEV(dev->device, "set ignore_irq = 1\n");
-				}
-			}
 		}
 
-		if (dev->ignore_irq != 0) {
-			if (dev->vpu_irqenable == 0) {
-				enable_irq(dev->irq);
-			}
+		//coverity[misra_c_2012_rule_10_4_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
+		if (dev->irq_trigger == 1 &&
+			osal_test_bit(intr_inst_index, (const volatile uint64_t*)dev->vpu_inst_bitmap) == 0) {
+			enable_irq(dev->irq);
 			dev->irq_trigger = 0;
-			dev->vpu_irqenable = 1;
+			if (intr_inst_index < MAX_NUM_VPU_INSTANCE) {
+				dev->interrupt_flag[intr_inst_index] = 0;
+			}
 			dev->ignore_irq = 0;
-			VPU_DBG_DEV(dev->device, "turn on irqenable\n");
 		}
 		osal_spin_unlock(&dev->irq_spinlock);
-#else
+	#else
 		osal_spin_lock(&dev->irq_spinlock);
-		if (dev->ignore_irq == 0) {
+		if (dev->ignore_irq != 1) {
+			dev->interrupt_flag = 1;
+			osal_wake_up(&dev->interrupt_wait_q); /*PRQA S 3469*/
 			osal_spin_lock(&dev->poll_int_wait_q.lock);
 			dev->poll_int_event++;
 			// PRQA S 3432,4543,4403,4558,4542,1861,3344 ++
@@ -2498,8 +2510,6 @@ static irqreturn_t vpu_irq_handler(int32_t irq, void *dev_id) /* PRQA S 3206 */
 			// PRQA S 3432,4543,4403,4558,4542,1861,3344 --
 			osal_spin_unlock(&dev->poll_int_wait_q.lock);
 			osal_wake_up(&dev->poll_int_wait_q); /*PRQA S 3469*/
-			dev->interrupt_flag = 1;
-			osal_wake_up(&dev->interrupt_wait_q); /*PRQA S 3469*/
 		} else {
 			if (dev->irq_trigger == 1) {
 				// PRQA S 3432,4543,4403,4558,4542,1861,3344 ++
@@ -2701,7 +2711,11 @@ static int32_t vpu_open(struct inode *inode, struct file *filp) /* PRQA S 3673 *
 	hb_vpu_dev_t *dev;
 	hb_vpu_priv_t *priv;
 	uint64_t freq = 0;
-
+#ifdef SUPPORT_SET_PRIORITY_FOR_COMMAND
+	hb_vpu_prio_queue_t *vpq = NULL;
+	hb_vpu_filp_list_t *vpq_filp, *n;
+	uint32_t in_list = 0;
+#endif
 	VPU_DEBUG_ENTER(); /* PRQA S 3432,4543,4403,4558,4542,1861,3344 */
 
 	dev = osal_list_entry(inode->i_cdev, hb_vpu_dev_t, cdev); /* PRQA S 3432,2810,0306,0662,1021,0497 */
@@ -2749,6 +2763,32 @@ static int32_t vpu_open(struct inode *inode, struct file *filp) /* PRQA S 3673 *
 	priv->is_irq_poll = 0;
 	filp->private_data = (void *)priv;
 	osal_spin_unlock(&dev->vpu_spinlock);
+
+#ifdef SUPPORT_SET_PRIORITY_FOR_COMMAND
+	vpq = dev->prio_queue;
+	osal_spin_lock(&vpq->vpu_prio_lock);
+	//coverity[misra_c_2012_rule_18_4_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
+	//coverity[misra_c_2012_rule_11_5_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
+	//coverity[misra_c_2012_rule_20_7_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
+	osal_list_for_each_entry_safe(vpq_filp, n, &vpq->vpq_filp_head, list) {
+		if (vpq_filp->filp == filp) {
+			in_list = 1;
+			break;
+		}
+	}
+	if (in_list == 0U) {
+		//coverity[misra_c_2012_rule_11_5_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
+		vpq_filp = osal_kzalloc(sizeof(*vpq_filp), OSAL_KMALLOC_ATOMIC);
+		if (vpq_filp == NULL) {
+			osal_spin_unlock(&vpq->vpu_prio_lock);
+			VPU_ERR_DEV(dev->device, "Failed to kzalloc vpq_filp.\n");
+			return -ENOMEM;
+		}
+		vpq_filp->filp = filp;
+		osal_list_add(&vpq_filp->list, &vpq->vpq_filp_head);
+	}
+	osal_spin_unlock(&vpq->vpu_prio_lock);
+#endif
 
 	//coverity[misra_c_2012_rule_8_6_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
 	VPU_DEBUG_LEAVE(); /* PRQA S 3432,4543,4403,4558,4542,1861,3344 */
@@ -2944,7 +2984,7 @@ static int32_t vpu_wait_interrupt(hb_vpu_dev_t *dev, u_long arg)
 	interrupt_flag_in_q =
 		osal_fifo_out_spinlocked(&dev->interrupt_pending_q[intr_inst_index],
 				&intr_reason_in_q, (uint32_t)sizeof(uint32_t),
-				&dev->irq_spinlock);
+				&dev->vpu_kfifo_lock);
 	if (interrupt_flag_in_q > 0U) {
 		dev->interrupt_reason[intr_inst_index] =
 			intr_reason_in_q;
@@ -2952,7 +2992,7 @@ static int32_t vpu_wait_interrupt(hb_vpu_dev_t *dev, u_long arg)
 		//coverity[misra_c_2012_rule_8_6_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
 		//coverity[misra_c_2012_rule_10_1_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
 		//coverity[misra_c_2012_rule_10_3_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
-		VPU_DBG_DEV(dev->device, "inst[%02d] Interrupt Remain : "
+		VPU_DBG_DEV(dev->device, "Interrupt Remain : intr_inst_index=%d, "
 			"intr_reason_in_q=0x%x, interrupt_flag_in_q=%d\n",
 			intr_inst_index, intr_reason_in_q,
 			interrupt_flag_in_q);
@@ -3000,7 +3040,7 @@ static int32_t vpu_wait_interrupt(hb_vpu_dev_t *dev, u_long arg)
 #if 1
 	if (signal_pending(current) != 0) {
 		ret = -ERESTARTSYS;
-		VPU_INFO_DEV(dev->device, "INSTANCE NO: [%02d] ERESTARTSYS\n", info.intr_inst_index);
+		VPU_INFO_DEV(dev->device, "INSTANCE NO: %d ERESTARTSYS\n", info.intr_inst_index);
 		return ret;
 	}
 #endif
@@ -3010,7 +3050,7 @@ static int32_t vpu_wait_interrupt(hb_vpu_dev_t *dev, u_long arg)
 	interrupt_flag_in_q =
 		osal_fifo_out_spinlocked(&dev->interrupt_pending_q[intr_inst_index],
 			&intr_reason_in_q, (uint32_t)sizeof(uint32_t),
-			&dev->irq_spinlock);
+			&dev->vpu_kfifo_lock);
 	if (interrupt_flag_in_q > 0U) {
 		dev->interrupt_reason[intr_inst_index] = intr_reason_in_q;
 	} else {
@@ -3022,25 +3062,20 @@ static int32_t vpu_wait_interrupt(hb_vpu_dev_t *dev, u_long arg)
 	//coverity[misra_c_2012_rule_8_6_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
 	//coverity[misra_c_2012_rule_10_1_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
 	//coverity[misra_c_2012_rule_10_3_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
-	VPU_DBG_DEV(dev->device, "inst[%02d] interrupt_flag_in_q(%d), s_interrupt_flag(%d),"
-		  "reason(0x%08llx)\n", intr_inst_index, interrupt_flag_in_q,
+	VPU_DBG_DEV(dev->device, "inst_index(%d), s_interrupt_flag(%d),"
+		  "reason(0x%08llx)\n", intr_inst_index,
 		  dev->interrupt_flag[intr_inst_index],
 		  dev->interrupt_reason[intr_inst_index]);
 	// PRQA S 3432,4543,4403,4558,4542,1861,3344 --
 #else
 	// PRQA S 3432,4543,4403,4558,4542,1861,3344 ++
 	//coverity[misra_c_2012_rule_8_6_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
-	VPU_DBG_DEV(dev->device, "inst[%02d] s_interrupt_flag(%d), reason(0x%08llx)\n",
+	VPU_DBG_DEV(dev->device, "inst_index(%d), s_interrupt_flag(%d), reason(0x%08llx)\n",
 		info.intr_inst_index, dev->interrupt_flag, dev->interrupt_reason);
 	// PRQA S 3432,4543,4403,4558,4542,1861,3344 --
 #endif
-
 #ifdef SUPPORT_MULTI_INST_INTR
 	}
-#endif
-
-	osal_spin_lock_irqsave(&dev->irq_spinlock, (uint64_t *)&flags_mp);
-#ifdef SUPPORT_MULTI_INST_INTR
 	info.intr_reason = (int32_t)dev->interrupt_reason[intr_inst_index];
 	dev->interrupt_flag[intr_inst_index] = 0;
 	dev->interrupt_reason[intr_inst_index] = 0;
@@ -3051,27 +3086,29 @@ static int32_t vpu_wait_interrupt(hb_vpu_dev_t *dev, u_long arg)
 #endif
 
 #ifdef VPU_IRQ_CONTROL
+	// PRQA S 1021,3473,1020,3432,2996,3200 ++
+	osal_spin_lock_irqsave(&dev->irq_spinlock, (uint64_t *)&flags_mp);
+	// PRQA S 1021,3473,1020,3432,2996,3200 --
 	if (dev->irq_trigger == 1) {
 		enable_irq(dev->irq);
 		dev->irq_trigger = 0;
-		dev->vpu_irqenable = 1;
 	}
+	osal_spin_unlock_irqrestore(&dev->irq_spinlock, (uint64_t *)&flags_mp);
 #endif
 
 	// PRQA S 1021,3473,1020,3432,2996,3200 ++
 	osal_spin_lock_irqsave(&dev->poll_int_wait_q[info.intr_inst_index].lock, (uint64_t *)&flags_mp);
 	// PRQA S 1021,3473,1020,3432,2996,3200 --
-	dev->poll_int_event[info.intr_inst_index]--;
+	// dev->poll_int_event[info.intr_inst_index]--;
 	dev->total_release[info.intr_inst_index]++;
 	// PRQA S 3432,4543,4403,4558,4542,1861,3344 ++
 	//coverity[misra_c_2012_rule_8_6_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
 	//coverity[misra_c_2012_rule_10_1_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
 	//coverity[misra_c_2012_rule_10_3_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
-	VPU_DBG_DEV(dev->device, "inst[%02d] poll_int_event[%02d]=%lld, total_release=%lld.\n",
-		info.intr_inst_index, info.intr_inst_index, dev->poll_int_event[info.intr_inst_index], dev->total_release[info.intr_inst_index]);
+	VPU_DBG_DEV(dev->device, "inst_index(%d), ioctl poll event %lld total_release=%lld.\n",
+		info.intr_inst_index, dev->poll_int_event[info.intr_inst_index], dev->total_release[info.intr_inst_index]);
 	// PRQA S 3432,4543,4403,4558,4542,1861,3344 --
 	osal_spin_unlock_irqrestore(&dev->poll_int_wait_q[info.intr_inst_index].lock, (uint64_t *)&flags_mp);
-	osal_spin_unlock_irqrestore(&dev->irq_spinlock, (uint64_t *)&flags_mp);
 
 	//coverity[misra_c_2012_rule_11_6_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
 	ret = (int32_t)osal_copy_to_app((void __user *)arg, (void *)&info,
@@ -3294,13 +3331,9 @@ static int32_t vpu_open_instance(struct file *filp,
 		vpu_send_diag_error_event((u16)EventIdVPUDevGetUserErr, (u8)ERR_SEQ_0, 0, __LINE__);
 		return -EFAULT;
 	}
-#ifdef SUPPORT_SET_PRIORITY_FOR_COMMAND
 	prio = inst_info.inst_open_count;
 	if ((inst_info.core_idx >= MAX_NUM_VPU_CORE) || prio < (int32_t)PRIO_0 || prio > (int32_t)PRIO_31 ||
 		(inst_info.inst_idx >= MAX_NUM_VPU_INSTANCE)) {
-#else
-	if ((inst_info.core_idx >= MAX_NUM_VPU_CORE) ||	(inst_info.inst_idx >= MAX_NUM_VPU_INSTANCE)) {
-#endif
 		VPU_ERR_DEV(dev->device, "Invalid instance id(%d) or core id(%d) or prio(%d).\n",
 			inst_info.inst_idx, inst_info.core_idx, prio);
 		vpu_send_diag_error_event((u16)EventIdVPUDevInstIdxErr, (u8)ERR_SEQ_0, 0, __LINE__);
@@ -3354,16 +3387,13 @@ static int32_t vpu_open_instance(struct file *filp,
 		return -EFAULT;
 	}
 
-	osal_spin_lock(&dev->irq_spinlock);
+	osal_spin_lock(&dev->vpu_spinlock);
 #ifdef SUPPORT_MULTI_INST_INTR
-	vpu_test_interrupt_flag_and_enableirq(dev, inst_info.inst_idx);
 	osal_fifo_reset(&dev->interrupt_pending_q[inst_info.inst_idx]);
 #else
 	dev->interrupt_reason = 0;
 #endif
-	osal_spin_unlock(&dev->irq_spinlock);
 
-	osal_spin_lock(&dev->vpu_spinlock);
 	// only clear the last vpu_stats, the vpu_contex has been set.
 	(void)memset((void *)&dev->vpu_status[inst_info.inst_idx], 0x00,
 		sizeof(dev->vpu_status[inst_info.inst_idx]));
@@ -3378,8 +3408,8 @@ static int32_t vpu_open_instance(struct file *filp,
 	osal_spin_unlock(&dev->vpu_spinlock);
 
 	// PRQA S 3432,4543,4403,4558,4542,1861,3344 ++
-	VPU_INFO_DEV(dev->device, "[-]VDI_IOCTL_OPEN_INSTANCE core_idx[%d] "
-		"inst[%02d], prio=%d, s_vpu_open_ref_count=%d, inst_open_count=%d\n",
+	VPU_INFO_DEV(dev->device, "[-]VDI_IOCTL_OPEN_INSTANCE core_idx=%d, "
+		"inst_idx=%d, prio=%d, s_vpu_open_ref_count=%d, inst_open_count=%d\n",
 		(int32_t)inst_info.core_idx,
 		(int32_t)inst_info.inst_idx, prio,
 		dev->vpu_open_ref_count,
@@ -3457,8 +3487,14 @@ static int32_t vpu_close_instance(hb_vpu_dev_t *dev, u_long arg)
 	if (dev->vpu_open_ref_count == 0) dev->first_flag = 0;
 	dev->inst_prio[inst_info.inst_idx] = -1;
 	dev->prio_flag = check_prio_flag(dev);
-	(void)vpu_prio_reset_fifo(dev, inst_info.inst_idx);
 #endif
+	if (dev->interrupt_flag[inst_info.inst_idx] == 1) {
+		if (dev->irq_trigger == 1) {
+			enable_irq(dev->irq);
+			dev->irq_trigger = 0;
+		}
+		dev->interrupt_flag[inst_info.inst_idx] = 0;
+	}
 	osal_spin_unlock(&dev->vpu_spinlock);
 
 	//coverity[misra_c_2012_rule_11_6_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
@@ -3468,8 +3504,8 @@ static int32_t vpu_close_instance(hb_vpu_dev_t *dev, u_long arg)
 	}
 
 	// PRQA S 3432,4543,4403,4558,4542,1861,3344 ++
-	VPU_INFO_DEV(dev->device, "[-]VDI_IOCTL_CLOSE_INSTANCE core[%d] "
-		"inst[%02d], s_vpu_open_ref_count=%d, inst_open_count=%d\n",
+	VPU_INFO_DEV(dev->device, "[-]VDI_IOCTL_CLOSE_INSTANCE core_idx=%d, "
+		"inst_idx=%d, s_vpu_open_ref_count=%d, inst_open_count=%d\n",
 		(int32_t)inst_info.core_idx,
 		(int32_t)inst_info.inst_idx,
 		dev->vpu_open_ref_count,
@@ -3565,18 +3601,6 @@ static int32_t vpu_get_register_info(const hb_vpu_dev_t *dev, u_long arg)
 	return ret;
 }
 
-static void vpu_instance_status_display(hb_vpu_dev_t *dev)
-{
-	uint64_t all_alloc_inst_mask = 0, all_crash_inst_mask = 0, all_free_inst_mask = 0;
-	osal_spin_lock(&dev->vpu_spinlock);
-	all_alloc_inst_mask = *dev->vpu_inst_bitmap;
-	all_crash_inst_mask = *dev->vpu_crash_inst_bitmap;
-	all_free_inst_mask = ((1ULL << MAX_NUM_VPU_INSTANCE) - 1) & (~all_alloc_inst_mask);
-	osal_spin_unlock(&dev->vpu_spinlock);
-	VPU_DBG_DEV(dev->device, "VPU INST STAT (free=0x%llx, alloc=0x%llx, crash=0x%llx)\n",
-		all_free_inst_mask, all_alloc_inst_mask, all_crash_inst_mask);
-}
-
 //coverity[HIS_metric_violation:SUPPRESS]
 static int32_t vpu_alloc_instance_id(struct file *filp,
 				hb_vpu_dev_t *dev, u_long arg)
@@ -3587,7 +3611,6 @@ static int32_t vpu_alloc_instance_id(struct file *filp,
 	hb_vpu_instance_list_t *vil, *vil_tmp, *n;
 	hb_vpu_drv_inst_t inst_info;
 	int32_t ret = 0;
-	uint64_t timeout = jiffies + VPU_GET_INST_SEM_TIMEOUT;
 
 	// PRQA S 3432,4543,4403,4558,4542,1861,3344 ++
 	//coverity[misra_c_2012_rule_8_6_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
@@ -3602,20 +3625,12 @@ static int32_t vpu_alloc_instance_id(struct file *filp,
 		return -EFAULT;
 	}
 
-	ret = osal_sema_down_timeout(&dev->vpu_free_inst_sem, (uint32_t)timeout);
-	if (ret != 0) {
-		VPU_ERR_DEV(dev->device, "Fail to get inst sema fail(%d).\n", ret);
-		vpu_instance_status_display(dev);
-		return -ETIME;
-	}
 	osal_spin_lock(&dev->vpu_spinlock);
 	inst_index = (uint32_t)osal_find_first_zero_bit((const uint64_t *)dev->vpu_inst_bitmap,
 					MAX_NUM_VPU_INSTANCE);
 	if (inst_index >= MAX_NUM_VPU_INSTANCE) {
-		osal_sema_up(&dev->vpu_free_inst_sem);		// Notes: should never arrive here
 		osal_spin_unlock(&dev->vpu_spinlock);
 		VPU_ERR_DEV(dev->device, "No available id space.\n");
-		vpu_instance_status_display(dev);
 		vpu_send_diag_error_event((u16)EventIdVPUDevInstIdxErr, (u8)ERR_SEQ_0, 0, __LINE__);
 		return -ENOMEM;
 	}
@@ -3631,7 +3646,6 @@ static int32_t vpu_alloc_instance_id(struct file *filp,
 		&dev->inst_list_head, list) {
 		if (vil_tmp->inst_idx == inst_index) {
 			(void)osal_test_and_clear_bit(inst_index, (volatile uint64_t *)dev->vpu_inst_bitmap); /* PRQA S 4446 */
-			osal_sema_up(&dev->vpu_free_inst_sem);
 			osal_spin_unlock(&dev->vpu_spinlock);
 			VPU_ERR_DEV(dev->device, "Failed to allocate instance id due to existing id(%d)\n",
 				(int32_t)inst_index);
@@ -3645,7 +3659,6 @@ static int32_t vpu_alloc_instance_id(struct file *filp,
 	vil = (hb_vpu_instance_list_t *)osal_kzalloc(sizeof(*vil), OSAL_KMALLOC_ATOMIC);
 	if (vil == NULL) {
 		(void)osal_test_and_clear_bit(inst_index, (volatile uint64_t *)dev->vpu_inst_bitmap); /* PRQA S 4446 */
-		osal_sema_up(&dev->vpu_free_inst_sem);
 		osal_spin_unlock(&dev->vpu_spinlock);
 		VPU_ERR_DEV(dev->device, "Failed to allocate memory\n");
 		vpu_send_diag_error_event((u16)EventIdVPUDevAddrErr, (u8)ERR_SEQ_0, 0, __LINE__);
@@ -3667,7 +3680,6 @@ static int32_t vpu_alloc_instance_id(struct file *filp,
 		osal_list_del(&vil->list);
 		osal_kfree(vil);
 		(void)osal_test_and_clear_bit(inst_index, (volatile uint64_t *)dev->vpu_inst_bitmap); /* PRQA S 4446 */
-		osal_sema_up(&dev->vpu_free_inst_sem);
 		osal_spin_unlock(&dev->vpu_spinlock);
 		VPU_ERR_DEV(dev->device, "failed to copy from user.\n");
 		vpu_send_diag_error_event((u16)EventIdVPUDevSetUserErr, (u8)ERR_SEQ_0, 0, __LINE__);
@@ -3676,7 +3688,7 @@ static int32_t vpu_alloc_instance_id(struct file *filp,
 
 	// PRQA S 3432,4543,4403,4558,4542,1861,3344 ++
 	//coverity[misra_c_2012_rule_8_6_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
-	VPU_DBG_DEV(dev->device, "[-]VDI_IOCTL_ALLOCATE_INSTANCE_ID id = [%02d]\n", inst_index);
+	VPU_DBG_DEV(dev->device, "[-]VDI_IOCTL_ALLOCATE_INSTANCE_ID id = %d\n", inst_index);
 	// PRQA S 3432,4543,4403,4558,4542,1861,3344 --
 
 	return ret;
@@ -3692,7 +3704,6 @@ static int32_t vpu_free_instance_id(struct file *filp,
 	hb_vpu_instance_list_t *vil, *n;
 	uint32_t found = 0;
 	int32_t ret = 0;
-	unsigned long flags_mp;
 
 	// PRQA S 3432,4543,4403,4558,4542,1861,3344 ++
 	//coverity[misra_c_2012_rule_8_6_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
@@ -3735,7 +3746,6 @@ static int32_t vpu_free_instance_id(struct file *filp,
 	}
 
 	osal_clear_bit(inst_info.inst_idx, (volatile uint64_t *)dev->vpu_inst_bitmap); /* PRQA S 4446 */
-	osal_sema_up(&dev->vpu_free_inst_sem);
 	priv->inst_index = MAX_VPU_INSTANCE_IDX;
 	(void)memset((void *)&dev->vpu_ctx[inst_info.inst_idx], 0x00,
 		sizeof(dev->vpu_ctx[inst_info.inst_idx]));
@@ -3743,13 +3753,9 @@ static int32_t vpu_free_instance_id(struct file *filp,
 		sizeof(dev->vpu_status[inst_info.inst_idx]));
 	osal_spin_unlock(&dev->vpu_spinlock);
 
-	osal_spin_lock_irqsave(&dev->irq_spinlock, (uint64_t *)&flags_mp);
-	vpu_test_interrupt_flag_and_enableirq(dev, inst_info.inst_idx);
-	osal_spin_unlock_irqrestore(&dev->irq_spinlock, (uint64_t *)&flags_mp);
-
 	// PRQA S 3432,4543,4403,4558,4542,1861,3344 ++
 	//coverity[misra_c_2012_rule_8_6_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
-	VPU_DBG_DEV(dev->device, "[-]VDI_IOCTL_FREE_INSTANCE_ID clear id = [%02d]\n", inst_info.inst_idx);
+	VPU_DBG_DEV(dev->device, "[-]VDI_IOCTL_FREE_INSTANCE_ID clear id = %d\n", inst_info.inst_idx);
 	// PRQA S 3432,4543,4403,4558,4542,1861,3344 --
 
 	return ret;
@@ -3925,14 +3931,14 @@ static int32_t vpu_do_map_ion_fd(struct file *filp,
 			(vil_tmp->filp == filp)) {
 			osal_kfree((void *)ion_dma_data);
 			VPU_ERR_DEV(dev->device, "Failed to map ion handle due to same fd(%d), "
-				"same filp(0x%pK) and same tgid(%d).\n",
+				"same filp(0x%p) and same tgid(%d).\n",
 				dma_map.fd, filp, current->tgid);
 			//coverity[misra_c_2012_rule_18_4_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
 			//coverity[misra_c_2012_rule_11_5_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
 			//coverity[misra_c_2012_rule_20_7_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
 			osal_list_for_each_entry_safe(vil_tmp, n, &dev->dma_data_list_head, list) {
 				VPU_ERR_DEV(dev->device, "Existing List items fd(%d), "
-					"filp(%pK).\n", vil_tmp->fd, vil_tmp->filp);
+					"filp(%p).\n", vil_tmp->fd, vil_tmp->filp);
 			}
 			osal_spin_unlock(&dev->vpu_spinlock);
 			vpu_send_diag_error_event((u16)EventIdVPUDevDmaMapExistErr, (u8)ERR_SEQ_0, 0, __LINE__);
@@ -4063,7 +4069,7 @@ static int32_t vpu_do_map_ion_phy(struct file *filp,
 			(vil_tmp->filp == filp)) {
 			osal_spin_unlock(&dev->vpu_spinlock);
 			VPU_ERR_DEV(dev->device, "Failed to map ion phy due to same phys(0x%llx) "
-				"same size(%d) and same filp(0x%pK)\n.",
+				"same size(%d) and same filp(0x%p)\n.",
 				dma_map.phys_addr, vil_tmp->size, filp);
 			vpu_send_diag_error_event((u16)EventIdVPUDevDmaMapExistErr, (u8)ERR_SEQ_1, 0, __LINE__);
 			return -EINVAL;
@@ -4071,12 +4077,8 @@ static int32_t vpu_do_map_ion_phy(struct file *filp,
 	}
 	osal_spin_unlock(&dev->vpu_spinlock);
 
-#ifdef RESERVED_WORK_MEMORY
 #if defined(CONFIG_HOBOT_FPGA_J5) || defined(CONFIG_HOBOT_J5) || defined(CONFIG_HOBOT_FPGA_HAPS_J5)
-	if ((dma_map.phys_addr >= (dev->codec_mem_reserved.end)) || (dma_map.phys_addr < dev->codec_mem_reserved.start)) {
-#else
-	if ((dma_map.phys_addr >= (dev->codec_mem_reserved2.base + dev->codec_mem_reserved2.size)) || (dma_map.phys_addr < dev->codec_mem_reserved2.base)) {
-#endif
+	if ((dma_map.phys_addr > (dev->codec_mem_reserved.end)) || (dma_map.phys_addr < dev->codec_mem_reserved.start)) {
 #endif
 		if (ion_check_in_heap_carveout(dma_map.phys_addr, dma_map.size) < 0) {
 			VPU_ERR_DEV(dev->device, "Invalid ion physical address(addr=0x%llx, size=%u), not in ion range.\n",
@@ -4084,7 +4086,7 @@ static int32_t vpu_do_map_ion_phy(struct file *filp,
 			vpu_send_diag_error_event((u16)EventIdVPUDevAddrErr, (u8)ERR_SEQ_0, 0, __LINE__);
 			return -EINVAL;
 		}
-#ifdef RESERVED_WORK_MEMORY
+#if defined(CONFIG_HOBOT_FPGA_J5) || defined(CONFIG_HOBOT_J5) || defined(CONFIG_HOBOT_FPGA_HAPS_J5)
 	}
 #endif
 
@@ -4406,7 +4408,7 @@ static ssize_t vpu_write(struct file *filp, const char __user * buf, size_t len,
 	dev = priv->vpu_dev;
 
 	if ((dev == NULL) || (buf == NULL)) {
-		VPU_ERR("failed to get vpu dev(%pK) data or buf(%pK) is NULL\n",
+		VPU_ERR("failed to get vpu dev(%p) data or buf(%p) is NULL\n",
 			dev, buf);
 		vpu_send_diag_error_event((u16)EventIdVPUDevAddrErr, (u8)ERR_SEQ_0, 0, __LINE__);
 		return -EINVAL;
@@ -4481,84 +4483,27 @@ static void vpu_release_internal_res(hb_vpu_dev_t *dev,
 	uint32_t i, j;
 	uint32_t open_count;
 	hb_vpu_instance_pool_t *vip;
-	int32_t ret;
-	uint64_t local_crash_inst_mask = 0;
+#ifdef SUPPORT_SET_PRIORITY_FOR_COMMAND
+	hb_vpu_prio_queue_t *vpq = NULL;
+	hb_vpu_filp_list_t *vpq_filp, *n;
+#endif
 
 	osal_spin_lock(&dev->vpu_spinlock);	//check this place
 	/* found and free the not closed instance by user applications */
-	(void)vpu_free_instances(filp, &local_crash_inst_mask);
+	(void)vpu_free_instances(filp);
+	dev->open_count--;
+	open_count = dev->open_count;
 	osal_spin_unlock(&dev->vpu_spinlock);
-
-
-#ifdef USE_VPU_CLOSE_INSTANCE_ONCE_ABNORMAL_RELEASE
-	uint32_t core = 0;
-	int32_t down_vpu_sem_finish = 1;
-	uint64_t timeout = jiffies + VPU_GET_SEM_TIMEOUT;
-	uint64_t remain_inst_mask = local_crash_inst_mask;
-	while (remain_inst_mask != 0U) {
-		VPU_DBG_DEV(dev->device, "tgid(%d) has crash_inst(mask=0x%llx), remain=0x%llx.\n",
-			current->tgid, local_crash_inst_mask, remain_inst_mask);
-		if (down_vpu_sem_finish == 0) {
-			ret = osal_sema_down_timeout(&dev->vpu_sem, (uint32_t)timeout);
-			if (ret == 0) {
-				down_vpu_sem_finish = 1;
-			} else {
-				VPU_ERR_DEV(dev->device, "Fail to wait semaphore(ret=%d).\n", ret);
-				continue;
-			}
-		}
-
-#ifdef USE_SHARE_SEM_BT_KERNEL_AND_USER
-		ret = vdi_lock(dev, core, VPUDRV_MUTEX_VPU);
-#else
-		ret = vdi_lock_user(filp, dev, VPUDRV_MUTEX_VPU);
-#endif
-		if (ret != 0) {
-			VPU_DBG_DEV(dev->device, "tgid(%d) can't fetch lock,"
-				"crash_inst(mask=0x%llx) close will delay.\n", current->tgid, remain_inst_mask);
-			down_vpu_sem_finish = 0;
-			osal_sema_up(&dev->vpu_sem);
-			msleep(10);
-			continue;
-		}
-
-		for (i = 0; i < MAX_NUM_VPU_INSTANCE; i++) {
-			if (osal_test_bit(i, &remain_inst_mask) == 0)
-				continue;
-
-			ret = _vpu_close_instance((struct file *)filp, dev, core, i);
-			if (ret != VPUAPI_RET_SUCCESS) {
-				VPU_INFO_DEV(dev->device, "Warning: inst[%02d],"
-					"_vpu_close_instance ret = %d\n", i, ret);
-				osal_clear_bit(i, &remain_inst_mask);
-			} else {
-				osal_spin_lock(&dev->vpu_spinlock);
-				(void)osal_test_and_clear_bit(i, (volatile uint64_t *)dev->vpu_crash_inst_bitmap);
-				(void)osal_test_and_clear_bit(i, (volatile uint64_t *)dev->vpu_inst_bitmap); /* PRQA S 4446 */
-				osal_sema_up(&dev->vpu_free_inst_sem);
-				osal_spin_unlock(&dev->vpu_spinlock);
-				osal_clear_bit(i, &remain_inst_mask);
-				VPU_INFO_DEV(dev->device, "inst[%02d] close success.\n", i);
-				vpu_instance_status_display(dev);
-				break;
-			}
-		}
-#ifdef USE_SHARE_SEM_BT_KERNEL_AND_USER
-		vdi_unlock(dev, core, VPUDRV_MUTEX_VPU);
-#else
-		vdi_unlock(dev, VPUDRV_MUTEX_VPU);
-#endif
-	}
-#endif
 
 	/* found and free the not handled buffer by user applications */
 	(void)vpu_free_buffers(filp);
 
-	osal_spin_lock(&dev->vpu_spinlock);
-	dev->open_count--;
-	open_count = dev->open_count;
-	osal_spin_unlock(&dev->vpu_spinlock);
 	if (open_count == 0U) {
+#ifdef SUPPORT_MULTI_INST_INTR
+		for (i = 0; i < MAX_NUM_VPU_INSTANCE; i++) {
+			osal_fifo_reset(&dev->interrupt_pending_q[i]);
+		}
+#endif
 		if (dev->instance_pool.base != 0UL) {
 			// PRQA S 3432,4543,4403,4558,4542,1861,3344 ++
 			//coverity[misra_c_2012_rule_8_6_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
@@ -4583,20 +4528,29 @@ static void vpu_release_internal_res(hb_vpu_dev_t *dev,
 
 		for (j = 0; j < MAX_NUM_VPU_INSTANCE; j++) {
 			// TODO(lei.zhu) should clear bit during every close
-			osal_spin_lock(&dev->vpu_spinlock); //check this place
-			osal_spin_lock(&dev->irq_spinlock); //check this place
-			// (void)osal_test_and_clear_bit(j, (volatile uint64_t *)dev->vpu_inst_bitmap); /* PRQA S 4446 */
-			osal_fifo_reset(&dev->interrupt_pending_q[j]);
+			(void)osal_test_and_clear_bit(j, (volatile uint64_t *)dev->vpu_inst_bitmap); /* PRQA S 4446 */
 			dev->inst_open_flag[j] = 0;
 			dev->total_poll[j] = 0;
 			dev->total_release[j] = 0;
-			dev->poll_int_event[j] = 0;
-			osal_spin_unlock(&dev->irq_spinlock);
-			osal_spin_unlock(&dev->vpu_spinlock);
 		}
-		VPU_DBG_DEV(dev->device, "irqenable = %llu\n", dev->vpu_irqenable);
 	}
 
+#ifdef SUPPORT_SET_PRIORITY_FOR_COMMAND
+	vpq = dev->prio_queue;
+	osal_spin_lock(&vpq->vpu_prio_lock);
+	//coverity[misra_c_2012_rule_18_4_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
+	//coverity[misra_c_2012_rule_11_5_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
+	//coverity[misra_c_2012_rule_20_7_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
+	osal_list_for_each_entry_safe(vpq_filp, n, &vpq->vpq_filp_head, list) {
+		if (vpq_filp->filp == filp) {
+			VPU_DBG_DEV(dev->device, "delete filp: %p, pid=%d, tgid=%d\n", filp, current->pid, current->tgid);
+			osal_list_del(&vpq_filp->list);
+			osal_kfree(vpq_filp);
+			break;
+		}
+	}
+	osal_spin_unlock(&vpq->vpu_prio_lock);
+#endif
 }
 
 static int32_t vpu_release(struct inode *inode, struct file *filp) /* PRQA S 3673 */
@@ -5969,250 +5923,6 @@ static int32_t vpu_venc_show_h264deblfilter_param(struct seq_file *s)
 	return 0;
 }
 
-static int32_t vpu_venc_show_h264vui_param(struct seq_file *s)
-{
-	uint32_t i;
-	int32_t output = 0;
-	//coverity[misra_c_2012_rule_11_5_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
-	hb_vpu_dev_t *dev = (hb_vpu_dev_t *)s->private;
-	if (dev == NULL) {
-		VPU_ERR("Invalid null device\n");
-		vpu_send_diag_error_event((u16)EventIdVPUDevAddrErr, (u8)ERR_SEQ_0, 0, __LINE__);
-		return -EINVAL;
-	}
-
-
-	for (i = 0; i < MAX_NUM_VPU_INSTANCE; i++) {
-		if ((dev->vpu_ctx[i].valid != 0) && (dev->vpu_ctx[i].context.encoder) &&
-			(dev->vpu_ctx[i].context.codec_id == MEDIA_CODEC_ID_H264)) {
-			mc_h264_vui_params_t *vui =
-				&(dev->vpu_ctx[i].vui_params.h264_vui);
-			if (output == 0) {
-				output = 1;
-				seq_printf(s, "\n");
-				seq_printf(s, "----encode h264 vui----\n");
-				seq_printf(s,
-					"%7s %7s %30s %16s %9s %10s %26s %25s %30s %12s "
-					"%21s %31s %16s %24s %19s %28s %21s %14s %25s %26s\n",
-					"enc_idx", "enc_id", "aspect_ratio_info_present_flag",
-					"aspect_ratio_idc", "sar_width", "sar_height",
-					"overscan_info_present_flag", "overscan_appropriate_flag",
-					"video_signal_type_present_flag", "video_format", "video_full_range_flag",
-					"colour_description_present_flag", "colour_primaries",
-					"transfer_characteristics", "matrix_coefficients",
-					"vui_timing_info_present_flag", "vui_num_units_in_tick",
-					"vui_time_scale", "vui_fixed_frame_rate_flag", "bitstream_restriction_flag");
-			}
-			seq_printf(s, "%7d %7s %30d %16d %9d %10d %26d %25d %30d %12d "
-				"%21d %31d %16d %24d %19d %28d %21d %14d %25d %26d\n",
-				dev->vpu_ctx[i].context.instance_index,
-				get_codec(&dev->vpu_ctx[i]),
-				vui->aspect_ratio_info_present_flag,
-				vui->aspect_ratio_idc,
-				vui->sar_width,
-				vui->sar_height,
-				vui->overscan_info_present_flag,
-				vui->overscan_appropriate_flag,
-				vui->video_signal_type_present_flag,
-				vui->video_format,
-				vui->video_full_range_flag,
-				vui->colour_description_present_flag,
-				vui->colour_primaries,
-				vui->transfer_characteristics,
-				vui->matrix_coefficients,
-				vui->vui_timing_info_present_flag,
-				vui->vui_num_units_in_tick,
-				vui->vui_time_scale,
-				vui->vui_fixed_frame_rate_flag,
-				vui->bitstream_restriction_flag);
-		}
-	}
-
-	return 0;
-}
-
-static int32_t vpu_venc_show_h265vui_param(struct seq_file *s)
-{
-	uint32_t i;
-	int32_t output = 0;
-	//coverity[misra_c_2012_rule_11_5_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
-	hb_vpu_dev_t *dev = (hb_vpu_dev_t *)s->private;
-	if (dev == NULL) {
-		VPU_ERR("Invalid null device\n");
-		vpu_send_diag_error_event((u16)EventIdVPUDevAddrErr, (u8)ERR_SEQ_0, 0, __LINE__);
-		return -EINVAL;
-	}
-
-	for (i = 0; i < MAX_NUM_VPU_INSTANCE; i++) {
-		if ((dev->vpu_ctx[i].valid != 0) && (dev->vpu_ctx[i].context.encoder) &&
-			(dev->vpu_ctx[i].context.codec_id == MEDIA_CODEC_ID_H265)) {
-			mc_h265_vui_params_t *vui =
-				&(dev->vpu_ctx[i].vui_params.h265_vui);
-			if (output == 0) {
-				output = 1;
-				seq_printf(s, "\n");
-				seq_printf(s, "----encode h265 vui----\n");
-				seq_printf(s,
-					"%7s %7s %30s %16s %9s %10s %26s %25s %30s %12s %21s %31s "
-					"%16s %24s %19s %28s %21s %14s %35s %33s %26s\n",
-					"enc_idx",
-					"enc_id",
-					"aspect_ratio_info_present_flag",
-					"aspect_ratio_idc",
-					"sar_width",
-					"sar_height",
-					"overscan_info_present_flag",
-					"overscan_appropriate_flag",
-					"video_signal_type_present_flag",
-					"video_format",
-					"video_full_range_flag",
-					"colour_description_present_flag",
-					"colour_primaries",
-					"transfer_characteristics",
-					"matrix_coefficients",
-					"vui_timing_info_present_flag",
-					"vui_num_units_in_tick",
-					"vui_time_scale",
-					"vui_poc_proportional_to_timing_flag",
-					"vui_num_ticks_poc_diff_one_minus1",
-					"bitstream_restriction_flag");
-			}
-			seq_printf(s, "%7d %7s %30d %16d %9d %10d %26d %25d %30d %12d %21d %31d "
-				"%16d %24d %19d %28d %21d %14d %35d %33d %26d\n",
-				dev->vpu_ctx[i].context.instance_index,
-				get_codec(&dev->vpu_ctx[i]),
-				vui->aspect_ratio_info_present_flag,
-				vui->aspect_ratio_idc,
-				vui->sar_width,
-				vui->sar_height,
-				vui->overscan_info_present_flag,
-				vui->overscan_appropriate_flag,
-				vui->video_signal_type_present_flag,
-				vui->video_format,
-				vui->video_full_range_flag,
-				vui->colour_description_present_flag,
-				vui->colour_primaries,
-				vui->transfer_characteristics,
-				vui->matrix_coefficients,
-				vui->vui_timing_info_present_flag,
-				vui->vui_num_units_in_tick,
-				vui->vui_time_scale,
-				vui->vui_poc_proportional_to_timing_flag,
-				vui->vui_num_ticks_poc_diff_one_minus1,
-				vui->bitstream_restriction_flag);
-		}
-	}
-
-	return 0;
-}
-
-static int32_t vpu_venc_show_3dnr_param(struct seq_file *s)
-{
-	uint32_t i;
-	int32_t output = 0;
-	//coverity[misra_c_2012_rule_11_5_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
-	hb_vpu_dev_t *dev = (hb_vpu_dev_t *)s->private;
-	if (dev == NULL) {
-		VPU_ERR("Invalid null device\n");
-		vpu_send_diag_error_event((u16)EventIdVPUDevAddrErr, (u8)ERR_SEQ_0, 0, __LINE__);
-		return -EINVAL;
-	}
-
-	for (i = 0; i < MAX_NUM_VPU_INSTANCE; i++) {
-		if ((dev->vpu_ctx[i].valid != 0) && (dev->vpu_ctx[i].context.encoder)) {
-			mc_video_3dnr_enc_params_t *noise_rd = &(dev->vpu_ctx[i].noise_rd);
-			if (output == 0) {
-				output = 1;
-				seq_printf(s, "\n");
-				seq_printf(s, "----encode 3dnr----\n");
-				seq_printf(s,
-					"%7s %7s %11s %12s %12s %13s %16s %17s %17s %16s %17s %17s "
-					"%15s %16s %16s\n",
-					"enc_idx",
-					"enc_id",
-					"nr_y_enable",
-					"nr_cb_enable",
-					"nr_cr_enable",
-					"nr_est_enable",
-					"nr_intra_weightY",
-					"nr_intra_weightCb",
-					"nr_intra_weightCr",
-					"nr_inter_weightY",
-					"nr_inter_weightCb",
-					"nr_inter_weightCr",
-					"nr_noise_sigmaY",
-					"nr_noise_sigmaCb",
-					"nr_noise_sigmaCr");
-			}
-			seq_printf(s,
-				"%7d %7s %11d %12d %12d %13d %16d %17d %17d %16d %17d %17d "
-				"%15d %16d %16d\n",
-				dev->vpu_ctx[i].context.instance_index,
-				get_codec(&dev->vpu_ctx[i]),
-				noise_rd->nr_y_enable,
-				noise_rd->nr_cb_enable,
-				noise_rd->nr_cr_enable,
-				noise_rd->nr_est_enable,
-				noise_rd->nr_intra_weightY,
-				noise_rd->nr_intra_weightCb,
-				noise_rd->nr_intra_weightCr,
-				noise_rd->nr_inter_weightY,
-				noise_rd->nr_inter_weightCb,
-				noise_rd->nr_inter_weightCr,
-				noise_rd->nr_noise_sigmaY,
-				noise_rd->nr_noise_sigmaCb,
-				noise_rd->nr_noise_sigmaCr);
-		}
-	}
-
-	return 0;
-}
-
-static int32_t vpu_venc_show_smart_bg_param(struct seq_file *s)
-{
-	uint32_t i;
-	int32_t output = 0;
-	//coverity[misra_c_2012_rule_11_5_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
-	hb_vpu_dev_t *dev = (hb_vpu_dev_t *)s->private;
-	if (dev == NULL) {
-		VPU_ERR("Invalid null device\n");
-		vpu_send_diag_error_event((u16)EventIdVPUDevAddrErr, (u8)ERR_SEQ_0, 0, __LINE__);
-		return -EINVAL;
-	}
-
-	for (i = 0; i < MAX_NUM_VPU_INSTANCE; i++) {
-		if ((dev->vpu_ctx[i].valid != 0) && (dev->vpu_ctx[i].context.encoder)) {
-			mc_video_smart_bg_enc_params_t *smart_bg = &(dev->vpu_ctx[i].smart_bg);
-			if (output == 0) {
-				output = 1;
-				seq_printf(s, "\n");
-				seq_printf(s, "----encode smart bg----\n");
-				seq_printf(s,
-					"%7s %7s %16s %17s %22s %12s %11s %13s\n",
-					"enc_idx",
-					"enc_id",
-					"bg_detect_enable",
-					"bg_threshold_diff",
-					"bg_threshold_mean_diff",
-					"bg_lambda_qp",
-					"bg_delta_qp",
-					"s2fme_disable");
-			}
-			seq_printf(s,"%7d %7s %16d %17d %22d %12d %11d %13d\n",
-				dev->vpu_ctx[i].context.instance_index,
-				get_codec(&dev->vpu_ctx[i]),
-				smart_bg->bg_detect_enable,
-				smart_bg->bg_threshold_diff,
-				smart_bg->bg_threshold_mean_diff,
-				smart_bg->bg_lambda_qp,
-				smart_bg->bg_delta_qp,
-				smart_bg->s2fme_disable);
-		}
-	}
-
-	return 0;
-}
-
 static int32_t vpu_venc_show_h264vuitiming_param(struct seq_file *s)
 {
 	uint32_t i;
@@ -6629,10 +6339,6 @@ static int32_t vpu_venc_show(struct seq_file *s, void *unused) /* PRQA S 3206 */
 	(void)vpu_venc_show_h265slice_param(s);
 	(void)vpu_venc_show_h265deblfilter_param(s);
 	(void)vpu_venc_show_h265sao_param(s);
-	(void)vpu_venc_show_h264vui_param(s);
-	(void)vpu_venc_show_h265vui_param(s);
-	(void)vpu_venc_show_3dnr_param(s);
-	(void)vpu_venc_show_smart_bg_param(s);
 	(void)vpu_venc_show_status(s);
 
 	return 0;
@@ -6931,13 +6637,6 @@ static void vpu_destroy_resource(hb_vpu_dev_t *dev)
 		vmem_exit(&s_vmem);
 	}
 #endif
-#ifdef RESERVED_WORK_MEMORY
-#if defined(CONFIG_HOBOT_FPGA_J5) || defined(CONFIG_HOBOT_J5) || defined(CONFIG_HOBOT_FPGA_HAPS_J5)
-#else
-	vpu_vunmap_work_buffer_memory(&dev->codec_mem_reserved2);
-#endif
-#endif
-
 	if (!IS_ERR_OR_NULL((const void *)dev->vpu_ion_client)) {
 		ion_client_destroy(dev->vpu_ion_client);
 	}
@@ -6959,23 +6658,14 @@ static void vpu_destroy_resource(hb_vpu_dev_t *dev)
 	}
 }
 
-//#define ARRAY_CNTS	2	/* arrary: 0-start, 1-size */
 //coverity[HIS_metric_violation:SUPPRESS]
 static int32_t __init vpu_init_system_mem(struct platform_device *pdev,
 						hb_vpu_dev_t *dev)
 {
 	struct resource *res;
-#ifdef RESERVED_WORK_MEMORY
-	int32_t i;
-	//struct device_node *node;
 #if defined(CONFIG_HOBOT_FPGA_J5) || defined(CONFIG_HOBOT_J5) || defined(CONFIG_HOBOT_FPGA_HAPS_J5)
 	struct device_node *node, *rnode;
-#else
-	//uint32_t reserved_num = 0;
-	uint64_t tmp_offset = 0;
-	//uint64_t iova_reserved_reg;
-	//uint64_t phys_reserved_reg;
-#endif
+	int32_t i;
 #endif
 	int32_t ret = 0;
 #ifdef CONFIG_PCIE_HOBOT_EP_FUN_AI
@@ -7008,7 +6698,6 @@ static int32_t __init vpu_init_system_mem(struct platform_device *pdev,
 		return ret;
 	}
 
-#ifdef RESERVED_WORK_MEMORY
 #if defined(CONFIG_HOBOT_FPGA_J5) || defined(CONFIG_HOBOT_J5) || defined(CONFIG_HOBOT_FPGA_HAPS_J5)
 	rnode = of_find_node_by_path("/reserved-memory");
 	if (rnode == NULL) {
@@ -7055,60 +6744,7 @@ static int32_t __init vpu_init_system_mem(struct platform_device *pdev,
 		vpu_send_diag_error_event((u16)EventIdVPUDevAddrErr, (u8)ERR_SEQ_5, 0, __LINE__);
 		return ret;
 	}
-#else
-#if 0
-	node = of_parse_phandle(pdev->dev.of_node, "vpu-ddr", 0);
-        ret = of_address_to_resource(node, 0, &source);
-        if (ret) {
-                VPU_ERR_DEV(&pdev->dev, "Failed to get vpu-ddr");
-                return ret;
-        }
-        phys_reserved_reg = source.start;
-
-        node = of_parse_phandle(pdev->dev.of_node, "vpu-iova", 0);
-        ret = of_address_to_resource(node, 0, &source);
-        if (ret) {
-                VPU_ERR_DEV(&pdev->dev, "Failed to get vpu-ddr");
-	}
-        iova_reserved_reg = source.start;
-
-        dev->codec_mem_reserved2.base = phys_reserved_reg;
-        dev->codec_mem_reserved2.phys_addr = phys_reserved_reg;
-        dev->codec_mem_reserved2.iova = iova_reserved_reg;
-        dev->codec_mem_reserved2.size = 0x4000000;
-	dev->codec_mem_reserved2.vaddr = vpu_vmap_work_buffer_memory(&dev->codec_mem_reserved2);
 #endif
-
-	dev->codec_mem_reserved2.size = 0x4000000;
-	dma_alloc_coherent(&pdev->dev, dev->codec_mem_reserved2.size, &dev->codec_mem_reserved2.base,
-			GFP_KERNEL);
-	dev->codec_mem_reserved2.phys_addr = dev->codec_mem_reserved2.base;
-	dma_alloc_coherent(&pdev->dev, dev->codec_mem_reserved2.size, &dev->codec_mem_reserved2.iova,
-			GFP_KERNEL);
-	dev->codec_mem_reserved2.vaddr = vpu_vmap_work_buffer_memory(&dev->codec_mem_reserved2);
-
-	for (i = 0; i < MAX_NUM_VPU_INSTANCE; i++) {
-		tmp_offset = i * WAVE521DEC_WORKBUF_SIZE;
-		dev->dec_work_memory[i].base = dev->codec_mem_reserved2.base + tmp_offset;
-		dev->dec_work_memory[i].phys_addr = dev->codec_mem_reserved2.phys_addr + tmp_offset;
-		dev->dec_work_memory[i].iova = dev->codec_mem_reserved2.iova + tmp_offset;
-		dev->dec_work_memory[i].size = WAVE521DEC_WORKBUF_SIZE;
-		//coverity[misra_c_2012_rule_8_6_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
-		VPU_DBG_DEV(&pdev->dev, "Reserverd Codec Dec MEM[%02d] phys 0x%llx, iova 0x%llx, size %d\n",
-			i, dev->dec_work_memory[i].phys_addr, dev->dec_work_memory[i].iova, dev->dec_work_memory[i].size);
-	}
-	for (i = 0; i < MAX_NUM_VPU_INSTANCE; i++) {
-		tmp_offset = MAX_NUM_VPU_INSTANCE * WAVE521DEC_WORKBUF_SIZE + i * WAVE521ENC_WORKBUF_SIZE;
-		dev->enc_work_memory[i].base = dev->codec_mem_reserved2.base + tmp_offset;
-		dev->enc_work_memory[i].phys_addr = dev->codec_mem_reserved2.phys_addr + tmp_offset;
-		dev->enc_work_memory[i].iova = dev->codec_mem_reserved2.iova + tmp_offset;
-		dev->enc_work_memory[i].size = WAVE521ENC_WORKBUF_SIZE;
-		//coverity[misra_c_2012_rule_8_6_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
-		VPU_DBG_DEV(&pdev->dev, "Reserverd Codec Enc MEM[%02d] phys 0x%llx, iova 0x%llx, size %d\n",
-			i, dev->enc_work_memory[i].phys_addr, dev->enc_work_memory[i].iova, dev->enc_work_memory[i].size);
-	}
-#endif
-#endif	/* end of RESERVED_WORK_MEMORY */
 
 #ifdef CONFIG_PCIE_HOBOT_EP_FUN_AI
 	ai_mode = hobot_fun_ai_mode_available();
@@ -7148,7 +6784,7 @@ static int32_t __init vpu_init_system_mem(struct platform_device *pdev,
 	//coverity[misra_c_2012_rule_10_3_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
 	VPU_INFO_DEV(&pdev->dev,
 		"vpu IO memory resource: physical base addr = 0x%llx,"
-		"virtual base addr = %px\n", dev->vpu_mem->start,
+		"virtual base addr = %p\n", dev->vpu_mem->start,
 		dev->regs_base);
 	// PRQA S 3432,4543,4403,4558,4542,1861,3344 --
 
@@ -7449,7 +7085,6 @@ static void __init vpu_init_lock(hb_vpu_dev_t *dev)
 	dev->async_queue = NULL;
 	dev->open_count = 0;
 	osal_sema_init(&dev->vpu_sem, 1);
-	osal_sema_init(&dev->vpu_free_inst_sem, MAX_NUM_VPU_INSTANCE);
 	osal_spin_init(&dev->vpu_spinlock); /* PRQA S 3200,3469,0662 */
 	osal_spin_init(&dev->vpu_ctx_spinlock); /* PRQA S 3200,3469,0662 */
 #ifdef SUPPORT_MULTI_INST_INTR
@@ -7508,9 +7143,7 @@ static int32_t vpu_create_debug_file(hb_vpu_dev_t *dev)
 	}
 
 	dev->vpu_loading_setting = 1;
-	dev->vpu_irqenable = 1;
 	//coverity[misra_c_2012_rule_10_1_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
-	debugfs_create_u64("irqenable", S_IRWXUGO, dev->debug_root, &dev->vpu_irqenable);
 	debugfs_create_u64("loadingsetting", S_IRWXUGO, dev->debug_root, &dev->vpu_loading_setting);
 	dev->debug_file_loading = debugfs_create_file("loading", 0664, /* PRQA S 0339,3120 */
 						dev->debug_root,
