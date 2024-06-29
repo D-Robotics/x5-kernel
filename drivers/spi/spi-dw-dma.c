@@ -220,12 +220,12 @@ static int dw_spi_dma_wait(struct dw_spi *dws, unsigned int len, u32 speed)
 {
 	unsigned long long ms;
 
+	ms = len * MSEC_PER_SEC * BITS_PER_BYTE;
+	do_div(ms, speed);
 	if (spi_controller_is_slave(dws->master)) {
-		/* Slave mode use a static timeout value of 10s */
-		ms = 10 * MSEC_PER_SEC;
+		/* Slave mode adds extra 10s timeout for cs */
+		ms += (ms + (10 * MSEC_PER_SEC));
 	} else {
-		ms = len * MSEC_PER_SEC * BITS_PER_BYTE;
-		do_div(ms, speed);
 		ms += ms + 200;
 	}
 
