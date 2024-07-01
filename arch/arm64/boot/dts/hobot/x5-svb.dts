@@ -42,10 +42,6 @@
 	};
 };
 
-&noc_qos {
-	status = "okay";
-};
-
 &optee {
 	status = "okay";
 };

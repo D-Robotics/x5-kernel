@@ -116,10 +116,6 @@
 				>;
 };
 
-&noc_qos {
-	status = "okay";
-};
-
 &adc {
 	status = "okay";
 };
