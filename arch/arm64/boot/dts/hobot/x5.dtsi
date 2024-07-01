@@ -2665,7 +2665,9 @@
 			compatible = "d-robotics,noc_qos";
 			reg = <0x20550100 0x80>;
 			dma-coherent;
-			clocks-num = <0>;
+			clocks-num = <1>;
+			clocks =<&hpsclks X5_HSIO_ENET_AXI_CLK>;
+			clock-names ="enet_axi_clk";
 			status = "okay";
 			ports-num = <1>;
 			ports-off = <0x0008>;
