@@ -1,0 +1,29 @@
+#
+# Horizon network device configuration
+#
+
+config NET_VENDOR_HOBOT
+	bool "Hobot ethernet devices"
+	default y
+	help
+	  If you have a network (Ethernet) device belonging to this class, say Y.
+
+if NET_VENDOR_HOBOT
+
+config JPLUS_ETH
+	tristate "Hobot JPLUS Ethernet Device support"
+	select PHYLIB
+	select CRC32
+	select MII
+	depends on OF && HAS_DMA
+	help
+		This driver supports the JPLUS Ethernet device from Hobot
+
+config JPLUS_ETH_FUSA
+	tristate "Hobot JPLUS Ethernet STL support"
+	depends on JPLUS_ETH
+	depends on HOBOT_J5_STL
+	help
+		This driver supports the JPLUS Ethernet STL from Hobot
+
+endif # NET_VENDOR_HOBOT
