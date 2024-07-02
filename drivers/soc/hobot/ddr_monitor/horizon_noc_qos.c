@@ -308,7 +308,7 @@ static int __maybe_unused noc_qos_suspend(struct device *dev)
 	return 0;
 }
 
-static int __maybe_unused noc_qos_resume(struct device *dev)
+static int __maybe_unused noc_qos_runtime_resume(struct device *dev)
 {
 	noc_qos_restore(dev);
 
@@ -320,9 +320,22 @@ static int __maybe_unused noc_qos_runtime_suspend(struct device *dev)
 	return 0;
 }
 
-static int __maybe_unused noc_qos_runtime_resume(struct device *dev)
+static int __maybe_unused noc_qos_resume(struct device *dev)
 {
-	return noc_qos_resume(dev);
+	int32_t ret = 0;
+
+	ret = pm_runtime_get_sync(dev);
+	if (ret) {
+		dev_err(dev, "failed to resume iommu\n");
+		return ret;
+	}
+	ret = pm_runtime_put_sync_suspend(dev);
+	if (ret) {
+		dev_err(dev, "Failed to suspend %d\n", ret);
+		return ret;
+	}
+
+	return ret;
 }
 
 static const struct dev_pm_ops noc_qos_pm_ops = {
