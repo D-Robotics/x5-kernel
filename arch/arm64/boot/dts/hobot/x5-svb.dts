@@ -94,18 +94,6 @@
 	status = "okay";
 };
 
-&pmu {
-	status = "okay";
-};
-
-&dsu_pmu {
-	status = "okay";
-};
-
-&dsu_ctrl {
-	status = "okay";
-};
-
 &uart1 {
 	status = "disabled";
 	pinctrl-names = "default";
