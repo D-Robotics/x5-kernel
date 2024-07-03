@@ -731,3 +731,7 @@
 		};
 	};
 };
+
+&hobot_pps {
+	status = "okay";
+};

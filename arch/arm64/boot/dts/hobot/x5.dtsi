@@ -4131,4 +4131,12 @@
 		compatible = "hobot-snd0";
 		status = "disabled";
 	};
+
+	hobot_pps: hobot_pps {
+		//pinctrl-names = "default";
+		//pinctrl-0 = <&gps_pps_func>;
+		compatible = "hobot-pps";
+		status = "disabled";
+		false_trigger_detect;
+	};
 };
