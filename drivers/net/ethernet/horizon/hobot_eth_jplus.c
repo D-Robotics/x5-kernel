@@ -506,6 +506,7 @@ static s32 get_clk_dt(struct platform_device *pdev, struct plat_config_data *pla
 {
 	s32 ret = 0;
 
+	/* ptp ref clk */
 	plat->clk_ptp_ref = devm_clk_get(&pdev->dev, "ptp_ref");
 	if (IS_ERR((void *)plat->clk_ptp_ref)) {
 		dev_err(&pdev->dev, "ethernet: ptp cloock not found\n");
@@ -519,32 +520,63 @@ static s32 get_clk_dt(struct platform_device *pdev, struct plat_config_data *pla
 	plat->clk_ptp_rate = (u32)clk_get_rate(plat->clk_ptp_ref);
 	pr_debug("%s, clk_ptp_rate:%u\n", __func__, plat->clk_ptp_rate); /*PRQA S 1294, 0685*/
 
+	/* apb clk */
+	plat->eth_apb_clk = devm_clk_get(&pdev->dev, "apb_clk");
+	if (IS_ERR((void *)plat->eth_apb_clk)) {
+		dev_err(&pdev->dev, "apb_clk not found\n");
+		goto err_apb_clk;
+	}
+	ret = clk_prepare_enable(plat->eth_apb_clk);
+	if (ret < 0) {
+		dev_err(&pdev->dev, "unable to enable apb_clk clk\n");
+		goto err_apb_clk;
+	}
+
+	/* axi clk */
 	plat->eth_bus_clk = devm_clk_get(&pdev->dev, "axi_clk");
 	if (IS_ERR((void *)plat->eth_bus_clk)) {
 		dev_err(&pdev->dev, "axi_clk not found\n");
-		goto err_ptp_ref;
+		goto err_bus_clk;
 	}
 	ret = clk_prepare_enable(plat->eth_bus_clk);
 	if (ret < 0) {
 		dev_err(&pdev->dev, "unable to enable axi_clk clk\n");
-		goto err_ptp_ref;
+		goto err_bus_clk;
 	}
 
+	/* mac clk */
 	plat->eth_mac_clk = devm_clk_get(&pdev->dev, "rgmii_clk");
 	if (IS_ERR((void *)plat->eth_mac_clk)) {
 		dev_err(&pdev->dev, "rgmii_clk not found\n");
-		goto err_bus_clk;
+		goto err_mac_clk;
 	}
 	ret = clk_prepare_enable(plat->eth_mac_clk);
 	if (ret < 0) {
 		dev_err(&pdev->dev, "unable to enable rgmii_clk\n");
-		goto err_bus_clk;
+		goto err_mac_clk;
 	}
+
+	/* phy ref clk */
+	plat->phy_ref_clk = devm_clk_get(&pdev->dev, "ref_clk");
+	if (IS_ERR((void *)plat->phy_ref_clk)) {
+		dev_err(&pdev->dev, "ref_clk not found\n");
+		goto err_ref_clk;
+	}
+	ret = clk_prepare_enable(plat->phy_ref_clk);
+	if (ret < 0) {
+		dev_err(&pdev->dev, "unable to enable ref_clk\n");
+		goto err_ref_clk;
+	}
+
 	return ret;
 
-err_bus_clk:
+err_ref_clk:
+	clk_disable_unprepare(plat->eth_mac_clk);
+err_mac_clk:
 	clk_disable_unprepare(plat->eth_bus_clk);
-err_ptp_ref:
+err_bus_clk:
+	clk_disable_unprepare(plat->eth_apb_clk);
+err_apb_clk:
 	clk_disable_unprepare(plat->clk_ptp_ref);
 err_ptp_clk:
 	return -EINVAL;
@@ -7317,15 +7349,11 @@ static s32 eth_probe(struct platform_device *pdev)
 	}
 	(void)hobot_eth_start_probe(pdev);
 
-	ret = eth_reset(&pdev->dev);
-	if (ret < 0)
-		goto err_reset;
-
 	(void)memset((void *)&mac_res, 0, sizeof(struct mac_resource));
 	ret = get_platform_resources(pdev, &mac_res);
 	if(ret < 0) {
 		dev_dbg(&pdev->dev, "get platform resources err\n"); /*PRQA S 1294, 0685*/
-		goto err_reset;
+		goto err_dt;
 	}
 	plat_dat = eth_probe_config_dt(pdev, &mac_res.mac);
 	if (IS_ERR((void *)plat_dat)) {
@@ -7333,12 +7361,17 @@ static s32 eth_probe(struct platform_device *pdev)
 		goto err_dt;
 	}
 
+	ret = eth_reset(&pdev->dev);
+	if (ret < 0)
+		goto err_reset;
+
 	ret = eth_drv_probe(&pdev->dev, plat_dat, &mac_res);
 	if (ret < 0)
 		goto err_probe;
 	(void)hobot_eth_end_probe(pdev);
 
 	return 0;
+
 err_probe:
 	devm_kfree(&pdev->dev, (void *)plat_dat->axi);
 	plat_dat->axi = NULL;
@@ -7346,9 +7379,9 @@ err_probe:
 	plat_dat->dma_cfg = NULL;
 	devm_kfree(&pdev->dev, (void *)plat_dat);
 	plat_dat = NULL;
-err_dt:
-	devm_iounmap(&pdev->dev, mac_res.addr);
 err_reset:
+	devm_iounmap(&pdev->dev, mac_res.addr);
+err_dt:
 	return ret;
 }
 
@@ -7375,9 +7408,11 @@ static s32 eth_remove(struct platform_device *pdev)
 	netif_carrier_off(ndev);
 	unregister_netdev(ndev);
 	phylink_destroy(priv->phylink);
+	clk_disable_unprepare(priv->plat->eth_apb_clk);
 	clk_disable_unprepare(priv->plat->eth_bus_clk);
 	clk_disable_unprepare(priv->plat->eth_mac_clk);
 	clk_disable_unprepare(priv->plat->clk_ptp_ref);
+	clk_disable_unprepare(priv->plat->phy_ref_clk);
 
 	if (NULL != priv->mii) {
 		mdiobus_unregister(priv->mii);
@@ -7487,9 +7522,11 @@ s32 eth_suspend(struct device *dev)
 		enable_mac_transmit(priv, (bool)false);
 	}
 
+	clk_disable_unprepare(priv->plat->eth_apb_clk);
 	clk_disable_unprepare(priv->plat->eth_bus_clk);
 	clk_disable_unprepare(priv->plat->eth_mac_clk);
 	clk_disable_unprepare(priv->plat->clk_ptp_ref);
+	clk_disable_unprepare(priv->plat->phy_ref_clk);
 
 	return 0;
 }
@@ -7524,9 +7561,12 @@ s32 eth_resume(struct device *dev)
 		return 0;
 	hobot_eth_start_resume(dev);
 
+	(void)clk_prepare_enable(priv->plat->eth_apb_clk);
 	(void)clk_prepare_enable(priv->plat->eth_bus_clk);
 	(void)clk_prepare_enable(priv->plat->eth_mac_clk);
 	(void)clk_prepare_enable(priv->plat->clk_ptp_ref);
+	(void)clk_prepare_enable(priv->plat->phy_ref_clk);
+
 
 	/*aon eth do not need to reset*/
 	if (1 == priv->plat->module_index) {

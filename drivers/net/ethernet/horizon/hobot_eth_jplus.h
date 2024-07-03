@@ -430,6 +430,7 @@ struct plat_config_data {
 	struct txq_cfg tx_queues_cfg[MTL_MAX_TX_QUEUES];
 	struct dma_ctrl_cfg *dma_cfg;
 
+	struct clk *eth_apb_clk;
 	struct clk *eth_bus_clk;
 	struct clk *eth_mac_clk;
 	struct clk *phy_ref_clk;
