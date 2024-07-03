@@ -37,10 +37,6 @@
 #include <net/pkt_cls.h>
 #include "hobot_eth_jplus.h"
 
-
-
-
-
 #define TSO_MAX_BUFF_SIZE (SZ_16K - 1)
 
 #define DRIVER_NAME "hobot_gmac"
@@ -160,9 +156,8 @@
 
 #define HOBOT_COAL_TIMER(x) (jiffies + usecs_to_jiffies(x))
 #define HOBOT_COAL_TX_TIMER	1000
-#define ETH_NUM_MAX 2
 static void hobot_init_timer(struct hobot_priv *priv);
-static struct net_device * pndev[ETH_NUM_MAX] = {NULL, NULL};
+static struct net_device * pndev = NULL;
 
 /**
  * enable_dma_irq
@@ -636,7 +631,6 @@ static void get_burst_map_dt(struct device_node *np, struct plat_config_data *pl
  * @np: device_node struct poniter
  * @plat: plat_config_data struct pointer
  * @pdev: platform_device struct pointer
- * @pinctrl: pinctrl struct pointer
  * Description: get dma config form device tree
  * called by eth_probe_config_dt
  * Return: NA
@@ -707,8 +701,6 @@ static struct plat_config_data *eth_probe_config_dt(struct platform_device *pdev
 {
 	struct device_node *np = pdev->dev.of_node;
 	struct plat_config_data *plat;
-	struct pinctrl *pinctrl;
-	struct pinctrl_state *pin_eth_mux;
 	struct dma_ctrl_cfg *dma_cfg;
 	void * err_ptr  = ERR_PTR(-EPROBE_DEFER);
 	s32 ret;
@@ -728,13 +720,6 @@ static struct plat_config_data *eth_probe_config_dt(struct platform_device *pdev
 	/* PHYLINK automatically parses the phy-handle property */
 	plat->phylink_node = np;
 
-	plat->module_index = of_alias_get_id(np, "ethernet");
-	if((plat->module_index) < 0)
-	{
-		err_ptr = ERR_PTR(-ENODEV);
-		goto free_plat;
-	}
-
 	if (0 != of_property_read_u32(np, "max-speed", &plat->max_speed))
 		plat->max_speed = 0;
 
@@ -744,21 +729,6 @@ static struct plat_config_data *eth_probe_config_dt(struct platform_device *pdev
 		goto free_plat;
 	}
 
-	pinctrl = devm_pinctrl_get(&pdev->dev);
-	if ( IS_ERR((void *)pinctrl) ) {
-		dev_err(&pdev->dev, "pinctrl get error\n");
-		goto free_plat;
-	}
-
-	pin_eth_mux = pinctrl_lookup_state(pinctrl, "eth_state");
-	if ( IS_ERR((void *)pin_eth_mux) ) {
-		dev_err(&pdev->dev, "pins_eth_mux in pinctrl state error\n");
-		goto pinctrl_put;
-	}
-	(void)pinctrl_select_state(pinctrl, pin_eth_mux);
-
-
-
 	(void)of_property_read_s32(np, "tx-fifo-depth", &plat->tx_fifo_size);
 	(void)of_property_read_s32(np, "rx-fifo-depth", &plat->rx_fifo_size);
 
@@ -767,14 +737,13 @@ static struct plat_config_data *eth_probe_config_dt(struct platform_device *pdev
 
 	plat->maxmtu = JUMBO_LEN;
 
-
 	plat->tso_en = of_property_read_bool(np, "snps,tso");
 	plat->fp_en = of_property_read_bool(np, "snps,fp");
 
 	dma_cfg = (struct dma_ctrl_cfg *)devm_kzalloc(&pdev->dev, sizeof(*dma_cfg), GFP_KERNEL);
 	if (NULL == dma_cfg) {
 		err_ptr = ERR_PTR(-ENOMEM);
-		goto pinctrl_put;
+		goto free_plat;
 	}
 
 	get_dma_cfg_dt(np, plat, dma_cfg);
@@ -804,8 +773,6 @@ free_axi:
 	plat->axi = NULL;
 free_dma_cfg:
 	devm_kfree(&pdev->dev, (void *)dma_cfg);
-pinctrl_put:
-	devm_pinctrl_put(pinctrl);
 free_plat:
 	devm_kfree(&pdev->dev, (void *)plat);
 err_kalloc:
@@ -829,11 +796,11 @@ static s32 get_platform_resources(struct platform_device *pdev, struct mac_resou
 		dev_err(&pdev->dev, "get irq resouce failed\n");
 		goto err_get_res;
 	}
+
+	/* wol_irq is optional */
 	mac_res->wol_irq = platform_get_irq(pdev, 1);
-	if (mac_res->wol_irq <= 0) {
-		dev_err(&pdev->dev, "get wol_irq resouce failed\n");
-		goto err_get_res;
-	}
+	if (mac_res->wol_irq <= 0)
+		dev_info(&pdev->dev, "No wol_irq resouce.\n");
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	if (NULL == res) {
@@ -3436,17 +3403,16 @@ static struct ptp_clock_info ptp_clock_ops = {
 
 /**
 * hobot_eth_ptp_get_time
-* @index: index of ethernet
 * @ts: time of ethernet
 * Description: support for other drivers to get ethernet time,
 * it is recommended to use ethernet1 for time synchronization
 * called by other drivers
 * Return: 0 on success, otherwise error.
 */
-s32 hobot_eth_ptp_get_time(u32 index, struct timespec64 *ts)
+s32 hobot_eth_ptp_get_time(struct timespec64 *ts)
 {
 	struct hobot_priv *priv;
-	struct net_device *ndev = pndev[index];
+	struct net_device *ndev = pndev;
 
 	if (ndev == NULL) {
 		(void)pr_err("%s, ndev is NULL\n", __func__);
@@ -3455,7 +3421,7 @@ s32 hobot_eth_ptp_get_time(u32 index, struct timespec64 *ts)
 
 	priv = (struct hobot_priv *)netdev_priv(ndev);
 
-	if ((ts == NULL) || (index >= ETH_NUM_MAX)) {
+	if ((ts == NULL)) {
 		(void)netdev_err(priv->ndev, "%s, invalid parameter\n", __func__);
 		return -1;
 	}
@@ -7273,13 +7239,7 @@ static s32 eth_drv_probe(struct device *device, struct plat_config_data *plat_da
 		goto err_wq_init;
 	}
 
-	if (priv->plat->module_index < ETH_NUM_MAX) {
-		pndev[priv->plat->module_index] = ndev;
-	} else {
-		netdev_err(ndev, "module_index error:%d\n", priv->plat->module_index);
-		ret = -ENODEV;
-		goto err_wq_init;
-	}
+	pndev = ndev;
 
 	return 0;
 
@@ -7515,7 +7475,7 @@ s32 eth_suspend(struct device *dev)
 	stop_all_dma(priv);
 
 	/* Enable Power down mode by programming the PMT regs */
-	if (device_may_wakeup(priv->device)) {
+	if (device_may_wakeup(priv->device) && priv->wol_irq > 0) {
 		mac_pmt(priv->ioaddr, (u32)priv->wolopts);
 		(void)enable_irq_wake((u32)priv->wol_irq);
 	} else {
@@ -7567,12 +7527,7 @@ s32 eth_resume(struct device *dev)
 	(void)clk_prepare_enable(priv->plat->clk_ptp_ref);
 	(void)clk_prepare_enable(priv->plat->phy_ref_clk);
 
-
-	/*aon eth do not need to reset*/
-	if (1 == priv->plat->module_index) {
-		(void)eth_reset(dev);
-	}
-
+	(void)eth_reset(dev);
 
 	/* Power Down bit, into the PM register, is cleared
 	 * automatically as soon as a magic packet or a Wake-up frame
@@ -7580,7 +7535,7 @@ s32 eth_resume(struct device *dev)
 	 * this bit because it can generate problems while resuming
 	 * from another devices (e.g. serial console).
 	 */
-	if (device_may_wakeup(priv->device)) {
+	if (device_may_wakeup(priv->device) && priv->wol_irq > 0) {
 		spin_lock_irqsave(&priv->lock, flags); /*PRQA S 2996*/
 		mac_pmt(priv->ioaddr, 0);
 		spin_unlock_irqrestore(&priv->lock, flags);/*PRQA S 2996*/

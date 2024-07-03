@@ -474,7 +474,6 @@ struct plat_config_data {
 	bool force_thresh_dma_mode;
 	bool en_tx_lpi_clockgating;
 	s32 mac_port_sel_speed;
-	s32 module_index;
 	struct device_node *phylink_node;
 };
 
