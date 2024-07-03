@@ -4,7 +4,7 @@
  *
  *  This is a driver for the horizon Ethernet QoS IP version 5.10a (GMAC).
  *
- *  This driver has been developed for a subset of the total available 
+ *  This driver has been developed for a subset of the total available
  *  feature set. Currently
  *  it supports:
  *  - TSO
@@ -686,10 +686,11 @@ static struct plat_config_data *eth_probe_config_dt(struct platform_device *pdev
 		err_ptr = ERR_PTR(-ENOMEM);
 		goto err_kalloc;
 	}
-	*mac = (const char *)of_get_mac_address(np);
-	if (IS_ERR(*mac)) {
+	ret = of_get_mac_address(np, (u8 *)*mac);
+	if (!ret) {
 		*mac = NULL;
 	}
+
 	of_get_phy_mode(np, (phy_interface_t *)&plat->interface);
 
 	/* PHYLINK automatically parses the phy-handle property */
@@ -6809,7 +6810,6 @@ static int eth_phy_setup(struct hobot_priv *priv)
 
 	priv->phylink_config.dev = &priv->ndev->dev;
 	priv->phylink_config.type = PHYLINK_NETDEV;
-	priv->phylink_config.pcs_poll = (bool)true;
 
 	if (!fwnode)
 		fwnode = dev_fwnode(priv->device);
@@ -7073,7 +7073,7 @@ static s32 eth_drv_function_register(struct hobot_priv *priv, struct net_device 
 	u32 queue;
 	for (queue = 0; queue < priv->plat->rx_queues_to_use; queue++) {
 		struct dma_rx_queue *rx_q = &priv->rx_queue[queue];
-		netif_napi_add(ndev, &rx_q->napi, eth_napi_poll, NAPI_POLL_WEIGHT);
+		netif_napi_add(ndev, &rx_q->napi, eth_napi_poll);
 	}
 
 	spin_lock_init(&priv->lock);/*PRQA S 3334*/
@@ -7567,7 +7567,7 @@ s32 eth_resume(struct device *dev)
 	start_all_queues(priv);
 
 	resume_boot_time = ktime_get_boottime();
-	tmp = priv->suspend_ptp_time + 
+	tmp = priv->suspend_ptp_time +
 		(resume_boot_time - priv->suspend_boot_time);
 	resume_ptp_time = ktime_to_timespec64(tmp);
 
