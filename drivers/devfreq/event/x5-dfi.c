@@ -75,9 +75,6 @@
 /* ddr subsystem reset */
 #define DFI_SWR_BIT	BIT(0)
 #define DFI_POR_BIT	BIT(3)
-
-#define DFI_APB_CLK_RATE	(200000000)
-
 /*
  * The dfi controller can monitor DDR load. It has an upper and lower threshold
  * for the operating points. Whenever the usage leaves these bounds an event is
@@ -88,6 +85,7 @@ struct x5_dfi {
 	struct devfreq_event_desc *desc;
 	struct device *dev;
 	int    irq;
+	struct clk *apb_clk;
 	u32    apb_clk_rate;
 	u32    interval;
 	void __iomem *regs_0;
@@ -360,9 +358,16 @@ static int x5_dfi_probe(struct platform_device *pdev)
 	if (!desc)
 		return -ENOMEM;
 
+	priv->apb_clk = devm_clk_get(priv->dev, "apb-clk");
+	if (IS_ERR(priv->apb_clk))
+		return PTR_ERR(priv->apb_clk);
+
 	/* apb clock rate will be used for wid time calculate */
+	priv->apb_clk_rate = clk_get_rate(priv->apb_clk);
 	device_property_read_u32(priv->dev, "interval", &priv->interval);
-	priv->apb_clk_rate = DFI_APB_CLK_RATE;
+
+	dev_info(priv->dev, "apb clk rate: %u, interval: %u\n",
+		 priv->apb_clk_rate, priv->interval);
 
 	dfi_monitor_init(priv);
 
