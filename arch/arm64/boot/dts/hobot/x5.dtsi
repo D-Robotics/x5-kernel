@@ -695,6 +695,8 @@
 		dfi_monitor: dfi-monitor {
 			compatible = "horizon,x5-dfi";
 			status = "okay";
+			clocks = <&hpsclks X5_TOP_APB_CLK>;
+			clock-names = "apb-clk";
 			reg = <0x38200000 0x100>, /* dfi monitor */
 			      <0x38300000 0x1000>; /* ddr intr */
 			interval = <1>;	/* in seconds */
