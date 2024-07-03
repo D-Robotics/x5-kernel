@@ -2958,6 +2958,95 @@
 				};
 			};
 
+			horizon_tsn: horizon_tsn@35010000 {
+				compatible = "snps,dwc-qos-ethernet-5.10a";
+				status = "disabled";
+				reg = <0x35010000 0x10000>,
+					<0x35050000 0x4>;
+				interrupt-parent = <&gic>;
+				interrupts = <GIC_SPI 24 IRQ_TYPE_LEVEL_HIGH>;
+				interrupt-names = "mac-irq";
+				clocks = <&hpsclks X5_HSIO_ENET_AXI_CLK>,
+					 <&hpsclks X5_HSIO_ENET_RGMII_CLK>,
+					 <&hpsclks X5_HSIO_ENET_PCLK>,
+					 <&hpsclks X5_HSIO_ENET_REF_CLK>,
+					 <&hpsclks X5_HSIO_ENET_PTP_REFCLK>;
+				clock-names = "axi_clk", "rgmii_clk", "apb_clk",
+					      "ref_clk", "ptp_ref";
+				resets = <&socrst HSIO_ENET_RESET>;
+				reset-names = "enet_rst";
+
+				snps,write-requests = <8>;
+				snps,read-requests = <8>;
+				snps,txpbl = <4>;
+				snps,rxpbl = <4>;
+				snps,clk_csr = <2>;
+				snps,tso;
+				snps,aal;
+				//snps,fp;
+				snps,force_sf_dma_mode = <1>;
+
+				phy-mode = "rgmii-id";
+				phy-handle = <&horizon_ethphy0>;
+
+				mdio {
+					compatible = "snps,dwmac-mdio";
+					#address-cells = <1>;
+					#size-cells = <0>;
+					horizon_ethphy0: horizon_ethernet-phy@1 {
+						compatible =
+							"ethernet-phy-ieee802.3-c22";
+						reg = <0>;
+					};
+				};
+
+				snps,mtl-rx-config {
+					snps,rx-queues-to-use = <4>;
+					//snps,rx-sched-sp;
+					queue0 {
+						snps,dcb-algorithm;
+					};
+
+					queue1 {
+
+						snps,avb-algorithm;
+						snps,route-ptp;
+					};
+
+					queue2 {
+						snps,priority = <0x4>;
+						snps,avb-algorithm;
+					};
+
+					queue3 {
+						snps,avb-algorithm;
+						snps,priority = <0x8>;
+					};
+				};
+				snps,mtl-tx-config {
+					snps,tx-queues-to-use = <4>;
+					queue0 {
+						snps,dcb-algorithm;
+						snps,tx-sched-sp;
+					};
+					//for PTP (10%BW)
+					queue1 {
+						snps,avb-algorithm;
+						snps,priority = <0x2>;
+					};
+					//class B traffic (25%BW)
+					queue2 {
+						snps,avb-algorithm;
+						snps,priority = <0x4>;
+					};
+					//classA (40%BW)
+					queue3 {
+						snps,avb-algorithm;
+						snps,priority = <0x8>;
+					};
+				};
+			};
+
 			sdio_0: sdhci@35020000 {
 				compatible = "horizon,x5-dwcmshc-sd";
 				status = "disabled";

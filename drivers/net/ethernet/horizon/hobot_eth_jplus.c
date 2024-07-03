@@ -506,7 +506,7 @@ static s32 get_clk_dt(struct platform_device *pdev, struct plat_config_data *pla
 {
 	s32 ret = 0;
 
-	plat->clk_ptp_ref = devm_clk_get(&pdev->dev, "eth_ptp_clk");
+	plat->clk_ptp_ref = devm_clk_get(&pdev->dev, "ptp_ref");
 	if (IS_ERR((void *)plat->clk_ptp_ref)) {
 		dev_err(&pdev->dev, "ethernet: ptp cloock not found\n");
 		goto err_ptp_clk;
@@ -519,25 +519,25 @@ static s32 get_clk_dt(struct platform_device *pdev, struct plat_config_data *pla
 	plat->clk_ptp_rate = (u32)clk_get_rate(plat->clk_ptp_ref);
 	pr_debug("%s, clk_ptp_rate:%u\n", __func__, plat->clk_ptp_rate); /*PRQA S 1294, 0685*/
 
-	plat->eth_bus_clk = devm_clk_get(&pdev->dev, "eth_bus_clk");
+	plat->eth_bus_clk = devm_clk_get(&pdev->dev, "axi_clk");
 	if (IS_ERR((void *)plat->eth_bus_clk)) {
-		dev_err(&pdev->dev, "eth_bus_clk not found\n");
+		dev_err(&pdev->dev, "axi_clk not found\n");
 		goto err_ptp_ref;
 	}
 	ret = clk_prepare_enable(plat->eth_bus_clk);
 	if (ret < 0) {
-		dev_err(&pdev->dev, "unable to enable eth_bus_clk clk\n");
+		dev_err(&pdev->dev, "unable to enable axi_clk clk\n");
 		goto err_ptp_ref;
 	}
 
-	plat->eth_mac_clk = devm_clk_get(&pdev->dev, "eth_mac_clk");
+	plat->eth_mac_clk = devm_clk_get(&pdev->dev, "rgmii_clk");
 	if (IS_ERR((void *)plat->eth_mac_clk)) {
-		dev_err(&pdev->dev, "eth_mac_clk not found\n");
+		dev_err(&pdev->dev, "rgmii_clk not found\n");
 		goto err_bus_clk;
 	}
 	ret = clk_prepare_enable(plat->eth_mac_clk);
 	if (ret < 0) {
-		dev_err(&pdev->dev, "unable to enable eth_mac_clk\n");
+		dev_err(&pdev->dev, "unable to enable rgmii_clk\n");
 		goto err_bus_clk;
 	}
 	return ret;

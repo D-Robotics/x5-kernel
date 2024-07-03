@@ -434,8 +434,6 @@ struct plat_config_data {
 	struct clk *eth_mac_clk;
 	struct clk *phy_ref_clk;
 	struct clk *clk_ptp_ref;
-	struct clk *eth_loopback_clk;
-
 
 	u32 rx_queues_to_use;
 	u32 tx_queues_to_use;

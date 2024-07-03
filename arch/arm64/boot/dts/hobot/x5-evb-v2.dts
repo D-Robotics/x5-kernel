@@ -712,6 +712,15 @@ the following ports need to be deleted*/
 
 /**display sub-system end**/
 
+&horizon_tsn {
+	status = "disabled";
+
+	phy-mode = "rgmii-id";
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_enet &lsio_gpio0_31>;
+	phyreset-gpio = <&ls_gpio0_porta 31 GPIO_ACTIVE_HIGH>;
+};
+
 &hobot_tsn {
 	status = "disabled";
 

@@ -594,6 +594,15 @@
 	};
 };
 
+&horizon_tsn {
+	status = "disabled";
+
+	phy-mode = "rgmii-id";
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_enet &lsio_gpio0_29>;
+	phyreset-gpio = <&ls_gpio0_porta 29 GPIO_ACTIVE_HIGH>;
+};
+
 &hobot_tsn {
 	status = "disabled";
 
