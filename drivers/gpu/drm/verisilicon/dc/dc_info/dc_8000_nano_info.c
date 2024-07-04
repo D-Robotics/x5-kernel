@@ -444,8 +444,6 @@ static struct dc_plane_info dc_plane_info[] = {
 				.type	       = DRM_PLANE_TYPE_OVERLAY,
 				.modifiers     = format_modifiers,
 				.num_modifiers = NUM_MODIFIERS,
-				.num_formats   = ARRAY_SIZE(primary_overlay_formats),
-				.formats       = primary_overlay_formats,
 				.min_width     = 0,
 				.min_height    = 0,
 				.max_width     = 4096,
@@ -454,12 +452,16 @@ static struct dc_plane_info dc_plane_info[] = {
 					      BIT(DRM_MODE_BLEND_PREMULTI) |
 					      BIT(DRM_MODE_BLEND_COVERAGE),
 #ifdef CONFIG_VERISILICON_GC_PROC_SUPPORT
+				.num_formats   = ARRAY_SIZE(gc_overlay_formats),
+				.formats       = gc_overlay_formats,
 				.rotation   = DRM_MODE_ROTATE_MASK | DRM_MODE_REFLECT_MASK,
 				.min_scale = FRAC_16_16(1, 3),
 				.max_scale = FRAC_16_16(3, 1),
 #else
-				.min_scale = DRM_PLANE_NO_SCALING,
-				.max_scale = DRM_PLANE_NO_SCALING,
+				.num_formats = ARRAY_SIZE(primary_overlay_formats),
+				.formats     = primary_overlay_formats,
+				.min_scale   = DRM_PLANE_NO_SCALING,
+				.max_scale   = DRM_PLANE_NO_SCALING,
 #endif
 				.zpos	    = {0, CONFIG_VERISILICON_PRIMARY_OVERLAY_CNT - 1, 2},
 				.crtc_names = crtc_names,
