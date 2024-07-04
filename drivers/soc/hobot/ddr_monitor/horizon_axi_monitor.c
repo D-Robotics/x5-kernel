@@ -558,7 +558,12 @@ static int axi_monitor_probe(struct platform_device *pdev)
 	axi_mon->nb = axi_monitor_nb;
 	blocking_notifier_chain_register(&axi_monitor_chain_head, &axi_mon->nb);
 
-	axi_mon->apb_clk_hz = 200000000;
+	axi_mon->apb_clk = devm_clk_get(dev, "apb-clk");
+	if (IS_ERR(axi_mon->apb_clk)) {
+		dev_err(dev, "Get clk failed!\n");
+		return -ENODEV;
+	}
+	axi_mon->apb_clk_hz = clk_get_rate(axi_mon->apb_clk);
 	dev_info(dev, "APB-Clk: %lluHz\n", axi_mon->apb_clk_hz);
 
 	/* session_time is stored in millisecs */

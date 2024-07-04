@@ -727,7 +727,8 @@
 			reg = <0x38100000 0x10000>;
 			interrupt-parent = <&gic>;
 			interrupts = <GIC_SPI 10 IRQ_TYPE_LEVEL_HIGH>;
-
+			clocks = <&hpsclks X5_TOP_APB_CLK>;
+			clock-names = "apb-clk";
 			axi-num = <5>;
 			axi-names = "cpu", "bpu", "vin", "codec", "gpu";
 		};
