@@ -11,8 +11,8 @@
 
 #include "8250.h"
 
-#define RX_DMA_SIZE	(256)
-#define RX_DMA_PERIODS	(16)
+#define RX_DMA_SIZE	(1024)
+#define RX_DMA_PERIODS	(RX_DMA_SIZE / 16) /* TODO: Set from FIFO size and Trig lvl */
 #define TX_DMA_SIZE	(RX_DMA_SIZE / RX_DMA_PERIODS)
 
 static void __dma_tx_complete(void *param)
@@ -50,6 +50,7 @@ static void __dma_rx_complete(void *param)
 	struct dma_tx_state	state;
 	enum dma_status		dma_status;
 	int			count;
+	unsigned int head, tail;
 	unsigned char *buf = dma->rx_buf;
 
 	/*
@@ -62,14 +63,22 @@ static void __dma_rx_complete(void *param)
 	if (dma_status == DMA_ERROR)
 		return;
 
-	count = dma->rx_size / RX_DMA_PERIODS;
-	buf += dma->rx_pos;
+ 	buf += dma->rx_pos;
+	head = dma->rx_pos;
+	tail = dma->rx_size - state.residue;
 
-	tty_insert_flip_string(tty_port, buf, count);
+	if (tail < head) {
+		count = (dma->rx_size - head) + tail;
+		tty_insert_flip_string(tty_port, buf, dma->rx_size - head);
+		buf = dma->rx_buf;
+		tty_insert_flip_string(tty_port, buf, tail);
+	} else {
+		count = tail - head;
+		tty_insert_flip_string(tty_port, buf, count);
+	}
+
 	p->port.icount.rx += count;
-	dma->rx_pos += count;
-	if (dma->rx_pos >= dma->rx_size)
-		dma->rx_pos = 0;
+	dma->rx_pos = tail;
 
 	tty_flip_buffer_push(tty_port);
 }
@@ -201,8 +210,8 @@ int serial8250_request_dma(struct uart_8250_port *p)
 	dma->rxconf.direction		= DMA_DEV_TO_MEM;
 	dma->rxconf.src_addr_width	= DMA_SLAVE_BUSWIDTH_1_BYTE;
 	dma->rxconf.src_addr		= rx_dma_addr + UART_RX;
-	dma->rxconf.src_msize		= up->fifosize / 2;
-	dma->rxconf.dst_msize		= up->fifosize / 2;
+	dma->rxconf.src_msize		= up->fifosize / 4;
+	dma->rxconf.dst_msize		= up->fifosize / 4;
 
 	dma->txconf.direction		= DMA_MEM_TO_DEV;
 	dma->txconf.dst_addr_width	= DMA_SLAVE_BUSWIDTH_1_BYTE;
