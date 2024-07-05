@@ -551,9 +551,11 @@ static void panel_simple_dsi_remove(struct mipi_dsi_device *dsi)
 {
 	int err;
 
-	err = mipi_dsi_detach(dsi);
-	if (err < 0)
-		dev_err(&dsi->dev, "failed to detach from DSI host: %d\n", err);
+	if (dsi->attached) {
+		err = mipi_dsi_detach(dsi);
+		if (err < 0)
+			dev_err(&dsi->dev, "failed to detach from DSI host: %d\n", err);
+	}
 
 	panel_simple_remove(&dsi->dev);
 }

@@ -199,7 +199,8 @@ static void pll_set_regs(struct drobot_clk_pll *pll,
 	writel(fbdiv_reg, pll->cfg_reg + PLL_FBDIV_OFFSET);
 
 	writel(cfg_reg, pll->cfg_reg);
-	writel(PLL_ANAREG6_EN, pll->internal_reg + PLL_ANAREG6);
+	if (rate_table->mfrac)
+		writel(PLL_ANAREG6_EN, pll->internal_reg + PLL_ANAREG6);
 	writel(postdiv_reg, pll->cfg_reg + PLL_POSTDIV_OFFSET);
 	fbdiv_reg |= PLL_FBDIV_LOAD;
 	writel(fbdiv_reg, pll->cfg_reg + PLL_FBDIV_OFFSET);

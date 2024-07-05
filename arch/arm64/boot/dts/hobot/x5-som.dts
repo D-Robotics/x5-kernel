@@ -74,16 +74,52 @@
 
 };
 
+&cpu_0 {
+	cpu-supply = <&vdd08_cpu_reg>;
+};
+
+&cpu_1 {
+	cpu-supply = <&vdd08_cpu_reg>;
+};
+
+&cpu_2 {
+	cpu-supply = <&vdd08_cpu_reg>;
+};
+
+&cpu_3 {
+	cpu-supply = <&vdd08_cpu_reg>;
+};
+
+&cpu_4 {
+	cpu-supply = <&vdd08_cpu_reg>;
+};
+
+&cpu_5 {
+	cpu-supply = <&vdd08_cpu_reg>;
+};
+
+&cpu_6 {
+	cpu-supply = <&vdd08_cpu_reg>;
+};
+
+&cpu_7 {
+	cpu-supply = <&vdd08_cpu_reg>;
+};
+
+&x5_bpu_pd {
+	bpu-supply = <&vdd08_bpu_1_reg>;
+};
+
+&x5_gpu_pd {
+	gpu-supply = <&vdd08_gpu_reg>;
+};
+
 &lsio_iomuxc {
 	icm_int1: icm-int1 {
 		horizon,pins = <
 			LSIO_I2C1_SDA	LSIO_PINMUX_2	BIT_OFFSET22	MUX_ALT1	&pconf_input_en_3v3
 		>;
 	};
-};
-
-&noc_qos {
-	status = "okay";
 };
 
 &adc {
@@ -467,19 +503,4 @@
 
 &bpu {
 	cnn-supply = <&vdd08_bpu_1_reg>;
-};
-
-/*For boards that do not need display module,
-the following ports need to be deleted*/
-
-&mipi_dsi0 {
-	ports {
-		/delete-node/ port@1;
-	};
-};
-
-&bt1120_bridge {
-	ports {
-		/delete-node/ port@1;
-	};
 };

@@ -455,7 +455,19 @@ static int __maybe_unused lite_mmu_suspend(struct device *dev)
 
 static int __maybe_unused lite_mmu_resume(struct device *dev)
 {
-	lite_mmu_restore_mapping(dev);
+	int32_t ret = 0;
+
+	ret = pm_runtime_get_sync(dev);
+	if (ret) {
+		dev_err(dev, "failed to resume iommu\n");
+		return ret;
+	}
+
+	ret = pm_runtime_put_sync_suspend(dev);
+	if (ret) {
+		dev_err(dev, "Failed to suspend %d\n", ret);
+		return ret;
+	}
 
 	return 0;
 }
@@ -467,7 +479,8 @@ static int __maybe_unused litemmu_pm_runtime_suspend(struct device *dev)
 
 static int __maybe_unused litemmu_pm_runtime_resume(struct device *dev)
 {
-	return lite_mmu_resume(dev);
+	lite_mmu_restore_mapping(dev);
+	return 0;
 }
 
 static const struct dev_pm_ops lite_mmu_pm_ops = {

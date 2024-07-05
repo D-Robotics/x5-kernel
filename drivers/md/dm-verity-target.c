@@ -42,6 +42,13 @@
 #define DM_VERITY_OPTS_MAX		(4 + DM_VERITY_OPTS_FEC + \
 					 DM_VERITY_ROOT_HASH_VERIFICATION_OPTS)
 
+#ifdef CONFIG_ARCH_HOBOT_X5
+#define AON_STATUS_REG_BASE         0x31021000
+#define AON_STATUS_REG1         (AON_STATUS_REG_BASE + 0x04)
+#define AON_AB_SLOT_OFFSET  (0)
+#define AON_AB_SLOT_CORRUTED_MASK    (0x0CL)
+#endif
+
 static unsigned int dm_verity_prefetch_cluster = DM_VERITY_DEFAULT_PREFETCH_SIZE;
 
 module_param_named(prefetch_cluster, dm_verity_prefetch_cluster, uint, S_IRUGO | S_IWUSR);
@@ -215,6 +222,17 @@ static void verity_hash_at_level(struct dm_verity *v, sector_t block, int level,
 		*offset = idx << (v->hash_dev_block_bits - v->hash_per_block_bits);
 }
 
+#ifdef CONFIG_ARCH_HOBOT_X5
+static void set_verity_corrupted(void)
+{
+	unsigned int aon_status1;
+	aon_status1 = readl(ioremap(AON_STATUS_REG1, 4));
+	aon_status1 |= AON_AB_SLOT_CORRUTED_MASK;
+	writel(aon_status1, ioremap(AON_STATUS_REG1, 4));
+	return;
+}
+#endif
+
 /*
  * Handle verification errors.
  */
@@ -260,11 +278,19 @@ out:
 	if (v->mode == DM_VERITY_MODE_LOGGING)
 		return 0;
 
-	if (v->mode == DM_VERITY_MODE_RESTART)
+	if (v->mode == DM_VERITY_MODE_RESTART) {
+#ifdef CONFIG_ARCH_HOBOT_X5
+		set_verity_corrupted();
+#endif
 		kernel_restart("dm-verity device corrupted");
+	}
 
-	if (v->mode == DM_VERITY_MODE_PANIC)
+	if (v->mode == DM_VERITY_MODE_PANIC) {
+#ifdef CONFIG_ARCH_HOBOT_X5
+		set_verity_corrupted();
+#endif
 		panic("dm-verity device corrupted");
+	}
 
 	return 1;
 }

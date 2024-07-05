@@ -42,8 +42,44 @@
 	};
 };
 
-&noc_qos {
-	status = "okay";
+&cpu_0 {
+	cpu-supply = <&vdd08_cpu_reg>;
+};
+
+&cpu_1 {
+	cpu-supply = <&vdd08_cpu_reg>;
+};
+
+&cpu_2 {
+	cpu-supply = <&vdd08_cpu_reg>;
+};
+
+&cpu_3 {
+	cpu-supply = <&vdd08_cpu_reg>;
+};
+
+&cpu_4 {
+	cpu-supply = <&vdd08_cpu_reg>;
+};
+
+&cpu_5 {
+	cpu-supply = <&vdd08_cpu_reg>;
+};
+
+&cpu_6 {
+	cpu-supply = <&vdd08_cpu_reg>;
+};
+
+&cpu_7 {
+	cpu-supply = <&vdd08_cpu_reg>;
+};
+
+&x5_bpu_pd {
+	bpu-supply = <&vdd08_bpu_1_reg>;
+};
+
+&x5_gpu_pd {
+	gpu-supply = <&vdd08_gpu_reg>;
 };
 
 &optee {
@@ -55,18 +91,6 @@
 };
 
 &uart0 {
-	status = "okay";
-};
-
-&pmu {
-	status = "okay";
-};
-
-&dsu_pmu {
-	status = "okay";
-};
-
-&dsu_ctrl {
 	status = "okay";
 };
 
@@ -179,6 +203,14 @@
 				hdmi_bridge_in: endpoint {
 					remote-endpoint =
 						<&bt1120_bridge_out>;
+				};
+			};
+
+			port@1 {
+				reg = <1>;
+
+				bt1120_bridge_out: endpoint {
+					remote-endpoint = <&hdmi_bridge_in>;
 				};
 			};
 		};
@@ -691,6 +723,14 @@
 &mipi_dsi0 {
 	status = "okay";
 
+	ports {
+		port@1 {
+			reg = <1>;
+			mipi_dsi_out: endpoint {
+				remote-endpoint = <&panel_in>;
+			};
+		};
+	};
 
 	dsi_panel0@0 {
 		compatible = "atk,md0550";

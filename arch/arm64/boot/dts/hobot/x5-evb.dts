@@ -93,6 +93,46 @@
 
 };
 
+&cpu_0 {
+	cpu-supply = <&vdd08_cpu_reg>;
+};
+
+&cpu_1 {
+	cpu-supply = <&vdd08_cpu_reg>;
+};
+
+&cpu_2 {
+	cpu-supply = <&vdd08_cpu_reg>;
+};
+
+&cpu_3 {
+	cpu-supply = <&vdd08_cpu_reg>;
+};
+
+&cpu_4 {
+	cpu-supply = <&vdd08_cpu_reg>;
+};
+
+&cpu_5 {
+	cpu-supply = <&vdd08_cpu_reg>;
+};
+
+&cpu_6 {
+	cpu-supply = <&vdd08_cpu_reg>;
+};
+
+&cpu_7 {
+	cpu-supply = <&vdd08_cpu_reg>;
+};
+
+&x5_bpu_pd {
+	bpu-supply = <&vdd08_bpu_1_reg>;
+};
+
+&x5_gpu_pd {
+	gpu-supply = <&vdd08_gpu_reg>;
+};
+
 &lsio_iomuxc {
 	icm_int1: icm-int1 {
 		horizon,pins = <
@@ -114,10 +154,6 @@
 				  &lsio_gpio0_12
 				  &lsio_gpio0_13
 				>;
-};
-
-&noc_qos {
-	status = "okay";
 };
 
 &adc {
@@ -541,6 +577,16 @@
 &mipi_dsi0 {
 
 	status = "okay";
+
+	ports {
+		port@1 {
+			reg = <1>;
+			mipi_dsi_out: endpoint {
+				remote-endpoint = <&panel_in>;
+			};
+		};
+	};
+
 	dsi_panel0@0 {
 		compatible = "jc-050hd134";
 		reg = <0>;
@@ -558,14 +604,6 @@
 		};
 	};
 
-};
-
-/*For boards that do not need display module,
-the following ports need to be deleted*/
-&bt1120_bridge {
-	ports {
-		/delete-node/ port@1;
-	};
 };
 
 &dphy0 {
@@ -692,4 +730,8 @@ the following ports need to be deleted*/
 			sound-dai = <&es7210_0 0>;
 		};
 	};
+};
+
+&hobot_pps {
+	status = "okay";
 };

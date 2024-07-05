@@ -396,8 +396,15 @@ static void gpu_proc_destroy_plane(struct dc_proc *dc_proc)
 	if (!(plane_info->features & GPU_PLANE_OUT))
 		return;
 
-	if (context.priv_fb)
+	if (context.priv_fb) {
 		drm_gem_fb_destroy(context.priv_fb);
+		context.priv_fb = NULL;
+	}
+
+	if (context.in_fb) {
+		drm_gem_fb_destroy(context.in_fb);
+		context.in_fb = NULL;
+	}
 }
 
 static void gpu_proc_resume_plane(struct dc_proc *dc_proc) {}

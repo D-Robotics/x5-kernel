@@ -369,7 +369,6 @@
 			next-level-cache = <&cpu_0_l2>;
 			cpu-idle-states = <&CPU_IDLE>;
 			clocks = <&hpsclks X5_CPU_CORE_CLK>;
-			cpu-supply = <&vdd08_cpu_reg>;
 			#cooling-cells = <2>;
 		};
 
@@ -391,7 +390,6 @@
 			next-level-cache = <&cpu_1_l2>;
 			cpu-idle-states = <&CPU_IDLE>;
 			clocks = <&hpsclks X5_CPU_CORE_CLK>;
-			cpu-supply = <&vdd08_cpu_reg>;
 			#cooling-cells = <2>;
 		};
 
@@ -413,7 +411,6 @@
 			next-level-cache = <&cpu_2_l2>;
 			cpu-idle-states = <&CPU_IDLE>;
 			clocks = <&hpsclks X5_CPU_CORE_CLK>;
-			cpu-supply = <&vdd08_cpu_reg>;
 			#cooling-cells = <2>;
 		};
 
@@ -435,7 +432,6 @@
 			next-level-cache = <&cpu_3_l2>;
 			cpu-idle-states = <&CPU_IDLE>;
 			clocks = <&hpsclks X5_CPU_CORE_CLK>;
-			cpu-supply = <&vdd08_cpu_reg>;
 			#cooling-cells = <2>;
 		};
 
@@ -457,7 +453,6 @@
 			next-level-cache = <&cpu_4_l2>;
 			cpu-idle-states = <&CPU_IDLE>;
 			clocks = <&hpsclks X5_CPU_CORE_CLK>;
-			cpu-supply = <&vdd08_cpu_reg>;
 			#cooling-cells = <2>;
 		};
 
@@ -479,7 +474,6 @@
 			next-level-cache = <&cpu_5_l2>;
 			cpu-idle-states = <&CPU_IDLE>;
 			clocks = <&hpsclks X5_CPU_CORE_CLK>;
-			cpu-supply = <&vdd08_cpu_reg>;
 			#cooling-cells = <2>; /* min followed by max */
 		};
 
@@ -501,7 +495,6 @@
 			next-level-cache = <&cpu_6_l2>;
 			cpu-idle-states = <&CPU_IDLE>;
 			clocks = <&hpsclks X5_CPU_CORE_CLK>;
-			cpu-supply = <&vdd08_cpu_reg>;
 			#cooling-cells = <2>;
 		};
 
@@ -523,7 +516,6 @@
 			next-level-cache = <&cpu_7_l2>;
 			cpu-idle-states = <&CPU_IDLE>;
 			clocks = <&hpsclks X5_CPU_CORE_CLK>;
-			cpu-supply = <&vdd08_cpu_reg>;
 			#cooling-cells = <2>;
 		};
 
@@ -641,14 +633,14 @@
 
 	pmu: pmu {
 		compatible = "arm,armv8-pmuv3";
-		status = "disabled";
+		status = "okay";
 		interrupt-parent = <&gic>;
 		interrupts = <GIC_PPI 7 IRQ_TYPE_LEVEL_LOW>;
 	};
 
 	dsu_pmu: dsu-pmu {
 		compatible = "arm,dsu-pmu";
-		status = "disabled";
+		status = "okay";
 		interrupt-parent = <&gic>;
 		interrupts = <GIC_SPI 110 IRQ_TYPE_LEVEL_HIGH>;
 		cpus = <&cpu_0>, <&cpu_1>, <&cpu_2>, <&cpu_3>,
@@ -657,7 +649,7 @@
 
 	dsu_ctrl: dsu-ctrl {
 		compatible = "horizon,dsu-ctrl";
-		status = "disabled";
+		status = "okay";
 	};
 
 	psci {
@@ -703,6 +695,8 @@
 		dfi_monitor: dfi-monitor {
 			compatible = "horizon,x5-dfi";
 			status = "okay";
+			clocks = <&hpsclks X5_TOP_APB_CLK>;
+			clock-names = "apb-clk";
 			reg = <0x38200000 0x100>, /* dfi monitor */
 			      <0x38300000 0x1000>; /* ddr intr */
 			interval = <1>;	/* in seconds */
@@ -727,28 +721,14 @@
 			};
 		};
 
-		noc_qos: noc_qos {
-			compatible = "d-robotics,noc_qos";
-			status = "okay";
-			reg = <0x20500000 0x300>,
-				  <0x20510000 0x900>,
-				  <0x20520000 0x200>,
-				  <0x20530000 0x200>,
-				  <0x20540000 0x300>,
-				  <0x20550000 0x600>,
-				  <0x20560000 0x200>;
-
-			qos-num = <7>;
-			qos-names = "cpu", "vin", "bpu", "codec", "gpu", "hsio", "hifi5";
-		};
-
 		axi_mon: axi-mon@38100000 {
 			compatible = "d-robotics,axi-monitor";
 			status = "okay";
 			reg = <0x38100000 0x10000>;
 			interrupt-parent = <&gic>;
 			interrupts = <GIC_SPI 10 IRQ_TYPE_LEVEL_HIGH>;
-
+			clocks = <&hpsclks X5_TOP_APB_CLK>;
+			clock-names = "apb-clk";
 			axi-num = <5>;
 			axi-names = "cpu", "bpu", "vin", "codec", "gpu";
 		};
@@ -801,6 +781,21 @@
 			status = "okay";
 		};
 
+		video_qos: video_qos@20530000 {
+			compatible = "d-robotics,noc_qos";
+			reg = <0x20530000 0x80>;
+			power-domains = <&power X5_VIDEO>;
+			consumer-dev = <&vpu>;
+
+			clocks-num = <1>;
+			clocks =<&hpsclks X5_VIDEO_CODEC_CCLK>;
+			clock-names = "codec_cclk";
+
+			status = "okay";
+			ports-num = <1>;
+			ports-off = <0x0008>;
+		};
+
 		vpu: vpu@3B000000 {
 			compatible = "cm, vpu";
 			reg = <0x3b000000 0x10000>;
@@ -828,6 +823,21 @@
 			#iommu-cells = <0>;
 			power-domains = <&power X5_VIDEO>;
 			status = "okay";
+		};
+
+		jpeg_qos: jpeg_qos@20530080 {
+			compatible = "d-robotics,noc_qos";
+			reg = <0x20530080 0x80>;
+			power-domains = <&power X5_VIDEO>;
+			consumer-dev = <&jpu>;
+
+			clocks-num = <1>;
+			clocks = <&hpsclks X5_VIDEO_JPEG_CCLK>;
+			clock-names = "jpeg_cclk";
+
+			status = "okay";
+			ports-num = <1>;
+			ports-off = <0x0008>;
 		};
 
 		jpu: jpu@3B010000 {
@@ -915,6 +925,19 @@
 				#iommu-cells = <0>;
 				power-domains = <&power X5_ISP>;
 				status = "okay";
+			};
+
+			isp_qos: isp_qos@20510280 {
+				compatible = "d-robotics,noc_qos";
+				reg = <0x20510280 0x280>;
+				power-domains = <&power X5_ISP>;
+				consumer-dev = <&isp>;
+
+				clocks-num = <0>;
+
+				status = "okay";
+				ports-num = <4>;
+				ports-off = <0x0008 0x0088 0x108 0x208>;
 			};
 
 			isp: isp@3d000000 {
@@ -1860,35 +1883,37 @@
 			#address-cells = <1>;
 			#size-cells = <0>;
 
-			x5_dsp_pd@x5-dsp-pd {
+			x5_dsp_pd: x5-dsp-pd {
 				reg = <X5_DSP>;
 				#power-domain-cells = <0>;
 				#address-cells = <1>;
 				#size-cells = <0>;
 				boot-on;
 
-				x5_hifi5_pd@x5-hifi5-pd {
+				x5_hifi5_pd: x5-hifi5-pd {
 					reg = <X5_DSP_HIFI5>;
 					#power-domain-cells = <0>;
 				};
 			};
-			x5_video_pd@x5-video-pd {
+
+			x5_video_pd: x5-video-pd {
 				reg = <X5_VIDEO>;
 				#power-domain-cells = <0>;
 			};
-			x5_bpu_pd@x5-bpu-pd {
+
+			x5_bpu_pd: x5-bpu-pd {
 				reg = <X5_BPU>;
 				#power-domain-cells = <0>;
-				bpu-supply = <&vdd08_bpu_1_reg>;
 			};
-			x5_gpu_pd@x5-gpu-pd {
+
+			x5_gpu_pd: x5-gpu-pd {
 				reg = <X5_GPU>;
 				#power-domain-cells = <0>;
-				gpu-supply = <&vdd08_gpu_reg>;
 				clocks = <&hpsclks X5_GPU_PCLK>,
 					 <&hpsclks X5_GPU_GC8000L_CLK>;
 			};
-			x5_isp_pd@x5-isp-pd {
+
+			x5_isp_pd: x5-isp-pd {
 				reg = <X5_ISP>;
 				#power-domain-cells = <0>;
 			};
@@ -1994,6 +2019,21 @@
 
 		/* Sunrise5 gpu subsystem */
 
+		gpu3d_qos: gpu3d_qos@20540080 {
+			compatible = "d-robotics,noc_qos";
+			reg = <0x20540080 0x100>;
+			power-domains = <&power X5_GPU>;
+			consumer-dev = <&gc8000>;
+
+			clocks-num = <3>;
+			clocks = <&hpsclks X5_GPU_PCLK>, <&hpsclks X5_GPU_GC8000L_CLK>, <&hpsclks X5_GPU_GC820_CLK>;
+			clock-names = "gpu_pclk", "gpu3d_clk", "gpu2d_clk";
+
+			status = "okay";
+			ports-num = <2>;
+			ports-off = <0x0008 0x0088>;
+		};
+
 		gc8000: gc8000@3c000000 {
 			compatible = "verisilicon,galcore";
 			reg = <0x3c000000 0x10000>;
@@ -2004,7 +2044,6 @@
 			interrupt-names = "core_major";
 			clocks = <&hpsclks X5_GPU_PCLK>, <&hpsclks X5_GPU_GC8000L_ACLK>, <&hpsclks X5_GPU_GC8000L_CLK>;
 			operating-points-v2 = <&gpu_opp_table>;
-			gpu-supply = <&vdd08_gpu_reg>;
 			power-domains = <&power X5_GPU>;
 			#cooling-cells = <2>;
 
@@ -2022,6 +2061,21 @@
 			power-domains = <&power X5_GPU>;
 
 			status = "okay";
+		};
+
+		gpu2d_qos: gpu2d_qos@20540000 {
+			compatible = "d-robotics,noc_qos";
+			reg = <0x20540000 0x80>;
+			power-domains = <&power X5_GPU>;
+			consumer-dev = <&gc820>;
+
+			clocks-num = <2>;
+			clocks = <&hpsclks X5_GPU_PCLK>, <&hpsclks X5_GPU_GC820_CLK>;
+			clock-names = "gpu_pclk", "gpu2d_clk";
+
+			status = "okay";
+			ports-num = <1>;
+			ports-off = <0x0008>;
 		};
 
 		gc820: gc820@3c010000 {
@@ -2052,6 +2106,19 @@
 			#iommu-cells = <0>;
 			power-domains = <&power X5_BPU>;
 			status = "okay";
+		};
+
+		bpu_qos: bpu_qos@20520000 {
+			compatible = "d-robotics,noc_qos";
+			reg = <0x20520000 0x80>;
+			power-domains = <&power X5_BPU>;
+			consumer-dev = <&bpu>;
+
+			clocks-num = <0>;
+
+			status = "okay";
+			ports-num = <1>;
+			ports-off = <0x0008>;
 		};
 
 		bpu: bpu@3a000000 {
@@ -2144,13 +2211,6 @@
 						mipi_dsi_in: endpoint {
 							remote-endpoint =
 								<&dsi_syscon_bridge_out>;
-						};
-					};
-
-					port@1 {
-						reg = <1>;
-						mipi_dsi_out: endpoint {
-							remote-endpoint = <&panel_in>;
 						};
 					};
 				};
@@ -2395,15 +2455,6 @@
 							remote-endpoint = <&bt1120_syscon_bridge_out>;
 						};
 					};
-
-					/* output */
-					port@1 {
-						reg = <1>;
-
-						bt1120_bridge_out: endpoint {
-							remote-endpoint = <&hdmi_bridge_in>;
-						};
-					};
 				};
 			};
 
@@ -2503,6 +2554,166 @@
 			};
 		};
 
+		cpu_qos: cpu_qos@20500000 {
+			compatible = "d-robotics,noc_qos";
+			reg = <0x20500000 0x200>;
+			clocks-num = <0>;
+			status = "okay";
+			ports-num = <3>;
+			ports-off = <0x0008 0x0088 0x0108>;
+		};
+
+		bt1120_qos: bt1120_qos@20510000 {
+			compatible = "d-robotics,noc_qos";
+			reg = <0x20510000 0x80>;
+			clocks-num = <1>;
+			clocks = <&hpsclks X5_DISP_BT1120_ACLK>;
+			clock-names = "bt1120_aclk";
+			status = "okay";
+			ports-num = <1>;
+			ports-off = <0x0008>;
+		};
+
+		dc8000_qos: dc8000_qos@20510080 {
+			compatible = "d-robotics,noc_qos";
+			reg = <0x20510080 0x80>;
+			clocks-num = <1>;
+			clocks = <&hpsclks X5_DISP_DC8000_ACLK>;
+			clock-names = "dc8000_aclk";
+			status = "okay";
+			ports-num = <1>;
+			ports-off = <0x0008>;
+		};
+
+		dw230_qos: dw230_qos@20510100 {
+			compatible = "d-robotics,noc_qos";
+			reg = <0x20510100 0x180>;
+			clocks-num = <2>;
+			clocks =<&hpsclks X5_CAM_VSE_AXI_CLK>,
+					<&hpsclks X5_CAM_DEWARP_AXI_CLK>;
+			clock-names ="vse_axi_clk", "dewarp_axi_clk";
+			status = "okay";
+			ports-num = <3>;
+			ports-off = <0x0008 0x0088 0x0108>;
+		};
+
+		sif_qos: sif_qos@20510500 {
+			compatible = "d-robotics,noc_qos";
+			reg = <0x20510500 0x200>;
+			clocks-num = <1>;
+			clocks = <&hpsclks X5_CAM_SIF_AXI_CLK>;
+			clock-names = "axi_clk";
+			status = "okay";
+			ports-num = <4>;
+			ports-off = <0x0008 0x0088 0x0108 0x0188>;
+		};
+
+		sif_disp_qos: sif_disp_qos@20510700 {
+			compatible = "d-robotics,noc_qos";
+			reg = <0x20510700 0x80>;
+			clocks-num = <1>;
+			clocks = <&hpsclks X5_DISP_SIF_ACLK>;
+			clock-names = "sif_aclk";
+			status = "okay";
+			ports-num = <1>;
+			ports-off = <0x0008>;
+		};
+
+		dma0_qos: dma0_qos@20550000 {
+			compatible = "d-robotics,noc_qos";
+			reg = <0x20550000 0x80>;
+			clocks-num = <1>;
+			clocks = <&hpsclks X5_HPS_DMA_AXI_CLK>;
+			clock-names = "axi_clk";
+			status = "okay";
+			ports-num = <1>;
+			ports-off = <0x0008>;
+		};
+
+		emmc_qos: emmc_qos@20550080 {
+			compatible = "d-robotics,noc_qos";
+			reg = <0x20550080 0x80>;
+			clocks-num = <1>;
+			clocks =<&hpsclks X5_HSIO_EMMC_ACLK>;
+			clock-names ="emmc_aclk";
+			status = "okay";
+			ports-num = <1>;
+			ports-off = <0x0008>;
+		};
+
+		gmac_qos: gmac_qos@20550100 {
+			compatible = "d-robotics,noc_qos";
+			reg = <0x20550100 0x80>;
+			dma-coherent;
+			clocks-num = <1>;
+			clocks =<&hpsclks X5_HSIO_ENET_AXI_CLK>;
+			clock-names ="enet_axi_clk";
+			status = "okay";
+			ports-num = <1>;
+			ports-off = <0x0008>;
+		};
+
+		sd_qos: sd_qos@20550180 {
+			compatible = "d-robotics,noc_qos";
+			reg = <0x20550180 0x80>;
+			clocks-num = <1>;
+			clocks =<&hpsclks X5_HSIO_SDIO0_ACLK>;
+			clock-names = "sdio0_aclk";
+			status = "okay";
+			ports-num = <1>;
+			ports-off = <0x0008>;
+		};
+
+		sdio_qos: sdio_qos@20550200 {
+			compatible = "d-robotics,noc_qos";
+			reg = <0x20550200 0x80>;
+			clocks-num = <1>;
+			clocks =<&hpsclks X5_HSIO_SDIO1_ACLK>;
+			clock-names = "sdio1_aclk";
+			status = "okay";
+			ports-num = <1>;
+			ports-off = <0x0008>;
+		};
+
+		security_qos: security_qos@20550280 {
+			compatible = "d-robotics,noc_qos";
+			reg = <0x20550280 0x80>;
+			clocks-num = <0>;
+			status = "okay";
+			ports-num = <1>;
+			ports-off = <0x0008>;
+		};
+
+		usb2_qos: usb2_qos@20550300 {
+			compatible = "d-robotics,noc_qos";
+			reg = <0x20550300 0x80>;
+			clocks-num = <1>;
+			clocks = <&hpsclks X5_HSIO_USB2_AXI_CLK>;
+			clock-names = "axi_clk";
+			status = "okay";
+			ports-num = <1>;
+			ports-off = <0x0008>;
+		};
+
+		usb3_qos: usb3_qos@20550380 {
+			compatible = "d-robotics,noc_qos";
+			reg = <0x20550380 0x80>;
+			clocks-num = <1>;
+			clocks = <&hpsclks X5_HSIO_USB3_AXI_CLK>;
+			clock-names = "axi_clk";
+			status = "okay";
+			ports-num = <1>;
+			ports-off = <0x0008>;
+		};
+
+		etr_qos: etr_qos@20550400 {
+			compatible = "d-robotics,noc_qos";
+			reg = <0x20550400 0x80>;
+			clocks-num = <0>;
+			status = "okay";
+			ports-num = <1>;
+			ports-off = <0x0008>;
+		};
 
 		/* Sunrise5 high-speed I/O subsystem */
 		hsio_apb {
@@ -3146,6 +3357,27 @@
 				clock-frequency = <24000000>;
 				clock-output-names = "audio_externel";
 			};
+		};
+
+		dsp_qos: dsp_qos@20560080 {
+			compatible = "d-robotics,noc_qos";
+			reg = <0x20560080 0x80>;
+			//power-domains = <&power X5_DSP>;
+			//consumer-dev = <&bpu>;
+			status = "disabled";
+			ports-num = <1>;
+			ports-off = <0x0008>;
+		};
+
+		hifi5_qos: hifi5_qos@20560000 {
+			compatible = "d-robotics,noc_qos";
+			reg = <0x20560000 0x80>;
+			power-domains = <&power X5_DSP_HIFI5>;
+			consumer-dev = <&remoteproc_hifi5>;
+			clocks-num = <0>;
+			status = "okay";
+			ports-num = <1>;
+			ports-off = <0x0008>;
 		};
 
 		remoteproc_hifi5: remoteproc_hifi5 {
@@ -3901,5 +4133,13 @@
 	snd0: snd0 {
 		compatible = "hobot-snd0";
 		status = "disabled";
+	};
+
+	hobot_pps: hobot_pps {
+		//pinctrl-names = "default";
+		//pinctrl-0 = <&gps_pps_func>;
+		compatible = "hobot-pps";
+		status = "disabled";
+		false_trigger_detect;
 	};
 };

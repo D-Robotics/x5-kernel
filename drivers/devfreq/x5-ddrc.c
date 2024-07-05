@@ -61,7 +61,7 @@ static struct x5_ddrc_freq *x5_ddrc_find_freq(struct x5_ddrc *priv,
 	return NULL;
 }
 
-static void x5_ddrc_smc_set_freq(struct device *dev, int target_freq)
+static void x5_ddrc_smc_set_freq(struct device *dev, unsigned long target_freq)
 {
 	ktime_t start, end;
 	int elapsed_time;
@@ -81,7 +81,7 @@ static void x5_ddrc_smc_set_freq(struct device *dev, int target_freq)
 	elapsed_time = ktime_to_ns(ktime_sub(end, start));
 
 	local_irq_enable();
-	dev_dbg(dev, "dvfs elapsed time: %d ns to : %d\n", elapsed_time, target_freq);
+	dev_dbg(dev, "dvfs elapsed time: %d ns to : %ld\n", elapsed_time, target_freq);
 }
 
 static int x5_ddrc_set_freq(struct device *dev, unsigned long target_rate)

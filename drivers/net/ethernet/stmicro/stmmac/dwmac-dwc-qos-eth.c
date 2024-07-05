@@ -570,6 +570,7 @@ bypass_clk_reset_gpio:
 	data->exit = x5_qos_exit;
 	data->bsp_priv = x5_eqos;
 	data->sph_disable = 1;
+	data->rx_clk_runs_in_lpi = 1;
 
 	return 0;
 

@@ -36,8 +36,7 @@
 #define LCA_TE_ALG_MAIN_HASH  0x1
 #define LCA_TE_ALG_MAIN_CMAC  0x2
 #define LCA_TE_ALG_MAIN_CBCMAC  0x3
-
-
+#define TE_MAX_STAT_SZ  512
 
 #define  _LCA_GET_MAIN_MODE(_alg_) ((((TE_ALG_HMAC_MD5) == (_alg_))                 \
     || ((TE_ALG_HMAC_SHA1) == (_alg_)) || ((TE_ALG_HMAC_SHA224) == (_alg_))    \
@@ -93,15 +92,16 @@ struct te_hash_alg {
 /* hash per-session context */
 struct te_hash_ctx {
 	struct te_drvdata *drvdata;
+	struct mutex mutex;
+	pid_t tid;
+	int flag;
 	int alg;
 	int inter_digestsize;
 	unsigned int blocksize;
 	bool is_hmac;
 	u8 *mackey;
 	u8 *maciv;
-	u8 *pad;
 	unsigned int keylen;
-	unsigned int datalen;
 	union {
 		te_hmac_ctx_t hctx;
 		te_dgst_ctx_t dctx;
@@ -131,6 +131,7 @@ struct te_ahash_req_ctx {
 		te_hmac_request_t *hmac_req;
 		te_cmac_request_t *cmac_req;
 	}dgst;
+	void *priv[];
 };
 #endif
 
@@ -156,10 +157,6 @@ static int lca_te_hash_cra_init(struct crypto_tfm *tfm)
 	dev_dbg(dev, "Initializing context @%p for %s\n", ctx,
 		crypto_tfm_alg_name(tfm));
 
-#ifdef CFG_TE_ASYNC_EN
-	crypto_ahash_set_reqsize(__crypto_ahash_cast(tfm),
-				 sizeof(struct te_ahash_req_ctx));
-#endif
 	memset(ctx, 0, sizeof(*ctx));
 	ctx->alg = halg->alg;
 	ctx->inter_digestsize = halg->inter_digestsize;
@@ -171,24 +168,45 @@ static int lca_te_hash_cra_init(struct crypto_tfm *tfm)
 	case LCA_TE_ALG_MAIN_HASH:
 		if (ctx->is_hmac) {
 			rc = te_hmac_init(&ctx->hctx, ctx->drvdata->h, ctx->alg);
+			if (rc) {
+				goto err;
+			}
 		} else {
 			rc = te_dgst_init(&ctx->dctx, ctx->drvdata->h, ctx->alg);
+			if (rc) {
+				goto err;
+			}
 		}
 		break;
 	case LCA_TE_ALG_MAIN_CMAC:
 		rc = te_cmac_init(&ctx->cctx, ctx->drvdata->h,
 				_LCA_CMAC_GET_MAIN_ALG(ctx->alg));
+		if (rc) {
+			goto err;
+		}
 		break;
 	case LCA_TE_ALG_MAIN_CBCMAC:
 		rc = te_cbcmac_init(&ctx->cbctx, ctx->drvdata->h,
 				_LCA_CBCMAC_GET_MAIN_ALG(ctx->alg));
+		if (rc) {
+			goto err;
+		}
 		break;
 	case LCA_TE_ALG_MAIN_INVALID:
 	default:
 		dev_err(dev, "Unsupported algo (0x%x)\n", ctx->alg);
 	}
 
-	return 0;
+#ifdef CFG_TE_ASYNC_EN
+	crypto_ahash_set_reqsize(__crypto_ahash_cast(tfm),
+				 sizeof(struct te_ahash_req_ctx) + TE_MAX_STAT_SZ);
+#endif
+	ctx->tid = current->pid;
+	mutex_init(&ctx->mutex);
+err:
+	dev_dbg(dev, "Initializing context @%p for %s rc:%x\n", ctx,
+		crypto_tfm_alg_name(tfm),rc);
+	return rc;
 }
 
 static void lca_te_hash_cra_exit(struct crypto_tfm *tfm)
@@ -217,18 +235,16 @@ static void lca_te_hash_cra_exit(struct crypto_tfm *tfm)
 		dev_err(dev, "Unsupported algo (0x%x)\n", ctx->alg);
 	}
 
-	if(ctx->mackey) {
+	if (ctx->mackey) {
 		kfree(ctx->mackey);
 		ctx->mackey = NULL;
 	}
-	if(ctx->maciv) {
+	if (ctx->maciv) {
 		kfree(ctx->maciv);
 		ctx->maciv = NULL;
 	}
-	if(ctx->pad) {
-		kfree(ctx->pad);
-		ctx->pad = NULL;
-	}
+
+	memset(ctx, 0, sizeof(*ctx));
 
 	pm_runtime_put_autosuspend(dev);
 	return;
@@ -266,6 +282,7 @@ static void te_ahash_complete(struct te_async_request *te_req, int err)
 	default:
 		dev_err(dev, "Unsupported algo (0x%x)\n", ctx->alg);
 	}
+	mutex_unlock(&ctx->mutex);
 	ahash_request_complete(req, err);
 	pm_runtime_put_autosuspend(dev);
 }
@@ -279,14 +296,14 @@ static int lca_te_ahash_digest(struct ahash_request *req)
 	struct te_ahash_req_ctx *areq_ctx = ahash_request_ctx(req);
 	struct scatterlist *src = req->src;
 
+	mutex_lock(&ctx->mutex);
 	dev_dbg(dev, "algo (0x%x) ishamc:%d\n", ctx->alg, ctx->is_hmac);
-
 	pm_runtime_get_sync(dev);
 	switch (_LCA_GET_MAIN_MODE(ctx->alg)) {
 	case LCA_TE_ALG_MAIN_HASH:
 		if (ctx->is_hmac) {
 			areq_ctx->dgst.hmac_req = kmalloc(sizeof(te_hmac_request_t), GFP_KERNEL);
-			if(!areq_ctx->dgst.hmac_req) {
+			if (!areq_ctx->dgst.hmac_req) {
 				rc = -ENOMEM;
 				goto err;
 			}
@@ -314,7 +331,7 @@ static int lca_te_ahash_digest(struct ahash_request *req)
 			}
 		} else {
 			areq_ctx->dgst.dgst_req = kmalloc(sizeof(te_dgst_request_t), GFP_KERNEL);
-			if(!areq_ctx->dgst.hmac_req) {
+			if (!areq_ctx->dgst.hmac_req) {
 				rc = -ENOMEM;
 				goto err;
 			}
@@ -341,7 +358,7 @@ static int lca_te_ahash_digest(struct ahash_request *req)
 		break;
 	case LCA_TE_ALG_MAIN_CMAC:
 		areq_ctx->dgst.cmac_req = kmalloc(sizeof(te_cmac_request_t), GFP_KERNEL);
-		if(!areq_ctx->dgst.cmac_req) {
+		if (!areq_ctx->dgst.cmac_req) {
 			rc = -ENOMEM;
 			goto err;
 		}
@@ -352,11 +369,11 @@ static int lca_te_ahash_digest(struct ahash_request *req)
 		areq_ctx->dgst.cmac_req->amac.maclen = crypto_ahash_digestsize(tfm);
 
 		/*free old iv*/
-		if(ctx->maciv)
+		if (ctx->maciv)
 			kfree(ctx->maciv);
 
 		ctx->maciv = (uint8_t *)kzalloc(ctx->inter_digestsize,GFP_KERNEL);
-		if(ctx->maciv == NULL) {
+		if (ctx->maciv == NULL) {
 			rc = -ENOMEM;
 			goto err;
 		}
@@ -372,6 +389,7 @@ static int lca_te_ahash_digest(struct ahash_request *req)
 			ctx->maciv = NULL;
 			goto err;
 		}
+
 		rc = te_acmac(ctx->drvdata->h, _LCA_CMAC_GET_MAIN_ALG(ctx->alg), areq_ctx->dgst.cmac_req);
 		if (rc != TE_SUCCESS) {
 			te_buf_mgr_free_memlist(&areq_ctx->dgst.cmac_req->amac.in);
@@ -384,7 +402,7 @@ static int lca_te_ahash_digest(struct ahash_request *req)
 		break;
 	case LCA_TE_ALG_MAIN_CBCMAC:
 		areq_ctx->dgst.cmac_req = kmalloc(sizeof(te_cmac_request_t), GFP_KERNEL);
-		if(!areq_ctx->dgst.cmac_req) {
+		if (!areq_ctx->dgst.cmac_req) {
 			rc = -ENOMEM;
 			goto err;
 		}
@@ -395,11 +413,11 @@ static int lca_te_ahash_digest(struct ahash_request *req)
 		areq_ctx->dgst.cmac_req->amac.maclen = crypto_ahash_digestsize(tfm);
 
 		/*free old iv*/
-		if(ctx->maciv)
+		if (ctx->maciv)
 			kfree(ctx->maciv);
 
 		ctx->maciv = (uint8_t *)kzalloc(ctx->inter_digestsize,GFP_KERNEL);
-		if(ctx->maciv == NULL) {
+		if (ctx->maciv == NULL) {
 			rc = -ENOMEM;
 			goto err;
 		}
@@ -407,26 +425,8 @@ static int lca_te_ahash_digest(struct ahash_request *req)
 		areq_ctx->dgst.cmac_req->amac.key.type = TE_KEY_TYPE_USER;
 		areq_ctx->dgst.cmac_req->amac.key.user.key = ctx->mackey;
 		areq_ctx->dgst.cmac_req->amac.key.user.keybits = ctx->keylen*BITS_IN_BYTE;
-		if(req->nbytes%ctx->blocksize) {
-			int padlen=0;
 
-			padlen = ctx->blocksize - (req->nbytes%ctx->blocksize);
-			/*free old pad*/
-			if(ctx->pad)
-				kfree(ctx->pad);
-			ctx->pad = (uint8_t *)kzalloc(padlen, GFP_KERNEL);
-			if(ctx->pad == NULL) {
-				kfree(areq_ctx->dgst.cmac_req);
-				areq_ctx->dgst.cmac_req = NULL;
-				kfree(ctx->maciv);
-				ctx->maciv = NULL;
-				rc = -ENOMEM;
-				goto err;
-			}
-			rc = te_buf_mgr_gen_memlist_ex(src, req->nbytes, &areq_ctx->dgst.cmac_req->amac.in, ctx->pad, padlen);
-		} else {
-			rc = te_buf_mgr_gen_memlist(src, req->nbytes, &areq_ctx->dgst.cmac_req->amac.in);
-		}
+		rc = te_buf_mgr_gen_memlist(src, req->nbytes, &areq_ctx->dgst.cmac_req->amac.in);
 		if (rc != TE_SUCCESS) {
 			kfree(areq_ctx->dgst.cmac_req);
 			areq_ctx->dgst.cmac_req = NULL;
@@ -453,15 +453,16 @@ static int lca_te_ahash_digest(struct ahash_request *req)
 	return -EINPROGRESS;
 err:
 	pm_runtime_put_autosuspend(dev);
+	mutex_unlock(&ctx->mutex);
 	return rc;
 }
 
 static void te_ahash_init_complete(struct te_async_request *te_req, int err)
 {
 	int rc = -1;
-	uint32_t len = 0;
 	struct ahash_request *req = (struct ahash_request *)te_req->data;
 	struct crypto_ahash *tfm = crypto_ahash_reqtfm(req);
+	uint32_t len = TE_MAX_STAT_SZ;
 	struct te_hash_ctx *ctx = crypto_ahash_ctx(tfm);
 	struct te_ahash_req_ctx *areq_ctx = ahash_request_ctx(req);
 	struct device *dev = drvdata_to_dev(ctx->drvdata);
@@ -469,22 +470,22 @@ static void te_ahash_init_complete(struct te_async_request *te_req, int err)
 	switch (_LCA_GET_MAIN_MODE(ctx->alg)) {
 	case LCA_TE_ALG_MAIN_HASH:
 		if (ctx->is_hmac) {
-			rc = te_hmac_export(&ctx->hctx, NULL, &len);
+			rc = te_hmac_export(&ctx->hctx, areq_ctx->priv, &len);
 			kfree(areq_ctx->init.hmac_req);
 			areq_ctx->init.hmac_req = NULL;
 		} else {
-			rc = te_dgst_export(&ctx->dctx, NULL, &len);
+			rc = te_dgst_export(&ctx->dctx, areq_ctx->priv, &len);
 			kfree(areq_ctx->init.dgst_req);
 			areq_ctx->init.dgst_req = NULL;
 		}
 		break;
 	case LCA_TE_ALG_MAIN_CMAC:
-		rc = te_cmac_export(&ctx->cctx, NULL, &len);
+		rc = te_cmac_export(&ctx->cctx, areq_ctx->priv, &len);
 		kfree(areq_ctx->init.cmac_req);
 		areq_ctx->init.cmac_req = NULL;
         break;
 	case LCA_TE_ALG_MAIN_CBCMAC:
-		rc = te_cbcmac_export(&ctx->cbctx, NULL, &len);
+		rc = te_cbcmac_export(&ctx->cbctx, areq_ctx->priv, &len);
 		kfree(areq_ctx->init.cmac_req);
 		areq_ctx->init.cmac_req = NULL;
 		break;
@@ -493,12 +494,14 @@ static void te_ahash_init_complete(struct te_async_request *te_req, int err)
 		dev_err(dev, "Unsupported algo (0x%x)\n", ctx->alg);
 	}
 
-	if (rc == TE_ERROR_SHORT_BUFFER) {
-		crypto_hash_alg_common(tfm)->statesize = len;
+	if (rc) {
+		err = rc;
+		dev_err(dev, "Internal error\n");
 	} else {
-		crypto_hash_alg_common(tfm)->statesize = 0;
+		crypto_hash_alg_common(tfm)->statesize = len;
 	}
 
+	mutex_unlock(&ctx->mutex);
 	ahash_request_complete(req, err);
 	pm_runtime_put_autosuspend(dev);
 }
@@ -510,14 +513,25 @@ static int lca_te_ahash_init(struct ahash_request *req)
 	struct te_hash_ctx *ctx = crypto_ahash_ctx(tfm);
 	struct device *dev = drvdata_to_dev(ctx->drvdata);
 	struct te_ahash_req_ctx *areq_ctx = ahash_request_ctx(req);
+	unsigned char tmp[SHA512_DIGEST_SIZE] = {0};
 
+	mutex_lock(&ctx->mutex);
 	pm_runtime_get_sync(dev);
 	memset(areq_ctx, 0, sizeof(*areq_ctx));
 	switch (_LCA_GET_MAIN_MODE(ctx->alg)) {
 	case LCA_TE_ALG_MAIN_HASH:
 		if (ctx->is_hmac) {
+			if (ctx->tid != current->pid){
+				rc = te_hmac_finish(&ctx->hctx, NULL, 0);
+				if (rc != TE_SUCCESS) {
+					dev_err(dev, "te_hmac_finish algo (0x%x) ret:%x\n", ctx->alg, rc);
+					rc = -EINVAL;
+					goto err;
+				}
+				ctx->tid = current->pid;
+			}
 			areq_ctx->init.hmac_req = kmalloc(sizeof(te_hmac_request_t), GFP_KERNEL);
-			if(!areq_ctx->init.hmac_req) {
+			if (!areq_ctx->init.hmac_req) {
 				rc = -ENOMEM;
 				goto err;
 			}
@@ -527,21 +541,33 @@ static int lca_te_ahash_init(struct ahash_request *req)
 			areq_ctx->init.hmac_req->st.key.type = TE_KEY_TYPE_USER;
 			areq_ctx->init.hmac_req->st.key.user.key = ctx->mackey;
 			areq_ctx->init.hmac_req->st.key.user.keybits = ctx->keylen*BITS_IN_BYTE;
+
 			rc = te_hmac_astart(&ctx->hctx, areq_ctx->init.hmac_req);
 			if (rc != TE_SUCCESS) {
+				dev_err(dev, "te_dgst_astart algo (0x%x) ret:%x\n", ctx->alg, rc);
 				kfree(areq_ctx->init.hmac_req);
 				areq_ctx->init.hmac_req = NULL;
 				goto err;
 			}
 		} else {
+			if (ctx->tid != current->pid){
+				rc = te_dgst_finish(&ctx->dctx, tmp);
+				if (rc != TE_SUCCESS) {
+					rc = -EINVAL;
+					goto err;
+				}
+				ctx->tid = current->pid;
+			}
+
 			areq_ctx->init.dgst_req = kmalloc(sizeof(te_dgst_request_t), GFP_KERNEL);
-			if(!areq_ctx->init.hmac_req) {
+			if (!areq_ctx->init.hmac_req) {
 				rc = -ENOMEM;
 				goto err;
 			}
 			areq_ctx->init.dgst_req->base.flags = req->base.flags;
 			areq_ctx->init.dgst_req->base.completion = te_ahash_init_complete;
 			areq_ctx->init.dgst_req->base.data = req;
+
 			rc = te_dgst_astart(&ctx->dctx, areq_ctx->init.dgst_req);
 			if (rc != TE_SUCCESS) {
 				kfree(areq_ctx->init.dgst_req);
@@ -551,14 +577,25 @@ static int lca_te_ahash_init(struct ahash_request *req)
 		}
 		break;
 	case LCA_TE_ALG_MAIN_CMAC:
+		if (ctx->tid != current->pid && ctx->flag != 0){
+			rc = te_cmac_finish(&ctx->cctx, tmp, ctx->blocksize);
+			if (rc != TE_SUCCESS) {
+				rc = -EINVAL;
+				goto err;
+			}
+			ctx->tid = current->pid;
+		}
+
 		rc = te_cmac_setkey(&ctx->cctx, ctx->mackey,
 				ctx->keylen*BITS_IN_BYTE);
 		if (rc != TE_SUCCESS) {
+			rc = -EINVAL;
 			goto err;
 		}
+		ctx->flag = 1;
 
 		areq_ctx->init.cmac_req = kmalloc(sizeof(te_cmac_request_t), GFP_KERNEL);
-		if(!areq_ctx->init.cmac_req) {
+		if (!areq_ctx->init.cmac_req) {
 			rc = -ENOMEM;
 			goto err;
 		}
@@ -574,22 +611,41 @@ static int lca_te_ahash_init(struct ahash_request *req)
 		}
 		break;
 	case LCA_TE_ALG_MAIN_CBCMAC:
+		if (ctx->tid != current->pid && ctx->flag != 0){
+			rc = te_cbcmac_free(&ctx->cbctx);
+			if (rc != TE_SUCCESS) {
+				dev_err(dev, "te_cbcmac_free algo (0x%x) rc:%x\n", ctx->alg, rc);
+				rc = -EINVAL;
+				goto err;
+			}
+			rc = te_cbcmac_init(&ctx->cbctx, ctx->drvdata->h,
+					_LCA_CBCMAC_GET_MAIN_ALG(ctx->alg));
+			if (rc != TE_SUCCESS) {
+				dev_err(dev, "te_cbcmac_init algo (0x%x) rc:%x\n", ctx->alg, rc);
+				rc = -EINVAL;
+				goto err;
+			}
+			ctx->tid = current->pid;
+		}
+
 		rc = te_cbcmac_setkey(&ctx->cbctx, ctx->mackey,
 				ctx->keylen*BITS_IN_BYTE);
 		if (rc != TE_SUCCESS) {
+			rc = -EINVAL;
 			goto err;
 		}
+		ctx->flag = 1;
 
 		/*free old iv*/
-		if(ctx->maciv)
+		if (ctx->maciv)
 			kfree(ctx->maciv);
 		ctx->maciv = (uint8_t *)kzalloc(ctx->inter_digestsize,GFP_KERNEL);
-		if(ctx->maciv == NULL) {
+		if (ctx->maciv == NULL) {
 			rc = -ENOMEM;
 			goto err;
 		}
 		areq_ctx->init.cmac_req = kmalloc(sizeof(te_cmac_request_t), GFP_KERNEL);
-		if(!areq_ctx->init.hmac_req) {
+		if (!areq_ctx->init.hmac_req) {
 			kfree(ctx->maciv);
 			ctx->maciv = NULL;
 			rc = -ENOMEM;
@@ -616,6 +672,7 @@ static int lca_te_ahash_init(struct ahash_request *req)
 	return -EINPROGRESS;
 err:
 	pm_runtime_put_autosuspend(dev);
+	mutex_unlock(&ctx->mutex);
 	return rc;
 }
 
@@ -624,6 +681,7 @@ static void te_ahash_update_complete(
 {
 	struct ahash_request *req = (struct ahash_request *)te_req->data;
 	struct crypto_ahash *tfm = crypto_ahash_reqtfm(req);
+	uint32_t len = crypto_hash_alg_common(tfm)->statesize;
 	struct te_hash_ctx *ctx = crypto_ahash_ctx(tfm);
 	struct te_ahash_req_ctx *areq_ctx = ahash_request_ctx(req);
 	struct device *dev = drvdata_to_dev(ctx->drvdata);
@@ -631,17 +689,25 @@ static void te_ahash_update_complete(
 	switch (_LCA_GET_MAIN_MODE(ctx->alg)) {
 	case LCA_TE_ALG_MAIN_HASH:
 		if (ctx->is_hmac) {
+			te_hmac_export(&ctx->hctx, areq_ctx->priv, &len);
 			te_buf_mgr_free_memlist(&areq_ctx->update.hmac_req->up.in);
 			kfree(areq_ctx->update.hmac_req);
 			areq_ctx->update.hmac_req = NULL;
 		} else {
+			te_dgst_export(&ctx->dctx, areq_ctx->priv, &len);
 			te_buf_mgr_free_memlist(&areq_ctx->update.dgst_req->up.in);
 			kfree(areq_ctx->update.dgst_req);
 			areq_ctx->update.dgst_req = NULL;
 		}
 		break;
 	case LCA_TE_ALG_MAIN_CMAC:
+		te_cmac_export(&ctx->cctx, areq_ctx->priv, &len);
+		te_buf_mgr_free_memlist(&areq_ctx->update.cmac_req->up.in);
+		kfree(areq_ctx->update.cmac_req);
+		areq_ctx->update.cmac_req = NULL;
+        break;
 	case LCA_TE_ALG_MAIN_CBCMAC:
+		te_cbcmac_export(&ctx->cbctx, areq_ctx->priv, &len);
 		te_buf_mgr_free_memlist(&areq_ctx->update.cmac_req->up.in);
 		kfree(areq_ctx->update.cmac_req);
 		areq_ctx->update.cmac_req = NULL;
@@ -651,6 +717,7 @@ static void te_ahash_update_complete(
 		dev_err(dev, "Unsupported algo (0x%x)\n", ctx->alg);
 	}
 
+	mutex_unlock(&ctx->mutex);
 	ahash_request_complete(req, err);
 	pm_runtime_put_autosuspend(dev);
 }
@@ -659,17 +726,28 @@ static int lca_te_ahash_update(struct ahash_request *req)
 {
 	int rc = -1;
 	struct crypto_ahash *tfm = crypto_ahash_reqtfm(req);
+	uint32_t len = crypto_hash_alg_common(tfm)->statesize;
 	struct te_hash_ctx *ctx = crypto_ahash_ctx(tfm);
 	struct device *dev = drvdata_to_dev(ctx->drvdata);
 	struct te_ahash_req_ctx *areq_ctx = ahash_request_ctx(req);
 	struct scatterlist *src = req->src;
 
+	mutex_lock(&ctx->mutex);
 	pm_runtime_get_sync(dev);
 	switch (_LCA_GET_MAIN_MODE(ctx->alg)) {
 	case LCA_TE_ALG_MAIN_HASH:
 		if (ctx->is_hmac) {
+			if (ctx->tid != current->pid){
+				rc = te_hmac_import(&ctx->hctx, areq_ctx->priv, len);
+				if (rc) {
+					rc = -EINVAL;
+					goto err;
+				}
+				ctx->tid = current->pid;
+			}
+
 			areq_ctx->update.hmac_req = kmalloc(sizeof(te_hmac_request_t), GFP_KERNEL);
-			if(!areq_ctx->update.hmac_req) {
+			if (!areq_ctx->update.hmac_req) {
 				rc = -ENOMEM;
 				goto err;
 			}
@@ -692,8 +770,17 @@ static int lca_te_ahash_update(struct ahash_request *req)
 				goto err;
 			}
 		} else {
+			if (ctx->tid != current->pid){
+				rc = te_dgst_import(&ctx->dctx, areq_ctx->priv, len);
+				if (rc) {
+					rc = -EINVAL;
+					goto err;
+				}
+				ctx->tid = current->pid;
+			}
+
 			areq_ctx->update.dgst_req = kmalloc(sizeof(te_dgst_request_t), GFP_KERNEL);
-			if(!areq_ctx->update.dgst_req) {
+			if (!areq_ctx->update.dgst_req) {
 				rc = -ENOMEM;
 				goto err;
 			}
@@ -718,8 +805,17 @@ static int lca_te_ahash_update(struct ahash_request *req)
 		}
 		break;
 	case LCA_TE_ALG_MAIN_CMAC:
+		if (ctx->tid != current->pid){
+			rc = te_cmac_import(&ctx->cctx, areq_ctx->priv, len);
+			if (rc) {
+				rc = -EINVAL;
+				goto err;
+			}
+			ctx->tid = current->pid;
+		}
+
 		areq_ctx->update.cmac_req = kmalloc(sizeof(te_cmac_request_t), GFP_KERNEL);
-		if(!areq_ctx->update.cmac_req) {
+		if (!areq_ctx->update.cmac_req) {
 			rc = -ENOMEM;
 			goto err;
 		}
@@ -742,8 +838,17 @@ static int lca_te_ahash_update(struct ahash_request *req)
 		}
 		break;
 	case LCA_TE_ALG_MAIN_CBCMAC:
+		if (ctx->tid != current->pid){
+			rc = te_cbcmac_import(&ctx->cbctx, areq_ctx->priv, len);
+			if (rc) {
+				rc = -EINVAL;
+				goto err;
+			}
+			ctx->tid = current->pid;
+		}
+
 		areq_ctx->update.cmac_req = kmalloc(sizeof(te_cmac_request_t), GFP_KERNEL);
-		if(!areq_ctx->update.cmac_req) {
+		if (!areq_ctx->update.cmac_req) {
 			rc = -ENOMEM;
 			goto err;
 		}
@@ -751,7 +856,6 @@ static int lca_te_ahash_update(struct ahash_request *req)
 		areq_ctx->update.cmac_req->base.completion = te_ahash_update_complete;
 		areq_ctx->update.cmac_req->base.data = req;
 
-		ctx->datalen += req->nbytes;
 		rc = te_buf_mgr_gen_memlist(src, req->nbytes, &areq_ctx->update.cmac_req->up.in);
 		if (rc != TE_SUCCESS) {
 			kfree(areq_ctx->update.cmac_req);
@@ -775,52 +879,10 @@ static int lca_te_ahash_update(struct ahash_request *req)
 	return -EINPROGRESS;
 err:
 	pm_runtime_put_autosuspend(dev);
+	mutex_unlock(&ctx->mutex);
 	return rc;
 }
-static void _te_cbcmac_pad_update_complete(
-				struct te_async_request *te_req, int err)
-{
-	te_cmac_request_t *cmac_req = (te_cmac_request_t *)te_req->data;
 
-	te_buf_mgr_free_memlist(&cmac_req->up.in);
-	kfree(cmac_req);
-	cmac_req = NULL;
-}
-static int _lca_te_cbcmac_pad_update(struct ahash_request *req, unsigned char *pad,
-								unsigned int len)
-{
-	int rc = -EINVAL;
-	struct crypto_ahash *tfm = crypto_ahash_reqtfm(req);
-	struct te_hash_ctx *ctx = crypto_ahash_ctx(tfm);
-	struct device *dev = drvdata_to_dev(ctx->drvdata);
-	te_cmac_request_t *cmac_req;
-
-	switch (_LCA_GET_MAIN_MODE(ctx->alg)) {
-	case LCA_TE_ALG_MAIN_CBCMAC:
-		cmac_req = kmalloc(sizeof(te_cmac_request_t), GFP_KERNEL);
-		if(!cmac_req)
-			return -ENOMEM;
-		cmac_req->base.flags = req->base.flags;
-		cmac_req->base.completion = _te_cbcmac_pad_update_complete;
-		cmac_req->base.data = cmac_req;
-
-		rc = te_buf_mgr_gen_memlist_ex(NULL, 0, &cmac_req->up.in,
-								pad, len);
-		if (rc != TE_SUCCESS) {
-			kfree(cmac_req);
-			cmac_req = NULL;
-			return rc;
-		}
-		rc = te_cbcmac_aupdate(&ctx->cbctx, cmac_req);
-		return rc;
-	case LCA_TE_ALG_MAIN_HASH:
-	case LCA_TE_ALG_MAIN_CMAC:
-	case LCA_TE_ALG_MAIN_INVALID:
-	default:
-		dev_err(dev, "Wrong algo (0x%x)\n", ctx->alg);
-		return rc;
-	}
-}
 static void te_ahash_final_complete(
 				struct te_async_request *te_req, int err)
 {
@@ -844,13 +906,13 @@ static void te_ahash_final_complete(
 	case LCA_TE_ALG_MAIN_CBCMAC:
 		kfree(areq_ctx->final.cmac_req);
 		areq_ctx->final.cmac_req = NULL;
-		ctx->datalen = 0;
 		break;
 	case LCA_TE_ALG_MAIN_INVALID:
 	default:
 		dev_err(dev, "Unsupported algo (0x%x)\n", ctx->alg);
 	}
 
+	mutex_unlock(&ctx->mutex);
 	ahash_request_complete(req, err);
 	pm_runtime_put_autosuspend(dev);
 }
@@ -859,16 +921,27 @@ static int lca_te_ahash_final(struct ahash_request *req)
 {
 	int rc = -1;
 	struct crypto_ahash *tfm = crypto_ahash_reqtfm(req);
+	uint32_t len = crypto_hash_alg_common(tfm)->statesize;
 	struct te_hash_ctx *ctx = crypto_ahash_ctx(tfm);
 	struct device *dev = drvdata_to_dev(ctx->drvdata);
 	struct te_ahash_req_ctx *areq_ctx = ahash_request_ctx(req);
 
+	mutex_lock(&ctx->mutex);
 	pm_runtime_get_sync(dev);
 	switch (_LCA_GET_MAIN_MODE(ctx->alg)) {
 	case LCA_TE_ALG_MAIN_HASH:
 		if (ctx->is_hmac) {
+			if (ctx->tid != current->pid){
+				rc = te_hmac_import(&ctx->hctx, areq_ctx->priv, len);
+				if (rc) {
+					rc = -EINVAL;
+					goto err;
+				}
+				ctx->tid = current->pid;
+			}
+
 			areq_ctx->final.hmac_req = kmalloc(sizeof(te_hmac_request_t), GFP_KERNEL);
-			if(!areq_ctx->final.hmac_req) {
+			if (!areq_ctx->final.hmac_req) {
 				rc = -ENOMEM;
 				goto err;
 			}
@@ -884,8 +957,17 @@ static int lca_te_ahash_final(struct ahash_request *req)
 				goto err;
 			}
 		} else {
+			if (ctx->tid != current->pid){
+				rc = te_dgst_import(&ctx->dctx, areq_ctx->priv, len);
+				if (rc) {
+					rc = -EINVAL;
+					goto err;
+				}
+				ctx->tid = current->pid;
+			}
+
 			areq_ctx->final.dgst_req = kmalloc(sizeof(te_dgst_request_t), GFP_KERNEL);
-			if(!areq_ctx->final.dgst_req) {
+			if (!areq_ctx->final.dgst_req) {
 				rc = -ENOMEM;
 				goto err;
 			}
@@ -902,8 +984,17 @@ static int lca_te_ahash_final(struct ahash_request *req)
 		}
 		break;
 	case LCA_TE_ALG_MAIN_CMAC:
+		if (ctx->tid != current->pid){
+			rc = te_cmac_import(&ctx->cctx, areq_ctx->priv, len);
+			if (rc) {
+				rc = -EINVAL;
+				goto err;
+			}
+			ctx->tid = current->pid;
+		}
+
 		areq_ctx->final.cmac_req = kmalloc(sizeof(te_cmac_request_t), GFP_KERNEL);
-		if(!areq_ctx->final.cmac_req) {
+		if (!areq_ctx->final.cmac_req) {
 			rc = -ENOMEM;
 			goto err;
 		}
@@ -920,25 +1011,17 @@ static int lca_te_ahash_final(struct ahash_request *req)
 		}
 		break;
 	case LCA_TE_ALG_MAIN_CBCMAC:
-		if(ctx->datalen%ctx->blocksize) {
-			int padlen=0;
-
-			padlen = ctx->blocksize - (ctx->datalen%ctx->blocksize);
-			/*free old pad*/
-			if(ctx->pad)
-				kfree(ctx->pad);
-			ctx->pad = (uint8_t *)kzalloc(padlen, GFP_KERNEL);
-			if(ctx->pad == NULL) {
-				rc = -ENOMEM;
+		if (ctx->tid != current->pid){
+			rc = te_cbcmac_import(&ctx->cbctx, areq_ctx->priv, len);
+			if (rc) {
+				rc = -EINVAL;
 				goto err;
 			}
-			rc = _lca_te_cbcmac_pad_update(req, ctx->pad, padlen);
-			if (rc != TE_SUCCESS) {
-				goto err;
-			}
+			ctx->tid = current->pid;
 		}
+
 		areq_ctx->final.cmac_req = kmalloc(sizeof(te_cmac_request_t), GFP_KERNEL);
-		if(!areq_ctx->final.cmac_req) {
+		if (!areq_ctx->final.cmac_req) {
 			rc = -ENOMEM;
 			goto err;
 		}
@@ -951,7 +1034,6 @@ static int lca_te_ahash_final(struct ahash_request *req)
 		if (rc != TE_SUCCESS) {
 			kfree(areq_ctx->final.cmac_req);
 			areq_ctx->final.cmac_req = NULL;
-			ctx->datalen = 0;
 			goto err;
 		}
 		break;
@@ -964,94 +1046,56 @@ static int lca_te_ahash_final(struct ahash_request *req)
 	return -EINPROGRESS;
 err:
 	pm_runtime_put_autosuspend(dev);
+	mutex_unlock(&ctx->mutex);
 	return rc;
 }
 
 static int lca_te_ahash_export(struct ahash_request *req, void *out)
 {
-	int rc = -1;
 	struct crypto_ahash *tfm = crypto_ahash_reqtfm(req);
 	struct te_hash_ctx *ctx = crypto_ahash_ctx(tfm);
-	struct device *dev = drvdata_to_dev(ctx->drvdata);
-	uint32_t len = crypto_ahash_statesize(tfm);
+	uint32_t len = crypto_hash_alg_common(tfm)->statesize;
+	struct te_ahash_req_ctx *areq_ctx = ahash_request_ctx(req);
 
-	dev_dbg(dev, "ahash export algo (0x%x) %d\n", ctx->alg, _LCA_GET_MAIN_MODE(ctx->alg));
-
-	pm_runtime_get_sync(dev);
-	switch (_LCA_GET_MAIN_MODE(ctx->alg)) {
-	case LCA_TE_ALG_MAIN_HASH:
-		if (ctx->is_hmac) {
-			rc = te_hmac_export(&ctx->hctx, out, &len);
-		} else {
-			rc = te_dgst_export(&ctx->dctx, out, &len);
-		}
-		break;
-	case LCA_TE_ALG_MAIN_CMAC:
-		rc = te_cmac_export(&ctx->cctx, out, &len);
-		break;
-	case LCA_TE_ALG_MAIN_CBCMAC:
-		rc = te_cbcmac_export(&ctx->cbctx, out, &len);
-		break;
-	case LCA_TE_ALG_MAIN_INVALID:
-	default:
-		dev_err(dev, "Unsupported algo (0x%x)\n", ctx->alg);
-	}
-	if (!rc) {
-		if(len != crypto_ahash_statesize(tfm))
-			rc = TE_ERROR_GENERIC;
-	}
-
-	pm_runtime_put_autosuspend(dev);
-	return rc;
+	mutex_lock(&ctx->mutex);
+	memcpy(out, areq_ctx->priv, len);
+	mutex_unlock(&ctx->mutex);
+	return 0;
 }
 
 static int lca_te_ahash_import(struct ahash_request *req, const void *in)
 {
-	int rc = -1;
 	struct crypto_ahash *tfm = crypto_ahash_reqtfm(req);
 	struct te_hash_ctx *ctx = crypto_ahash_ctx(tfm);
-	struct device *dev = drvdata_to_dev(ctx->drvdata);
 	uint32_t len = crypto_ahash_statesize(tfm);
+	struct te_ahash_req_ctx *areq_ctx = ahash_request_ctx(req);
 
-	dev_dbg(dev, "ahash import algo (0x%x) %d\n", ctx->alg, _LCA_GET_MAIN_MODE(ctx->alg));
-
-	pm_runtime_get_sync(dev);
-	switch (_LCA_GET_MAIN_MODE(ctx->alg)) {
-	case LCA_TE_ALG_MAIN_HASH:
-		if (ctx->is_hmac) {
-			rc = te_hmac_import(&ctx->hctx, in, len);
-		} else {
-			rc = te_dgst_import(&ctx->dctx, in, len);
-		}
-		break;
-	case LCA_TE_ALG_MAIN_CMAC:
-		rc = te_cmac_import(&ctx->cctx, in, len);
-		break;
-	case LCA_TE_ALG_MAIN_CBCMAC:
-		rc = te_cbcmac_import(&ctx->cbctx, in, len);
-		break;
-	case LCA_TE_ALG_MAIN_INVALID:
-	default:
-		dev_err(dev, "Unsupported algo (0x%x)\n", ctx->alg);
-	}
-
-	pm_runtime_put_autosuspend(dev);
-	return rc;
+	mutex_lock(&ctx->mutex);
+	memcpy(areq_ctx->priv, in, len);
+	mutex_unlock(&ctx->mutex);
+	return 0;
 }
 
 static int lca_te_ahash_setkey(struct crypto_ahash *tfm, const u8 *key,
 		      unsigned int keylen)
 {
+	int rc = 0;
 	struct te_hash_ctx *ctx = crypto_ahash_ctx(tfm);
 
-	if(ctx->mackey)
+	mutex_lock(&ctx->mutex);
+	if (ctx->mackey)
 		kfree(ctx->mackey);
 	ctx->mackey = kmalloc(keylen, GFP_KERNEL);
-	if(ctx->mackey == NULL)
-		return -ENOMEM;
+	if (ctx->mackey == NULL) {
+		rc = -ENOMEM;
+		goto err;
+	}
+
 	memcpy(ctx->mackey, key, keylen);
 	ctx->keylen = keylen;
-	return 0;
+err:
+	mutex_unlock(&ctx->mutex);
+	return rc;
 }
 
 #else
@@ -1063,13 +1107,13 @@ static int lca_te_hmac( te_drv_handle hdl, te_algo_t alg,
 	te_hmac_ctx_t hmac_ctx = {0};
 
 	rc = te_hmac_init(&hmac_ctx, hdl, alg);
-	if(rc != 0)
+	if (rc != 0)
 		return rc;
 	rc = te_hmac_update(&hmac_ctx, in, len);
-	if(rc != 0)
+	if (rc != 0)
 		goto finish;
 	rc = te_hmac_finish(&hmac_ctx, mac, maclen);
-	if(rc != 0)
+	if (rc != 0)
 		goto finish;
 finish:
 	te_hmac_free(&hmac_ctx);
@@ -1137,7 +1181,7 @@ static int lca_te_shash_init(struct shash_desc *desc)
 	case LCA_TE_ALG_MAIN_CMAC:
 		rc = te_cmac_setkey(&ctx->cctx, ctx->mackey,
 				ctx->keylen*BITS_IN_BYTE);
-		if(rc != TE_SUCCESS) {
+		if (rc != TE_SUCCESS) {
 			goto out;
 		}
 
@@ -1151,11 +1195,11 @@ static int lca_te_shash_init(struct shash_desc *desc)
 	case LCA_TE_ALG_MAIN_CBCMAC:
 		rc = te_cbcmac_setkey(&ctx->cbctx, ctx->mackey,
 				ctx->keylen*BITS_IN_BYTE);
-		if(rc != TE_SUCCESS) {
+		if (rc != TE_SUCCESS) {
 			goto out;
 		}
 		iv= (uint8_t *)kmalloc(ctx->inter_digestsize,GFP_KERNEL);
-		if(iv == NULL) {
+		if (iv == NULL) {
 			rc = -ENOMEM;
 			goto out;
 		}
@@ -1278,7 +1322,7 @@ static int lca_te_shash_export(struct shash_desc *desc, void *out)
 	}
 
 	if (!rc) {
-		if(len != crypto_shash_statesize(tfm))
+		if (len != crypto_shash_statesize(tfm))
 			rc = TE_ERROR_GENERIC;
 	}
 
@@ -1325,10 +1369,10 @@ static int lca_te_shash_setkey(struct crypto_shash *tfm, const u8 *key,
 {
 	struct te_hash_ctx *ctx = crypto_shash_ctx(tfm);
 
-	if(ctx->mackey)
+	if (ctx->mackey)
 		kfree(ctx->mackey);
 	ctx->mackey = kmalloc(keylen, GFP_KERNEL);
-	if(ctx->mackey == NULL)
+	if (ctx->mackey == NULL)
 		return -ENOMEM;
 	memcpy(ctx->mackey, key, keylen);
 	ctx->keylen = keylen;
@@ -2014,7 +2058,6 @@ static struct te_hash_alg *te_hash_create_alg(
 	alg->cra_blocksize = template->blocksize;
 	alg->cra_alignmask = 0;
 	alg->cra_exit = lca_te_hash_cra_exit;
-
 	alg->cra_init = lca_te_hash_cra_init;
 #ifdef CFG_TE_ASYNC_EN
 	alg->cra_flags = CRYPTO_ALG_ASYNC;
@@ -2062,7 +2105,6 @@ int lca_te_hash_alloc(struct te_drvdata *drvdata)
 				goto fail;
 			}
 			t_alg->drvdata = drvdata;
-
 			rc = crypto_register_ahash(&t_alg->ahash_alg);
 			if (unlikely(rc)) {
 				dev_err(dev,"%s alg registration failed\n",
@@ -2085,7 +2127,6 @@ int lca_te_hash_alloc(struct te_drvdata *drvdata)
 				goto fail;
 			}
 			t_alg->drvdata = drvdata;
-
 			rc = crypto_register_ahash(&t_alg->ahash_alg);
 			if (unlikely(rc)) {
 				dev_err(dev,"%s alg registration failed\n",
@@ -2106,7 +2147,6 @@ int lca_te_hash_alloc(struct te_drvdata *drvdata)
 				goto fail;
 			}
 			t_alg->drvdata = drvdata;
-
 			rc = crypto_register_ahash(&t_alg->ahash_alg);
 			if (unlikely(rc)) {
 				dev_err(dev,"%s alg registration failed\n",
