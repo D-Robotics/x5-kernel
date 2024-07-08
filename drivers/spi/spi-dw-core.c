@@ -1355,6 +1355,7 @@ EXPORT_SYMBOL_NS_GPL(dw_spi_suspend_host, SPI_DW_CORE);
 int dw_spi_resume_host(struct dw_spi *dws)
 {
 	dw_spi_hw_init(&dws->master->dev, dws);
+	dws->current_freq = 0;
 	if (dws->rxburst)
 		dw_writel(dws, DW_SPI_DMARDLR, dws->rxburst - 1);
 	if (dws->txburst)
