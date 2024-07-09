@@ -558,6 +558,8 @@ static int dw8250_probe(struct platform_device *pdev)
 	data->uart_16550_compatible = device_property_read_bool(dev,
 						"snps,uart-16550-compatible");
 
+	data->broken_afc = device_property_read_bool(dev, "broken-auto-flow-control");
+
 	err = device_property_read_u32(dev, "reg-shift", &val);
 	if (!err)
 		p->regshift = val;
