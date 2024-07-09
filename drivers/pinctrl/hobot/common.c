@@ -32,6 +32,94 @@
 #define GPIO_SWPORT_DR	0x00
 #define GPIO_SWPORT_DDR 0x04
 
+/* Drive Strength Current Mappings */
+struct output_current {
+	u32 ds;
+	u32 current_value; /* output current in mA */
+};
+
+#define X5_CELL_TYPE_TOTAL (3u)
+#define X5_CELL_LEVEL_TOTAL (2U)
+#define X5_DS_TOTAL (16u)
+
+/* This is a mapping of pre-measured typical current and register value.
+ * The actual current may vary chip by chip.
+ */
+static const struct output_current output_current_mapping[X5_CELL_TYPE_TOTAL][X5_CELL_LEVEL_TOTAL][X5_DS_TOTAL] = {
+	[AON_1V8] {
+		/*output low*/
+		{
+			{.ds = 0, .current_value = 3},   {.ds = 1, .current_value = 6},
+			{.ds = 2, .current_value = 9},   {.ds = 3, .current_value = 12},
+			{.ds = 4, .current_value = 16},  {.ds = 5, .current_value = 19},
+			{.ds = 6, .current_value = 21},  {.ds = 7, .current_value = 23},
+			{.ds = 8, .current_value = 30},  {.ds = 9, .current_value = 32},
+			{.ds = 10, .current_value = 34}, {.ds = 11, .current_value = 35},
+			{.ds = 12, .current_value = 37}, {.ds = 13, .current_value = 39},
+			{.ds = 14, .current_value = 40}, {.ds = 15, .current_value = 41},
+		},
+		/*output high*/
+		{
+			{.ds = 0, .current_value = 2}, {.ds = 1, .current_value = 5},
+			{.ds = 2, .current_value = 7}, {.ds = 3, .current_value = 10},
+			{.ds = 4, .current_value = 14}, {.ds = 5, .current_value = 16},
+			{.ds = 6, .current_value = 18}, {.ds = 7, .current_value = 20},
+			{.ds = 8, .current_value = 26}, {.ds = 9, .current_value = 27},
+			{.ds = 10, .current_value = 29}, {.ds = 11, .current_value = 30},
+			{.ds = 12, .current_value = 32}, {.ds = 13, .current_value = 33},
+			{.ds = 14, .current_value = 34}, {.ds = 15, .current_value = 35},
+		}
+	},
+	[SOC_1V8] {
+		/*output low*/
+		{
+			{.ds = 0, .current_value = 1},   {.ds = 1, .current_value = 2},
+			{.ds = 2, .current_value = 3},   {.ds = 3, .current_value = 5},
+			{.ds = 4, .current_value = 6},   {.ds = 5, .current_value = 7},
+			{.ds = 6, .current_value = 9},   {.ds = 7, .current_value = 10},
+			{.ds = 8, .current_value = 12},  {.ds = 9, .current_value = 13},
+			{.ds = 10, .current_value = 15}, {.ds = 11, .current_value = 16},
+			{.ds = 12, .current_value = 18}, {.ds = 13, .current_value = 19},
+			{.ds = 14, .current_value = 21}, {.ds = 15, .current_value = 22},
+		},
+		/*output high*/
+		{
+			{.ds = 0, .current_value = 1}, {.ds = 1, .current_value = 1},
+			{.ds = 2, .current_value = 3}, {.ds = 3, .current_value = 4},
+			{.ds = 4, .current_value = 6}, {.ds = 5, .current_value = 7},
+			{.ds = 6, .current_value = 9}, {.ds = 7, .current_value = 10},
+			{.ds = 8, .current_value = 11}, {.ds = 9, .current_value = 13},
+			{.ds = 10, .current_value = 14}, {.ds = 11, .current_value = 16},
+			{.ds = 12, .current_value = 17}, {.ds = 13, .current_value = 18},
+			{.ds = 14, .current_value = 20}, {.ds = 15, .current_value = 21},
+		}
+	},
+	[SOC_1V8_3V3] {
+		/*output low*/
+		{
+			{.ds = 0, .current_value = 4},   {.ds = 1, .current_value = 7},
+			{.ds = 2, .current_value = 9},   {.ds = 3, .current_value = 11},
+			{.ds = 4, .current_value = 13},  {.ds = 5, .current_value = 15},
+			{.ds = 6, .current_value = 18},  {.ds = 7, .current_value = 20},
+			{.ds = 8, .current_value = 22},  {.ds = 9, .current_value = 24},
+			{.ds = 10, .current_value = 26}, {.ds = 11, .current_value = 29},
+			{.ds = 12, .current_value = 31}, {.ds = 13, .current_value = 33},
+			{.ds = 14, .current_value = 35}, {.ds = 15, .current_value = 37},
+		},
+		/*output high*/
+		{
+			{.ds = 0, .current_value = 6}, {.ds = 1, .current_value = 10},
+			{.ds = 2, .current_value = 13}, {.ds = 3, .current_value = 16},
+			{.ds = 4, .current_value = 19}, {.ds = 5, .current_value = 22},
+			{.ds = 6, .current_value = 25}, {.ds = 7, .current_value = 28},
+			{.ds = 8, .current_value = 32}, {.ds = 9, .current_value = 35},
+			{.ds = 10, .current_value = 38}, {.ds = 11, .current_value = 41},
+			{.ds = 12, .current_value = 44}, {.ds = 13, .current_value = 47},
+			{.ds = 14, .current_value = 51}, {.ds = 15, .current_value = 54},
+		}
+	}
+};
+
 /*
  * gpiolib gpio_direction_input callback function. The setting of the  pin
  * mux function as 'gpio input' will be handled by the pinctrl subsystem
@@ -451,6 +539,32 @@ static int horizon_pmx_set(struct pinctrl_dev *pctldev, unsigned int selector, u
 	return 0;
 }
 
+static int horizon_gpio_get_level(struct pinctrl_dev *pctldev, int pin)
+{
+	struct horizon_pinctrl *ipctl = pinctrl_dev_get_drvdata(pctldev);
+	struct pinctrl_gpio_range *gpio_range;
+	unsigned int level, direction, gpio, gpio_port;
+	void __iomem *reg_base;
+
+	dev_dbg(ipctl->dev, "get pin = %d direction\n", pin);
+	gpio_range = pinctrl_find_gpio_range_from_pin_nolock(pctldev, pin);
+	if (!gpio_range) {
+		 dev_err(ipctl->dev, "pin = %d can not find corresponding gpio id\n", pin);
+		 return 0;
+	}
+	gpio = pin - gpio_range->pin_base;
+	if (ipctl->gpio_bank_num > 1)
+		 gpio_port = (gpio_range->npins >= 31) ? 0 : 1;
+	else
+		 gpio_port = 0;
+	dev_dbg(ipctl->dev, "map pin%d to gpio[%d] - %d\n", pin, gpio_port, gpio);
+
+	reg_base  = ipctl->gpio_bank_base[gpio_port];
+	direction = readl(reg_base + GPIO_SWPORT_DDR);
+	level     = readl(reg_base + GPIO_SWPORT_DR);
+	return !!((direction & BIT(gpio)) && (level & BIT(gpio)));
+}
+
 static int horizon_gpio_get_direction(struct pinctrl_dev *pctldev, int pin)
 {
 	struct horizon_pinctrl *ipctl = pinctrl_dev_get_drvdata(pctldev);
@@ -476,6 +590,11 @@ static int horizon_gpio_get_direction(struct pinctrl_dev *pctldev, int pin)
 	val	 = readl(reg_base + GPIO_SWPORT_DDR);
 	mutex_unlock(&ipctl->mutex);
 	return !!(val & BIT(gpio));
+}
+
+static u32 get_mapping_current(unsigned int cell_type, bool level, u32 ds)
+{
+	return output_current_mapping[cell_type][level][ds].current_value;
 }
 
 static int horizon_gpio_set_direction(struct pinctrl_dev *pctldev, int pin, bool input,
@@ -542,14 +661,16 @@ int horizon_pinconf_get(struct pinctrl_dev *pctldev, unsigned int pin, unsigned 
 	struct horizon_pinctrl *ipctl = pinctrl_dev_get_drvdata(pctldev);
 	enum pin_config_param param   = pinconf_to_config_param(*config);
 	unsigned int arg, val, reg_domain, ds_bits_offset, pe_bits_offset, ps_bits_offset,
-		pu_bits_offset, pd_bits_offset, st_bits_offset;
+		pu_bits_offset, pd_bits_offset, st_bits_offset, cell_type;
 	void __iomem *pull_en_regs;
 	void __iomem *pull_select_regs;
 	void __iomem *pull_up_regs;
 	void __iomem *pull_down_regs;
 	void __iomem *schmit_tg_regs;
 	void __iomem *drv_str_regs;
+	bool level;
 	int i;
+
 	if (!info || !info->pins || !info->npins) {
 		dev_err(ipctl->dev, "wrong pinctrl info\n");
 		return -EINVAL;
@@ -566,6 +687,7 @@ int horizon_pinconf_get(struct pinctrl_dev *pctldev, unsigned int pin, unsigned 
 			pu_bits_offset = info->pins[i].pu_bits_offset;
 			pd_bits_offset = info->pins[i].pd_bits_offset;
 			st_bits_offset = info->pins[i].st_bits_offset;
+			cell_type      = info->pins[i].cell_type;
 			break;
 		}
 	}
@@ -641,7 +763,8 @@ int horizon_pinconf_get(struct pinctrl_dev *pctldev, unsigned int pin, unsigned 
 		/* Lower 4 bits represent pin drive strength */
 		val = readl(drv_str_regs);
 		val = (val >> ds_bits_offset) & 0xf;
-		arg = val & 0xf;
+		level = horizon_gpio_get_level(pctldev, pin);
+		arg = get_mapping_current(cell_type, level, val);
 		break;
 	default:
 		mutex_unlock(&ipctl->mutex);

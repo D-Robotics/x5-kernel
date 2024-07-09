@@ -39,4 +39,9 @@
 #define  HORIZON_IO_PAD_VOLTAGE_IP_CTRL 2
 #define  HORIZON_IO_PAD_CTRL_VOLTAGE_1V8 3
 #define  HORIZON_IO_PAD_CTRL_VOLTAGE_3V3 4
+
+/* GPIO cell type */
+#define AON_1V8 		0
+#define SOC_1V8 		1
+#define SOC_1V8_3V3		2
 #endif /* __HORIZON_PINFUNC_H */

@@ -25,15 +25,16 @@ struct horizon_pin_desc {
 	unsigned int pd_bits_offset;
 	unsigned int st_bits_offset;
 	unsigned int ms_bits_offset;
+	unsigned int cell_type;
 };
 
 #ifndef _PIN
-#define _PIN(id, nm, reg, ms_reg, ds, pe, ps, pu, pd, st, ms)                         \
-	{                                                                             \
+#define _PIN(id, nm, reg, ms_reg, ds, pe, ps, pu, pd, st, ms, ct)      \
+	{                                                                         \
 		.pin_id = id, .name = nm, .reg_domain = reg, .ms_reg_domain = ms_reg, \
 		.ds_bits_offset = ds, .pe_bits_offset = pe, .ps_bits_offset = ps,     \
 		.pu_bits_offset = pu, .pd_bits_offset = pd, .st_bits_offset = st,     \
-		.ms_bits_offset = ms,                                                 \
+		.ms_bits_offset = ms, .cell_type = ct,                         \
 	}
 #endif
 
