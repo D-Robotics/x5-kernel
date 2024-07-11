@@ -46,6 +46,7 @@
 #include <uapi/asm-generic/mman-common.h>
 #include <linux/export.h>
 #include <linux/ion.h>
+#include <hobot_ion_iommu.h>
 
 #define ION_DRIVER_API_VERSION_MAJOR	1
 #define ION_DRIVER_API_VERSION_MINOR	0
@@ -3037,7 +3038,11 @@ static struct sg_table *ion_map_dma_buf(struct dma_buf_attachment *attachment,
 
 	table = a->table;
 
+#if defined(CONFIG_DROBOT_LITE_MMU)
+	ret = ion_iommu_map_ion_sgtable(attachment->dev, table, direction, 0);
+#else
 	ret = dma_map_sgtable(attachment->dev, table, direction, 0);
+#endif
 	if (ret)
 		return ERR_PTR(ret);
 
@@ -3048,7 +3053,11 @@ static void ion_unmap_dma_buf(struct dma_buf_attachment *attachment,
 			      struct sg_table *table,
 			      enum dma_data_direction direction)
 {
-	//dma_unmap_sgtable(attachment->dev, table, direction, 0);
+#if defined(CONFIG_DROBOT_LITE_MMU)
+	ion_iommu_unmap_ion_sgtable(attachment->dev, table, direction);
+#else
+	dma_unmap_sgtable(attachment->dev, table, direction, 0);
+#endif
 }
 
 int ion_mmap(struct ion_buffer *buffer, struct vm_area_struct *vma)

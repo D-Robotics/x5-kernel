@@ -13,6 +13,8 @@ obj-$(CONFIG_ION_HOBOT) += hobot_ion.o
 #hobot_ion_device-objs-$(CONFIG_ION) += ion_heap.o
 #hobot_ion_device-objs := $(hobot_ion_device-objs-y)
 
+ccflags-y += -I$(srctree)/drivers/iommu/
+
 ifeq ($(CONFIG_HOBOT_GCOV_BASE),y)
 GCOV_PROFILE := y
 endif
