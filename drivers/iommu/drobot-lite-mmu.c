@@ -457,7 +457,7 @@ static int __maybe_unused lite_mmu_resume(struct device *dev)
 {
 	int32_t ret = 0;
 
-	ret = pm_runtime_get_sync(dev);
+	ret = pm_runtime_resume_and_get(dev);
 	if (ret) {
 		dev_err(dev, "failed to resume iommu\n");
 		return ret;

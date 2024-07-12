@@ -324,9 +324,9 @@ static int __maybe_unused noc_qos_resume(struct device *dev)
 {
 	int32_t ret = 0;
 
-	ret = pm_runtime_get_sync(dev);
+	ret = pm_runtime_resume_and_get(dev);
 	if (ret) {
-		dev_err(dev, "failed to resume iommu\n");
+		dev_err(dev, "failed to resume qos\n");
 		return ret;
 	}
 	ret = pm_runtime_put_sync_suspend(dev);
