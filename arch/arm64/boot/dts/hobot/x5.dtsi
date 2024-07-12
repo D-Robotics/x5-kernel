@@ -3168,6 +3168,7 @@
 				interrupt-parent = <&gic>;
 				interrupts = <GIC_SPI 146 IRQ_TYPE_LEVEL_HIGH>;
 				resets = <&dsprst DSP_UART_RESET>;
+				broken-auto-flow-control;
 			};
 
 			dsp_crm_syscon: dsp_crm_syscon@32140000 {
@@ -3636,6 +3637,7 @@
 				interrupt-parent = <&gic>;
 				interrupts = <GIC_SPI 83 IRQ_TYPE_LEVEL_HIGH>;
 				resets = <&socrst LSIO_UART2_RESET>;
+				broken-auto-flow-control;
 			};
 
 			uart3: serial@34090000 {
@@ -3649,6 +3651,7 @@
 				interrupt-parent = <&gic>;
 				interrupts = <GIC_SPI 84 IRQ_TYPE_LEVEL_HIGH>;
 				resets = <&socrst LSIO_UART3_RESET>;
+				broken-auto-flow-control;
 			};
 
 			uart4: serial@340a0000 {
@@ -3662,6 +3665,7 @@
 				interrupt-parent = <&gic>;
 				interrupts = <GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>;
 				resets = <&socrst LSIO_UART4_RESET>;
+				broken-auto-flow-control;
 			};
 
 			i2c0: i2c@340b0000 {
@@ -3904,6 +3908,7 @@
 				interrupt-parent = <&gic>;
 				interrupts = <GIC_SPI 70 IRQ_TYPE_LEVEL_HIGH>;
 				resets = <&socrst LSIO_UART5_RESET>;
+				broken-auto-flow-control;
 			};
 
 			uart6: serial@341b0000 {
@@ -3917,6 +3922,7 @@
 				interrupt-parent = <&gic>;
 				interrupts = <GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH>;
 				resets = <&socrst LSIO_UART6_RESET>;
+				broken-auto-flow-control;
 			};
 
 			uart7: serial@34060000 {
