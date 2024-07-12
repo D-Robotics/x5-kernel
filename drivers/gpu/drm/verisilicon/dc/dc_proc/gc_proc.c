@@ -397,6 +397,8 @@ static void gpu_proc_destroy_plane(struct dc_proc *dc_proc)
 	struct gpu_plane_proc *hw_plane		= to_gpu_plane_proc(dc_proc);
 	const struct gpu_plane_info *plane_info = hw_plane->base.info->info;
 
+	kfree(hw_plane);
+
 	if (!(plane_info->features & GPU_PLANE_OUT))
 		return;
 
@@ -479,7 +481,7 @@ static int gpu_proc_check_format_mod(struct dc_proc *dc_proc, u32 format, u64 mo
 	return true;
 }
 
-static struct dc_proc *gpu_create_plane(struct device *dev, const struct dc_proc_info *info)
+static struct dc_proc *gpu_proc_create_plane(struct device *dev, const struct dc_proc_info *info)
 {
 	struct gpu_plane_proc *hw_plane;
 	struct vs_n2d_aux *aux;
@@ -501,7 +503,7 @@ static struct dc_proc *gpu_create_plane(struct device *dev, const struct dc_proc
 }
 
 const struct dc_proc_funcs gpu_plane_funcs = {
-	.create		  = gpu_create_plane,
+	.create		  = gpu_proc_create_plane,
 	.update		  = gpu_proc_update_plane,
 	.disable	  = gpu_proc_disable_plane,
 	.check		  = gpu_proc_check_plane,
