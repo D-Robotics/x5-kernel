@@ -356,7 +356,9 @@ static void gpu_proc_update_plane(struct dc_proc *dc_proc, void *old_drm_plane_s
 	struct vs_n2d_aux *aux			= hw_plane->aux;
 
 	if (plane_info->features & GPU_PLANE_IN) {
-		create_fb(dc_proc);
+		if (create_fb(dc_proc) != 0) {
+			return;
+		}
 	}
 
 	if (plane_info->features & GPU_PLANE_OUT) {
