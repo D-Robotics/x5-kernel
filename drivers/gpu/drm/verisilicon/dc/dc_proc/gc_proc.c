@@ -362,8 +362,10 @@ static void gpu_proc_update_plane(struct dc_proc *dc_proc, void *old_drm_plane_s
 	}
 
 	if (plane_info->features & GPU_PLANE_OUT) {
-		drm_framebuffer_assign(&context.priv_fb, plane_state->fb);
-		drm_framebuffer_assign(&plane_state->fb, context.in_fb);
+		if (context.priv_fb) {
+			drm_framebuffer_assign(&context.priv_fb, plane_state->fb);
+			drm_framebuffer_assign(&plane_state->fb, context.in_fb);
+		}
 		return;
 	}
 
