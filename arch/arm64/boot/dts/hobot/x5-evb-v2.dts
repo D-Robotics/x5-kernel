@@ -217,6 +217,12 @@
 	};
 };
 
+&i2c1 {
+	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_i2c1>;
+};
+
 &i2c5 {
 	status = "okay";
 	pinctrl-names = "default";
@@ -519,7 +525,17 @@
 
 &mipi_host1 {
 	status = "okay";
-	//in x5-evb, mipi host0 & host1 share one mclk and gpio
+	/*
+		in x5-evb 1_a: mipi host0 & host1 share one mclk and gpio
+	  	in x5-evb 1-b:
+			1. default: mipi host0 & host1 share one mclk and gpio
+			2. connecting the adapter board: host1 uses an external active crystal oscillator
+	*/
+
+	/* open mipi_host1's mclk after removing the comments in the following code */
+	// pinctrl-0 = <&pinctrl_sensor1_mclk>; //mclk0
+	// pinctrl-1 = <&lsio_gpio0_25>;
+	// snrclk-idx = <1>;  //mclk index
 };
 
 &mipi_host2 {
@@ -553,10 +569,15 @@
 
 &vin_vcon1 {
 	status = "okay";
-	//use same sensor gpio with vcon0 and i2c bus
-	bus = <4>;
-	//lpwm_chn = <1>; //open lpwm0 - channel1
-	//use same lpwm0 with vcon0
+	/* camera sensor
+	 * reset gpio:	LSIO_SPI4_MISO:	409
+	 * pwd gpio:	LSIO_GPIO1_01:	348
+	 */
+	pinctrl-names = "default";
+	pinctrl-0 = <&lsio_gpio0_30>;
+	gpio_oth = <409>;   //reset gpio
+	bus = <1>; 	//i2c1
+	lpwm_chn = <1>;  //open lpwm0 - channel1
 };
 
 &vin_vcon2 {
