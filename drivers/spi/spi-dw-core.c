@@ -140,19 +140,13 @@ static void dw_writer(struct dw_spi *dws)
 	u32 max = dw_spi_tx_max(dws);
 	u32 txw = 0;
 
+	dws->tx_len -= max;
 	while (max--) {
 		if (dws->tx) {
-			if (dws->n_bytes == 1)
-				txw = *(u8 *)(dws->tx);
-			else if (dws->n_bytes == 2)
-				txw = *(u16 *)(dws->tx);
-			else
-				txw = *(u32 *)(dws->tx);
-
+			txw = (*(u32 *)(dws->tx) & (0xFFFFFFFF >> (32 - (dws->n_bytes * 8))));
 			dws->tx += dws->n_bytes;
 		}
 		dw_write_io_reg(dws, DW_SPI_DR, txw);
-		--dws->tx_len;
 	}
 }
 
@@ -161,19 +155,13 @@ static void dw_reader(struct dw_spi *dws)
 	u32 max = dw_spi_rx_max(dws);
 	u32 rxw;
 
+	dws->rx_len -= max;
 	while (max--) {
 		rxw = dw_read_io_reg(dws, DW_SPI_DR);
 		if (dws->rx) {
-			if (dws->n_bytes == 1)
-				*(u8 *)(dws->rx) = rxw;
-			else if (dws->n_bytes == 2)
-				*(u16 *)(dws->rx) = rxw;
-			else
-				*(u32 *)(dws->rx) = rxw;
-
+			*(u32 *)dws->rx = rxw;
 			dws->rx += dws->n_bytes;
 		}
-		--dws->rx_len;
 	}
 }
 
@@ -432,7 +420,10 @@ static void dw_spi_irq_setup(struct dw_spi *dws)
 	 */
 	level = min_t(unsigned int, dws->fifo_len / 2, dws->tx_len);
 	dw_writel(dws, DW_SPI_TXFTLR, level);
-	dw_writel(dws, DW_SPI_RXFTLR, level - 1);
+	if (dws->dma_mapped)
+		dw_writel(dws, DW_SPI_RXFTLR, level - 1);
+	else
+		dw_writel(dws, DW_SPI_RXFTLR, 1);
 
 	dws->transfer_handler = dw_spi_transfer_handler;
 
