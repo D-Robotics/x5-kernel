@@ -1,0 +1,690 @@
+// SPDX-License-Identifier: GPL-2.0
+/*
+ * dtsi for pinctrl of Sunrise5 board
+ *
+ * Copyright(C) 2024, D-Robotics Co., Ltd. All rights reserved
+ *
+ */
+#include <dt-bindings/pinctrl/horizon-pinfunc.h>
+#include <dt-bindings/pinctrl/horizon-lsio-pinfunc.h>
+#include <dt-bindings/pinctrl/horizon-hsio-pinfunc.h>
+#include <dt-bindings/pinctrl/horizon-disp-pinfunc.h>
+#include <dt-bindings/pinctrl/horizon-aon-pinfunc.h>
+#include <dt-bindings/pinctrl/horizon-dsp-pinfunc.h>
+/*
+ * The horizon,pins defined in each group is a tuple of
+ * <pin_id, mux_reg_offset, mux_reg_bit, mux mode, pinconf_attributes>
+ * attributes include pull up/down and drive strength, etc.
+ */
+/{
+	pconf_bias_disabled: pconf-bias-disabled {
+		bias-disable;
+		drive-strength = <3>;
+	};
+
+	pconf_bias_disabled_mid_1v8: pconf-bias-disabled-mid-1v8 {
+		bias-disable;
+		power-source = <HORIZON_IO_PAD_VOLTAGE_1V8>;
+		drive-strength = <7>;
+	};
+
+	pconf_bias_disabled_mid_3v3: pconf-bias-disabled-mid-3v3 {
+		bias-disable;
+		power-source = <HORIZON_IO_PAD_VOLTAGE_3V3>;
+		drive-strength = <7>;
+	};
+
+	pconf_drv_pd_mid_1v8: pconf-dev-pd-mid-1v8 {
+		power-source = <HORIZON_IO_PAD_VOLTAGE_1V8>;
+		drive-strength = <7>;
+	};
+
+	pconf_drv_pu_mid_1v8: pconf-dev-pu-mid-1v8 {
+		bias-pull-up;
+		power-source = <HORIZON_IO_PAD_VOLTAGE_1V8>;
+		drive-strength = <7>;
+	};
+
+	pconf_drv_pu_ds12_1v8: pconf-dev-pu-ds12-1v8 {
+		bias-pull-up;
+		power-source = <HORIZON_IO_PAD_VOLTAGE_1V8>;
+		drive-strength = <12>;
+	};
+
+	pconf_drv_pu_mid_3v3: pconf-dev-pu-mid-3v3 {
+		bias-pull-up;
+		power-source = <HORIZON_IO_PAD_VOLTAGE_3V3>;
+		drive-strength = <7>;
+	};
+
+	pconf_drv_pu: pconf-dev-pu {
+		bias-pull-up;
+		drive-strength = <3>;
+	};
+
+	pconf_drv_pu_max: pconf-dev-pu-max {
+		bias-pull-up;
+		drive-strength = <15>;
+	};
+
+	pconf_drv_pu_max_3v3: pconf-dev-pu-max-3v3 {
+		bias-pull-up;
+		power-source = <HORIZON_IO_PAD_VOLTAGE_3V3>;
+		drive-strength = <15>;
+	};
+
+	pconf_drv_pu_max_1v8: pconf-dev-pu-max-1v8 {
+		bias-pull-up;
+		power-source = <HORIZON_IO_PAD_VOLTAGE_1V8>;
+		drive-strength = <15>;
+	};
+
+	pconf_drv_pd: pconf-dev-pd {
+		bias-pull-down;
+		drive-strength = <3>;
+	};
+
+	pconf_drv_pd_max: pconf-dev-pd-max {
+		bias-pull-down;
+		drive-strength = <15>;
+	};
+
+	pconf_drv_od: pconf-dev-od {
+		drive-open-drain;
+		drive-strength = <3>;
+	};
+
+	pconf_input_en_1v8: pconf-input-en-1v8 {
+		input-enable;
+		power-source = <HORIZON_IO_PAD_VOLTAGE_1V8>;
+		drive-strength = <3>;
+	};
+
+	pconf_input_en_3v3: pconf-input-en-3v3 {
+		input-enable;
+		power-source = <HORIZON_IO_PAD_VOLTAGE_3V3>;
+		drive-strength = <3>;
+	};
+
+	pconf_output_en: pconf-output-en {
+		output-enable;
+		drive-strength = <15>;
+	};
+
+	pconf_output_high: pconf-output-high {
+		output-high;
+		drive-strength = <3>;
+	};
+
+	pconf_output_low: pconf-output-low {
+		output-low;
+		drive-strength = <3>;
+	};
+
+	pconf_output_normal: pconf-output-normal{
+		drive-strength = <6>;
+	};
+
+	pconf_pwm_1v8: pconf-pwm-1v8 {
+		drive-strength = <1>;
+		power-source = <HORIZON_IO_PAD_VOLTAGE_1V8>;
+	};
+
+	pconf_pwm_3v3: pconf-pwm-3v3 {
+		drive-strength = <1>;
+		power-source = <HORIZON_IO_PAD_VOLTAGE_3V3>;
+	};
+
+	pconf_sd_sdio_pu_ds12_ipctrl: pconf-sd-sdio-pu-ds12-ipctrl {
+		bias-pull-up;
+		drive-strength = <12>;
+		power-source = <HORIZON_IO_PAD_VOLTAGE_IP_CTRL>;
+	};
+
+	pconf_sd_sdio_ds12_padctrl_3v3: pconf-sd-sdio-ds12-padctrl-3v3 {
+		bias-pull-up;
+		power-source = <HORIZON_IO_PAD_CTRL_VOLTAGE_3V3>;
+		drive-strength = <12>;
+	};
+
+	pconf_sd_sdio_pu_ds12_padctrl_1v8: pconf-sd-sdio-ds12-padctrl-1v8 {
+		bias-pull-up;
+		power-source = <HORIZON_IO_PAD_CTRL_VOLTAGE_1V8>;
+		drive-strength = <12>;
+	};
+};
+
+&dsp_iomuxc {
+	pinctrl_dsp_i2c7: dsp_i2c7grp {
+		horizon,pins = <
+			DSP_I2C7_SDA  DSP_PINMUX_0  BIT_OFFSET0  MUX_ALT0 &pconf_drv_pu_mid_1v8
+			DSP_I2C7_SCL  DSP_PINMUX_0  BIT_OFFSET2  MUX_ALT0 &pconf_drv_pu_mid_1v8
+		>;
+	};
+
+	pinctrl_dsp_i2s0: i2s0grp {
+		horizon,pins = <
+			DSP_I2S0_DI  DSP_PINMUX_0  BIT_OFFSET4  MUX_ALT0 &pconf_drv_pd_mid_1v8
+			DSP_I2S0_DO  DSP_PINMUX_0  BIT_OFFSET6  MUX_ALT0 &pconf_drv_pd_mid_1v8
+			DSP_I2S0_MCLK  DSP_PINMUX_0  BIT_OFFSET8  MUX_ALT0 &pconf_drv_pu_mid_1v8
+			DSP_I2S0_SCLK  DSP_PINMUX_0  BIT_OFFSET10  MUX_ALT0 &pconf_drv_pu_mid_1v8
+			DSP_I2S0_WS  DSP_PINMUX_0  BIT_OFFSET12  MUX_ALT0 &pconf_drv_pu_mid_1v8
+		>;
+	};
+
+	pinctrl_dsp_i2s1: i2s1grp {
+		horizon,pins = <
+			DSP_I2S1_DI  DSP_PINMUX_0  BIT_OFFSET14  MUX_ALT0 &pconf_drv_pd_mid_1v8
+			DSP_I2S1_DO  DSP_PINMUX_0  BIT_OFFSET16  MUX_ALT0 &pconf_drv_pd_mid_1v8
+			DSP_I2S1_MCLK  DSP_PINMUX_0  BIT_OFFSET18  MUX_ALT0 &pconf_drv_pu_mid_1v8
+			DSP_I2S1_SCLK  DSP_PINMUX_0  BIT_OFFSET20  MUX_ALT0 &pconf_drv_pu_mid_1v8
+			DSP_I2S1_WS  DSP_PINMUX_0  BIT_OFFSET22  MUX_ALT0 &pconf_drv_pu_mid_1v8
+		>;
+	};
+
+	pinctrl_dsp_pdm_cko: pdmckogrp {
+		horizon,pins = <
+			DSP_PDM_CKO  DSP_PINMUX_0  BIT_OFFSET24  MUX_ALT0 &pconf_drv_pu_mid_1v8
+		>;
+	};
+
+	pinctrl_dsp_pdm_in: pdmingrp {
+		horizon,pins = <
+			DSP_PDM_IN0  DSP_PINMUX_0  BIT_OFFSET26  MUX_ALT0 &pconf_drv_pu_mid_1v8
+			DSP_PDM_IN1  DSP_PINMUX_0  BIT_OFFSET28  MUX_ALT0 &pconf_drv_pu_mid_1v8
+			DSP_PDM_IN2  DSP_PINMUX_0  BIT_OFFSET30  MUX_ALT0 &pconf_drv_pu_mid_1v8
+			DSP_PDM_IN3  DSP_PINMUX_1  BIT_OFFSET0  MUX_ALT0 &pconf_drv_pu_mid_1v8
+		>;
+	};
+
+	pinctrl_dsp_spi: dsp_spigrp {
+		horizon,pins = <
+			DSP_SPI6_MISO  DSP_PINMUX_1  BIT_OFFSET2  MUX_ALT0 &pconf_drv_pu_mid_1v8
+			DSP_SPI6_MOSI  DSP_PINMUX_1  BIT_OFFSET4  MUX_ALT0 &pconf_drv_pu_mid_1v8
+			DSP_SPI6_SCLK  DSP_PINMUX_1  BIT_OFFSET6  MUX_ALT0 &pconf_drv_pu_mid_1v8
+			DSP_SPI6_SSN  DSP_PINMUX_1  BIT_OFFSET8  MUX_ALT0 &pconf_drv_pu_mid_1v8
+		>;
+	};
+
+	pinctrl_dsp_uart0: uart0grp {
+		horizon,pins = <
+			DSP_UART0_RXD  DSP_PINMUX_1  BIT_OFFSET10  MUX_ALT0 &pconf_drv_pu_mid_1v8
+			DSP_UART0_TXD  DSP_PINMUX_1  BIT_OFFSET12  MUX_ALT0 &pconf_drv_pu_mid_1v8
+		>;
+	};
+
+};
+
+&lsio_iomuxc {
+	pinctrl_uart1: uart1grp {
+		horizon,pins = <
+			LSIO_UART1_RX	LSIO_PINMUX_3 BIT_OFFSET12  MUX_ALT0	&pconf_drv_pu_mid_3v3
+			LSIO_UART1_TX	LSIO_PINMUX_3 BIT_OFFSET14  MUX_ALT0	&pconf_drv_pu_mid_3v3
+			LSIO_UART1_CTS  LSIO_PINMUX_3 BIT_OFFSET28  MUX_ALT0	&pconf_drv_pu_mid_3v3
+			LSIO_UART1_RTS  LSIO_PINMUX_3 BIT_OFFSET30  MUX_ALT0	&pconf_drv_pu_mid_3v3
+		>;
+	};
+
+	pinctrl_uart2: uart2grp {
+		horizon,pins = <
+			LSIO_UART2_RX  LSIO_PINMUX_3 BIT_OFFSET16  MUX_ALT0 &pconf_drv_pu_mid_3v3
+			LSIO_UART2_TX  LSIO_PINMUX_3 BIT_OFFSET18  MUX_ALT0 &pconf_drv_pu_mid_3v3
+		>;
+	};
+
+	pinctrl_uart3: uart3grp {
+		horizon,pins = <
+			LSIO_UART3_RX  LSIO_PINMUX_3 BIT_OFFSET20  MUX_ALT0 &pconf_drv_pu_mid_3v3
+			LSIO_UART3_TX  LSIO_PINMUX_3 BIT_OFFSET22  MUX_ALT0 &pconf_drv_pu_mid_3v3
+		>;
+	};
+
+	pinctrl_uart4: uart4grp {
+		horizon,pins = <
+			LSIO_UART4_RX  LSIO_PINMUX_3 BIT_OFFSET24  MUX_ALT0 &pconf_drv_pu_mid_3v3
+			LSIO_UART4_TX  LSIO_PINMUX_3 BIT_OFFSET26  MUX_ALT0 &pconf_drv_pu_mid_3v3
+		>;
+	};
+
+	pinctrl_spi0: spi0grp {
+		horizon,pins = <
+			LSIO_SPI0_SCLK LSIO_PINMUX_1 BIT_OFFSET0  MUX_ALT0 &pconf_drv_pu_mid_1v8
+			LSIO_SPI0_SSN  LSIO_PINMUX_1 BIT_OFFSET2  MUX_ALT0 &pconf_drv_pu_mid_1v8
+			LSIO_SPI0_MISO LSIO_PINMUX_1 BIT_OFFSET4  MUX_ALT0 &pconf_drv_pu_mid_1v8
+			LSIO_SPI0_MOSI LSIO_PINMUX_1 BIT_OFFSET6  MUX_ALT0 &pconf_drv_pu_mid_1v8
+		>;
+	};
+
+	pinctrl_spi1: spi1grp {
+		horizon,pins = <
+			LSIO_SPI1_SCLK LSIO_PINMUX_0 BIT_OFFSET2  MUX_ALT0 &pconf_drv_pu_mid_1v8
+			LSIO_SPI1_SSN  LSIO_PINMUX_0 BIT_OFFSET4  MUX_ALT0 &pconf_drv_pu_mid_1v8
+			LSIO_SPI1_MISO LSIO_PINMUX_0 BIT_OFFSET6  MUX_ALT0 &pconf_drv_pu_mid_1v8
+			LSIO_SPI1_MOSI LSIO_PINMUX_0 BIT_OFFSET8  MUX_ALT0 &pconf_drv_pu_mid_1v8
+		>;
+	};
+
+	pinctrl_spi2: spi2grp {
+		horizon,pins = <
+			LSIO_SPI2_SCLK LSIO_PINMUX_1 BIT_OFFSET16  MUX_ALT0 &pconf_drv_pu_mid_3v3
+			LSIO_SPI2_SSN  LSIO_PINMUX_1 BIT_OFFSET18  MUX_ALT0 &pconf_drv_pu_mid_3v3
+			LSIO_SPI2_MISO LSIO_PINMUX_1 BIT_OFFSET20  MUX_ALT0 &pconf_drv_pu_mid_3v3
+			LSIO_SPI2_MOSI LSIO_PINMUX_1 BIT_OFFSET22  MUX_ALT0 &pconf_drv_pu_mid_3v3
+		>;
+	};
+
+	pinctrl_spi3: spi3grp {
+		horizon,pins = <
+			LSIO_SPI3_SCLK LSIO_PINMUX_1 BIT_OFFSET24  MUX_ALT0 &pconf_drv_pu_mid_1v8
+			LSIO_SPI3_SSN  LSIO_PINMUX_1 BIT_OFFSET26  MUX_ALT0 &pconf_drv_pu_mid_1v8
+			LSIO_SPI3_MISO LSIO_PINMUX_1 BIT_OFFSET28  MUX_ALT0 &pconf_drv_pu_mid_1v8
+			LSIO_SPI3_MOSI LSIO_PINMUX_1 BIT_OFFSET30  MUX_ALT0 &pconf_drv_pu_mid_1v8
+		>;
+	};
+
+	pinctrl_spi4: spi4grp {
+		horizon,pins = <
+			LSIO_SPI4_SCLK LSIO_PINMUX_2 BIT_OFFSET0  MUX_ALT0 &pconf_drv_pu_mid_1v8
+			LSIO_SPI4_SSN  LSIO_PINMUX_2 BIT_OFFSET2  MUX_ALT0 &pconf_drv_pu_mid_1v8
+			LSIO_SPI4_MISO LSIO_PINMUX_2 BIT_OFFSET4  MUX_ALT0 &pconf_drv_pu_mid_1v8
+			LSIO_SPI4_MOSI LSIO_PINMUX_2 BIT_OFFSET6  MUX_ALT0 &pconf_drv_pu_mid_1v8
+		>;
+	};
+
+	pinctrl_spi5: spi5grp {
+		horizon,pins = <
+			LSIO_SPI5_SCLK LSIO_PINMUX_2 BIT_OFFSET8   MUX_ALT0	&pconf_drv_pu_mid_1v8
+			LSIO_SPI5_SSN  LSIO_PINMUX_2 BIT_OFFSET10  MUX_ALT0	&pconf_drv_pu_mid_1v8
+			LSIO_SPI5_MISO LSIO_PINMUX_2 BIT_OFFSET12  MUX_ALT0	&pconf_drv_pu_mid_1v8
+			LSIO_SPI5_MOSI LSIO_PINMUX_2 BIT_OFFSET14  MUX_ALT0	&pconf_drv_pu_mid_1v8
+		>;
+	};
+
+	pinctrl_i2c0: i2c0grp {
+		horizon,pins = <
+			LSIO_I2C0_SCL  LSIO_PINMUX_2 BIT_OFFSET16  MUX_ALT0 &pconf_drv_pu_mid_3v3
+			LSIO_I2C0_SDA  LSIO_PINMUX_2 BIT_OFFSET18  MUX_ALT0 &pconf_drv_pu_mid_3v3
+		>;
+	};
+
+	pinctrl_i2c1: i2c1grp {
+		horizon,pins = <
+			LSIO_I2C1_SCL  LSIO_PINMUX_2 BIT_OFFSET20  MUX_ALT0 &pconf_drv_pu_mid_3v3
+			LSIO_I2C1_SDA  LSIO_PINMUX_2 BIT_OFFSET22  MUX_ALT0 &pconf_drv_pu_mid_3v3
+		>;
+	};
+
+	pinctrl_i2c2: i2c2grp {
+		horizon,pins = <
+			LSIO_I2C2_SCL  LSIO_PINMUX_2 BIT_OFFSET24  MUX_ALT0 &pconf_drv_pu_mid_1v8
+			LSIO_I2C2_SDA  LSIO_PINMUX_2 BIT_OFFSET26  MUX_ALT0 &pconf_drv_pu_mid_1v8
+		>;
+	};
+
+	pinctrl_i2c3: i2c3grp {
+		horizon,pins = <
+			LSIO_I2C3_SCL  LSIO_PINMUX_2 BIT_OFFSET28  MUX_ALT0 &pconf_drv_pu_mid_1v8
+			LSIO_I2C3_SDA  LSIO_PINMUX_2 BIT_OFFSET30  MUX_ALT0 &pconf_drv_pu_mid_1v8
+		>;
+	};
+
+	pinctrl_i2c4: i2c4grp {
+		horizon,pins = <
+			LSIO_I2C4_SCL  LSIO_PINMUX_3 BIT_OFFSET0  MUX_ALT0 &pconf_drv_pu_mid_1v8
+			LSIO_I2C4_SDA  LSIO_PINMUX_3 BIT_OFFSET2  MUX_ALT0 &pconf_drv_pu_mid_1v8
+		>;
+	};
+
+	pinctrl_uart5: uart5grp {
+		horizon,pins = <
+			LSIO_SPI4_SCLK  LSIO_PINMUX_2 BIT_OFFSET0  MUX_ALT2 &pconf_drv_pu_mid_1v8
+			LSIO_SPI4_SSN  LSIO_PINMUX_2 BIT_OFFSET2  MUX_ALT2 &pconf_drv_pu_mid_1v8
+		>;
+	};
+
+	pinctrl_uart6: uart6grp {
+		horizon,pins = <
+			LSIO_UART7_CTS  LSIO_PINMUX_3 BIT_OFFSET8	MUX_ALT1 &pconf_drv_pu_mid_3v3
+			LSIO_UART7_RTS  LSIO_PINMUX_3 BIT_OFFSET10	MUX_ALT1 &pconf_drv_pu_mid_3v3
+		>;
+	};
+
+	pinctrl_uart7: uart7grp {
+		horizon,pins = <
+			LSIO_UART7_RX	LSIO_PINMUX_3	BIT_OFFSET4		MUX_ALT0 &pconf_drv_pu_mid_3v3
+			LSIO_UART7_TX	LSIO_PINMUX_3	BIT_OFFSET6		MUX_ALT0 &pconf_drv_pu_mid_3v3
+			LSIO_UART7_CTS	LSIO_PINMUX_3	BIT_OFFSET8		MUX_ALT0 &pconf_drv_pu_mid_3v3
+			LSIO_UART7_RTS	LSIO_PINMUX_3	BIT_OFFSET10	MUX_ALT0 &pconf_drv_pu_mid_3v3
+		>;
+	};
+
+	pinctrl_i2c5: i2c5grp {
+		horizon,pins = <
+			LSIO_UART3_RX  LSIO_PINMUX_3 BIT_OFFSET20  MUX_ALT1 &pconf_drv_pu_mid_3v3
+			LSIO_UART3_TX  LSIO_PINMUX_3 BIT_OFFSET22  MUX_ALT1 &pconf_drv_pu_mid_3v3
+		>;
+	};
+
+	pinctrl_i2c6: i2c6grp {
+		horizon,pins = <
+			LSIO_SPI4_MISO  LSIO_PINMUX_2 BIT_OFFSET4  MUX_ALT2 &pconf_drv_pu_mid_1v8
+			LSIO_SPI4_MOSI  LSIO_PINMUX_2 BIT_OFFSET6  MUX_ALT2 &pconf_drv_pu_mid_1v8
+		>;
+	};
+
+	pinctrl_pwm0_0: pinctrl_pwm0_0 {
+		horizon,pins = <
+			LSIO_SPI2_SCLK	LSIO_PINMUX_1	BIT_OFFSET16	MUX_ALT3	&pconf_pwm_3v3
+		>;
+	};
+
+	pinctrl_pwm0_1: pinctrl_pwm0_1 {
+		horizon,pins = <
+			LSIO_SPI2_SSN	LSIO_PINMUX_1	BIT_OFFSET18	MUX_ALT3	&pconf_pwm_3v3
+		>;
+	};
+
+	pinctrl_pwm1_0: pinctrl_pwm1_0 {
+		horizon,pins = <
+			LSIO_SPI2_MISO	LSIO_PINMUX_1	BIT_OFFSET20	MUX_ALT3	&pconf_pwm_3v3
+		>;
+	};
+
+	pinctrl_pwm1_1: pinctrl_pwm1_1 {
+		horizon,pins = <
+			LSIO_SPI2_MOSI	LSIO_PINMUX_1	BIT_OFFSET22	MUX_ALT3	&pconf_pwm_3v3
+		>;
+	};
+
+	pinctrl_pwm2_0: pinctrl_pwm2_0 {
+		horizon,pins = <
+			LSIO_I2C0_SCL	LSIO_PINMUX_2	BIT_OFFSET16	MUX_ALT3	&pconf_pwm_3v3
+		>;
+	};
+
+	pinctrl_pwm2_1: pinctrl_pwm2_1 {
+		horizon,pins = <
+			LSIO_I2C0_SDA	LSIO_PINMUX_2	BIT_OFFSET18	MUX_ALT3	&pconf_pwm_3v3
+		>;
+	};
+
+	pinctrl_pwm3_0: pinctrl_pwm3_0 {
+		horizon,pins = <
+			LSIO_I2C1_SCL	LSIO_PINMUX_2	BIT_OFFSET20	MUX_ALT3	&pconf_pwm_3v3
+		>;
+	};
+
+	pinctrl_pwm3_1: pinctrl_pwm3_1 {
+		horizon,pins = <
+			LSIO_I2C1_SDA	LSIO_PINMUX_2	BIT_OFFSET22	MUX_ALT3	&pconf_pwm_3v3
+		>;
+	};
+
+	pinctrl_lpwm0_0: pinctrl_lpwm0_0 {
+		horizon,pins = <
+			LSIO_SPI5_SCLK	LSIO_PINMUX_2	BIT_OFFSET8		MUX_ALT2	&pconf_pwm_1v8
+		>;
+	};
+
+	pinctrl_lpwm0_1: pinctrl_lpwm0_1 {
+		horizon,pins = <
+			LSIO_SPI5_SSN	LSIO_PINMUX_2	BIT_OFFSET10	MUX_ALT2	&pconf_pwm_1v8
+		>;
+	};
+
+	pinctrl_lpwm0_2: pinctrl_lpwm0_2 {
+		horizon,pins = <
+			LSIO_SPI5_MISO	LSIO_PINMUX_2	BIT_OFFSET12	MUX_ALT2	&pconf_pwm_1v8
+		>;
+	};
+
+	pinctrl_lpwm0_3: pinctrl_lpwm0_3 {
+		horizon,pins = <
+			LSIO_SPI5_MOSI	LSIO_PINMUX_2	BIT_OFFSET14	MUX_ALT2	&pconf_pwm_1v8
+		>;
+	};
+
+	pinctrl_lpwm1_0: pinctrl_lpwm1_0 {
+		horizon,pins = <
+			LSIO_SPI3_SCLK LSIO_PINMUX_1 BIT_OFFSET24  MUX_ALT2 	&pconf_pwm_1v8
+		>;
+	};
+
+	pinctrl_lpwm1_1: pinctrl_lpwm1_1 {
+		horizon,pins = <
+			LSIO_SPI3_SSN LSIO_PINMUX_1 BIT_OFFSET26  MUX_ALT2 	&pconf_pwm_1v8
+		>;
+	};
+
+	pinctrl_lpwm1_2: pinctrl_lpwm1_2 {
+		horizon,pins = <
+			LSIO_SPI3_MISO LSIO_PINMUX_1 BIT_OFFSET28  MUX_ALT2 	&pconf_pwm_1v8
+		>;
+	};
+
+	pinctrl_lpwm1_3: pinctrl_lpwm1_3 {
+		horizon,pins = <
+			LSIO_SPI3_MOSI LSIO_PINMUX_1 BIT_OFFSET30  MUX_ALT2 	&pconf_pwm_1v8
+		>;
+	};
+
+	pinctrl_sensor0_mclk: pinctrl_sensor0_mclk {
+		horizon,pins = <
+			LSIO_SPI3_SCLK LSIO_PINMUX_1 BIT_OFFSET24  MUX_ALT3 &pconf_drv_pu_mid_1v8
+		>;
+	};
+
+	pinctrl_sensor1_mclk: pinctrl_sensor1_mclk {
+		horizon,pins = <
+			LSIO_SPI3_SSN LSIO_PINMUX_1 BIT_OFFSET26  MUX_ALT3 &pconf_drv_pu_mid_1v8
+		>;
+	};
+
+	pinctrl_sensor2_mclk: pinctrl_sensor2_mclk {
+		horizon,pins = <
+			LSIO_SPI3_MISO LSIO_PINMUX_1 BIT_OFFSET28  MUX_ALT3 &pconf_drv_pu_mid_1v8
+		>;
+	};
+
+	pinctrl_sensor3_mclk: pinctrl_sensor3_mclk {
+		horizon,pins = <
+			LSIO_SPI3_MOSI LSIO_PINMUX_1 BIT_OFFSET30  MUX_ALT3 &pconf_drv_pu_mid_1v8
+		>;
+	};
+};
+
+&hsio_iomuxc {
+	pinctrl_enet: enetgrp {
+		horizon,pins = <
+			HSIO_ENET_MDC		HSIO_PINMUX_1	BIT_OFFSET30	MUX_ALT0	&pconf_bias_disabled_mid_1v8
+			HSIO_ENET_MDIO		HSIO_PINMUX_1	BIT_OFFSET28	MUX_ALT0	&pconf_bias_disabled_mid_1v8
+			HSIO_ENET_TXD_0		HSIO_PINMUX_1	BIT_OFFSET26	MUX_ALT0	&pconf_bias_disabled_mid_1v8
+			HSIO_ENET_TXD_1		HSIO_PINMUX_1	BIT_OFFSET24	MUX_ALT0	&pconf_bias_disabled_mid_1v8
+			HSIO_ENET_TXD_2		HSIO_PINMUX_1	BIT_OFFSET22	MUX_ALT0	&pconf_bias_disabled_mid_1v8
+			HSIO_ENET_TXD_3		HSIO_PINMUX_1	BIT_OFFSET20	MUX_ALT0	&pconf_bias_disabled_mid_1v8
+			HSIO_ENET_TXEN		HSIO_PINMUX_1	BIT_OFFSET18	MUX_ALT0	&pconf_bias_disabled_mid_1v8
+			HSIO_ENET_TX_CLK	HSIO_PINMUX_1	BIT_OFFSET16	MUX_ALT0	&pconf_bias_disabled_mid_1v8
+			HSIO_ENET_RX_CLK	HSIO_PINMUX_1	BIT_OFFSET14	MUX_ALT0	&pconf_bias_disabled_mid_1v8
+			HSIO_ENET_RXD_0		HSIO_PINMUX_1	BIT_OFFSET12	MUX_ALT0	&pconf_bias_disabled_mid_1v8
+			HSIO_ENET_RXD_1		HSIO_PINMUX_1	BIT_OFFSET10	MUX_ALT0	&pconf_bias_disabled_mid_1v8
+			HSIO_ENET_RXD_2		HSIO_PINMUX_1	BIT_OFFSET8		MUX_ALT0	&pconf_bias_disabled_mid_1v8
+			HSIO_ENET_RXD_3		HSIO_PINMUX_1	BIT_OFFSET6		MUX_ALT0	&pconf_bias_disabled_mid_1v8
+			HSIO_ENET_RXDV		HSIO_PINMUX_1	BIT_OFFSET4		MUX_ALT0	&pconf_bias_disabled_mid_1v8
+			HSIO_ENET_PHY_CLK	HSIO_PINMUX_1	BIT_OFFSET2		MUX_ALT0	&pconf_bias_disabled_mid_1v8
+		>;
+	};
+
+	pinctrl_enet_rmii: enetrmiigrp {
+		horizon,pins = <
+			HSIO_ENET_MDC           HSIO_PINMUX_1   BIT_OFFSET30    MUX_ALT0        &pconf_bias_disabled_mid_3v3
+			HSIO_ENET_MDIO          HSIO_PINMUX_1   BIT_OFFSET28    MUX_ALT0        &pconf_bias_disabled_mid_3v3
+			HSIO_ENET_TXD_0         HSIO_PINMUX_1   BIT_OFFSET26    MUX_ALT0        &pconf_bias_disabled_mid_3v3
+			HSIO_ENET_TXD_1         HSIO_PINMUX_1   BIT_OFFSET24    MUX_ALT0        &pconf_bias_disabled_mid_3v3
+			HSIO_ENET_TXD_2         HSIO_PINMUX_1   BIT_OFFSET22    MUX_ALT0        &pconf_bias_disabled_mid_3v3
+			HSIO_ENET_TXD_3         HSIO_PINMUX_1   BIT_OFFSET20    MUX_ALT0        &pconf_bias_disabled_mid_3v3
+			HSIO_ENET_TXEN          HSIO_PINMUX_1   BIT_OFFSET18    MUX_ALT0        &pconf_bias_disabled_mid_3v3
+			HSIO_ENET_TX_CLK        HSIO_PINMUX_1   BIT_OFFSET16    MUX_ALT1        &pconf_bias_disabled_mid_3v3
+			HSIO_ENET_RX_CLK        HSIO_PINMUX_1   BIT_OFFSET14    MUX_ALT0        &pconf_bias_disabled_mid_3v3
+			HSIO_ENET_RXD_0         HSIO_PINMUX_1   BIT_OFFSET12    MUX_ALT0        &pconf_bias_disabled_mid_3v3
+			HSIO_ENET_RXD_1         HSIO_PINMUX_1   BIT_OFFSET10    MUX_ALT0        &pconf_bias_disabled_mid_3v3
+			HSIO_ENET_RXD_2         HSIO_PINMUX_1   BIT_OFFSET8             MUX_ALT0        &pconf_bias_disabled_mid_3v3
+			HSIO_ENET_RXD_3         HSIO_PINMUX_1   BIT_OFFSET6             MUX_ALT0        &pconf_bias_disabled_mid_3v3
+			HSIO_ENET_RXDV          HSIO_PINMUX_1   BIT_OFFSET4             MUX_ALT0        &pconf_bias_disabled_mid_3v3
+			HSIO_ENET_PHY_CLK       HSIO_PINMUX_1   BIT_OFFSET2             MUX_ALT0        &pconf_bias_disabled_mid_3v3
+		>;
+	};
+
+	pinctrl_sd: sdgrp {
+		horizon,pins = <
+			HSIO_SD_WP		HSIO_PINMUX_2	BIT_OFFSET24	MUX_ALT0	&pconf_sd_sdio_pu_ds12_ipctrl
+			HSIO_SD_CLK		HSIO_PINMUX_2	BIT_OFFSET22	MUX_ALT0	&pconf_sd_sdio_pu_ds12_ipctrl
+			HSIO_SD_CMD		HSIO_PINMUX_2	BIT_OFFSET20	MUX_ALT0	&pconf_sd_sdio_pu_ds12_ipctrl
+			HSIO_SD_CDN		HSIO_PINMUX_2	BIT_OFFSET18	MUX_ALT0	&pconf_sd_sdio_pu_ds12_ipctrl
+			HSIO_SD_DATA0	HSIO_PINMUX_2	BIT_OFFSET16	MUX_ALT0	&pconf_sd_sdio_pu_ds12_ipctrl
+			HSIO_SD_DATA1	HSIO_PINMUX_2	BIT_OFFSET14	MUX_ALT0	&pconf_sd_sdio_pu_ds12_ipctrl
+			HSIO_SD_DATA2	HSIO_PINMUX_2	BIT_OFFSET12	MUX_ALT0	&pconf_sd_sdio_pu_ds12_ipctrl
+			HSIO_SD_DATA3	HSIO_PINMUX_2	BIT_OFFSET10	MUX_ALT0	&pconf_sd_sdio_pu_ds12_ipctrl
+		>;
+	};
+
+	pinctrl_sdio: sdiogrp {
+		horizon,pins = <
+			HSIO_SDIO_WP	HSIO_PINMUX_2	BIT_OFFSET8	MUX_ALT0		&pconf_sd_sdio_pu_ds12_ipctrl
+			HSIO_SDIO_CLK	HSIO_PINMUX_0	BIT_OFFSET30	MUX_ALT0	&pconf_sd_sdio_pu_ds12_ipctrl
+			HSIO_SDIO_CMD	HSIO_PINMUX_0	BIT_OFFSET28	MUX_ALT0	&pconf_sd_sdio_pu_ds12_ipctrl
+			HSIO_SDIO_DATA0	HSIO_PINMUX_1	BIT_OFFSET0		MUX_ALT0	&pconf_sd_sdio_pu_ds12_ipctrl
+			HSIO_SDIO_DATA1	HSIO_PINMUX_2	BIT_OFFSET30	MUX_ALT0	&pconf_sd_sdio_pu_ds12_ipctrl
+			HSIO_SDIO_DATA2	HSIO_PINMUX_2	BIT_OFFSET28	MUX_ALT0	&pconf_sd_sdio_pu_ds12_ipctrl
+			HSIO_SDIO_DATA3	HSIO_PINMUX_2	BIT_OFFSET26	MUX_ALT0	&pconf_sd_sdio_pu_ds12_ipctrl
+		>;
+	};
+
+	pinctrl_sdio_cdn: sdio_cdngrp {
+		horizon,pins = <
+			HSIO_SDIO_CDN	HSIO_PINMUX_0	BIT_OFFSET26	MUX_ALT0	&pconf_sd_sdio_pu_ds12_ipctrl
+		>;
+	};
+
+	pinctrl_qspi: qspigrp {
+		horizon,pins = <
+			HSIO_QSPI_SSN0	HSIO_PINMUX_0	BIT_OFFSET24	MUX_ALT0	&pconf_drv_pu_mid_1v8
+			HSIO_QSPI_SCLK	HSIO_PINMUX_0	BIT_OFFSET20	MUX_ALT0	&pconf_drv_pu_mid_1v8
+			HSIO_QSPI_DATA0	HSIO_PINMUX_2	BIT_OFFSET6		MUX_ALT0	&pconf_drv_pu_mid_1v8
+			HSIO_QSPI_DATA1	HSIO_PINMUX_2	BIT_OFFSET4		MUX_ALT0	&pconf_drv_pu_mid_1v8
+			HSIO_QSPI_DATA2	HSIO_PINMUX_2	BIT_OFFSET2		MUX_ALT0	&pconf_drv_pu_mid_1v8
+			HSIO_QSPI_DATA3	HSIO_PINMUX_2	BIT_OFFSET0		MUX_ALT0	&pconf_drv_pu_mid_1v8
+		>;
+	};
+
+	pinctrl_qspi_ssn1: qspi_ssn1grp {
+		horizon,pins = <
+			HSIO_QSPI_SSN1	HSIO_PINMUX_0	BIT_OFFSET22	MUX_ALT0	&pconf_drv_pu_mid_1v8
+		>;
+	};
+
+	pinctrl_emmc: emmcgrp {
+		horizon,pins = <
+			HSIO_EMMC_CLK	HSIO_PINMUX_0	BIT_OFFSET18	MUX_ALT0	&pconf_drv_pu_ds12_1v8
+			HSIO_EMMC_CMD	HSIO_PINMUX_0	BIT_OFFSET16	MUX_ALT0	&pconf_drv_pu_ds12_1v8
+			HSIO_EMMC_DATA0	HSIO_PINMUX_0	BIT_OFFSET14	MUX_ALT0	&pconf_drv_pu_ds12_1v8
+			HSIO_EMMC_DATA1	HSIO_PINMUX_0	BIT_OFFSET12	MUX_ALT0	&pconf_drv_pu_ds12_1v8
+			HSIO_EMMC_DATA2	HSIO_PINMUX_0	BIT_OFFSET10	MUX_ALT0	&pconf_drv_pu_ds12_1v8
+			HSIO_EMMC_DATA3	HSIO_PINMUX_0	BIT_OFFSET8		MUX_ALT0	&pconf_drv_pu_ds12_1v8
+			HSIO_EMMC_DATA4	HSIO_PINMUX_0	BIT_OFFSET6		MUX_ALT0	&pconf_drv_pu_ds12_1v8
+			HSIO_EMMC_DATA5	HSIO_PINMUX_0	BIT_OFFSET4		MUX_ALT0	&pconf_drv_pu_ds12_1v8
+			HSIO_EMMC_DATA6	HSIO_PINMUX_0	BIT_OFFSET2		MUX_ALT0	&pconf_drv_pu_ds12_1v8
+			HSIO_EMMC_DATA7	HSIO_PINMUX_0	BIT_OFFSET0		MUX_ALT0	&pconf_drv_pu_ds12_1v8
+			HSIO_EMMC_RSTN	HSIO_PINMUX_3	BIT_OFFSET0		MUX_ALT0	&pconf_drv_pu_ds12_1v8
+		>;
+	};
+};
+
+&disp_iomuxc {
+	pinctrl_boot_strap: bootstrapgrp {
+		horizon,pins = <
+			DISP_BT1120_DATA0		DISP_PINMUX_0	BIT_OFFSET0		MUX_ALT0	&pconf_drv_pu_mid_1v8
+			DISP_BT1120_DATA1		DISP_PINMUX_0	BIT_OFFSET2		MUX_ALT0	&pconf_drv_pu_mid_1v8
+			DISP_BT1120_DATA2		DISP_PINMUX_0	BIT_OFFSET4		MUX_ALT0	&pconf_drv_pu_mid_1v8
+			DISP_BT1120_DATA3		DISP_PINMUX_0	BIT_OFFSET6		MUX_ALT0	&pconf_drv_pu_mid_1v8
+			DISP_BT1120_DATA4		DISP_PINMUX_0	BIT_OFFSET8		MUX_ALT0	&pconf_drv_pu_mid_1v8
+			DISP_BT1120_DATA5		DISP_PINMUX_0	BIT_OFFSET10	MUX_ALT0	&pconf_drv_pu_mid_1v8
+			DISP_BT1120_DATA6		DISP_PINMUX_0	BIT_OFFSET12	MUX_ALT0	&pconf_drv_pu_mid_1v8
+			DISP_BT1120_DATA7		DISP_PINMUX_0	BIT_OFFSET14	MUX_ALT0	&pconf_drv_pu_mid_1v8
+			DISP_BT1120_DATA8		DISP_PINMUX_0	BIT_OFFSET16	MUX_ALT0	&pconf_drv_pu_mid_1v8
+			DISP_BT1120_DATA9		DISP_PINMUX_0	BIT_OFFSET18	MUX_ALT0	&pconf_drv_pu_mid_1v8
+			DISP_BT1120_DATA10		DISP_PINMUX_0	BIT_OFFSET20	MUX_ALT0	&pconf_drv_pu_mid_1v8
+			DISP_BT1120_DATA11		DISP_PINMUX_0	BIT_OFFSET22	MUX_ALT0	&pconf_drv_pu_mid_1v8
+			DISP_BT1120_DATA12		DISP_PINMUX_0	BIT_OFFSET24	MUX_ALT0	&pconf_drv_pu_mid_1v8
+			DISP_BT1120_DATA13		DISP_PINMUX_0	BIT_OFFSET26	MUX_ALT0	&pconf_drv_pu_mid_1v8
+			DISP_BT1120_DATA14		DISP_PINMUX_0	BIT_OFFSET28	MUX_ALT0	&pconf_drv_pu_mid_1v8
+			DISP_BT1120_DATA15		DISP_PINMUX_0	BIT_OFFSET30	MUX_ALT0	&pconf_drv_pu_mid_1v8
+			DISP_BT1120_O_PIXELCLK	DISP_PINMUX_1	BIT_OFFSET0		MUX_ALT0	&pconf_drv_pu_mid_1v8
+		>;
+	};
+
+	pinctrl_bt1120_data: bt1120datagrp {
+		horizon,pins = <
+			DISP_BT1120_DATA0		DISP_PINMUX_0	BIT_OFFSET0		MUX_ALT1	&pconf_drv_pu_mid_1v8
+			DISP_BT1120_DATA1		DISP_PINMUX_0	BIT_OFFSET2		MUX_ALT1	&pconf_drv_pu_mid_1v8
+			DISP_BT1120_DATA2		DISP_PINMUX_0	BIT_OFFSET4		MUX_ALT1	&pconf_drv_pu_mid_1v8
+			DISP_BT1120_DATA3		DISP_PINMUX_0	BIT_OFFSET6		MUX_ALT1	&pconf_drv_pu_mid_1v8
+			DISP_BT1120_DATA4		DISP_PINMUX_0	BIT_OFFSET8		MUX_ALT1	&pconf_drv_pu_mid_1v8
+			DISP_BT1120_DATA5		DISP_PINMUX_0	BIT_OFFSET10	MUX_ALT1	&pconf_drv_pu_mid_1v8
+			DISP_BT1120_DATA6		DISP_PINMUX_0	BIT_OFFSET12	MUX_ALT1	&pconf_drv_pu_mid_1v8
+			DISP_BT1120_DATA7		DISP_PINMUX_0	BIT_OFFSET14	MUX_ALT1	&pconf_drv_pu_mid_1v8
+			DISP_BT1120_DATA8		DISP_PINMUX_0	BIT_OFFSET16	MUX_ALT1	&pconf_drv_pu_mid_1v8
+			DISP_BT1120_DATA9		DISP_PINMUX_0	BIT_OFFSET18	MUX_ALT1	&pconf_drv_pu_mid_1v8
+			DISP_BT1120_DATA10		DISP_PINMUX_0	BIT_OFFSET20	MUX_ALT1	&pconf_drv_pu_mid_1v8
+			DISP_BT1120_DATA11		DISP_PINMUX_0	BIT_OFFSET22	MUX_ALT1	&pconf_drv_pu_mid_1v8
+			DISP_BT1120_DATA12		DISP_PINMUX_0	BIT_OFFSET24	MUX_ALT1	&pconf_drv_pu_mid_1v8
+			DISP_BT1120_DATA13		DISP_PINMUX_0	BIT_OFFSET26	MUX_ALT1	&pconf_drv_pu_mid_1v8
+			DISP_BT1120_DATA14		DISP_PINMUX_0	BIT_OFFSET28	MUX_ALT1	&pconf_drv_pu_mid_1v8
+			DISP_BT1120_DATA15		DISP_PINMUX_0	BIT_OFFSET30	MUX_ALT1	&pconf_drv_pu_mid_1v8
+			DISP_BT1120_O_PIXELCLK  DISP_PINMUX_0	BIT_OFFSET0		MUX_ALT1	&pconf_drv_pu_mid_1v8
+		>;
+	};
+};
+
+&aon_iomuxc {
+	pinctrl_aon_vdd: aonvddgrp {
+		horizon,pins = <
+			AON_ENV_VDD	AON_PINMUX_0	BIT_OFFSET8	MUX_ALT0	&pconf_drv_pu_mid_1v8
+		>;
+	};
+
+	pinctrl_aon_cnn0: aoncnn0grp {
+		horizon,pins = <
+			AON_ENV_CNN0	AON_PINMUX_0	BIT_OFFSET10	MUX_ALT0	&pconf_drv_pu_mid_1v8
+		>;
+	};
+
+	pinctrl_aon_cnn1: aoncnn1grp {
+		horizon,pins = <
+			AON_ENV_CNN1	AON_PINMUX_0	BIT_OFFSET12	MUX_ALT0	&pconf_drv_pu_mid_1v8
+		>;
+	};
+
+	pinctrl_aon_pmic: aonpmicgrp {
+		horizon,pins = <
+			AON_PMIC_EN	INVALID_PINMUX	BIT_OFFSET0		MUX_ALT0	&pconf_drv_pu_mid_1v8
+		>;
+	};
+
+	pinctrl_aon_hw: aonhwgrp {
+		horizon,pins = <
+			AON_HW_RESETN	INVALID_PINMUX	BIT_OFFSET0		MUX_ALT0	&pconf_drv_pu_mid_1v8
+		>;
+	};
+
+	pinctrl_aon_resetn: aonrestengrp {
+		horizon,pins = <
+			AON_RESETN_OUT	INVALID_PINMUX	BIT_OFFSET0		MUX_ALT0	&pconf_drv_pu_mid_1v8
+		>;
+	};
+
+	pinctrl_aon_irq: aonirqgrp {
+		horizon,pins = <
+			AON_IRQ_OUT	INVALID_PINMUX	BIT_OFFSET0		MUX_ALT0	&pconf_drv_pu_mid_1v8
+		>;
+	};
+};
