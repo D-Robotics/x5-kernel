@@ -2515,7 +2515,7 @@ static int sdhci_get_cd(struct mmc_host *mmc)
 		return 1;
 
 	/* Host native card detect */
-	return !!(sdhci_readl(host, SDHCI_PRESENT_STATE) & SDHCI_CARD_PRESENT);
+	return !!!(sdhci_readl(host, SDHCI_PRESENT_STATE) & SDHCI_CARD_PRESENT);
 }
 
 int sdhci_get_cd_nogpio(struct mmc_host *mmc)
