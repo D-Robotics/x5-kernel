@@ -9,8 +9,8 @@
 /dts-v1/;
 #include "x5.dtsi"
 #include "x5-memory.dtsi"
-#include "pinmux-func-x5-rdk.dtsi"
-#include "pinmux-gpio-x5-rdk.dtsi"
+#include "pinmux-func.dtsi"
+#include "pinmux-gpio.dtsi"
 #include <dt-bindings/input/linux-event-codes.h>
 #include <autoconf.h>
 
