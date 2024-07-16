@@ -21,21 +21,6 @@
 	#address-cells = <2>;
 	#size-cells = <2>;
 
-	gpio-keys {
-		compatible = "gpio-keys";
-		autorepeat;
-		pinctrl-names = "default";
-		pinctrl-0 = <&aon_gpio_2>;
-
-		key-power {
-			debounce-interval = <100>;
-			gpios = <&aon_gpio_porta 2 GPIO_ACTIVE_LOW>;
-			label = "GPIO Key Power";
-			linux,code = <KEY_POWER>;
-			wakeup-source;
-		};
-	};
-
 	gua_audio_rpc_wrapper:audio-rpc-wrapper {
 		compatible = "gua,audio-rpc-wrapper";
 		rpmsg-enable;
@@ -134,13 +119,6 @@
 	gpu-supply = <&vdd08_gpu_reg>;
 };
 
-&lsio_iomuxc {
-	icm_int1: icm-int1 {
-		horizon,pins = <
-			LSIO_I2C1_SDA	LSIO_PINMUX_2	BIT_OFFSET22	MUX_ALT1	&pconf_input_en_3v3
-		>;
-	};
-};
 
 &ls_gpio0_porta {
 	pinctrl-names = "default";
@@ -165,12 +143,8 @@
 	status = "okay";
 };
 
-&uart2 {
+&uart1 {
 	status = "okay";
-	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_uart2>;
-	dma-names = "tx", "rx";
-	dmas = <&axi_dmac 5>, <&axi_dmac 4>;
 };
 
 &uart5 {
@@ -183,6 +157,11 @@
 	status = "okay";
 };
 
+&i2c0 {
+	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_i2c0>;
+};
 
 &i2c2 {
 	status = "okay";
@@ -217,69 +196,50 @@
 	};
 };
 
-&i2c5 {
+&i2c3 {
 	status = "okay";
 	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_i2c5>;
-	es7210_0: es7210_0@40 {
-		compatible = "MicArray_0";
-		reg = <0x40>;
-		#sound-dai-cells = <1>;
-		channels = <8>;
-		adc_dev_num = <2>;
-		status = "okay";
-	};
-	es7210_1@42 {
-		compatible = "MicArray_2";
-		reg = <0x42>;
-		channels = <8>;
-		adc_dev_num = <2>;
-	};
-
-	es8156: es8156@8 {
-		compatible = "everest,es8156";
-		reg = <0x8>;
-		#sound-dai-cells = <0>;
-		status = "okay";
-	};
+	pinctrl-0 = <&pinctrl_i2c3>;
 };
 
 &i2c4 {
 	status = "okay";
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_i2c4>;
-	gt9xx@14 {
-		compatible = "goodix,gt9xx";
-		reg = <0x14>;
-		status = "okay";
-		pinctrl-names = "default";
-		pinctrl-0 = <&dsp_gpio0_22 &dsp_gpio0_21>;
-		reset-gpios = <&dsp_gpio_porta 22 GPIO_ACTIVE_LOW>;
-		irq-gpios = <&dsp_gpio_porta 21 IRQ_TYPE_EDGE_FALLING>;
-		irq-flags = <2>;
-		touchscreen-size-x = <720>;
-		touchscreen-size-y = <1280>;
-		goodix,driver-send-cfg = <1>;
-		goodix,int-sync = <1>;
-	};
+};
 
-	lt8618: lt8618@3b{
-		status = "okay";
-		compatible = "lontium,lt8618";
+&i2c5 {
+	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_i2c5>;
+	hdmi_bridge@3b {
+		compatible = "sil,sii9022";
 		reg = <0x3b>;
+
 		pinctrl-names = "default";
- 		//LSIO_GPIO1_PIN13
-		pinctrl-0 = <&lsio_gpio1_13>;
-		reset-gpios = <&ls_gpio1_porta 13 GPIO_ACTIVE_LOW>;
+		pinctrl-0 = <&dsp_gpio0_20>;
+
+		reset-gpios = <&dsp_gpio_porta 20 GPIO_ACTIVE_LOW>;
+
+		status = "okay";
+
 		ports {
 			#address-cells = <1>;
 			#size-cells = <0>;
 
 			port@0 {
 				reg = <0>;
-				hdmi_bridge_in_4k: endpoint {
+				hdmi_bridge_in: endpoint {
 					remote-endpoint =
 						<&bt1120_bridge_out>;
+				};
+			};
+
+			port@1 {
+				reg = <1>;
+
+				bt1120_bridge_out: endpoint {
+					remote-endpoint = <&hdmi_bridge_in>;
 				};
 			};
 		};
@@ -292,23 +252,16 @@
 	pinctrl-0 = <&pinctrl_i2c6>;
 };
 
-&lpwm0 {
-	status = "okay";
-	/* conflict with camera pwd gpio */
-	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_lpwm0_0 &pinctrl_lpwm0_1
-			&pinctrl_lpwm0_2 &pinctrl_lpwm0_3>;
-};
-
-
-&lpwm1 {
+&spi1 {
 	status = "okay";
 	pinctrl-names = "default";
-	/** for display backlight **/
-	pinctrl-0 = <&pinctrl_lpwm1_1>;
+	pinctrl-0 = <&pinctrl_spi1>;
+	dma-names = "tx", "rx";
+	dmas = <&axi_dmac 25>, <&axi_dmac 24>;
 };
 
 &pwm3 {
+	/* LSIO_PWM_OUT6 and LSIO_PWM_OUT7 */
 	status = "okay";
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_pwm3_0 &pinctrl_pwm3_1>;
@@ -338,14 +291,6 @@
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_emmc>;
 	fixed-emmc-driver-type = <2>;
-};
-
-&spi2 {
-	status = "okay";
-	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_spi2>;
-	dma-names = "tx", "rx";
-	dmas = <&axi_dmac 25>, <&axi_dmac 24>;
 };
 
 &dc8000_nano {
@@ -396,10 +341,6 @@
 };
 
 &usb3 {
-	status = "okay";
-};
-
-&i2c7 {
 	status = "okay";
 };
 
@@ -519,70 +460,54 @@
 
 &mipi_host1 {
 	status = "okay";
-	//in x5-evb, mipi host0 & host1 share one mclk and gpio
+	// in RDK X5, mipi host0 & host1 share one mclk and gpio
 };
 
 &mipi_host2 {
 	status = "okay";
 	pinctrl-names = "enable", "disable";
-	pinctrl-0 = <&pinctrl_sensor2_mclk>; //mclk2
-	pinctrl-1 = <&lsio_gpio0_26>;
-	snrclk-idx = <2>;  //mclk index
+	pinctrl-0 = <&pinctrl_sensor1_mclk>; //mclk1
+	pinctrl-1 = <&lsio_gpio0_25>;
+	snrclk-idx = <1>;  //mclk index
 };
 
 &mipi_host3 {
 	status = "okay";
-	pinctrl-names = "enable", "disable";
-	pinctrl-0 = <&pinctrl_sensor3_mclk>; //mclk3
-	pinctrl-1 = <&lsio_gpio0_27>;
-	snrclk-idx = <3>;  //mclk index
+	// in RDK X5, mipi host2 & host3 share one mclk and gpio
 };
 
 &vin_vcon0 {
 	status = "okay";
 	/* camera sensor
-	 * reset gpio:	AON_GPIO0_00:	498
-	 * pwd gpio:	LSIO_GPIO1_00:	347
+	 * reset gpio:	LSIO_GPIO0_PIN12:	391
 	 */
 	pinctrl-names = "default";
-	pinctrl-0 = <&aon_gpio_0>;
-	gpio_oth = <498>;   //reset gpio
-	bus = <4>; //i2c4
-	lpwm_chn = <0>;  //open lpwm0 - channel0
+	pinctrl-0 = <&lsio_gpio0_12>;
+	gpio_oth = <391>;   // reset gpio
+	bus = <6>; // i2c bus
 };
 
 &vin_vcon1 {
 	status = "okay";
-	//use same sensor gpio with vcon0 and i2c bus
-	bus = <4>;
-	//lpwm_chn = <1>; //open lpwm0 - channel1
-	//use same lpwm0 with vcon0
+	// use same sensor gpio with vcon0 and i2c bus
+	bus = <6>;
 };
 
 &vin_vcon2 {
 	status = "okay";
 	/* camera sensor
-	 * reset gpio:	AON_GPIO_PIN4:	502
-	 * pwd gpio:	LSIO_GPIO1_02:	349
+	 * reset gpio:	LSIO_GPIO0_PIN13:	392
 	 */
 	pinctrl-names = "default";
-	pinctrl-0 = <&aon_gpio_4>;
-	gpio_oth = <502>;   //reset gpio
-	bus = <2>;  //i2c2
-	lpwm_chn = <2>; //open lpwm0 - channel2
+	pinctrl-0 = <&lsio_gpio0_13>;
+	gpio_oth = <392>;   // reset gpio
+	bus = <4>;  // i2c bus
 };
 
 &vin_vcon3 {
 	status = "okay";
-	/* camera sensor
-	 * reset gpio:	LSIO_GPIO1_06:	353
-	 * pwd gpio:	LSIO_GPIO1_03:	350
-	 */
-	pinctrl-names = "default";
-	pinctrl-0 = <&lsio_gpio1_6>;
-	gpio_oth = <353>;   //reset gpio
-	bus = <7>;  //i2c7
-	lpwm_chn = <3>; //open lpwm0 - channel3
+	// use same sensor gpio with vcon2 and i2c bus
+	bus = <4>;
 };
 
 &bpu {
@@ -597,7 +522,6 @@
 };
 
 &mipi_dsi0 {
-
 	status = "okay";
 
 	ports {
@@ -628,20 +552,10 @@
 
 };
 
-/*For boards that do not need display module,
-the following ports need to be deleted*/
+/* For boards that do not need display module,
+the following ports need to be deleted */
 
-/*EVB V2 has one bt1120 to hdmi bridge*/
-&bt1120_bridge {
-	ports {
-		port@1 {
-			reg = <1>;
-			bt1120_bridge_out: endpoint {
-				remote-endpoint = <&hdmi_bridge_in_4k>;
-			};
-		};
-	};
-};
+/* RDK x5 has one bt1120 to hdmi bridge */
 
 &dphy0 {
 	status = "okay";
@@ -704,8 +618,8 @@ the following ports need to be deleted*/
 
 	phy-mode = "rgmii-id";
 	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_enet &lsio_gpio0_31>;
-	phyreset-gpio = <&ls_gpio0_porta 31 GPIO_ACTIVE_HIGH>;
+	pinctrl-0 = <&pinctrl_enet &hsio_gpio0_23>;
+	phyreset-gpio = <&hs_gpio0_porta 23 GPIO_ACTIVE_HIGH>;
 };
 
 &qspi {
@@ -734,37 +648,8 @@ the following ports need to be deleted*/
 };
 
 &snd0 {
-	status = "okay";
+	status = "disabled";
 	#address-cells = <1>;
 	#size-cells = <0>;
 	simple-audio-card,name = "duplex-audio";
-
-	simple-audio-card,dai-link@0 {
-		link-name = "dai-link0";
-		reg = <1>;
-		format = "dsp_a";
-		mclk-fs = <64>;
-		bitclock-master = <&snd0_mm>;
-		frame-master = <&snd0_mm>;
-		snd0_mm: cpu {
-			sound-dai = <&dw_i2s1 0>;
-		};
-		codec {
-			sound-dai = <&es8156>;
-		};
-	};
-	dai-link@1 {
-		link-name = "dai-link1";
-		reg = <1>;
-		format = "dsp_a";
-		mclk-fs = <64>;
-		bitclock-master = <&snd0_m>;
-		frame-master = <&snd0_m>;
-		snd0_m: cpu {
-			sound-dai = <&dw_i2s1 1>;
-		};
-		codec {
-			sound-dai = <&es7210_0 0>;
-		};
-	};
 };
