@@ -286,10 +286,10 @@
 	};
 };
 
-&i2c7 {
+&i2c6 {
 	status = "okay";
 	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_dsp_i2c7>;
+	pinctrl-0 = <&pinctrl_i2c6>;
 };
 
 &lpwm0 {
