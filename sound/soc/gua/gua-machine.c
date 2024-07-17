@@ -77,6 +77,16 @@ static struct snd_soc_dai_link gua_dai_links[] = {
 		.playback_only = false,
 		.capture_only = false,
 	},
+	{
+                .name = "LINK5",
+                .stream_name = "PDM-stream",
+                .num_cpus = 1,
+                .num_platforms = 1,
+                .num_codecs = 1,
+                .dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_NB_NF | SND_SOC_DAIFMT_CBS_CFS,
+                .playback_only = false,
+                .capture_only = false,
+        },
 };
 /* make sure : bind with cpu_dais in file:gua-cpu-dai.c */
 const char *cpu_names[] = {
@@ -85,6 +95,7 @@ const char *cpu_names[] = {
 	"CPU DAI2",
 	"CPU DAI3",
 	"CPU DAI4",
+	"CPU DAI5",
 };
 
 struct gua_audio_data {

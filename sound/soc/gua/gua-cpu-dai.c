@@ -25,7 +25,7 @@
 extern void link_audio_info(struct gua_audio_info *audio_info);
 
 #define GUA_AUDIO_RATES	(SNDRV_PCM_RATE_8000|SNDRV_PCM_RATE_16000|SNDRV_PCM_RATE_48000)
-#define GUA_AUDIO_FORMATS	SNDRV_PCM_FMTBIT_S16_LE
+#define GUA_AUDIO_FORMATS	(SNDRV_PCM_FMTBIT_S16_LE | SNDRV_PCM_FMTBIT_S24_LE)
 
 static const unsigned int gua_rpmsg_rates[] = {
 	8000, 16000, 44100, 32000, 48000, 96000, 192000,
@@ -142,6 +142,25 @@ static struct snd_soc_dai_driver gua_cpu_dai[] = {
 			.stream_name = "Hisf-Record",
 			.channels_min = 1,
 			.channels_max = 6,
+			.rates = GUA_AUDIO_RATES,
+			.formats = GUA_AUDIO_FORMATS,
+		},
+		.ops = &gua_rpmsg_dai_ops,
+	},
+	{
+		.name ="CPU DAI5",
+		.id = 1,
+		.playback = {
+			.stream_name = "PDM-Playback",
+			.channels_min = 1,
+			.channels_max = 2,
+			.rates = GUA_AUDIO_RATES,
+			.formats = GUA_AUDIO_FORMATS,
+		},
+		.capture = {
+			.stream_name = "PDM-Record",
+			.channels_min = 1,
+			.channels_max = 8,
 			.rates = GUA_AUDIO_RATES,
 			.formats = GUA_AUDIO_FORMATS,
 		},
@@ -336,9 +355,9 @@ static int gua_cpu_dai_probe(struct platform_device *pdev)
 		for (i = 0; i < ARRAY_SIZE(gua_cpu_dai); i++)
 		{
 			gua_cpu_dai[i].playback.rates = SNDRV_PCM_RATE_48000 | SNDRV_PCM_RATE_16000;
-			gua_cpu_dai[i].playback.formats = SNDRV_PCM_FMTBIT_S16_LE;
+			gua_cpu_dai[i].playback.formats = GUA_AUDIO_FORMATS;
 			gua_cpu_dai[i].capture.rates = SNDRV_PCM_RATE_48000 | SNDRV_PCM_RATE_16000;
-			gua_cpu_dai[i].capture.formats = SNDRV_PCM_FMTBIT_S16_LE;
+			gua_cpu_dai[i].capture.formats = GUA_AUDIO_FORMATS;
 		}
 	}
 

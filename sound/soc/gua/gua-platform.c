@@ -19,6 +19,7 @@
 #include <sound/soc.h>
 #include "gua_pcm.h"
 
+#define GUA_AUDIO_FORMATS       (SNDRV_PCM_FMTBIT_S16_LE | SNDRV_PCM_FMTBIT_S24_LE)
 extern int32_t sync_pipeline_state(uint16_t pcm_device, uint8_t stream, uint8_t state);
 
 /* make sure : bind with dai_links & cpu_dais */
@@ -42,7 +43,7 @@ static struct gua_pcm_hw_info pcms_hw_info[] ={
 			.channels_max = 12,
 			.fifo_size = 0,
 			.buffer_bytes_max = 960 * 24 * 4, /* period_bytes_max * periods_max */
-			.formats = SNDRV_PCM_FMTBIT_S16_LE,
+			.formats = GUA_AUDIO_FORMATS,
 			.rates = SNDRV_PCM_RATE_16000 | SNDRV_PCM_RATE_48000,
 			.rate_min = 16000,
 			.rate_max = 48000,
@@ -63,7 +64,7 @@ static struct gua_pcm_hw_info pcms_hw_info[] ={
 			.channels_max = 12,
 			.fifo_size = 0,
 			.buffer_bytes_max = 960 * 24 * 4, /* period_bytes_max * periods_max */
-			.formats = SNDRV_PCM_FMTBIT_S16_LE,
+			.formats = GUA_AUDIO_FORMATS,
 			.rates = SNDRV_PCM_RATE_16000 | SNDRV_PCM_RATE_48000,
 			.rate_min = 16000,
 			.rate_max = 48000,
@@ -88,7 +89,7 @@ static struct gua_pcm_hw_info pcms_hw_info[] ={
 			.channels_max = 2,
 			.fifo_size = 0,
 			.buffer_bytes_max = 960 * 4 * 4, /* period_bytes_max * periods_max */
-			.formats = SNDRV_PCM_FMTBIT_S16_LE,
+			.formats = GUA_AUDIO_FORMATS,
 			.rates = SNDRV_PCM_RATE_16000 | SNDRV_PCM_RATE_48000,
 			.rate_min = 16000,
 			.rate_max = 48000,
@@ -109,7 +110,7 @@ static struct gua_pcm_hw_info pcms_hw_info[] ={
 			.channels_max = 6,
 			.fifo_size = 0,
 			.buffer_bytes_max = 960 * 12 * 4, /* period_bytes_max * periods_max */
-			.formats = SNDRV_PCM_FMTBIT_S16_LE,
+			.formats = GUA_AUDIO_FORMATS,
 			.rates = SNDRV_PCM_RATE_16000 | SNDRV_PCM_RATE_48000,
 			.rate_min = 16000,
 			.rate_max = 48000,
@@ -134,7 +135,7 @@ static struct gua_pcm_hw_info pcms_hw_info[] ={
 			.channels_max = 2,
 			.fifo_size = 0,
 			.buffer_bytes_max = 960 * 4 * 4, /* period_bytes_max * periods_max */
-			.formats = SNDRV_PCM_FMTBIT_S16_LE,
+			.formats = GUA_AUDIO_FORMATS,
 			.rates = SNDRV_PCM_RATE_16000 | SNDRV_PCM_RATE_48000,
 			.rate_min = 16000,
 			.rate_max = 48000,
@@ -155,7 +156,7 @@ static struct gua_pcm_hw_info pcms_hw_info[] ={
 			.channels_max = 6,
 			.fifo_size = 0,
 			.buffer_bytes_max = 960 * 12 * 4, /* period_bytes_max * periods_max */
-			.formats = SNDRV_PCM_FMTBIT_S16_LE,
+			.formats = GUA_AUDIO_FORMATS,
 			.rates = SNDRV_PCM_RATE_16000 | SNDRV_PCM_RATE_48000,
 			.rate_min = 16000,
 			.rate_max = 48000,
@@ -180,7 +181,7 @@ static struct gua_pcm_hw_info pcms_hw_info[] ={
 			.channels_max = 2,
 			.fifo_size = 0,
 			.buffer_bytes_max = 960 * 4 * 4, /* period_bytes_max * periods_max */
-			.formats = SNDRV_PCM_FMTBIT_S16_LE,
+			.formats = GUA_AUDIO_FORMATS,
 			.rates = SNDRV_PCM_RATE_16000 | SNDRV_PCM_RATE_48000,
 			.rate_min = 16000,
 			.rate_max = 48000,
@@ -201,7 +202,7 @@ static struct gua_pcm_hw_info pcms_hw_info[] ={
 			.channels_max = 6,
 			.fifo_size = 0,
 			.buffer_bytes_max = 960 * 12 * 4, /* period_bytes_max * periods_max */
-			.formats = SNDRV_PCM_FMTBIT_S16_LE,
+			.formats = GUA_AUDIO_FORMATS,
 			.rates = SNDRV_PCM_RATE_16000 | SNDRV_PCM_RATE_48000,
 			.rate_min = 16000,
 			.rate_max = 48000,
@@ -226,7 +227,7 @@ static struct gua_pcm_hw_info pcms_hw_info[] ={
 			.channels_max = 2,
 			.fifo_size = 0,
 			.buffer_bytes_max = 960 * 4 * 4, /* period_bytes_max * periods_max */
-			.formats = SNDRV_PCM_FMTBIT_S16_LE,
+			.formats = GUA_AUDIO_FORMATS,
 			.rates = SNDRV_PCM_RATE_16000 | SNDRV_PCM_RATE_48000,
 			.rate_min = 16000,
 			.rate_max = 48000,
@@ -247,7 +248,52 @@ static struct gua_pcm_hw_info pcms_hw_info[] ={
 			.channels_max = 6,
 			.fifo_size = 0,
 			.buffer_bytes_max = 960 * 12 * 4, /* period_bytes_max * periods_max */
-			.formats = SNDRV_PCM_FMTBIT_S16_LE,
+			.formats = GUA_AUDIO_FORMATS,
+			.rates = SNDRV_PCM_RATE_16000 | SNDRV_PCM_RATE_48000,
+			.rate_min = 16000,
+			.rate_max = 48000,
+		},
+	},
+	{
+		.type = 2,
+		.playback_hw = {
+			.info = SNDRV_PCM_INFO_INTERLEAVED |
+				SNDRV_PCM_INFO_BLOCK_TRANSFER |
+				SNDRV_PCM_INFO_MMAP |
+				SNDRV_PCM_INFO_MMAP_VALID |
+				SNDRV_PCM_INFO_NO_PERIOD_WAKEUP |
+				SNDRV_PCM_INFO_PAUSE |
+				SNDRV_PCM_INFO_RESUME,
+			.period_bytes_min = 480 * 2, /* 10ms 1ch 16bit */
+			.period_bytes_max = 960 * 4, /* 20ms 2ch 16bit */
+			.periods_min = 2,
+			.periods_max = 4,
+			.channels_min = 1,
+			.channels_max = 2,
+			.fifo_size = 0,
+			.buffer_bytes_max = 960 * 4 * 4, /* period_bytes_max * periods_max */
+			.formats = GUA_AUDIO_FORMATS,
+			.rates = SNDRV_PCM_RATE_16000 | SNDRV_PCM_RATE_48000,
+			.rate_min = 16000,
+			.rate_max = 48000,
+		},
+		.capture_hw = {
+			.info = SNDRV_PCM_INFO_INTERLEAVED |
+				SNDRV_PCM_INFO_BLOCK_TRANSFER |
+				SNDRV_PCM_INFO_MMAP |
+				SNDRV_PCM_INFO_MMAP_VALID |
+				SNDRV_PCM_INFO_NO_PERIOD_WAKEUP |
+				SNDRV_PCM_INFO_PAUSE |
+				SNDRV_PCM_INFO_RESUME,
+			.period_bytes_min = 480 * 2, /* 10ms 1ch 16bit */
+			.period_bytes_max = 960 * 12, /* 20ms 6ch 16bit */
+			.periods_min = 2,
+			.periods_max = 4,
+			.channels_min = 2,
+			.channels_max = 8,
+			.fifo_size = 0,
+			.buffer_bytes_max = 960 * 12 * 4, /* period_bytes_max * periods_max */
+			.formats = GUA_AUDIO_FORMATS,
 			.rates = SNDRV_PCM_RATE_16000 | SNDRV_PCM_RATE_48000,
 			.rate_min = 16000,
 			.rate_max = 48000,
