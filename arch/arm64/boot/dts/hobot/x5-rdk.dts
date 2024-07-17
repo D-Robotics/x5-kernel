@@ -15,7 +15,7 @@
 #include <autoconf.h>
 
 / {
-	model = "Horizon Robotics X5 RDK board";
+	model = "D-Robotics RDK X5";
 	compatible = "Horizon, x5";
 
 	#address-cells = <2>;
@@ -78,7 +78,6 @@
 
 };
 
-
 &cpu_0 {
 	cpu-supply = <&vdd08_cpu_reg>;
 };
@@ -119,6 +118,9 @@
 	gpu-supply = <&vdd08_gpu_reg>;
 };
 
+&axi_dmac {
+	status = "okay";
+};
 
 &ls_gpio0_porta {
 	pinctrl-names = "default";
@@ -147,14 +149,11 @@
 	status = "okay";
 };
 
+// Bluetooth
 &uart5 {
 	status = "okay";
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_uart5>;
-};
-
-&axi_dmac {
-	status = "okay";
 };
 
 &i2c0 {
@@ -260,6 +259,12 @@
 	dmas = <&axi_dmac 25>, <&axi_dmac 24>;
 };
 
+&spi5 {
+	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_spi5>;
+};
+
 &pwm3 {
 	/* LSIO_PWM_OUT6 and LSIO_PWM_OUT7 */
 	status = "okay";
@@ -315,6 +320,7 @@
 };
 
 &dwc3_usb2 {
+	role-switch-default-mode = "device";
 	extcon = <&extcon_usb2otg>;
 
 	status = "okay";
@@ -349,7 +355,8 @@
 };
 
 &dw_i2s0 {
-	status = "disabled";
+	status = "okay";
+	#sound-dai-cells = <1>;
 };
 
 &dw_i2s1 {
@@ -516,11 +523,6 @@
 
 /**display sub-system start**/
 
-&dsi_backlight {
-	status = "disabled";
-	pwms = <&lpwm1 1 1000000>;
-};
-
 &mipi_dsi0 {
 	status = "okay";
 
@@ -536,11 +538,6 @@
 	dsi_panel0@0 {
 		compatible = "jc-050hd134";
 		reg = <0>;
-
-		pinctrl-names = "default";
-		pinctrl-0 = <&lsio_gpio0_14>;
-		reset-gpios = <&ls_gpio0_porta 14 GPIO_ACTIVE_HIGH>;
-		//backlight = <&dsi_backlight>;
 
 		port {
 			panel_in: endpoint {
@@ -603,16 +600,6 @@ the following ports need to be deleted */
 };
 
 /**display sub-system end**/
-
-&hobot_tsn {
-	status = "disabled";
-
-	phy-mode = "rgmii-id";
-	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_enet &lsio_gpio0_31>;
-	phyreset-gpio = <&ls_gpio0_porta 31 GPIO_ACTIVE_HIGH>;
-};
-
 &gmac_tsn {
 	status = "okay";
 
