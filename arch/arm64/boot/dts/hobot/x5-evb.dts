@@ -63,7 +63,7 @@
 		compatible = "gua,cpu-dai";
 		msg-wrapper = <&ipc_wrapper>;
 		gua,pcm-buffer-size = <0x1E000>;
-		pcm-rpmsg-channel-mapping = <0x00>, <0x00>, <0x00>, <0x00>, <0x00>;
+		pcm-rpmsg-channel-mapping = <0x00>, <0x00>, <0x00>, <0x00>, <0x00>, <0x00>;
 		status = "okay";
 	};
 
@@ -716,6 +716,7 @@
 			sound-dai = <&es8156>;
 		};
 	};
+
 	dai-link@1 {
 		link-name = "dai-link1";
 		reg = <1>;
@@ -728,6 +729,19 @@
 		};
 		codec {
 			sound-dai = <&es7210_0 0>;
+		};
+	};
+
+	dai-link@2 {
+		link-name = "archband-pdm-dai-link";
+		reg = <1>;
+		bitclock-master = <&arb_dai>;
+		frame-master = <&arb_dai>;
+		arb_dai: cpu {
+			sound-dai = <&archband_pdm>;
+		};
+		codec {
+			sound-dai = <&virt_codec>;
 		};
 	};
 };
