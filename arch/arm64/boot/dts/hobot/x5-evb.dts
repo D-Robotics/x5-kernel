@@ -193,6 +193,7 @@
 		status = "okay";
 		hpu3501-regulator {
 			master;
+			en_pin_map = <0x15>;
 			regulators {
 				vdd08_bpu_1_reg: BUCK2 {
 					regulator-name = "VCC_BPU";
