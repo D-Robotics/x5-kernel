@@ -122,21 +122,6 @@
 	status = "okay";
 };
 
-&ls_gpio0_porta {
-	pinctrl-names = "default";
-	pinctrl-0 = < &lsio_gpio0_0
-				  &lsio_gpio0_1
-				  &lsio_gpio0_2
-				  &lsio_gpio0_3
-				  &lsio_gpio0_4
-				  &lsio_gpio0_5
-				  &lsio_gpio0_6
-				  &lsio_gpio0_7
-				  &lsio_gpio0_12
-				  &lsio_gpio0_13
-				>;
-};
-
 &adc {
 	status = "okay";
 };
