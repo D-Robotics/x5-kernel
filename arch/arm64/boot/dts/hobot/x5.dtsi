@@ -763,7 +763,7 @@
 			ddr_size = "0";
 			ddr_part_num = "0";
 			som_name = "0";
-			base_board_name = "0";
+			base_board_name = "00000000000000000000000000000000";
 			boot_mode = "0";
 			socuid = "00000000000000000000000000000000";
 			chip_id = "00000000";
