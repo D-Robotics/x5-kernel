@@ -2625,10 +2625,9 @@
 		dw230_qos: dw230_qos@20510100 {
 			compatible = "d-robotics,noc_qos";
 			reg = <0x20510100 0x180>;
-			clocks-num = <2>;
-			clocks =<&hpsclks X5_CAM_VSE_AXI_CLK>,
-					<&hpsclks X5_CAM_DEWARP_AXI_CLK>;
-			clock-names ="vse_axi_clk", "dewarp_axi_clk";
+			clocks-num = <1>;
+			clocks =<&hpsclks X5_CAM_VSE_CORE_CLK>;
+			clock-names ="vse_core";
 			status = "okay";
 			ports-num = <3>;
 			ports-off = <0x0008 0x0088 0x0108>;

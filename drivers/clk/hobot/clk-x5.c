@@ -460,11 +460,11 @@ static int crm_hps_clk_init(struct platform_device *pdev)
 	hws[X5_CAM_CSI3_IPI_CLK] = drobot_clk_register_generator_no_idle("csi3_ipi_clk", soc_gen_src_sels, ARRAY_SIZE(soc_gen_src_sels), base + HPS_CLK_GEN + 0x3A0);
 	hws[X5_CAM_CSI_TX_CLK] = drobot_clk_register_generator_no_idle("csi_tx_clk", soc_gen_src_sels, ARRAY_SIZE(soc_gen_src_sels), base + HPS_CLK_GEN + 0x3C0);
 	hws[X5_CAM_SIF_AXI_CLK] = drobot_clk_register_gen_no_flags("sif_axi_clk", soc_gen_src_sels, ARRAY_SIZE(soc_gen_src_sels), base + HPS_CLK_GEN + 0x3E0, ctx->idle, ISO_CG_SIF);
-	hws[X5_CAM_DEWARP_CORE_CLK] = drobot_clk_register_generator_no_idle("dewarp_core_clk", soc_gen_src_sels, ARRAY_SIZE(soc_gen_src_sels), base + HPS_CLK_GEN + 0x420);
-	hws[X5_CAM_DEWARP_AXI_CLK] = drobot_clk_register_generator_no_idle("dewarp_axi_clk", soc_gen_src_sels, ARRAY_SIZE(soc_gen_src_sels), base + HPS_CLK_GEN + 0x400);
+	hws[X5_CAM_DEWARP_CORE_CLK] = drobot_clk_register_gen_no_flags("dewarp_core_clk", soc_gen_src_sels, ARRAY_SIZE(soc_gen_src_sels), base + HPS_CLK_GEN + 0x420, ctx->idle, ISO_CG_DW230);
+	hws[X5_CAM_DEWARP_AXI_CLK] = drobot_clk_register_generator_flags_no_idle("dewarp_axi_clk", soc_gen_src_sels, ARRAY_SIZE(soc_gen_src_sels), base + HPS_CLK_GEN + 0x400, CLK_IS_CRITICAL);
 	hws[X5_CAM_VSE_CORE_CLK] = drobot_clk_register_gen_no_flags("vse_core_clk", soc_gen_src_sels, ARRAY_SIZE(soc_gen_src_sels), base + HPS_CLK_GEN + 0x440, ctx->idle, ISO_CG_DW230);
 	hws[X5_CAM_VSE_UPSCALE_CLK] = drobot_clk_register_gen_no_flags("vse_upscale_clk", soc_gen_src_sels, ARRAY_SIZE(soc_gen_src_sels), base + HPS_CLK_GEN + 0x460, ctx->idle, ISO_CG_DW230);
-	hws[X5_CAM_VSE_AXI_CLK] = drobot_clk_register_gen_no_flags("vse_axi_clk", soc_gen_src_sels, ARRAY_SIZE(soc_gen_src_sels), base + HPS_CLK_GEN + 0x480, ctx->idle, ISO_CG_DW230);
+	hws[X5_CAM_VSE_AXI_CLK] = drobot_clk_register_generator_flags_no_idle("vse_axi_clk", soc_gen_src_sels, ARRAY_SIZE(soc_gen_src_sels), base + HPS_CLK_GEN + 0x480, CLK_IS_CRITICAL);
 
 	hws[X5_CAM_ISP8000_CLK] = drobot_clk_hw_register_gate("isp_clk", "isp_core_clk", base + CAMERA_CLK_ENB, 0, gate_flags, ctx->idle, ISO_CG_ISP, false);
 	hws[X5_CAM_ISP8000_MCM_CLK] = drobot_clk_hw_register_gate("isp_mcm_clk", "isp_core_clk", base + CAMERA_CLK_ENB, 1, gate_flags, ctx->idle, ISO_CG_ISP, false);
