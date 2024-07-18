@@ -537,7 +537,7 @@ static int aicbsp_platform_power_on(void)
 static void aicbsp_platform_power_off(void)
 {
 //TODO wifi disable and sdio card detection
-	return 0;
+	return;
 #ifdef CONFIG_PLATFORM_ALLWINNER
 	if (aicbsp_bus_index < 0)
 		 aicbsp_bus_index = sunxi_wlan_get_bus_index();
