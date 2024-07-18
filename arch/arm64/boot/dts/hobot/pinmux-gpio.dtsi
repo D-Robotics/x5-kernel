@@ -190,7 +190,7 @@
 
 	lsio_gpio0_6: lsio_gpio0_6 {
 		horizon,pins = <
-			LSIO_UART1_CTS	LSIO_PINMUX_3 BIT_OFFSET28	MUX_ALT2	&pconf_input_en_3v3
+			LSIO_UART1_CTS	LSIO_PINMUX_3 BIT_OFFSET28	MUX_ALT2	&pconf_output_high
 		>;
 	};
 
