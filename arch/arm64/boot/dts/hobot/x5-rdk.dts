@@ -192,19 +192,18 @@
 	pinctrl-0 = <&pinctrl_i2c4>;
 };
 
-&i2c5 {
+&i2c7 {
 	status = "okay";
 	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_i2c5>;
-	hdmi_bridge@3b {
+	pinctrl-0 = <&pinctrl_dsp_i2c7>;
+
+		hdmi_bridge@3b {
 		compatible = "sil,sii9022";
 		reg = <0x3b>;
-
 		pinctrl-names = "default";
 		pinctrl-0 = <&dsp_gpio0_20>;
 
 		reset-gpios = <&dsp_gpio_porta 20 GPIO_ACTIVE_LOW>;
-
 		status = "okay";
 
 		ports {
@@ -213,17 +212,9 @@
 
 			port@0 {
 				reg = <0>;
-				hdmi_bridge_in: endpoint {
+				hdmi_bridge_in_4k: endpoint {
 					remote-endpoint =
 						<&bt1120_bridge_out>;
-				};
-			};
-
-			port@1 {
-				reg = <1>;
-
-				bt1120_bridge_out: endpoint {
-					remote-endpoint = <&hdmi_bridge_in>;
 				};
 			};
 		};
@@ -273,7 +264,7 @@
 	status = "okay";
 
 	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_sdio>;
+	pinctrl-0 = <&pinctrl_sdio &dsp_gpio0_15 &dsp_gpio0_16 &lsio_gpio0_6>;
 };
 
 &emmc {
@@ -521,7 +512,7 @@
 	};
 
 	dsi_panel0@0 {
-		compatible = "jc-050hd134";
+		compatible = "wh-cm480";
 		reg = <0>;
 
 		port {
@@ -538,6 +529,16 @@
 the following ports need to be deleted */
 
 /* RDK x5 has one bt1120 to hdmi bridge */
+&bt1120_bridge {
+	ports {
+		port@1 {
+			reg = <1>;
+			bt1120_bridge_out: endpoint {
+				remote-endpoint = <&hdmi_bridge_in_4k>;
+			};
+		};
+	};
+};
 
 &dphy0 {
 	status = "okay";
