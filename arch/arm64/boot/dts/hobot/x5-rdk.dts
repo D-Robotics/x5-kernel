@@ -110,6 +110,10 @@
 	cpu-supply = <&vdd08_cpu_reg>;
 };
 
+&rtc {
+	status = "disabled";
+};
+
 &x5_bpu_pd {
 	bpu-supply = <&vdd08_bpu_1_reg>;
 };
@@ -176,7 +180,15 @@
 				};
 			};
 		};
+		hpu3501-rtc {
+			opsel = <0>;
+			// AON_RTC_ALARM_N_1V8 - AON_GPIO_PIN3
 
+			pinctrl-names = "default";
+			pinctrl-0 = <&aon_gpio_3>;
+			interrupt-parent = <&aon_gpio_porta>;
+			interrupts = <3 IRQ_TYPE_EDGE_RISING>;
+		};
 	};
 };
 
@@ -332,7 +344,7 @@
 
 &dw_i2s0 {
 	status = "okay";
-	#sound-dai-cells = <1>;
+	//#sound-dai-cells = <1>;
 };
 
 &dw_i2s1 {
