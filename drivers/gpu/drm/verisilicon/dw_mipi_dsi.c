@@ -1067,30 +1067,10 @@ static int primary_bind(struct dw_mipi_dsi *dsi)
 	struct dw_mipi_dsi_primary *primary = dsi_to_primary(dsi);
 	struct device *dev		    = primary->dsi.dev;
 	struct drm_bridge *bridge;
-	struct drm_panel *panel;
-	struct device_node *port;
-	int ret;
 
-	ret = drm_of_find_panel_or_bridge(dev->of_node, 1, 0, &panel, &bridge);
-	if (ret) {
-		if (ret != -ENODEV)
-			return ret;
-
-		port = of_graph_get_port_by_id(dev->of_node, 1);
-		if (!port)
-			return -ENODEV;
-
-		panel = of_drm_find_panel(port);
-		of_node_put(port);
-		if (IS_ERR(panel))
-			return PTR_ERR(panel);
-	}
-
-	if (panel) {
-		bridge = drm_panel_bridge_add_typed(panel, DRM_MODE_CONNECTOR_DSI);
-		if (IS_ERR(bridge))
-			return PTR_ERR(bridge);
-	}
+	bridge = devm_drm_of_get_bridge(dev, dev->of_node, 1, 0);
+	if (IS_ERR(bridge))
+		return PTR_ERR(bridge);
 
 	primary->panel_bridge = bridge;
 

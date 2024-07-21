@@ -320,13 +320,6 @@ static void get_buffer_addr(struct drm_framebuffer *drm_fb, dma_addr_t dma_addr[
 	}
 }
 
-static void bt1120_plane_destroy(struct vs_plane *vs_plane)
-{
-	struct bt1120_plane *bt1120_plane = to_bt1120_plane(vs_plane);
-
-	kfree(bt1120_plane);
-}
-
 static int bt1120_plane_check(struct vs_plane *vs_plane, struct drm_plane_state *state)
 {
 	const struct drm_rect *src = &state->src;
@@ -394,7 +387,6 @@ static int bt1120_plane_check_format(struct vs_plane *vs_plane, u32 format, uint
 }
 
 static const struct vs_plane_funcs bt1120_plane_funcs = {
-	.destroy	  = bt1120_plane_destroy,
 	.check		  = bt1120_plane_check,
 	.update		  = bt1120_plane_update,
 	.check_format_mod = bt1120_plane_check_format,
@@ -458,13 +450,6 @@ static void bt1120_wb_commit(struct vs_wb *vs_wb, struct drm_connector_state *st
 	sif_set_output(bt1120_wb->sif, job->fb);
 }
 
-static void bt1120_wb_destroy(struct vs_wb *vs_wb)
-{
-	struct bt1120_wb *bt1120_wb = to_bt1120_wb(vs_wb);
-
-	kfree(bt1120_wb);
-}
-
 static int bt1120_wb_post_create(struct bt1120_wb *bt1120_wb)
 {
 	struct vs_wb *vs_wb	   = &bt1120_wb->vs_wb;
@@ -516,8 +501,7 @@ static void bt1120_wb_vblank(struct vs_wb *vs_wb)
 }
 
 static const struct vs_wb_funcs vs_wb_funcs = {
-	.destroy = bt1120_wb_destroy,
-	.commit	 = bt1120_wb_commit,
+	.commit = bt1120_wb_commit,
 };
 
 static struct device *__find_device(struct list_head *device_list, const char *name)
@@ -703,13 +687,6 @@ static void bt1120_disp_enable_vblank(struct vs_crtc *vs_crtc, bool enabled)
 		bt1120_set_clear(bt1120_disp->bt1120, REG_BT1120_IRQ_EN_CTL, 0, BIT(1));
 }
 
-static void bt1120_disp_destroy(struct vs_crtc *vs_crtc)
-{
-	struct bt1120_disp *bt1120_disp = to_bt1120_disp(vs_crtc);
-
-	kfree(bt1120_disp);
-}
-
 static struct drm_crtc_state *bt1120_disp_create_state(struct vs_crtc *vs_crtc)
 {
 	struct bt1120_disp_state *state;
@@ -758,7 +735,6 @@ static void bt1120_disp_print_state(struct drm_printer *p, const struct drm_crtc
 }
 
 static const struct vs_crtc_funcs bt1120_crtc_funcs = {
-	.destroy	 = bt1120_disp_destroy,
 	.enable		 = bt1120_disp_enable,
 	.disable	 = bt1120_disp_disable,
 	.mode_fixup	 = bt1120_disp_mode_fixup,
