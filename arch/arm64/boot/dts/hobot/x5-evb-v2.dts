@@ -315,10 +315,10 @@
 	pinctrl-0 = <&pinctrl_lpwm1_1>;
 };
 
-&pwm3 {
+&pwm2 {
 	status = "okay";
 	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_pwm3_0 &pinctrl_pwm3_1>;
+	pinctrl-0 = <&pinctrl_pwm2_0 &pinctrl_pwm2_1>;
 };
 
 /* SD Card */
