@@ -43,6 +43,7 @@ typedef int (*i2c_slave_cb_t)(struct i2c_client *client,
 
 /* I2C Frequency Modes */
 #define I2C_MAX_STANDARD_MODE_FREQ	100000
+#define I2C_FAST_MODE_200_FREQ		200000
 #define I2C_MAX_FAST_MODE_FREQ		400000
 #define I2C_MAX_FAST_MODE_PLUS_FREQ	1000000
 #define I2C_MAX_TURBO_MODE_FREQ		1400000

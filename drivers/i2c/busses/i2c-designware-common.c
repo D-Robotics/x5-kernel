@@ -185,6 +185,7 @@ static const u32 supported_speeds[] = {
 	I2C_MAX_HIGH_SPEED_MODE_FREQ,
 	I2C_MAX_FAST_MODE_PLUS_FREQ,
 	I2C_MAX_FAST_MODE_FREQ,
+	I2C_FAST_MODE_200_FREQ,
 	I2C_MAX_STANDARD_MODE_FREQ,
 };
 
@@ -203,7 +204,7 @@ int i2c_dw_validate_speed(struct dw_i2c_dev *dev)
 	}
 
 	dev_err(dev->dev,
-		"%d Hz is unsupported, only 100kHz, 400kHz, 1MHz and 3.4MHz are supported\n",
+		"%d Hz is unsupported, only 100kHz, 200kHz, 400kHz, 1MHz and 3.4MHz are supported\n",
 		t->bus_freq_hz);
 
 	return -EINVAL;

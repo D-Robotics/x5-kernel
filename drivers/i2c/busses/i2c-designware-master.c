@@ -105,7 +105,33 @@ static int i2c_dw_set_timings_master(struct dw_i2c_dev *dev)
 						0);	/* No offset */
 		}
 		fp_str = " Plus";
+	} else if (t->bus_freq_hz == I2C_FAST_MODE_200_FREQ) {
+		/*
+		 * Check are Fast Mode Plus parameters available. Calculate
+		 * SCL timing parameters for Fast Mode Plus if not set.
+		 */
+		if (dev->fp_hcnt && dev->fp_lcnt) {
+			dev->fs_hcnt = dev->fp_hcnt;
+			dev->fs_lcnt = dev->fp_lcnt;
+		} else {
+			ic_clk = i2c_dw_clk_rate(dev);
+			dev->fs_hcnt =
+				i2c_dw_scl_hcnt(ic_clk,
+						1200,	/* tHIGH = 1.2 us */
+						sda_falling_time,
+						0,	/* DW default */
+						0);	/* No offset */
+			dev->fs_lcnt =
+				i2c_dw_scl_lcnt(ic_clk,
+						2600,	/* tLOW = 2.6 us */
+						scl_falling_time,
+						0);	/* No offset */
+		}
+	} else {
+		dev->fs_hcnt = 0;
+		dev->fs_lcnt = 0;
 	}
+
 	/*
 	 * Calculate SCL timing parameters for fast mode if not set. They are
 	 * needed also in high speed mode.
@@ -911,6 +937,7 @@ static const u32 supported_speeds[] = {
 	I2C_MAX_HIGH_SPEED_MODE_FREQ,
 	I2C_MAX_FAST_MODE_PLUS_FREQ,
 	I2C_MAX_FAST_MODE_FREQ,
+	I2C_FAST_MODE_200_FREQ,
 	I2C_MAX_STANDARD_MODE_FREQ,
 };
 
