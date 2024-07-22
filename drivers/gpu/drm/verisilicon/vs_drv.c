@@ -350,6 +350,19 @@ static int vs_drm_platform_of_probe(struct device *dev)
 	struct device_node *port;
 	bool found = false;
 	int i;
+	int ret;
+
+	/**
+		FIX-ME: Attempt to load vs_x5_syscon_bridge using request_module
+		Note: This method is a workaround to ensure vs_x5_syscon_bridge is loaded before
+		vs_drm. It is not the most elegant solution and should be improved.
+	*/
+
+	ret = request_module("vs_x5_syscon_bridge");
+	if (ret != 0) {
+		printk(KERN_ERR "Failed to load vs_x5_syscon_bridge\n");
+		return ret;
+	}
 
 	if (!np)
 		return -ENODEV;
