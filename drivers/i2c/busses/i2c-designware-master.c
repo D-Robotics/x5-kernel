@@ -175,6 +175,9 @@ static int i2c_dw_set_timings_master(struct dw_i2c_dev *dev)
 static int i2c_dw_init_master(struct dw_i2c_dev *dev)
 {
 	int ret;
+#if defined (CONFIG_ARCH_HOBOT_X5)
+	u32 comp_param1;
+#endif
 
 	ret = i2c_dw_acquire_lock(dev);
 	if (ret)
@@ -182,6 +185,15 @@ static int i2c_dw_init_master(struct dw_i2c_dev *dev)
 
 	/* Disable the adapter */
 	__i2c_dw_disable(dev);
+
+
+#if defined (CONFIG_ARCH_HOBOT_X5)
+	/* Unify FS_SPKLEN to 0xa for Sunrise5 SoC */
+	regmap_read(dev->map, DW_IC_COMP_PARAM_1, &comp_param1);
+	if ((comp_param1 & DW_IC_COMP_PARAM_1_SPEED_MODE_MASK)
+			== DW_IC_COMP_PARAM_1_SPEED_MODE_HIGH)
+		regmap_write(dev->map, DW_IC_FS_SPKLEN, 0xa);
+#endif
 
 	/* Write standard speed timing parameters */
 	regmap_write(dev->map, DW_IC_SS_SCL_HCNT, dev->ss_hcnt);
