@@ -3033,13 +3033,13 @@ static struct sg_table *ion_map_dma_buf(struct dma_buf_attachment *attachment,
 {
 	struct ion_dma_buf_attachment *a = attachment->priv;
 	struct sg_table *table;
-	//int ret;
+	int ret;
 
 	table = a->table;
 
-	//ret = dma_map_sgtable(attachment->dev, table, direction, 0);
-	//if (ret)
-	//	return ERR_PTR(ret);
+	ret = dma_map_sgtable(attachment->dev, table, direction, 0);
+	if (ret)
+		return ERR_PTR(ret);
 
 	return table;
 }
