@@ -110,8 +110,6 @@ static void vs_crtc_destroy(struct drm_crtc *crtc)
 
 	if (vs_crtc->funcs->destroy)
 		vs_crtc->funcs->destroy(vs_crtc);
-
-	kfree(vs_crtc);
 }
 
 static void vs_crtc_atomic_destroy_state(struct drm_crtc *crtc, struct drm_crtc_state *state)

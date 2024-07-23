@@ -226,8 +226,6 @@ static void vs_wb_destroy(struct drm_connector *connector)
 
 	if (vs_wb->funcs->destroy)
 		vs_wb->funcs->destroy(vs_wb);
-
-	kfree(vs_wb);
 }
 
 static void vs_wb_atomic_destroy_state(struct drm_connector *connector,

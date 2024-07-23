@@ -37,6 +37,7 @@
 #include <drm/drm_atomic.h>
 #include <drm/drm_atomic_helper.h>
 #include <drm/drm_vblank.h>
+#include <drm/drm_managed.h>
 
 #include "dc_hw.h"
 #include "vs_dc.h"
@@ -76,7 +77,7 @@ static int dc_bind(struct device *dev, struct device *master, void *data)
 		struct dc_crtc *dc_crtc;
 		struct vs_crtc *vs_crtc;
 
-		dc_crtc = kzalloc(sizeof(*dc_crtc), GFP_KERNEL);
+		dc_crtc = drmm_kzalloc(drm_dev, sizeof(*dc_crtc), GFP_KERNEL);
 		if (!dc_crtc) {
 			ret = -ENOMEM;
 			goto err_cleanup_planes_crtcs;
@@ -111,7 +112,7 @@ static int dc_bind(struct device *dev, struct device *master, void *data)
 		struct dc_plane *dc_plane;
 		struct vs_plane *vs_plane;
 
-		dc_plane = kzalloc(sizeof(*dc_plane), GFP_KERNEL);
+		dc_plane = drmm_kzalloc(drm_dev, sizeof(*dc_plane), GFP_KERNEL);
 		if (!dc_plane) {
 			ret = -ENOMEM;
 			goto err_cleanup_planes_crtcs;
@@ -143,7 +144,7 @@ static int dc_bind(struct device *dev, struct device *master, void *data)
 		struct dc_wb *dc_wb;
 		struct vs_wb *vs_wb;
 
-		dc_wb = kzalloc(sizeof(*dc_wb), GFP_KERNEL);
+		dc_wb = drmm_kzalloc(drm_dev, sizeof(*dc_wb), GFP_KERNEL);
 		if (!dc_wb) {
 			ret = -ENOMEM;
 			goto err_cleanup_planes_crtcs;
@@ -282,7 +283,7 @@ static struct dc_device *dc_add_device(struct device *dev, const char *name)
 {
 	struct dc_device *dc_dev;
 
-	dc_dev = kzalloc(sizeof(*dc_dev), GFP_KERNEL);
+	dc_dev = devm_kzalloc(dev, sizeof(*dc_dev), GFP_KERNEL);
 	if (!dc_dev)
 		return ERR_PTR(-ENOMEM);
 
@@ -481,6 +482,8 @@ static int dc_remove(struct platform_device *pdev)
 	clk_disable_unprepare(dc->axi_clk);
 
 	clk_disable_unprepare(dc->apb_clk);
+
+	kfree(dc->hw);
 
 	dev_set_drvdata(dev, NULL);
 

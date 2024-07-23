@@ -49,8 +49,6 @@ static void vs_plane_destroy(struct drm_plane *plane)
 
 	if (vs_plane->funcs->destroy)
 		vs_plane->funcs->destroy(vs_plane);
-
-	kfree(vs_plane);
 }
 
 static void vs_plane_atomic_destroy_state(struct drm_plane *plane, struct drm_plane_state *state)

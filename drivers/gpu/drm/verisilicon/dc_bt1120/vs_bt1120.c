@@ -41,6 +41,7 @@
 #include <drm/drm_framebuffer.h>
 #include <drm/drm_bridge.h>
 #include <drm/drm_of.h>
+#include <drm/drm_managed.h>
 
 #include "vs_bt1120.h"
 #include "vs_bt1120_reg.h"
@@ -813,7 +814,7 @@ static int bt1120_bind(struct device *dev, struct device *master, void *data)
 	/* crtc */
 	bt1120_display_info = bt1120_info->display;
 
-	bt1120_disp = kzalloc(sizeof(*bt1120_disp), GFP_KERNEL);
+	bt1120_disp = drmm_kzalloc(drm_dev, sizeof(*bt1120_disp), GFP_KERNEL);
 	if (!bt1120_disp) {
 		ret = -ENOMEM;
 		goto err_detach_iommu;
@@ -839,7 +840,7 @@ static int bt1120_bind(struct device *dev, struct device *master, void *data)
 	/* plane */
 	bt1120_plane_info = bt1120_info->plane;
 
-	bt1120_plane = kzalloc(sizeof(*bt1120_plane), GFP_KERNEL);
+	bt1120_plane = drmm_kzalloc(drm_dev, sizeof(*bt1120_plane), GFP_KERNEL);
 	if (!bt1120_plane) {
 		ret = -ENOMEM;
 		goto err_cleanup_vs_crtcs;
@@ -858,7 +859,7 @@ static int bt1120_bind(struct device *dev, struct device *master, void *data)
 
 	/* writeback */
 	wb_info	  = &bt1120_info->writebacks[0];
-	bt1120_wb = kzalloc(sizeof(*bt1120_wb), GFP_KERNEL);
+	bt1120_wb = drmm_kzalloc(drm_dev, sizeof(*bt1120_wb), GFP_KERNEL);
 	if (!bt1120_wb) {
 		ret = -ENOMEM;
 		goto err_cleanup_planes;
@@ -985,7 +986,7 @@ static struct bt1120_aux_device *bt1120_add_device(struct device *dev, const cha
 {
 	struct bt1120_aux_device *bt1120_aux_device;
 
-	bt1120_aux_device = kzalloc(sizeof(*bt1120_aux_device), GFP_KERNEL);
+	bt1120_aux_device = devm_kzalloc(dev, sizeof(*bt1120_aux_device), GFP_KERNEL);
 	if (!bt1120_aux_device)
 		return ERR_PTR(-ENOMEM);
 

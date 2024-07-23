@@ -239,11 +239,13 @@ static void vs_drm_unbind(struct device *dev)
 
 	drm_dev_unregister(drm_dev);
 
+	drm_atomic_helper_shutdown(drm_dev);
+
 	drm_kms_helper_poll_fini(drm_dev);
 
 	component_unbind_all(drm_dev->dev, drm_dev);
 
-	drm_mode_config_cleanup(drm_dev);
+
 
 #ifdef CONFIG_VERISILICON_GEM_ION
 	if (priv->client) {
@@ -324,6 +326,7 @@ static struct component_match *vs_drm_match_add(struct device *dev)
 				dev_err(dev, "Failed to add device_link to %s\n", dev_name(d));
 				goto err_links;
 			}
+			j++;
 
 			WARN_ON(j == CONFIG_VERISILICON_DEV_LINK_CNT);
 
@@ -435,8 +438,10 @@ static int vs_drm_platform_remove(struct platform_device *pdev)
 {
 	int i = 0;
 
-	for (i = 0; i < CONFIG_VERISILICON_DEV_LINK_CNT && links[i]; i++)
+	for (i = 0; i < CONFIG_VERISILICON_DEV_LINK_CNT && links[i]; i++) {
 		device_link_del(links[i]);
+		links[i] = NULL;
+	}
 
 	component_master_del(&pdev->dev, &vs_drm_ops);
 

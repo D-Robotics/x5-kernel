@@ -432,8 +432,10 @@ static void dc_plane_destroy(struct vs_plane *vs_plane)
 	struct dc_plane *dc_plane = to_dc_plane(vs_plane);
 
 	__dc_proc_destroy(&dc_plane->list);
-	kfree(vs_plane->info->modifiers);
-	kfree(dc_plane);
+	if (vs_plane->info) {
+		if (vs_plane->info->modifiers && vs_plane->info->num_modifiers > NUM_MODIFIERS)
+			kfree(vs_plane->info->modifiers);
+	}
 }
 
 static int dc_plane_check(struct vs_plane *vs_plane, struct drm_plane_state *state)
@@ -649,8 +651,6 @@ static void dc_crtc_destroy(struct vs_crtc *vs_crtc)
 	struct dc_crtc *dc_crtc = to_dc_crtc(vs_crtc);
 
 	__dc_proc_destroy(&dc_crtc->list);
-
-	kfree(dc_crtc);
 }
 
 static void dc_crtc_enable(struct vs_crtc *vs_crtc)
@@ -917,8 +917,6 @@ static void dc_wb_destroy(struct vs_wb *vs_wb)
 	struct dc_wb *dc_wb = to_dc_wb(vs_wb);
 
 	__dc_proc_destroy(&dc_wb->list);
-
-	kfree(dc_wb);
 }
 
 void dc_wb_vblank(struct vs_wb *vs_wb)
