@@ -58,6 +58,7 @@ static int i2c_dw_set_timings_master(struct dw_i2c_dev *dev)
 	/* Set standard and fast speed dividers for high/low periods */
 	sda_falling_time = t->sda_fall_ns ?: 300; /* ns */
 	scl_falling_time = t->scl_fall_ns ?: 300; /* ns */
+	dev_dbg(dev->dev, "sda_falling_time:%d, scl_falling_time:%d\n", sda_falling_time, scl_falling_time);
 
 	/* Calculate SCL timing parameters for standard mode if not set */
 	if (!dev->ss_hcnt || !dev->ss_lcnt) {
@@ -989,6 +990,86 @@ static const struct device_attribute speed_attr = {
 	.show = speed_show,
 	.store = speed_store,
 };
+
+static ssize_t scl_falling_time_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	ssize_t	status = 0;
+	struct i2c_adapter *adap = to_i2c_adapter(dev);
+	struct dw_i2c_dev *data = i2c_get_adapdata(adap);
+
+	status = sprintf(buf, "%dns\n", data->timings.scl_fall_ns);
+	dev_dbg(data->dev, "%s", __func__);
+	return status;
+}
+
+static ssize_t scl_falling_time_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t size)
+{
+	int scl_fall_ns;
+	ssize_t	status = 0;
+	struct i2c_adapter *adap = to_i2c_adapter(dev);
+	struct dw_i2c_dev *data = i2c_get_adapdata(adap);
+
+	status = kstrtoint(buf, 0, &scl_fall_ns);
+	if (status == 0) {
+		pm_runtime_get_sync(dev);
+		mutex_lock(&data->lock);
+		data->timings.scl_fall_ns = scl_fall_ns;
+		i2c_dw_set_timings_master(data);
+		mutex_unlock(&data->lock);
+		pm_runtime_put_sync(dev);
+		status = size;
+		dev_dbg(data->dev, "%s scl-falling-time-ns: %d", __func__, scl_fall_ns);
+	}
+	return status;
+}
+
+static const struct device_attribute scl_fall_ns_attr = {
+	.attr = {.name = "scl-falling-time-ns", .mode = 0644},
+	.show = scl_falling_time_show,
+	.store = scl_falling_time_store,
+};
+
+static ssize_t sda_falling_time_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	ssize_t	status = 0;
+	struct i2c_adapter *adap = to_i2c_adapter(dev);
+	struct dw_i2c_dev *data = i2c_get_adapdata(adap);
+
+	status = sprintf(buf, "%dns\n", data->timings.sda_fall_ns);
+	dev_dbg(data->dev, "%s", __func__);
+	return status;
+}
+
+static ssize_t sda_falling_time_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t size)
+{
+	int sda_fall_ns;
+	ssize_t	status = 0;
+	struct i2c_adapter *adap = to_i2c_adapter(dev);
+	struct dw_i2c_dev *data = i2c_get_adapdata(adap);
+
+	status = kstrtoint(buf, 0, &sda_fall_ns);
+	if (status == 0) {
+		pm_runtime_get_sync(dev);
+		mutex_lock(&data->lock);
+		data->timings.sda_fall_ns = sda_fall_ns;
+		i2c_dw_set_timings_master(data);
+		mutex_unlock(&data->lock);
+		pm_runtime_put_sync(dev);
+		status = size;
+		dev_dbg(data->dev, "%s sda-falling-time-ns: %d", __func__, sda_fall_ns);
+	}
+	return status;
+}
+
+static const struct device_attribute sda_fall_ns_attr = {
+	.attr = {.name = "sda-falling-time-ns", .mode = 0644},
+	.show = sda_falling_time_show,
+	.store = sda_falling_time_store,
+};
 #endif /* CONFIG_ARCH_HOBOT_X5 */
 
 int i2c_dw_probe_master(struct dw_i2c_dev *dev)
@@ -1070,6 +1151,18 @@ int i2c_dw_probe_master(struct dw_i2c_dev *dev)
 	ret = device_create_file(&adap->dev, &speed_attr);
 	if (ret) {
 		dev_err(dev->dev, "create i2c speed_attr error");
+		return ret;
+	}
+
+	ret = device_create_file(&adap->dev, &scl_fall_ns_attr);
+	if (ret) {
+		dev_err(dev->dev, "create i2c scl_fall_ns_attr error");
+		return ret;
+	}
+
+	ret = device_create_file(&adap->dev, &sda_fall_ns_attr);
+	if (ret) {
+		dev_err(dev->dev, "create i2c sda_fall_ns_attr error");
 		return ret;
 	}
 #endif
