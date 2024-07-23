@@ -504,3 +504,9 @@
 &bpu {
 	cnn-supply = <&vdd08_bpu_1_reg>;
 };
+
+&efuse{
+	/* use aon gpio7 as efuse power */
+	pinctrl-names = "default";
+	pinctrl-0 = <&aon_gpio_7>;
+};

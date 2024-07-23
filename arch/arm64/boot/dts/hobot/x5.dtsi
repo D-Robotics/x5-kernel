@@ -711,8 +711,6 @@
 			#size-cells = <1>;
 			clocks = <&hpsclks X5_SEC_APB_CLK>;
 			clock-names = "pclk_efuse";
-			pinctrl-names = "default";
-			pinctrl-0 = <&aon_gpio_7>;
 
 			/* Data cells */
 			efuse_adc_offset: adc-offset@74 {

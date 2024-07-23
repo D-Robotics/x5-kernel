@@ -750,3 +750,9 @@
 &hobot_pps {
 	status = "okay";
 };
+
+&efuse{
+	/* use aon gpio7 as efuse power */
+	pinctrl-names = "default";
+	pinctrl-0 = <&aon_gpio_7>;
+};
