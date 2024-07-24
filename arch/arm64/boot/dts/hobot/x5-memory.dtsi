@@ -78,15 +78,21 @@
 			ecc-size = <0x0>;
 		};
 
-		ion_reserved: ion_reserved@940C0000 {
+		linux,cma2@95000000 {
+			compatible = "shared-dma-pool";
+			reg = <0x0 0x95000000 0x0 0x0C800000>; /* 200MB */
+			reusable;
+		};
+
+		ion_reserved: ion_reserved@A1800000 {
 			compatible = "ion-pool";
-			reg = <0x0 0x940C0000 0x0 0x20000000>; /* 512MB */
+			reg = <0x0 0xA1800000 0x0 0x20000000>; /* 512MB */
 			status = "okay";
 		};
 
-		ion_carveout: ion_carveout@B40C0000 {
+		ion_carveout: ion_carveout@C1800000 {
 			compatible = "ion-carveout";
-			reg = <0x0 0xB40C0000 0x0 0x20000000>; /* 512MB */
+			reg = <0x0 0xC1800000 0x0 0x20000000>; /* 512MB */
 			status = "okay";
 		};
 
@@ -94,7 +100,7 @@
 			compatible = "ion-cma";
 			alignment = <0x0 0x2000>;
 			reusable;
-			reg = <0x0 0xD40C0000 0x0 0x18000000>; /* 384MB */
+			reg = <0x0 0xE1800000 0x0 0x0B800000>; /* 184MB */
 			status = "okay";
 		};
 		/* The remaining memory is used as kernel heaps,
