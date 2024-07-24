@@ -2391,11 +2391,13 @@ static void stmmac_dma_operation_mode(struct stmmac_priv *priv)
 
 		qmode = priv->plat->rx_queues_cfg[chan].mode_to_use;
 
-		if (chan == 0)
-			rxfifosz = max(rxfifosz, STMMAC_RX_QO_FIFOSZ_MIN);
-		else
-			rxfifosz = (priv->plat->rx_fifo_size - STMMAC_RX_QO_FIFOSZ_MIN) /
-					(rx_channels_count - 1);
+		if (rxfifosz < STMMAC_RX_QO_FIFOSZ_MIN) {
+			if (chan == 0)
+				rxfifosz = max(rxfifosz, STMMAC_RX_QO_FIFOSZ_MIN);
+			else
+				rxfifosz = (priv->plat->rx_fifo_size - STMMAC_RX_QO_FIFOSZ_MIN) /
+						(rx_channels_count - 1);
+		}
 
 		stmmac_dma_rx_mode(priv, priv->ioaddr, rxmode, chan,
 				rxfifosz, qmode);
@@ -2415,11 +2417,13 @@ static void stmmac_dma_operation_mode(struct stmmac_priv *priv)
 	for (chan = 0; chan < tx_channels_count; chan++) {
 		qmode = priv->plat->tx_queues_cfg[chan].mode_to_use;
 
-		if (chan == 0)
-			txfifosz = max(txfifosz, STMMAC_TX_QO_FIFOSZ_MIN);
-		else
-			txfifosz = (priv->plat->tx_fifo_size - STMMAC_TX_QO_FIFOSZ_MIN) /
-					(tx_channels_count - 1);
+		if (txfifosz < STMMAC_TX_QO_FIFOSZ_MIN) {
+			if (chan == 0)
+				txfifosz = max(txfifosz, STMMAC_TX_QO_FIFOSZ_MIN);
+			else
+				txfifosz = (priv->plat->tx_fifo_size - STMMAC_TX_QO_FIFOSZ_MIN) /
+						(tx_channels_count - 1);
+		}
 
 		stmmac_dma_tx_mode(priv, priv->ioaddr, txmode, chan,
 				txfifosz, qmode);
