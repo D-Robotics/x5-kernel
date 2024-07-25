@@ -787,7 +787,7 @@
 			interrupt-parent = <&gic>;
 			interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>;
 			services = <&tee_regmap>;
-			status = "okay";
+			status = "disabled";
 			range_1: range-1 {
 				region_name = "kernel";
 				region_start_31_0       = <0x04000000>;
