@@ -120,7 +120,7 @@ void ion_iommu_unmap_ion_handle(struct device *dev,
  * @brief Map physical address
  *
  * @param[in] dev: corresponding device
- * @param[in] pyhs_addr: physical address
+ * @param[in] phys_addr: physical address
  * @param[in] size: map size
  * @param[out] iova: Mapped IO virtual address
  * @param[in] iommu_prot: iommu map Attributes
@@ -136,7 +136,7 @@ void ion_iommu_unmap_ion_handle(struct device *dev,
  * @design
  */
 int32_t ion_iommu_map_ion_phys(struct device *dev,
-		phys_addr_t pyhs_addr, size_t size, dma_addr_t *iova, int32_t iommu_prot);
+		phys_addr_t phys_addr, size_t size, dma_addr_t *iova, int32_t iommu_prot);
 
 /**
  * @NO{S17E08C01I}

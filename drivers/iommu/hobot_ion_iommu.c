@@ -663,7 +663,7 @@ EXPORT_SYMBOL(ion_iommu_unmap_ion_handle);/*PRQA S 0307, 0777*//*kernel declarat
  * @brief Map physical address
  *
  * @param[in] dev: corresponding device
- * @param[in] pyhs_addr: physical address
+ * @param[in] phys_addr: physical address
  * @param[in] size: map size
  * @param[out] iova: Mapped IO virtual address
  * @param[in] iommu_prot: iommu map Attributes
@@ -679,7 +679,7 @@ EXPORT_SYMBOL(ion_iommu_unmap_ion_handle);/*PRQA S 0307, 0777*//*kernel declarat
  * @design
  */
 int32_t ion_iommu_map_ion_phys(struct device *dev,
-		phys_addr_t pyhs_addr, size_t size, dma_addr_t *iova, int32_t iommu_prot)
+		phys_addr_t phys_addr, size_t size, dma_addr_t *iova, int32_t iommu_prot)
 {
 	int32_t ret = 0;
 
@@ -688,7 +688,7 @@ int32_t ion_iommu_map_ion_phys(struct device *dev,
 		return -EINVAL;
 	}
 
-	*iova = hobot_iovmm_map_page(dev, pyhs_addr, size,
+	*iova = hobot_iovmm_map_page(dev, phys_addr, size,
 				DMA_TO_DEVICE, iommu_prot);
 
 	if (IS_ERR_VALUE(*iova) != 0) {/*PRQA S 2895*//*kernel function*/
