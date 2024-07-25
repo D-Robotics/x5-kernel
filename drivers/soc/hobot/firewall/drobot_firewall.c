@@ -243,6 +243,7 @@ static int ddr_mpu_protect(struct mpu_protection *mpu_prt, struct mpu_region *re
         uint32_t regmap_base = 0;
 
         if (strncmp(region->name, "kernel", strlen("kernel") + 1) == 0) {
+                region->region_start_31_0 = (uint32_t)virt_to_phys(_stext) - 0x80000000;
                 region->region_end_31_0 = (uint32_t)virt_to_phys(__end_rodata) - 0x80000000;
         }
         if (region->base == HORIZON_DDR_MPU_0) {

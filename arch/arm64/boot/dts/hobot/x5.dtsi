@@ -787,15 +787,15 @@
 			interrupt-parent = <&gic>;
 			interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>;
 			services = <&tee_regmap>;
-			status = "disabled";
+			status = "okay";
 			range_1: range-1 {
 				region_name = "kernel";
-				region_start_31_0       = <0x04000000>;
+				region_start_31_0       = <0x0>;
 				region_start_63_32      = <0x0>;
 				region_end_31_0         = <0x0>;
 				region_end_63_32        = <0x0>;
-				disable_rd_userid_31_0  = <A55_NSAID_1>;
-				disable_rd_userid_63_32 = <0xffffffff>;
+				disable_rd_userid_31_0  = <0x0>;
+				disable_rd_userid_63_32 = <0x0>;
 				disable_wr_userid_31_0  = <A55_NSAID_1>;
 				disable_wr_userid_63_32 = <0xffffffff>;
 				disable_ns              = <0>;
