@@ -35,11 +35,11 @@
 			linux,cma-default;
 		};
 
-                /* use as firewall default address */
-                firewall_ddr_default: firewall_ddr_default@8FE7F000 {
+		/* use as firewall default address */
+		firewall_ddr_default: firewall_ddr_default@8FE7F000 {
 			reg = <0x0 0x8FE7F000 0x0 0x00001000>;
 			no-map;
-                };
+		};
 
 		adsp_ddr: adsp_ddr@8FE80000 {
 			reg = <0x0 0x8FE80000 0x0 0x02200000>;
