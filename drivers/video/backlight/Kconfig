@@ -476,6 +476,13 @@ config BACKLIGHT_LED
 	help
 	  If you have a LCD backlight adjustable by LED class driver, say Y
 	  to enable this driver.
+	  
+config BACKLIGHT_HOBOT_X3
+	tristate "Hobot backlight controller driver"
+	default y
+	depends on I2C
+	help
+		Control the backlight level of RDK LCD panel.
 
 endif # BACKLIGHT_CLASS_DEVICE
 

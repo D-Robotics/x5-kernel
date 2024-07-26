@@ -229,6 +229,15 @@
 	status = "okay";
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_i2c3>;
+
+	ft5406@38 {
+		compatible = "ft5406";
+		reg = <0x38>;
+	};
+	hbx3_bl@45 {
+		compatible = "hobot_bl_controller";
+		reg = <0x45>;
+	};
 };
 
 &i2c4 {
