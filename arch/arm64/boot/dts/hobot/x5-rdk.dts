@@ -141,6 +141,22 @@
 	status = "okay";
 };
 
+// 40pin GPIO
+&ls_gpio0_porta {
+	pinctrl-names = "default";
+	pinctrl-0 = < &lsio_gpio0_0
+				  &lsio_gpio0_1
+				  &lsio_gpio0_2
+				  &lsio_gpio0_3
+				  &lsio_gpio0_8
+				  &lsio_gpio0_9
+				  &lsio_gpio0_20
+				  &lsio_gpio0_21
+				  &lsio_gpio0_22
+				  &lsio_gpio0_23
+				>;
+};
+
 &adc {
 	status = "okay";
 };
@@ -151,6 +167,8 @@
 
 &uart1 {
 	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_uart1>;
 };
 
 // Bluetooth
@@ -219,6 +237,41 @@
 	pinctrl-0 = <&pinctrl_i2c4>;
 };
 
+&i2c5 {
+	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_i2c5>;
+
+	es7210_0: es7210_0@40 {
+		compatible = "MicArray_0";
+		reg = <0x40>;
+		#sound-dai-cells = <1>;
+		channels = <8>;
+		adc_dev_num = <2>;
+		status = "okay";
+	};
+
+	es7210_1@42 {
+		compatible = "MicArray_2";
+		reg = <0x42>;
+		channels = <8>;
+		adc_dev_num = <2>;
+	};
+
+	es8156: es8156@8 {
+		compatible = "everest,es8156";
+		reg = <0x8>;
+		#sound-dai-cells = <0>;
+		status = "okay";
+	};
+};
+
+&i2c6 {
+	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_i2c6>;
+};
+
 &i2c7 {
 	status = "okay";
 	pinctrl-names = "default";
@@ -248,18 +301,18 @@
 	};
 };
 
-&i2c6 {
-	status = "okay";
-	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_i2c6>;
-};
-
 &spi1 {
 	status = "okay";
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_spi1>;
 	dma-names = "tx", "rx";
-	dmas = <&axi_dmac 25>, <&axi_dmac 24>;
+	dmas = <&axi_dmac 23>, <&axi_dmac 22>;
+
+	spidev@0 {
+		compatible = "dr,x5-spidev";
+		spi-max-frequency = <32000000>;
+		reg = <0>;
+	};
 };
 
 &spi5 {
@@ -660,8 +713,37 @@ the following ports need to be deleted */
 };
 
 &snd0 {
-	status = "disabled";
+	status = "okay";
 	#address-cells = <1>;
 	#size-cells = <0>;
 	simple-audio-card,name = "duplex-audio";
+
+	simple-audio-card,dai-link@0 {
+		link-name = "dai-link0";
+		reg = <1>;
+		format = "dsp_a";
+		mclk-fs = <64>;
+		bitclock-master = <&snd0_mm>;
+		frame-master = <&snd0_mm>;
+		snd0_mm: cpu {
+			sound-dai = <&dw_i2s1 0>;
+		};
+		codec {
+			sound-dai = <&es8156>;
+		};
+	};
+	dai-link@1 {
+		link-name = "dai-link1";
+		reg = <1>;
+		format = "dsp_a";
+		mclk-fs = <64>;
+		bitclock-master = <&snd0_m>;
+		frame-master = <&snd0_m>;
+		snd0_m: cpu {
+			sound-dai = <&dw_i2s1 1>;
+		};
+		codec {
+			sound-dai = <&es7210_0 0>;
+		};
+	};
 };
