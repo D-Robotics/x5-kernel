@@ -19,7 +19,9 @@
 #include <sound/soc.h>
 #include "gua_pcm.h"
 
-#define GUA_AUDIO_FORMATS       (SNDRV_PCM_FMTBIT_S16_LE | SNDRV_PCM_FMTBIT_S24_LE)
+#define GUA_AUDIO_FORMATS       (SNDRV_PCM_FMTBIT_S16_LE | SNDRV_PCM_FMTBIT_S24_3LE)
+#define DMA_BUSWIDTH_4BYTES     (4u)
+#define FROMAT_BITS_TO_BYTES     (3u)
 extern int32_t sync_pipeline_state(uint16_t pcm_device, uint8_t stream, uint8_t state);
 
 /* make sure : bind with dai_links & cpu_dais */
@@ -328,7 +330,7 @@ static int gua_pcm_hw_params(struct snd_soc_component *component, struct snd_pcm
 
 	if (params_format(params) == SNDRV_PCM_FORMAT_S16_LE)
 		rpmsg->send_msg.param.format = AUDIO_FORMAT_I_S16LE;
-	else if (params_format(params) == SNDRV_PCM_FORMAT_S24_LE)
+	else if (params_format(params) == SNDRV_PCM_FORMAT_S24_3LE)
 		rpmsg->send_msg.param.format = AUDIO_FORMAT_I_S24LE;
 	else
 		rpmsg->send_msg.param.format = AUDIO_FORMAT_I_S32LE;
@@ -392,7 +394,8 @@ static int gua_pcm_open(struct snd_soc_component *component, struct snd_pcm_subs
 	struct pcm_info *pcm_info = &au_info->pcm_info;
 	int pcm_device = substream->pcm->device;
 	int cmd;
-	int ret, id;
+	int ret = 0, id;
+	int buf_bytes;
 
 	dev_info(rtd->dev, "AUDIO : pcm open. pcm[%d] stream[%d]\n", substream->pcm->device, substream->stream);
 
@@ -402,6 +405,7 @@ static int gua_pcm_open(struct snd_soc_component *component, struct snd_pcm_subs
 		cmd = PCM_TX_PERIOD_DONE;
 		pcm_info->data[pcm_device].message[cmd].send_msg.param.sw_pointer = 0;
 		pcm_info->data[pcm_device].message[cmd].recv_msg.param.hw_pointer = 0;
+		buf_bytes = pcms_hw_info[substream->pcm->device].playback_hw.buffer_bytes_max;
 	} else {
 		sync_pipeline_state(pcm_device, SNDRV_PCM_STREAM_CAPTURE, PCM_RX_OPEN);
 		pcm_hw_info = pcms_hw_info[substream->pcm->device].capture_hw;
@@ -409,6 +413,7 @@ static int gua_pcm_open(struct snd_soc_component *component, struct snd_pcm_subs
 		pcm_info->data[pcm_device].message[cmd].send_msg.param.sw_pointer = 0;
 		pcm_info->data[pcm_device].message[cmd].recv_msg.param.hw_pointer = 0;
 		id = pcm_info->data[pcm_device].poster_id[1];
+		buf_bytes = pcms_hw_info[substream->pcm->device].capture_hw.buffer_bytes_max;
 	}
 	snd_soc_set_runtime_hwparams(substream, &pcm_hw_info);
 
@@ -417,6 +422,12 @@ static int gua_pcm_open(struct snd_soc_component *component, struct snd_pcm_subs
 		return ret;
 	}
 	pcm_info->data[pcm_device].ack_drop_count[substream->stream] = 0;
+
+	au_info->tmp_buf = kzalloc(buf_bytes, GFP_KERNEL);
+	if (!au_info->tmp_buf) {
+		pr_err("kzalloc for tmp_buf failed\n");
+		return -ENOMEM;
+	}
 
 	return ret;
 }
@@ -477,6 +488,11 @@ static int gua_pcm_close(struct snd_soc_component *component, struct snd_pcm_sub
 		dev_warn(rtd->dev, "AUDIO : message is dropped, number is %d\n", pcm_info->data[pcm_device].ack_drop_count[substream->stream]);
 	}
 
+	if (au_info->tmp_buf) {
+		kfree(au_info->tmp_buf);
+		au_info->tmp_buf = NULL;
+	}
+
 	return ret;
 }
 
@@ -488,27 +504,37 @@ static int gua_pcm_set_buffer(struct snd_pcm_substream *substream)
 	struct pcm_info *pcm_info = &au_info->pcm_info;
 	audio_poster_t *au_poster;
 	struct pcm_rpmsg *rpmsg;
+	struct pcm_rpmsg *hw_rpmsg;
 	int pcm_device = substream->pcm->device;
 	int id;
+	uint32_t word_len;
 
 	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
 		rpmsg = &pcm_info->data[pcm_device].message[PCM_TX_BUFFER];
+		hw_rpmsg = &pcm_info->data[pcm_device].message[PCM_TX_HW_PARAM];
 		rpmsg->send_msg.param.cmd = PCM_TX_BUFFER;
 		id = pcm_info->data[pcm_device].poster_id[0];
 	} else {
 		rpmsg = &pcm_info->data[pcm_device].message[PCM_RX_BUFFER];
+		hw_rpmsg = &pcm_info->data[pcm_device].message[PCM_RX_HW_PARAM];
 		rpmsg->send_msg.param.cmd = PCM_RX_BUFFER;
 		id = pcm_info->data[pcm_device].poster_id[1];
 	}
 	au_poster = &au_info->au_warpper->poster[id];
 	rpmsg->send_msg.param.pcm_device = pcm_device;
 	rpmsg->send_msg.param.buffer_addr = substream->runtime->dma_addr;
-	rpmsg->send_msg.param.buffer_size = snd_pcm_lib_buffer_bytes(substream);
-	rpmsg->send_msg.param.period_size = snd_pcm_lib_period_bytes(substream);
+	if (hw_rpmsg->send_msg.param.format == AUDIO_FORMAT_I_S24LE) {
+		word_len = 3;
+		rpmsg->send_msg.param.buffer_size = snd_pcm_lib_buffer_bytes(substream) / word_len * DMA_BUSWIDTH_4BYTES;
+		rpmsg->send_msg.param.period_size = snd_pcm_lib_period_bytes(substream) / word_len * DMA_BUSWIDTH_4BYTES;
+	} else {
+		rpmsg->send_msg.param.buffer_size = snd_pcm_lib_buffer_bytes(substream);
+		rpmsg->send_msg.param.period_size = snd_pcm_lib_period_bytes(substream);
+	}
 	rpmsg->send_msg.param.sw_pointer = 0;
 	pcm_info->data[pcm_device].periods[substream->stream] = rpmsg->send_msg.param.buffer_size / rpmsg->send_msg.param.period_size;
 
-	dev_info(rtd->dev, "AUDIO : pcm set buffer\n");
+	dev_info(rtd->dev, "AUDIO : pcm set buffer, period_size %d buffer_size %d\n", rpmsg->send_msg.param.period_size, rpmsg->send_msg.param.buffer_size);
 	return au_info->au_warpper->send_msg(au_poster, (void *)&rpmsg->send_msg, sizeof(struct pcm_rpmsg_s));
 }
 
@@ -684,7 +710,7 @@ static int gua_pcm_new(struct snd_soc_component *component, struct snd_soc_pcm_r
 	struct snd_pcm *pcm = rtd->pcm;
 	struct snd_soc_dai *cpu_dai = asoc_rtd_to_cpu(rtd, 0);
 	struct gua_audio_info *au_info = dev_get_drvdata(cpu_dai->dev);
-	int ret;
+	int ret = 0;
 
 	if (pcm->streams[SNDRV_PCM_STREAM_PLAYBACK].substream) {
 		au_info->pcm_info.data[pcm->device].substream[0] = pcm->streams[0].substream;
@@ -730,6 +756,73 @@ static void pcm_addr_offset_calc(void)
 	}
 }
 
+static int32_t gua_pcm_copy_usr(struct snd_soc_component *component,
+		struct snd_pcm_substream *substream,
+		int channel, unsigned long hwoff,
+		void *buf, unsigned long bytes) {
+	struct snd_pcm_runtime *runtime = substream->runtime;
+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+	struct snd_soc_dai *cpu_dai = asoc_rtd_to_cpu(rtd, 0);
+	struct gua_audio_info *au_info = dev_get_drvdata(cpu_dai->dev);
+	struct pcm_info *pcm_info = &au_info->pcm_info;
+	struct pcm_rpmsg *rpmsg;
+	int pcm_device = substream->pcm->device;
+	uint8_t format;
+	uint64_t hwoff_real;
+	uint32_t word_len;
+
+	char *dma_ptr = NULL;
+	unsigned long period_bytes = frames_to_bytes(runtime, runtime->period_size);
+	int32_t period_count = bytes / period_bytes;
+	char *tmp_buf = au_info->tmp_buf;
+
+	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
+		rpmsg = &pcm_info->data[pcm_device].message[PCM_TX_HW_PARAM];
+	} else {
+		rpmsg = &pcm_info->data[pcm_device].message[PCM_RX_HW_PARAM];
+	}
+
+	format = rpmsg->send_msg.param.format;
+	if (format == AUDIO_FORMAT_I_S24LE) {
+		word_len = 3;
+		hwoff_real = hwoff / word_len * DMA_BUSWIDTH_4BYTES;
+		dma_ptr = runtime->dma_area + hwoff_real + channel * (runtime->dma_bytes / runtime->channels);
+		if (substream->stream == SNDRV_PCM_STREAM_CAPTURE) {
+			for (int i = 0; i < period_count; i++) {
+				dma_ptr = dma_ptr + i * hwoff_real;
+				tmp_buf = tmp_buf + i * period_bytes;
+				for (int j = 0; j < period_bytes / word_len; j++) {
+					memcpy(&tmp_buf[j*word_len], &dma_ptr[j*DMA_BUSWIDTH_4BYTES], word_len);
+				}
+			}
+			if (copy_to_user((void __user *)buf, (void *)tmp_buf, bytes))
+				return -EFAULT;
+
+		} else {
+			if (copy_from_user((void *)tmp_buf, (void __user *)buf, bytes))
+				return -EFAULT;
+			for (int i = 0; i < period_count; i++) {
+				dma_ptr = dma_ptr + i * hwoff_real;
+				tmp_buf = tmp_buf + i * period_bytes;
+				for (int j = 0; j < period_bytes / word_len; j++) {
+					memcpy(&dma_ptr[j*DMA_BUSWIDTH_4BYTES], &tmp_buf[j*word_len], word_len);
+				}
+			}
+		}
+	} else {
+		dma_ptr = runtime->dma_area + hwoff + channel * (runtime->dma_bytes / runtime->channels);
+		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
+			if (copy_from_user(dma_ptr, (void __user *)buf, bytes))
+				return -EFAULT;
+		} else {
+			if (copy_to_user((void __user *)buf, dma_ptr, bytes))
+				return -EFAULT;
+		}
+	}
+
+	return 0;
+}
+
 static struct snd_soc_component_driver gua_soc_component = {
 #ifdef CONFIG_DEBUG_FS
 	.debugfs_prefix = "platform",
@@ -746,6 +839,7 @@ static struct snd_soc_component_driver gua_soc_component = {
 	.prepare	= gua_pcm_prepare,
 	.pcm_construct	= gua_pcm_new,
 	.pcm_destruct	= gua_pcm_free,
+	.copy_user      = gua_pcm_copy_usr
 };
 
 int gua_alsa_platform_register(struct device *dev)

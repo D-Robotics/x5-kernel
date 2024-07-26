@@ -112,6 +112,8 @@ struct gua_audio_info {
 	struct pcm_info pcm_info;			/*!< PCM information in sound card */
 	struct audio_mem_info mem_info;		/*!< share memory information */
 	ipc_wrapper_data_t *au_warpper;	/*!< pointer of ipc_wrapper platform device data */
+
+	char *tmp_buf; /*!< tmp_buf which used buffer dump */
 };
 
 /**

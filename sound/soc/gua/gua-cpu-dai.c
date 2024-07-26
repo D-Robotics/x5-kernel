@@ -25,7 +25,7 @@
 extern void link_audio_info(struct gua_audio_info *audio_info);
 
 #define GUA_AUDIO_RATES	(SNDRV_PCM_RATE_8000|SNDRV_PCM_RATE_16000|SNDRV_PCM_RATE_48000)
-#define GUA_AUDIO_FORMATS	(SNDRV_PCM_FMTBIT_S16_LE | SNDRV_PCM_FMTBIT_S24_LE)
+#define GUA_AUDIO_FORMATS	(SNDRV_PCM_FMTBIT_S16_LE | SNDRV_PCM_FMTBIT_S24_3LE)
 
 static const unsigned int gua_rpmsg_rates[] = {
 	8000, 16000, 44100, 32000, 48000, 96000, 192000,
