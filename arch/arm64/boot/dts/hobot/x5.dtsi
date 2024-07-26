@@ -2033,6 +2033,7 @@
 					mode-usb2 = <0x00000200>;
 					mode-uart = <0x00000300>;
 					mode-recovery = <0x00000400>;
+					mode-eye = <0x00000500>;
 				};
 
 				reboot-reason {
