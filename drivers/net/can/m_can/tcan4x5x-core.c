@@ -102,6 +102,11 @@
 #define TCAN4X5X_WD_3_S_TIMER BIT(29)
 #define TCAN4X5X_WD_6_S_TIMER (BIT(28) | BIT(29))
 
+#define LSIO_GPIO0 0x34120000
+#define GPIO_DATA 0x00
+#define LSIO_GPIO0_PIN07 7
+void __iomem *lsio_gpio0_base;
+
 static inline struct tcan4x5x_priv *cdev_to_priv(struct m_can_classdev *cdev)
 {
 	return container_of(cdev, struct tcan4x5x_priv, cdev);
@@ -124,19 +129,16 @@ static void tcan4x5x_check_wake(struct tcan4x5x_priv *priv)
 static int tcan4x5x_reset(struct tcan4x5x_priv *priv)
 {
 	int ret = 0;
+	unsigned int value;
 
-	if (priv->reset_gpio) {
-		gpiod_set_value(priv->reset_gpio, 1);
 
-		/* tpulse_width minimum 30us */
-		usleep_range(30, 100);
-		gpiod_set_value(priv->reset_gpio, 0);
-	} else {
-		ret = regmap_write(priv->regmap, TCAN4X5X_CONFIG,
-				   TCAN4X5X_SW_RESET);
-		if (ret)
-			return ret;
-	}
+	value = ioread32(lsio_gpio0_base+GPIO_DATA);
+	value = value | (0x01 << LSIO_GPIO0_PIN07);
+	iowrite32(value, lsio_gpio0_base+GPIO_DATA);
+	usleep_range(30, 100);
+	value = ioread32(lsio_gpio0_base+GPIO_DATA);
+	value = value & (~(0x01 << LSIO_GPIO0_PIN07));
+	iowrite32(value, lsio_gpio0_base+GPIO_DATA);
 
 	usleep_range(700, 1000);
 
@@ -267,10 +269,11 @@ static int tcan4x5x_get_gpios(struct m_can_classdev *cdev)
 		tcan4x5x_disable_wake(cdev);
 	}
 
-	tcan4x5x->reset_gpio = devm_gpiod_get_optional(cdev->dev, "reset",
-						       GPIOD_OUT_LOW);
-	if (IS_ERR(tcan4x5x->reset_gpio))
-		tcan4x5x->reset_gpio = NULL;
+    lsio_gpio0_base = ioremap(LSIO_GPIO0, 0x1000);
+    if (!lsio_gpio0_base) {
+        printk(KERN_ERR "Failed to map MMIO region\n");
+        return 0;
+    }
 
 	ret = tcan4x5x_reset(tcan4x5x);
 	if (ret)
@@ -381,6 +384,8 @@ out_power:
 static void tcan4x5x_can_remove(struct spi_device *spi)
 {
 	struct tcan4x5x_priv *priv = spi_get_drvdata(spi);
+
+	iounmap(lsio_gpio0_base);
 
 	m_can_class_unregister(&priv->cdev);
 
