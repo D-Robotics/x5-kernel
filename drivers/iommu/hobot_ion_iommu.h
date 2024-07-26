@@ -141,6 +141,48 @@ int32_t ion_iommu_map_ion_phys(struct device *dev,
 /**
  * @NO{S17E08C01I}
  * @ASIL{B}
+ * @brief Map sgtable
+ *
+ * @param[in] dev: corresponding device
+ * @param[in] table: the sgtable pending map
+ * @param[in] dir: the direction of sgtable
+ * @param[in] attr: the mapping attributes
+ *
+ * @retval "=0": succeed
+ * @retval "!=0": Linux errno
+ *
+ * @data_read None
+ * @data_updated None
+ *
+ * @callgraph
+ * @callergraph
+ * @design
+ */
+int32_t ion_iommu_map_ion_sgtable(struct device *dev, struct sg_table *table, enum dma_data_direction dir, unsigned long attrs);
+
+/**
+ * @NO{S17E08C01I}
+ * @ASIL{B}
+ * @brief Unmap sgtalbe
+ *
+ * @param[in] dev: corresponding device
+ * @param[in] table: the table pending unmap
+ *
+ * @retval "=0": succeed
+ * @retval "!=0": Linux errno
+ *
+ * @data_read None
+ * @data_updated None
+ *
+ * @callgraph
+ * @callergraph
+ * @design
+ */
+void ion_iommu_unmap_ion_sgtable(struct device *dev, struct sg_table *table, enum dma_data_direction dir);
+
+/**
+ * @NO{S17E08C01I}
+ * @ASIL{B}
  * @brief Unmap physical address
  *
  * @param[in] dev: corresponding device

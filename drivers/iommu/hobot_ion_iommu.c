@@ -17,8 +17,10 @@
 #include <linux/init.h>
 #include <linux/list.h>
 #include <linux/dma-buf.h>
+#include <linux/dma-map-ops.h>
 #include <linux/vmalloc.h>
 #include <linux/slab.h>
+#include <linux/scatterlist.h>
 
 #include "hobot_ion_iommu.h"
 #include <linux/ion.h>
@@ -1020,6 +1022,65 @@ void ion_iommu_unmap_ion_phys(struct device *dev,
 {
 }
 EXPORT_SYMBOL(ion_iommu_unmap_ion_phys);
+
+int32_t ion_iommu_map_ion_sgtable(struct device *dev, struct sg_table *table,
+								enum dma_data_direction dir, unsigned long attrs)
+{
+#if defined(CONFIG_DROBOT_LITE_MMU)
+	phys_addr_t phys;
+	struct lite_mmu_iommu *iommu = dev_iommu_priv_get(dev);
+	struct iommu_domain *domain;
+	int32_t ret, i;
+	struct scatterlist *sg;
+
+	if (IS_ERR_OR_NULL(iommu)) {
+		dev_warn_once(dev,
+			"Not attached to any iommu, using physical address!");
+		table->nents = 0;
+		return 0;
+	}
+
+	if (!iommu->domain)
+		return -EINVAL;
+
+	domain = iommu->domain;
+
+	for_each_sg(table->sgl, sg, table->orig_nents, i) {
+		phys = page_to_phys(sg_page(sg)) + sg->offset;
+		dev_dbg(dev, "%s:%d page:%#llx phys:%#llx sg->dma_address:%#llx\n", __func__, __LINE__,
+				(uint64_t)sg_page(sg),
+				(uint64_t)phys,
+				(uint64_t)sg->dma_address);
+		if (sg->dma_address != 0)
+			continue;
+		ret = ion_iommu_map_ion_phys(dev, phys,
+				sg->length, &(sg->dma_address), 0);
+		if (ret) {
+			dev_err(dev, "Mapping phys:%#llx failed!\n", (uint64_t)phys);
+			return ret;
+		}
+		sg_dma_len(sg) = sg->length;
+		if (!dev_is_dma_coherent(dev) && !(attrs & DMA_ATTR_SKIP_CPU_SYNC))
+			arch_sync_dma_for_device(phys, sg->length, dir);
+	}
+
+#else
+	if ((dev == NULL) || (iova == NULL)) {
+		(void)pr_err("%s: Invalid input parameters!\n", __func__);
+		return -EINVAL;
+	}
+	*iova = phys_addr;
+#endif
+	return 0;
+}
+EXPORT_SYMBOL(ion_iommu_map_ion_sgtable);
+
+/* code review E1: No need to return value */
+void ion_iommu_unmap_ion_sgtable(struct device *dev,
+		struct sg_table *table, enum dma_data_direction dir)
+{
+}
+EXPORT_SYMBOL(ion_iommu_unmap_ion_sgtable);
 
 int32_t ion_iommu_reset_mapping(struct device *dev)
 {
