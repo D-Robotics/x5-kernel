@@ -3420,7 +3420,13 @@
 			compatible = "hobot,remoteproc-hifi5";
 			status = "disabled";
 			interrupt-parent = <&gic>;
-			interrupts = <0 19 4>, <0 217 0x4>;
+			interrupts = <GIC_SPI 150 IRQ_TYPE_LEVEL_HIGH>;
+			dsp_iram0_map_addr = <0x20200000 0x10000>;
+			dsp_dram0_map_addr = <0x20210000 0x10000>;
+			dsp_dram1_map_addr = <0x20220000 0x10000>;
+			dsp_ddr = <&adsp_ddr>;
+			dsp_ddr_offset = <0x480000>;
+			dsp_ddr_size = <0x1d00000>;
 			log-offset = <0x7fe000>;
 			log-size = <4096>;
 			log-write-index-offset = <0x7fff10>;
