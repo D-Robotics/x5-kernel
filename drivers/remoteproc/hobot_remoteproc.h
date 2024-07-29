@@ -12,6 +12,7 @@
 #ifndef HOBOT_DSP_REMOTEPROC_H
 #define HOBOT_DSP_REMOTEPROC_H
 
+#include <linux/reset.h>
 #include <linux/clk.h>
 #include "hb_ipc_interface.h"
 #include "ipc_wrapper.h"
@@ -76,6 +77,9 @@ enum hifi5_runstall {
 //acore timesync notify
 #define TIMESYNC_ADSP_NOTIFY_ADDR	(0xd3ffff0cu)
 #define TIMESYNC_ADSP_NOTIFY_OFF	(0x7fff0cu)
+
+#define WWDT_ENABLE 	(0x1u)
+#define  WWDT_DISABLE	(0x0u)
 
 #define MAX_R_INDEX_NUM 16u
 
@@ -153,8 +157,6 @@ struct hobot_rproc_pdata {
 	int device_index;
 	u32 ipc_int_pa;
 	void __iomem *ipc_int_va;
-	void __iomem *mem_reserved[4];
-	u32 mem_reserved_size[4];
 	struct workqueue_struct *work_queue;
 	struct workqueue_struct *work_coredumpqueue;
 	struct work_struct work;
@@ -198,6 +200,27 @@ struct hobot_rproc_pdata {
 	// clk
 	struct clk *clk;
 	struct clk *p_clk;
+
+	//coredump
+	void __iomem *mem_reserved[4];
+	u32 mem_reserved_size[4];
+
+	uint32_t dsp_iram0_map_addr;
+	uint32_t dsp_iram0_size;
+	uint32_t dsp_dram0_map_addr;
+	uint32_t dsp_dram0_size;
+	uint32_t dsp_dram1_map_addr;
+	uint32_t dsp_dram1_size;
+	uint32_t dsp_ddr_size;
+
+	struct workqueue_struct *wq_coredump;
+	struct work_struct work_coredump;
+	struct completion completion_coredump;
+
+	int32_t is_wwdt_enable;
+	int32_t irq_wwdt_reset;
+
+	struct reset_control *rst;
 
 #if 0
 	int32_t dsp_pwait_int;

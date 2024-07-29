@@ -91,6 +91,7 @@ struct x5_hifi5_resous {
 static struct x5_hifi5_resous g_hifi5_res;
 
 static uint32_t litemmu_table[4] = {0x03020100, 0x07060504, 0x0B0A0908, 0x0F0E0D0C};
+static char *ramdump_name[] = {"ddr", "iram0", "dram0", "dram1"};
 
 extern int32_t sync_pipeline_state(uint16_t pcm_device, uint8_t stream, uint8_t state);
 static int32_t hobot_dsp_ipc_close_instance(void);
@@ -807,6 +808,11 @@ static int32_t hifi5_release_remoteproc(struct hobot_rproc_pdata *pdata)
 
 	if(g_hifi5_res.sec_reg)
 		devm_iounmap(pdata->dev, g_hifi5_res.sec_reg);
+
+	if (WWDT_DISABLE == pdata->is_wwdt_enable) {
+		enable_irq(pdata->irq_wwdt_reset);
+		pdata->is_wwdt_enable = WWDT_ENABLE;
+	}
 
 	adsp_boot_flag = 0;
 
@@ -1673,6 +1679,194 @@ static int32_t hobot_remoteproc_smf_init(struct platform_device *pdev)
 	return 0;
 }
 
+
+static void hobot_remoteproc_coredump_work(struct work_struct *work) {
+	struct file *fp[4];
+	struct timespec64 current_time;
+	struct tm tm;
+	char file_name[4][128];
+	struct hobot_rproc_pdata *pdata = container_of(work, struct hobot_rproc_pdata, work_coredump);
+	loff_t pos;
+	uint32_t i;
+	ssize_t wsize;
+
+	while (1) {
+		if (wait_for_completion_interruptible(&pdata->completion_coredump) < 0) {
+			break;
+		}
+
+		ktime_get_real_ts64(&current_time);
+		time64_to_tm(current_time.tv_sec, 0, &tm);
+		for (i = 0; i < 4; i++) {
+			snprintf(file_name[i], sizeof(file_name[i]),
+				"/userdata/log/coredump/dsp_%s_%04ld-%02d-%02d-%02d-%02d-%02d.hex",
+				ramdump_name[i], tm.tm_year+1900, tm.tm_mon+1, tm.tm_mday,
+				tm.tm_hour, tm.tm_min, tm.tm_sec);
+
+			fp[i] = filp_open(file_name[i], O_CREAT | O_TRUNC | O_WRONLY, S_IWUSR | S_IRUSR);
+			if (IS_ERR(fp[i])) {
+				dev_err(&pdata->rproc->dev, "filp_open %s failed\n", file_name[i]);
+				return;
+			}
+
+			pos = fp[i]->f_pos;
+			wsize = kernel_write(fp[i], pdata->mem_reserved[i], pdata->mem_reserved_size[i],
+					&pos);
+			fp[i]->f_pos = pos;
+
+			filp_close(fp[i], NULL);
+		}
+
+		//dsp reset
+		reset_control_assert(pdata->rst);
+	}
+}
+
+static irqreturn_t dsp_wdt_isr(int32_t irq, void *param) {
+	struct hobot_rproc_pdata *pdata = (struct hobot_rproc_pdata *)param;
+	pdata->is_wwdt_enable = WWDT_DISABLE;
+	disable_irq_nosync(irq);
+	complete(&pdata->completion_coredump);
+	dev_info(&pdata->rproc->dev, "%s interrupt\n", __func__);
+
+	return IRQ_HANDLED;
+}
+
+static int32_t irq_init(struct platform_device *pdev) {
+	struct hobot_rproc_pdata *pdata = platform_get_drvdata(pdev);
+	int32_t ret = 0;
+
+	pdata->irq_wwdt_reset = platform_get_irq(pdev, 0);
+	if (pdata->irq_wwdt_reset < 0) {
+		dev_err(&pdev->dev, "platform_get_irq irq_wwdt_reset error\n");
+		return -EINVAL;
+	}
+
+	pdata->wq_coredump = create_singlethread_workqueue("dsp_dump_wq");
+	if (!pdata->wq_coredump) {
+		dev_err(&pdev->dev, "create_singlethread_workqueue error\n");
+		return -EINVAL;
+	}
+
+	init_completion(&pdata->completion_coredump);
+	INIT_WORK(&(pdata->work_coredump), hobot_remoteproc_coredump_work);
+
+	if (queue_work(pdata->wq_coredump, &pdata->work_coredump) == false) {
+		dev_err(&pdev->dev, "queue_work dsp coredump error\n");
+		return -EINVAL;
+	}
+
+	ret = devm_request_irq(&pdev->dev, (uint32_t)pdata->irq_wwdt_reset,
+			dsp_wdt_isr, IRQF_SHARED, "dsp_wwdt_irq", pdata);
+	if (ret) {
+		dev_err(&pdev->dev, "devm_request_irq dsp_wwdt_irq error\n");
+		return -EINVAL;
+	}
+	pdata->is_wwdt_enable = WWDT_ENABLE;
+	return ret;
+}
+
+static int32_t parse_reserve_mem(struct platform_device *pdev) {
+	int32_t ret = 0;
+
+	struct device_node *node;
+        struct resource res;
+	u32 dsp_ddr_offset;
+	struct hobot_rproc_pdata *pdata = platform_get_drvdata(pdev);
+
+	ret = of_property_read_u32_index(pdev->dev.of_node, "dsp_iram0_map_addr", 0,
+			&(pdata->dsp_iram0_map_addr));
+	if (ret) {
+		dev_err(&pdev->dev, "get dsp_iram0_map_addr failed\n");
+		return -EINVAL;
+	}
+
+	ret = of_property_read_u32_index(pdev->dev.of_node, "dsp_iram0_map_addr", 1,
+                        &(pdata->dsp_iram0_size));
+        if (ret) {
+                dev_err(&pdev->dev, "get dsp_iram0_map_addr size failed\n");
+                return -EINVAL;
+        }
+
+	ret = of_property_read_u32_index(pdev->dev.of_node, "dsp_dram0_map_addr", 0,
+			&(pdata->dsp_dram0_map_addr));
+	if (ret) {
+		dev_err(&pdev->dev, "get dsp_dram0_map_addr failed\n");
+		return -EINVAL;
+	}
+
+	ret = of_property_read_u32_index(pdev->dev.of_node, "dsp_dram0_map_addr", 1,
+                        &(pdata->dsp_dram0_size));
+        if (ret) {
+                dev_err(&pdev->dev, "get dsp_dram0_map_addr size failed\n");
+                return -EINVAL;
+        }
+
+	ret = of_property_read_u32_index(pdev->dev.of_node, "dsp_dram1_map_addr", 0,
+                        &(pdata->dsp_dram1_map_addr));
+        if (ret) {
+                dev_err(&pdev->dev, "get dsp_dram1_map_addr failed\n");
+                return -EINVAL;
+        }
+
+        ret = of_property_read_u32_index(pdev->dev.of_node, "dsp_dram1_map_addr", 1,
+                        &(pdata->dsp_dram1_size));
+        if (ret) {
+                dev_err(&pdev->dev, "get dsp_dram1_map_addr size failed\n");
+                return -EINVAL;
+        }
+
+	node = of_parse_phandle(pdev->dev.of_node, "dsp_ddr", 0);
+        ret = of_address_to_resource(node, 0, &res);
+        if (ret) {
+                dev_err(&pdev->dev, "Get adsp_ddr failed\n");
+                return ret;
+        }
+	ret = of_property_read_u32(pdev->dev.of_node, "dsp_ddr_offset", &dsp_ddr_offset);
+	if (ret) {
+		dev_err(&pdev->dev, "get ddr-offset error\n");
+		return -EINVAL;
+	}
+	ret = of_property_read_u32(pdev->dev.of_node, "dsp_ddr_size", &pdata->dsp_ddr_size);
+	if (ret) {
+		dev_err(&pdev->dev, "get ddr-size error\n");
+		return -EINVAL;
+	}
+
+	dev_dbg(&pdev->dev, "iram0 0x%x dram0 0x%x dram1 0x%x ddr 0x%llx\n",
+		pdata->dsp_iram0_map_addr, pdata->dsp_dram0_map_addr,
+		pdata->dsp_dram1_map_addr, res.start + dsp_ddr_offset);
+	pdata->mem_reserved[0] = ioremap_wc(res.start + dsp_ddr_offset,
+			pdata->dsp_ddr_size);
+	pdata->mem_reserved[1] = ioremap_wc(pdata->dsp_iram0_map_addr,
+			pdata->dsp_iram0_size);
+	pdata->mem_reserved[2] = ioremap_wc(pdata->dsp_dram0_map_addr,
+			pdata->dsp_dram0_size);
+	pdata->mem_reserved[3] = ioremap_wc(pdata->dsp_dram1_map_addr,
+			pdata->dsp_dram1_size);
+
+	if (!pdata->mem_reserved[0] || !pdata->mem_reserved[1] || !pdata->mem_reserved[2] || !pdata->mem_reserved[3]) {
+		dev_err(&pdev->dev, "ioremap dsp tcm failed\n");
+		return -EINVAL;
+	}
+
+	pdata->mem_reserved_size[0] = pdata->dsp_ddr_size;
+	pdata->mem_reserved_size[1] = pdata->dsp_iram0_size;
+	pdata->mem_reserved_size[2] = pdata->dsp_dram0_size;
+	pdata->mem_reserved_size[3] = pdata->dsp_dram1_size;
+
+	return ret;
+}
+
+static void deinit_reserve_mem(struct platform_device *pdev) {
+	struct hobot_rproc_pdata *pdata = platform_get_drvdata(pdev);
+
+	for (int i = 0; i < 4; i++) {
+		if (pdata->mem_reserved[i])
+			iounmap(pdata->mem_reserved[i]);
+	}
+}
+
 static int32_t hobot_remoteproc_probe(struct platform_device *pdev)
 {
 	int32_t device_index = 0;
@@ -1755,14 +1949,20 @@ static int32_t hobot_remoteproc_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "clk enabled failed\n");
 		return ret;
 	}
-#if 0
-	wait for ipc porting
+
+	ret = parse_reserve_mem(pdev);
 	ret = irq_init(pdev);
 	if (ret < 0) {
 		dev_err(&pdev->dev, "irq_init error\n");
-		goto deinit_ipc_out;
+		goto deinit_irq_out;
 	}
-#endif
+
+	pdata->rst = devm_reset_control_get(&pdev->dev, NULL);
+	if (IS_ERR(pdata->rst)) {
+		dev_err(&pdev->dev, "Missing reset controller\n");
+		return PTR_ERR_OR_ZERO(pdata->rst);
+	}
+
 	ret = proc_node_init(pdev);
 	if (ret < 0) {
 		dev_err(&pdev->dev, "proc_node_init error\n");
@@ -1855,6 +2055,8 @@ static int32_t hobot_remoteproc_remove(struct platform_device *pdev) {
 #endif
 
 	rproc_free(pdata->rproc);
+
+	deinit_reserve_mem(pdev);
 
 	return ret;
 }
