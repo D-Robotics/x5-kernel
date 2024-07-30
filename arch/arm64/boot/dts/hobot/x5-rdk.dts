@@ -308,6 +308,23 @@
 			};
 		};
 	};
+	es8326: es8326@18 {
+		compatible = "everest,es8326";
+		reg = <0x18>;
+		#sound-dai-cells = <0>;
+		interrupt-parent = <&dsp_gpio_porta>;
+		interrupts = <21 0>;
+		everest,interrupt-src = [08];
+		everest,interrupt-clk = [00];
+		mclk = <24576000>; // add sysclk property, remove the property if the clock frequency is not fixed.
+		status = "okay";
+	};
+};
+
+&i2c6 {
+	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_i2c6>;
 };
 
 &spi1 {
@@ -433,7 +450,8 @@
 
 &dw_i2s0 {
 	status = "okay";
-	//#sound-dai-cells = <1>;
+	dwc-master = <1>;
+	#sound-dai-cells = <1>;
 };
 
 &dw_i2s1 {
@@ -730,29 +748,16 @@ the following ports need to be deleted */
 	simple-audio-card,dai-link@0 {
 		link-name = "dai-link0";
 		reg = <1>;
-		format = "dsp_a";
+		format = "i2s";
 		mclk-fs = <64>;
 		bitclock-master = <&snd0_mm>;
 		frame-master = <&snd0_mm>;
 		snd0_mm: cpu {
-			sound-dai = <&dw_i2s1 0>;
+			sound-dai = <&dw_i2s0 0>;
 		};
 		codec {
-			sound-dai = <&es8156>;
-		};
-	};
-	dai-link@1 {
-		link-name = "dai-link1";
-		reg = <1>;
-		format = "dsp_a";
-		mclk-fs = <64>;
-		bitclock-master = <&snd0_m>;
-		frame-master = <&snd0_m>;
-		snd0_m: cpu {
-			sound-dai = <&dw_i2s1 1>;
-		};
-		codec {
-			sound-dai = <&es7210_0 0>;
+			sound-dai = <&es8326>;
 		};
 	};
 };
+
