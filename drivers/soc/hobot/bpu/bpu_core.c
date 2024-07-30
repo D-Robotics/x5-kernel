@@ -922,7 +922,7 @@ static int bpu_core_suspend(struct device *dev)
 
 	mutex_lock(&core->mutex_lock);
 	tmp_hw_state = core->hw_enabled;
-	ret = bpu_core_power_off_quirk(core);
+	ret = bpu_core_disable(core);
 	if (ret != 0) {
 		mutex_unlock(&core->mutex_lock);
 		dev_err(dev, "BPU core%d suspend failed\n", core->index);
