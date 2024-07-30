@@ -463,14 +463,25 @@ static inline int get_coeff(int mclk, int rate, int array,
 }
 
 static int es8326_set_dai_sysclk(struct snd_soc_dai *codec_dai,
-				 int clk_id, unsigned int freq, int dir)
+                                 int clk_id, unsigned int freq, int dir)
 {
-	struct snd_soc_component *codec = codec_dai->component;
-	struct es8326_priv *es8326 = snd_soc_component_get_drvdata(codec);
+    struct snd_soc_component *codec = codec_dai->component;
+    struct es8326_priv *es8326 = snd_soc_component_get_drvdata(codec);
+    struct device_node *np = codec->dev->of_node;
+    int ret;
 
-	es8326->sysclk = freq;
+    if (np) {
+        ret = of_property_read_u32(np, "mclk", &es8326->sysclk);
+        if (ret) {
+            dev_err(codec->dev, "Failed to read mclk from device tree: %d\n", ret);
+            es8326->sysclk = freq;// If there is no device tree node or failed read, use the provided freq value.
+            return ret;
+        }
+    } else {
+        es8326->sysclk = freq; // If there is no device tree node, use the provided freq value.
+    }
 
-	return 0;
+    return 0;
 }
 
 static int es8326_set_dai_fmt(struct snd_soc_dai *codec_dai, unsigned int fmt)
