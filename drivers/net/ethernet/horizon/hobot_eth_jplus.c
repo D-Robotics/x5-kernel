@@ -7139,8 +7139,8 @@ err_mdio_reg:
 static s32 eth_drv_probe(struct device *device, struct plat_config_data *plat_dat, struct mac_resource *mac_res)
 {
 	struct hobot_priv *priv;
+	u8 mac_addr[ETH_ALEN];
 	s32 ret;
-
 
 	struct net_device *ndev = alloc_etherdev_mqs(sizeof(struct hobot_priv), MTL_MAX_TX_QUEUES, MTL_MAX_RX_QUEUES);
 	if (NULL == ndev)
@@ -7157,12 +7157,19 @@ static s32 eth_drv_probe(struct device *device, struct plat_config_data *plat_da
 	priv->ndev->irq = mac_res->irq;
 	priv->wol_irq = mac_res->wol_irq;
 	if (!IS_ERR_OR_NULL(mac_res->mac)) {
-		memcpy(ndev->dev_addr, mac_res->mac, ETH_ALEN);/*PRQA S 1495*/
+		eth_hw_addr_set(ndev,mac_res->mac);
 	} else 	{
-		get_random_bytes((void *)ndev->dev_addr, (s32)ndev->addr_len);
-		ndev->dev_addr[0] &= ~SZ_1;	/* clear multicast bit */ /*PRQA S 1851, 4434, 4532*/
-		ndev->dev_addr[0] |= SZ_2;	/* set local assignment bit (IEEE802) */ /*PRQA S 1861*/
+		get_random_bytes(mac_addr, ETH_ALEN);
+		mac_addr[0] &= ~SZ_1;		/* clear multicast bit */ /*PRQA S 1851, 4434, 4532*/
+		mac_addr[0] |= SZ_2;		/* set local assignment bit (IEEE802) */ /*PRQA S 1861*/
+		eth_hw_addr_set(ndev, mac_addr);
+
+		netdev_info(ndev, "(using random mac adress)\n");
 	}
+
+	netdev_info(ndev, "devicec MAC addr %pM\n",
+			ndev->dev_addr);
+
 	set_umac_addr(priv->ioaddr, ndev->dev_addr, 0);
 
 	dev_set_drvdata(device, (void *)priv->ndev);
