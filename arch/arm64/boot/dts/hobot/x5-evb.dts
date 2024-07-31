@@ -655,7 +655,7 @@
 /**display sub-system end**/
 
 &horizon_tsn {
-	status = "disabled";
+	status = "okay";
 
 	phy-mode = "rgmii-id";
 	pinctrl-names = "default";
@@ -673,7 +673,7 @@
 };
 
 &gmac_tsn {
-	status = "okay";
+	status = "disabled";
 
 	phy-mode = "rgmii-id";
 	pinctrl-names = "default";
