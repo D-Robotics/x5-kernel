@@ -94,17 +94,6 @@ config VERISILICON_GC_PROC_SUPPORT
 	  Say Y if you want to support GC820 integration to Verisilicon drm
 	  framework.
 
-config VERISILICON_PRIMARY_OVERLAY_CNT
-	int "primary/overlay plane count" if VERISILICON_GC_PROC_SUPPORT
-	range 3 10
-	default 3 if !VERISILICON_GC_PROC_SUPPORT
-	default 10 if VERISILICON_GC_PROC_SUPPORT
-	help
-	  Specifies the default primary/overlay plane count supported by DC8000
-	  Nano. With help of 2D GPU, 8 more planes are supported. And original
-	  overlay plane 2 is dedicated only to display GPU result. With the help
-	  of 2D GPU, scaling and rotation are supported.
-
 config VERISILICON_DEV_LINK_CNT
 	int "max supplier devices count for drm device"
 	default 32

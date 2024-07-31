@@ -403,7 +403,7 @@ static struct dc_plane_info dc_plane_info[] = {
 					BIT(DRM_COLOR_YCBCR_BT601) | BIT(DRM_COLOR_YCBCR_BT709),
 				.min_scale  = DRM_PLANE_NO_SCALING,
 				.max_scale  = DRM_PLANE_NO_SCALING,
-				.zpos	    = {0, CONFIG_VERISILICON_PRIMARY_OVERLAY_CNT - 1, 0},
+				.zpos	    = {0, 2, 0},
 				.crtc_names = crtc_names,
 				.num_crtcs  = ARRAY_SIZE(crtc_names),
 			},
@@ -430,7 +430,7 @@ static struct dc_plane_info dc_plane_info[] = {
 					BIT(DRM_COLOR_YCBCR_BT601) | BIT(DRM_COLOR_YCBCR_BT709),
 				.min_scale  = DRM_PLANE_NO_SCALING,
 				.max_scale  = DRM_PLANE_NO_SCALING,
-				.zpos	    = {0, CONFIG_VERISILICON_PRIMARY_OVERLAY_CNT - 1, 1},
+				.zpos	    = {0, 2, 1},
 				.crtc_names = crtc_names,
 				.num_crtcs  = ARRAY_SIZE(crtc_names),
 			},
@@ -452,18 +452,18 @@ static struct dc_plane_info dc_plane_info[] = {
 					      BIT(DRM_MODE_BLEND_PREMULTI) |
 					      BIT(DRM_MODE_BLEND_COVERAGE),
 #ifdef CONFIG_VERISILICON_GC_PROC_SUPPORT
-				.num_formats   = ARRAY_SIZE(gc_overlay_formats),
-				.formats       = gc_overlay_formats,
-				.rotation   = DRM_MODE_ROTATE_MASK | DRM_MODE_REFLECT_MASK,
-				.min_scale = FRAC_16_16(1, 3),
-				.max_scale = FRAC_16_16(3, 1),
+				.num_formats = ARRAY_SIZE(gc_overlay_formats),
+				.formats     = gc_overlay_formats,
+				.rotation    = DRM_MODE_ROTATE_MASK | DRM_MODE_REFLECT_MASK,
+				.min_scale   = FRAC_16_16(1, 3),
+				.max_scale   = FRAC_16_16(3, 1),
 #else
 				.num_formats = ARRAY_SIZE(primary_overlay_formats),
 				.formats     = primary_overlay_formats,
 				.min_scale   = DRM_PLANE_NO_SCALING,
 				.max_scale   = DRM_PLANE_NO_SCALING,
 #endif
-				.zpos	    = {0, CONFIG_VERISILICON_PRIMARY_OVERLAY_CNT - 1, 2},
+				.zpos	    = {0, 2, 2},
 				.crtc_names = crtc_names,
 				.num_crtcs  = ARRAY_SIZE(crtc_names),
 			},
@@ -475,190 +475,6 @@ static struct dc_plane_info dc_plane_info[] = {
 		.num_proc  = ARRAY_SIZE(dc_proc_info_overlay_1),
 #endif
 	},
-#ifdef CONFIG_VERISILICON_GC_PROC_SUPPORT
-	{
-		.info =
-			{
-				.name	       = "Overlay_2",
-				.type	       = DRM_PLANE_TYPE_OVERLAY,
-				.modifiers     = format_modifiers,
-				.num_modifiers = NUM_MODIFIERS,
-				.num_formats   = ARRAY_SIZE(gc_overlay_formats),
-				.formats       = gc_overlay_formats,
-				.min_width     = 0,
-				.min_height    = 0,
-				.max_width     = 2560,
-				.max_height    = 1440,
-				.blend_mode    = BIT(DRM_MODE_BLEND_PIXEL_NONE) |
-					      BIT(DRM_MODE_BLEND_PREMULTI) |
-					      BIT(DRM_MODE_BLEND_COVERAGE),
-				.rotation   = DRM_MODE_ROTATE_MASK | DRM_MODE_REFLECT_MASK,
-				.min_scale  = FRAC_16_16(1, 3),
-				.max_scale  = FRAC_16_16(3, 1),
-				.zpos	    = {0, CONFIG_VERISILICON_PRIMARY_OVERLAY_CNT - 1, 3},
-				.crtc_names = crtc_names,
-				.num_crtcs  = ARRAY_SIZE(crtc_names),
-			},
-		.proc_info = dc_proc_info_gpu_0,
-		.num_proc  = ARRAY_SIZE(dc_proc_info_gpu_0),
-	},
-	{
-		.info =
-			{
-				.name	       = "Overlay_3",
-				.type	       = DRM_PLANE_TYPE_OVERLAY,
-				.modifiers     = format_modifiers,
-				.num_modifiers = NUM_MODIFIERS,
-				.num_formats   = ARRAY_SIZE(gc_overlay_formats),
-				.formats       = gc_overlay_formats,
-				.min_width     = 0,
-				.min_height    = 0,
-				.max_width     = 2560,
-				.max_height    = 1440,
-				.blend_mode    = BIT(DRM_MODE_BLEND_PIXEL_NONE) |
-					      BIT(DRM_MODE_BLEND_PREMULTI) |
-					      BIT(DRM_MODE_BLEND_COVERAGE),
-				.rotation   = DRM_MODE_ROTATE_MASK | DRM_MODE_REFLECT_MASK,
-				.min_scale  = FRAC_16_16(1, 3),
-				.max_scale  = FRAC_16_16(3, 1),
-				.zpos	    = {0, CONFIG_VERISILICON_PRIMARY_OVERLAY_CNT - 1, 4},
-				.crtc_names = crtc_names,
-				.num_crtcs  = ARRAY_SIZE(crtc_names),
-			},
-		.proc_info = dc_proc_info_gpu_0,
-		.num_proc  = ARRAY_SIZE(dc_proc_info_gpu_0),
-	},
-	{
-		.info =
-			{
-				.name	       = "Overlay_4",
-				.type	       = DRM_PLANE_TYPE_OVERLAY,
-				.modifiers     = format_modifiers,
-				.num_modifiers = NUM_MODIFIERS,
-				.num_formats   = ARRAY_SIZE(gc_overlay_formats),
-				.formats       = gc_overlay_formats,
-				.min_width     = 0,
-				.min_height    = 0,
-				.max_width     = 2560,
-				.max_height    = 1440,
-				.blend_mode    = BIT(DRM_MODE_BLEND_PIXEL_NONE) |
-					      BIT(DRM_MODE_BLEND_PREMULTI) |
-					      BIT(DRM_MODE_BLEND_COVERAGE),
-				.rotation   = DRM_MODE_ROTATE_MASK | DRM_MODE_REFLECT_MASK,
-				.min_scale  = FRAC_16_16(1, 3),
-				.max_scale  = FRAC_16_16(3, 1),
-				.zpos	    = {0, CONFIG_VERISILICON_PRIMARY_OVERLAY_CNT - 1, 5},
-				.crtc_names = crtc_names,
-				.num_crtcs  = ARRAY_SIZE(crtc_names),
-			},
-		.proc_info = dc_proc_info_gpu_0,
-		.num_proc  = ARRAY_SIZE(dc_proc_info_gpu_0),
-	},
-	{
-		.info =
-			{
-				.name	       = "Overlay_5",
-				.type	       = DRM_PLANE_TYPE_OVERLAY,
-				.modifiers     = format_modifiers,
-				.num_modifiers = NUM_MODIFIERS,
-				.num_formats   = ARRAY_SIZE(gc_overlay_formats),
-				.formats       = gc_overlay_formats,
-				.min_width     = 0,
-				.min_height    = 0,
-				.max_width     = 2560,
-				.max_height    = 1440,
-				.blend_mode    = BIT(DRM_MODE_BLEND_PIXEL_NONE) |
-					      BIT(DRM_MODE_BLEND_PREMULTI) |
-					      BIT(DRM_MODE_BLEND_COVERAGE),
-				.rotation   = DRM_MODE_ROTATE_MASK | DRM_MODE_REFLECT_MASK,
-				.min_scale  = FRAC_16_16(1, 3),
-				.max_scale  = FRAC_16_16(3, 1),
-				.zpos	    = {0, CONFIG_VERISILICON_PRIMARY_OVERLAY_CNT - 1, 6},
-				.crtc_names = crtc_names,
-				.num_crtcs  = ARRAY_SIZE(crtc_names),
-			},
-		.proc_info = dc_proc_info_gpu_0,
-		.num_proc  = ARRAY_SIZE(dc_proc_info_gpu_0),
-	},
-	{
-		.info =
-			{
-				.name	       = "Overlay_6",
-				.type	       = DRM_PLANE_TYPE_OVERLAY,
-				.modifiers     = format_modifiers,
-				.num_modifiers = NUM_MODIFIERS,
-				.num_formats   = ARRAY_SIZE(gc_overlay_formats),
-				.formats       = gc_overlay_formats,
-				.min_width     = 0,
-				.min_height    = 0,
-				.max_width     = 2560,
-				.max_height    = 1440,
-				.blend_mode    = BIT(DRM_MODE_BLEND_PIXEL_NONE) |
-					      BIT(DRM_MODE_BLEND_PREMULTI) |
-					      BIT(DRM_MODE_BLEND_COVERAGE),
-				.rotation   = DRM_MODE_ROTATE_MASK | DRM_MODE_REFLECT_MASK,
-				.min_scale  = FRAC_16_16(1, 3),
-				.max_scale  = FRAC_16_16(3, 1),
-				.zpos	    = {0, CONFIG_VERISILICON_PRIMARY_OVERLAY_CNT - 1, 7},
-				.crtc_names = crtc_names,
-				.num_crtcs  = ARRAY_SIZE(crtc_names),
-			},
-		.proc_info = dc_proc_info_gpu_0,
-		.num_proc  = ARRAY_SIZE(dc_proc_info_gpu_0),
-	},
-	{
-		.info =
-			{
-				.name	       = "Overlay_7",
-				.type	       = DRM_PLANE_TYPE_OVERLAY,
-				.modifiers     = format_modifiers,
-				.num_modifiers = NUM_MODIFIERS,
-				.num_formats   = ARRAY_SIZE(gc_overlay_formats),
-				.formats       = gc_overlay_formats,
-				.min_width     = 0,
-				.min_height    = 0,
-				.max_width     = 2560,
-				.max_height    = 1440,
-				.blend_mode    = BIT(DRM_MODE_BLEND_PIXEL_NONE) |
-					      BIT(DRM_MODE_BLEND_PREMULTI) |
-					      BIT(DRM_MODE_BLEND_COVERAGE),
-				.rotation   = DRM_MODE_ROTATE_MASK | DRM_MODE_REFLECT_MASK,
-				.min_scale  = FRAC_16_16(1, 3),
-				.max_scale  = FRAC_16_16(3, 1),
-				.zpos	    = {0, CONFIG_VERISILICON_PRIMARY_OVERLAY_CNT - 1, 8},
-				.crtc_names = crtc_names,
-				.num_crtcs  = ARRAY_SIZE(crtc_names),
-			},
-		.proc_info = dc_proc_info_gpu_0,
-		.num_proc  = ARRAY_SIZE(dc_proc_info_gpu_0),
-	},
-	{
-		.info =
-			{
-				.name	       = "Overlay_8",
-				.type	       = DRM_PLANE_TYPE_OVERLAY,
-				.modifiers     = format_modifiers,
-				.num_modifiers = NUM_MODIFIERS,
-				.num_formats   = ARRAY_SIZE(gc_overlay_formats),
-				.formats       = gc_overlay_formats,
-				.min_width     = 0,
-				.min_height    = 0,
-				.max_width     = 2560,
-				.max_height    = 1440,
-				.blend_mode    = BIT(DRM_MODE_BLEND_PIXEL_NONE) |
-					      BIT(DRM_MODE_BLEND_PREMULTI) |
-					      BIT(DRM_MODE_BLEND_COVERAGE),
-				.rotation   = DRM_MODE_ROTATE_MASK | DRM_MODE_REFLECT_MASK,
-				.min_scale  = FRAC_16_16(1, 3),
-				.max_scale  = FRAC_16_16(3, 1),
-				.zpos	    = {0, CONFIG_VERISILICON_PRIMARY_OVERLAY_CNT - 1, 9},
-				.crtc_names = crtc_names,
-				.num_crtcs  = ARRAY_SIZE(crtc_names),
-			},
-		.proc_info = dc_proc_info_gpu_0,
-		.num_proc  = ARRAY_SIZE(dc_proc_info_gpu_0),
-	},
-#endif
 	{
 		.info =
 			{
