@@ -1528,7 +1528,6 @@ static void set_mac_speed(const struct hobot_priv *priv, int speed, int duplex)
 {
 	struct net_device *ndev = priv->ndev;
 	u32 regval;
-	u32 target, rate;
 
 	regval = ioreadl(priv->ioaddr, GMAC_CONFIG);
 	regval &= (u32)~(GMAC_CONFIG_PS | GMAC_CONFIG_FES | GMAC_CONFIG_DM);
@@ -1538,20 +1537,14 @@ static void set_mac_speed(const struct hobot_priv *priv, int speed, int duplex)
 
 	if (speed == SPEED_10) {
 		regval |= (u32)GMAC_CONFIG_PS;
-		target = CLOCK_2_5M;
 	} else if (speed == SPEED_100) {
 		regval |= (u32)(GMAC_CONFIG_PS | GMAC_CONFIG_FES);
-		target = CLOCK_25M;
 	} else if (speed == SPEED_1000) {
-		target = CLOCK_125M;
+		// do nothing
 	} else {
 		netdev_err(ndev, "Unknown PHY speed %d\n", speed);
 		return;
 	}
-	clk_disable_unprepare(priv->plat->eth_mac_clk);
-	rate = (u32)clk_round_rate(priv->plat->eth_mac_clk, target);
-	(void)clk_set_rate(priv->plat->eth_mac_clk, rate);
-	(void)clk_prepare_enable(priv->plat->eth_mac_clk);
 
 	reg_writel(priv, regval, GMAC_CONFIG); /*PRQA S 0497, 1294, 0685*/
 }
