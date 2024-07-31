@@ -1,16 +1,32 @@
 // SPDX-License-Identifier: GPL-2.0
-/****************************************************************************
+/*
+ * Copyright (c) 2024, VeriSilicon Holdings Co., Ltd. All rights reserved
  *
- *    Copyright (c) 2001 - 2024 by VeriSilicon Holdings Co., Ltd.
- *    All rights reserved.
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
  *
- *    The material in this file is confidential and contains trade secrets
- *    of VeriSilicon. This is proprietary information owned by VeriSilicon.
- *    No part of this work may be disclosed, reproduced, copied, transmitted,
- *    or used in any way for any purpose, without the express written
- *    permission of VeriSilicon.
+ * 1. Redistributions of source code must retain the above copyright notice,
+ * this list of conditions and the following disclaimer.
  *
- ****************************************************************************/
+ * 2. Redistributions in binary form must reproduce the above copyright notice,
+ * this list of conditions and the following disclaimer in the documentation
+ * and/or other materials provided with the distribution.
+ *
+ * 3. Neither the name of the copyright holder nor the names of its contributors
+ * may be used to endorse or promote products derived from this software without
+ * specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
 
 #include <drm/drm_framebuffer.h>
 #include <drm/drm_gem_framebuffer_helper.h>
@@ -84,7 +100,16 @@ err:
 	return ERR_PTR(ret);
 }
 
-static void gpu_proc_disable_plane(struct dc_proc *dc_proc, void *old_state) {}
+static void gpu_proc_disable_plane(struct dc_proc *dc_proc, void *old_state)
+{
+	struct gpu_plane_proc *hw_plane		= to_gpu_plane_proc(dc_proc);
+	const struct gpu_plane_info *plane_info = hw_plane->base.info->info;
+
+	if (plane_info->features & GPU_PLANE_OUT) {
+		drm_framebuffer_assign(&context.priv_fb, NULL);
+		context.priv_fb = NULL;
+	}
+}
 
 static n2d_buffer_format_t to_gc_format(u32 format)
 {
@@ -333,7 +358,7 @@ static int create_fb(struct dc_proc *dc_proc)
 	if (context.priv_fb) { /* if size changes, realloc the buffer */
 		if (context.priv_fb->width != fbreq.width ||
 		    context.priv_fb->height != fbreq.height)
-			drm_gem_fb_destroy(context.priv_fb);
+			drm_framebuffer_put(context.priv_fb);
 		else
 			return 0;
 	}
@@ -362,9 +387,11 @@ static void gpu_proc_update_plane(struct dc_proc *dc_proc, void *old_drm_plane_s
 	}
 
 	if (plane_info->features & GPU_PLANE_OUT) {
-		if (context.priv_fb) {
-			drm_framebuffer_assign(&context.priv_fb, plane_state->fb);
-			drm_framebuffer_assign(&plane_state->fb, context.in_fb);
+		drm_framebuffer_assign(&context.priv_fb, plane_state->fb);
+		drm_framebuffer_assign(&plane_state->fb, context.in_fb);
+		if (context.in_fb) {
+			drm_framebuffer_put(context.in_fb);
+			context.in_fb = NULL;
 		}
 		return;
 	}
@@ -394,23 +421,9 @@ static void gpu_proc_commit_plane(struct dc_proc *dc_proc) {}
 
 static void gpu_proc_destroy_plane(struct dc_proc *dc_proc)
 {
-	struct gpu_plane_proc *hw_plane		= to_gpu_plane_proc(dc_proc);
-	const struct gpu_plane_info *plane_info = hw_plane->base.info->info;
+	struct gpu_plane_proc *hw_plane = to_gpu_plane_proc(dc_proc);
 
 	kfree(hw_plane);
-
-	if (!(plane_info->features & GPU_PLANE_OUT))
-		return;
-
-	if (context.priv_fb) {
-		drm_gem_fb_destroy(context.priv_fb);
-		context.priv_fb = NULL;
-	}
-
-	if (context.in_fb) {
-		drm_gem_fb_destroy(context.in_fb);
-		context.in_fb = NULL;
-	}
 }
 
 static void gpu_proc_resume_plane(struct dc_proc *dc_proc) {}
