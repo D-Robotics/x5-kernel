@@ -941,7 +941,7 @@ static n2d_error_t _map_to_kernel(n2d_os_t *os, n2d_uint64_t handle, n2d_uint32_
 	n2d_uint32_t offset = 0;
 	n2d_uint32_t bytes  = 0;
 
-	pr_info("%s: flag = 0x%x.\n", __func__, flag);
+	pr_debug("%s: flag = 0x%x.\n", __func__, flag);
 	if (flag & N2D_ALLOC_FLAG_WRAP_USER) { /* already mapped kernel */
 		return error;
 	}

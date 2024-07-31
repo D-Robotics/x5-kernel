@@ -863,7 +863,7 @@ static int drv_release(struct inode *inode, struct file *file)
 	n2d_kernel_dispatch(global_device->kernel, N2D_KERNEL_COMMAND_CLOSE, 0, 0, N2D_NULL);
 	n2d_check_allocate_count(&allocate_count);
 	if (allocate_count)
-		n2d_kernel_os_print("Allocated %d memory\n", allocate_count);
+		pr_err("Allocated %d memory\n", allocate_count);
 
 	gpu_suspend(N2D_NULL, state);
 
@@ -959,9 +959,7 @@ int aux_open(struct vs_n2d_aux *aux)
 	gcmkASSERT(dev == global_device->dev);
 
 	gpu_resume(N2D_NULL);
-	ONERROR(n2d_kernel_dispatch(global_device->kernel, N2D_KERNEL_COMMAND_OPEN, 0, 0,
-				    N2D_NULL));
-on_error:
+
 	return error;
 }
 EXPORT_SYMBOL(aux_open);
@@ -974,10 +972,9 @@ int aux_close(struct vs_n2d_aux *aux)
 
 	gcmkASSERT(dev == global_device->dev);
 
-	n2d_kernel_dispatch(global_device->kernel, N2D_KERNEL_COMMAND_CLOSE, 0, 0, N2D_NULL);
 	n2d_check_allocate_count(&allocate_count);
 	if (allocate_count)
-		n2d_kernel_os_print("Allocated %d memory\n", allocate_count);
+		pr_debug("Allocated %d memory\n", allocate_count);
 
 	gpu_suspend(N2D_NULL, state);
 
@@ -1011,7 +1008,7 @@ static int n2d_vnode_close(struct vio_video_ctx *vctx)
 
 	n2d_check_allocate_count(&allocate_count);
 	if (allocate_count)
-		n2d_kernel_os_print("Allocated %d memory\n", allocate_count);
+		pr_debug("Allocated %d memory\n", allocate_count);
 
 	gpu_suspend(N2D_NULL, state);
 

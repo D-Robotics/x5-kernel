@@ -72,7 +72,7 @@ n2d_user_os_allocate(
     }
 
     /* Allocate the memory. */
-    *memory = kmalloc(size, GFP_KERNEL);
+    *memory = n2d_kmalloc(size, GFP_KERNEL);
 
     if (*memory == N2D_NULL)
     {
@@ -99,7 +99,7 @@ n2d_user_os_free(
     }
 
     /* Free the memory. */
-    kfree(memory);
+    n2d_kfree(memory);
 
     /* Success. */
     return N2D_SUCCESS;

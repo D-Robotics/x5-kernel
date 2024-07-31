@@ -45,6 +45,7 @@
 struct gpu_plane_context {
 	struct drm_framebuffer *in_fb;
 	struct drm_framebuffer *priv_fb;
+	int opened;
 };
 
 static struct gpu_plane_context context;
@@ -104,10 +105,22 @@ static void gpu_proc_disable_plane(struct dc_proc *dc_proc, void *old_state)
 {
 	struct gpu_plane_proc *hw_plane		= to_gpu_plane_proc(dc_proc);
 	const struct gpu_plane_info *plane_info = hw_plane->base.info->info;
+	struct vs_n2d_aux *aux		= hw_plane->aux;
+	int ret = 0;
 
 	if (plane_info->features & GPU_PLANE_OUT) {
 		drm_framebuffer_assign(&context.priv_fb, NULL);
 		context.priv_fb = NULL;
+	}
+
+	if (context.opened == 1) {
+		n2d_close();
+		ret = aux_close(aux);
+		if (ret < 0) {
+			dev_info(aux->dev, "%s: failed to close n2d aux.\n", __func__);
+			return;
+		}
+		context.opened = 0;
 	}
 }
 
@@ -236,13 +249,15 @@ static void aux_rotate(struct vs_n2d_aux *aux, unsigned int rotation, n2d_rectan
 	n2d_error_t error	       = N2D_SUCCESS;
 	struct n2d_config *config      = &aux->config;
 
-	error = aux_open(aux);
-	if (error < 0) {
-		dev_info(aux->dev, "%s: failed to open n2d aux.\n", __func__);
-		return;
+	if (context.opened == 0) {
+		error = aux_open(aux);
+		if (error < 0) {
+			dev_info(aux->dev, "%s: failed to open n2d aux.\n", __func__);
+			return;
+		}
+		N2D_ON_ERROR(n2d_open());
+		context.opened = 1;
 	}
-
-	N2D_ON_ERROR(n2d_open());
 	/* check size based on format/width, height */
 	memDesc.flag	 = N2D_WRAP_FROM_USERMEMORY;
 	memDesc.physical = config->in_buffer_addr[0][0]; /* assume the buffer is contiguous */
@@ -291,13 +306,7 @@ static void aux_rotate(struct vs_n2d_aux *aux, unsigned int rotation, n2d_rectan
 on_error:
 	n2d_free(&src);
 	n2d_free(&dst);
-	n2d_close();
 
-	error = aux_close(aux);
-	if (error < 0) {
-		dev_info(aux->dev, "%s: failed to close n2d aux.\n", __func__);
-		return;
-	}
 }
 
 static void aux_overlay(struct vs_n2d_aux *aux)

@@ -104,7 +104,7 @@ static n2d_error_t do_close(n2d_kernel_t *kernel, n2d_uint32_t process)
 	}
 
 	ONERROR(n2d_kernel_db_attach_process(kernel->db, process, N2D_FALSE));
-	n2d_kernel_os_print("Detach process:%d\n", process);
+	// n2d_kernel_os_print("Detach process:%d\n", process);
 
 on_error:
 	return error;
