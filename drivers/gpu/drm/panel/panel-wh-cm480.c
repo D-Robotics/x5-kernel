@@ -336,25 +336,24 @@ static int panel_simple_probe(struct device *dev, const struct panel_desc *desc)
 	struct panel_simple *panel;
 	int connector_type;
 	int err;
-printk("######################## %s %s %d\n",__FILE__, __FUNCTION__, __LINE__);
+
 	panel = devm_kzalloc(dev, sizeof(*panel), GFP_KERNEL);
 	if (!panel)
 		return -ENOMEM;
-printk("######################## %s %s %d\n",__FILE__, __FUNCTION__, __LINE__);
+
 	panel->enabled	= false;
 	panel->prepared = false;
 	panel->desc	= desc;
-printk("######################## %s %s %d\n",__FILE__, __FUNCTION__, __LINE__);
+
 	panel->supply = devm_regulator_get(dev, "power");
 	if (IS_ERR(panel->supply))
 		return PTR_ERR(panel->supply);
-printk("######################## %s %s %d\n",__FILE__, __FUNCTION__, __LINE__);
+
 	err = of_drm_get_panel_orientation(dev->of_node, &panel->orientation);
 	if (err) {
 		dev_err(dev, "%pOF: failed to get orientation %d\n", dev->of_node, err);
 		return err;
 	}
-printk("######################## %s %s %d\n",__FILE__, __FUNCTION__, __LINE__);
 	connector_type = desc->connector_type;
 	/* Catch common mistakes for panels. */
 	switch (connector_type) {
@@ -367,15 +366,11 @@ printk("######################## %s %s %d\n",__FILE__, __FUNCTION__, __LINE__);
 		connector_type = DRM_MODE_CONNECTOR_DSI;
 		break;
 	}
-printk("######################## %s %s %d\n",__FILE__, __FUNCTION__, __LINE__);
 	drm_panel_init(&panel->base, dev, &panel_simple_funcs, connector_type);
-printk("######################## %s %s %d\n",__FILE__, __FUNCTION__, __LINE__);
 	err = drm_panel_of_backlight(&panel->base);
 	if (err)
 		return err;
-printk("######################## %s %s %d\n",__FILE__, __FUNCTION__, __LINE__);
 	drm_panel_add(&panel->base);
-printk("######################## %s %s %d\n",__FILE__, __FUNCTION__, __LINE__);
 	dev_set_drvdata(dev, panel);
 
 	return 0;
