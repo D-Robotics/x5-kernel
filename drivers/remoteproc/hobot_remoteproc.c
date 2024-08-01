@@ -1623,6 +1623,40 @@ static ssize_t hb_show_wakeup_status(struct device *dev,/*PRQA S ALL*/
 
 static DEVICE_ATTR(wakeup_status, 0644, hb_show_wakeup_status, hb_store_wakeup_status);
 
+static ssize_t hb_show_hifi5_clk_rate(struct device *dev, struct device_attribute *attr, char *buf) {
+	struct platform_device *pdev = to_platform_device(dev);
+	struct hobot_rproc_pdata *pdata = platform_get_drvdata(pdev);
+
+	return sprintf(buf, "Get real hifi5 clk rate: %ldHz\n", clk_get_rate(pdata->clk));
+}
+
+static ssize_t hb_store_hifi5_clk_rate(struct device *dev, struct device_attribute *attr, const char *buf, size_t count) {
+	uint32_t cmd = 0;
+	int32_t ret = 0;
+	struct platform_device *pdev = to_platform_device(dev);
+	struct hobot_rproc_pdata *pdata = platform_get_drvdata(pdev);
+	uint64_t hifi5_round_rate;
+
+	ret = kstrtouint(buf, 10, &cmd);
+	if (ret) {
+		dev_err(pdata->dev, "%s Invalid Injection. %d\n", __func__, ret);
+		return ret;
+	}
+
+	hifi5_round_rate = (uint64_t)clk_round_rate(pdata->clk, cmd);
+	ret = clk_set_rate(pdata->clk, hifi5_round_rate);
+	if (ret) {
+		dev_err(pdata->dev, "set %lld hifi5 clk rate failed\n", hifi5_round_rate);
+		return ret;
+	}
+
+	dev_info(pdata->dev, "hifi5_round_rate %lld hifi5_clk_rate %d\n", hifi5_round_rate, cmd);
+
+	return count;
+}
+
+static DEVICE_ATTR(hifi5_clk_rate, 0644, hb_show_hifi5_clk_rate, hb_store_hifi5_clk_rate);
+
 static int32_t hobot_smf_power_recv_cb(uint8_t *payload, uint32_t payload_size, void *priv)
 {
 	gua_audio_rpc_data_t *msg = NULL;
@@ -2002,11 +2036,17 @@ static int32_t hobot_remoteproc_probe(struct platform_device *pdev)
 		goto create_file_out2; /*PRQA S ALL*/ /*qac-0.7.0-2001*/
 	}
 
+	ret = device_create_file(&pdev->dev, &dev_attr_hifi5_clk_rate);
+	if (ret != 0) {
+		dev_err(&pdev->dev, "BUG: Can not create hifi5 clk rate\n");
+		goto create_file_out3;
+	}
+
 #ifdef CONFIG_HOBOT_REMOTEPROC_PM
 	ret = hobot_remoteproc_pm_ctrl(pdata, 0, 0);
 	if (ret < 0) {
 		dev_err(&pdev->dev, "HIFI pm disable error\n");
-		goto create_file_out2;
+		goto create_file_out4;
 	}
 #endif
 
@@ -2014,6 +2054,10 @@ static int32_t hobot_remoteproc_probe(struct platform_device *pdev)
 	pr_info("hobot_remoteproc_probe end\n");
 
 	return 0;
+create_file_out4:
+	device_remove_file(&pdev->dev, &dev_attr_hifi5_clk_rate);
+create_file_out3:
+	device_remove_file(&pdev->dev, &dev_attr_wakeup_status);
 create_file_out2:
 	device_remove_file(&pdev->dev, &dev_attr_suspend_test);
 create_file_out1:
@@ -2041,6 +2085,7 @@ static int32_t hobot_remoteproc_remove(struct platform_device *pdev) {
 	device_remove_file(&pdev->dev, &dev_attr_fw_dump);
 	device_remove_file(&pdev->dev, &dev_attr_suspend_test);
 	device_remove_file(&pdev->dev, &dev_attr_wakeup_status);
+	device_remove_file(&pdev->dev, &dev_attr_hifi5_clk_rate);
 
 #ifdef CONFIG_HOBOT_ADSP_CTRL
 	iounmap(timesync_acore_to_adsp);
