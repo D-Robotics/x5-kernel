@@ -56,7 +56,7 @@
 										>;
 		msg-wrapper = <&ipc_wrapper>;
 		memory-region = <&adsp_bsp_reserved>;
-		status = "okay";
+		status = "disabled";
 	};
 
 	sound_cpu:cpu-dai {
@@ -290,7 +290,10 @@
 		compatible = "sil,sii9022";
 		reg = <0x3b>;
 		pinctrl-names = "default";
-		pinctrl-0 = <&dsp_gpio0_20>;
+		pinctrl-0 = <&dsp_gpio0_20 &dsp_gpio0_19>;
+
+		interrupt-parent = <&dsp_gpio_porta>;
+		interrupts = <19 IRQ_TYPE_EDGE_FALLING>;
 
 		reset-gpios = <&dsp_gpio_porta 20 GPIO_ACTIVE_LOW>;
 		status = "okay";
@@ -319,12 +322,6 @@
 		mclk = <24576000>; // add sysclk property, remove the property if the clock frequency is not fixed.
 		status = "okay";
 	};
-};
-
-&i2c6 {
-	status = "okay";
-	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_i2c6>;
 };
 
 &spi1 {
@@ -460,7 +457,7 @@
 };
 
 &archband_pdm {
-	status = "okay";
+	status = "disabled";
 };
 
 &virt_codec {
@@ -497,7 +494,7 @@
 };
 
 &remoteproc_hifi5 {
-	status = "okay";
+	status = "disabled";
 	hifi5-rpmsg-channel-mapping = <0x00>, <0x00>;
 	msg-wrapper = <&ipc_wrapper>;
 	shm-addr = <&adsp_bsp_reserved>;
