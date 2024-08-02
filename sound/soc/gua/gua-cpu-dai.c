@@ -246,6 +246,12 @@ int pcm_msg_recv_cb(uint8_t *payload, uint32_t payload_size, void *priv) {
 		mutex_unlock(&pcm_info->data[pcm_device].pointer_lock[0]);
 		pcm_info->dma_message_cb(pcm_info->data[pcm_device].substream[0]);
 	} else if (msg->param.cmd == PCM_RX_PERIOD_DONE) {
+		if (pcm_info->data[pcm_device].periods[1] <= 0) {
+			dev_err(pcm_info->dev, "Invalid paramter pcm_device(%d) hw_pointer(%d) periods(%d)\n",
+				pcm_device, msg->param.hw_pointer, pcm_info->data[pcm_device].periods[1]);
+
+			return -EINVAL;
+		}
 		mutex_lock(&pcm_info->data[pcm_device].pointer_lock[1]);
 		/* TODO */
 		// if ((msg->param.hw_pointer - pcm_info->data[pcm_device].hw_pointer[1] - 1) % pcm_info->data[pcm_device].periods[1]) {
