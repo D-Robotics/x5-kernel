@@ -1981,6 +1981,7 @@
 					interrupt-controller;
 					#interrupt-cells = <2>;
 					gpio-ranges = <&aon_iomuxc 0 0 8>;
+					gpio-base = <498>;
 				};
 			};
 
@@ -3159,6 +3160,7 @@
 					interrupt-controller;
 					#interrupt-cells = <2>;
 					gpio-ranges = <&hsio_iomuxc 0 0 31>;
+					gpio-base = <466>;
 				};
 			};
 
@@ -3183,6 +3185,7 @@
 					interrupt-controller;
 					#interrupt-cells = <2>;
 					gpio-ranges = <&hsio_iomuxc 0 31 18>;
+					gpio-base = <434>;
 				};
 			};
 
@@ -3479,6 +3482,7 @@
 					interrupt-controller;
 					#interrupt-cells = <2>;
 					gpio-ranges = <&dsp_iomuxc 0 0 23>;
+					gpio-base = <411>;
 				};
 			};
 
@@ -3927,6 +3931,7 @@
 					interrupt-controller;
 					#interrupt-cells = <2>;
 					gpio-ranges = <&lsio_iomuxc 0 0 32>;
+					gpio-base = <379>;
 				};
 			};
 
@@ -3951,6 +3956,7 @@
 					interrupt-controller;
 					#interrupt-cells = <2>;
 					gpio-ranges = <&lsio_iomuxc 0 32 17>;
+					gpio-base = <347>;
 				};
 			};
 
