@@ -273,6 +273,19 @@
 		#sound-dai-cells = <0>;
 		status = "okay";
 	};
+
+	bmi08xa:bmi08xa@0x19 {
+		compatible = "bmi08xa";
+		reg = <0x19>;
+		pinctrl-0 = <&dsp_gpio0_12>;
+		accel_irq_gpio = <&dsp_gpio_porta 12 GPIO_ACTIVE_HIGH>;
+	};
+	bmi08xg:bmi08xg@0x69{
+		compatible = "bmi08xg";
+		reg = <0x69>;
+		pinctrl-0 = <&lsio_gpio0_2>;
+		gyro_irq_gpio = <&ls_gpio1_porta 2 GPIO_ACTIVE_HIGH>;
+	};
 };
 
 &i2c6 {
@@ -452,7 +465,7 @@
 };
 
 &dw_i2s1 {
-	status = "okay";
+	status = "disabled";
 	#sound-dai-cells = <1>;
 };
 
