@@ -79,3 +79,6 @@ st_accel-$(CONFIG_IIO_BUFFER) += st_accel_buffer.o
 
 obj-$(CONFIG_IIO_ST_ACCEL_I2C_3AXIS) += st_accel_i2c.o
 obj-$(CONFIG_IIO_ST_ACCEL_SPI_3AXIS) += st_accel_spi.o
+
+bmi088-objs := bmi08x_i2c.o bs_log.o bmi08g.o bmi08a.o bmi08x_driver.o
+obj-$(CONFIG_BMI08X) += bmi088.o
