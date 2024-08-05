@@ -211,6 +211,8 @@
 #define UBI_IOCVOLCRBLK _IOW(UBI_VOL_IOC_MAGIC, 7, struct ubi_blkcreate_req)
 /* Remove the R/O block device */
 #define UBI_IOCVOLRMBLK _IO(UBI_VOL_IOC_MAGIC, 8)
+/* Get the volume usable_leb_size */
+#define UBI_IOCVOLINFO _IOR(UBI_VOL_IOC_MAGIC, 9, struct ubi_info_user)
 
 /* Maximum MTD device name length supported by UBI */
 #define MAX_UBI_MTD_NAME_LEN 127
@@ -366,6 +368,16 @@ struct ubi_mkvol_req {
 struct ubi_rsvol_req {
 	__s64 bytes;
 	__s32 vol_id;
+} __packed;
+
+/**
+ * struct ubi_info_user - a data structure used in volume get-information requests.
+ * @usable_leb_size: size of the volume leb
+ * @used_bytes: total size of the volume in bytes
+ */
+struct ubi_info_user {
+	__s64 used_bytes;
+	__s32 usable_leb_size;
 } __packed;
 
 /**

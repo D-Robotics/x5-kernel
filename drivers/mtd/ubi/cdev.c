@@ -576,6 +576,19 @@ static long vol_cdev_ioctl(struct file *file, unsigned int cmd,
 		break;
 	}
 
+	/* Get the vol usable_leb_size */
+	case UBI_IOCVOLINFO:
+	{
+		struct ubi_info_user info;
+
+		memset(&info, 0, sizeof(info));
+		info.usable_leb_size = vol->usable_leb_size;
+		info.used_bytes = vol->used_bytes;
+		if (copy_to_user(argp, &info, sizeof(struct ubi_info_user)))
+			return -EFAULT;
+		break;
+	}
+
 	default:
 		err = -ENOTTY;
 		break;
