@@ -3578,6 +3578,7 @@
 			def_mode = <1>;
 			num_chans = <2>;
 			shm_size = <0x400>;
+			ipc-mask-offset = <0x8000>;
 			ipc_channel0 {
 				num_pools = <1>;
 				ipc_pool0 {
@@ -3603,6 +3604,7 @@
 			def_mode = <1>;
 			num_chans = <1>;
 			shm_size = <0x400>;
+			ipc-mask-offset = <0x8000>;
 			ipc_channel0 {
 				num_pools = <1>;
 				ipc_pool0 {
@@ -3628,6 +3630,7 @@
 			def_mode = <1>;
 			num_chans = <2>;
 			shm_size = <0x3000>;
+			ipc-mask-offset = <0x8000>;
 			ipc_channel0 {
 				num_pools = <1>;
 				ipc_pool0 {
