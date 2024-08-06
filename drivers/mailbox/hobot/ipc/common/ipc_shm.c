@@ -90,6 +90,8 @@ struct ipc_shm_priv {
 	int32_t num_chans;/**< number of shared memory channels*/
 	struct ipc_shm_channel channels[MAX_NUM_CHAN_PER_INSTANCE];/**< ipc channels private data*/
 	struct ipc_shm_global *global;/**< local global data shared with remote*/
+
+	void __iomem *ipc_shm_mask;/**< ipc instance/channel info*/
 };
 
 /* ipc shm private data */
@@ -204,10 +206,12 @@ static uint8_t ipc_instance_is_free(int32_t instance)
 static int32_t ipc_shm_rx(int32_t instance, int32_t budget)
 {
 	int32_t num_chans = ipc_shm_priv_data[instance].num_chans;
-	int32_t chan_budget, chan_work;
+	int32_t chan_budget, chan_work = 0;
 	int32_t more_work = 1;
 	int32_t work = 0;
 	int32_t i;
+	int32_t mask = readl(ipc_shm_priv_data[instance].ipc_shm_mask);
+	int32_t chan_id = mask >> (4 * instance + 1);
 
 	/* fair channel handling algorithm */
 	while ((work < budget) && (more_work > 0)) {
@@ -215,7 +219,8 @@ static int32_t ipc_shm_rx(int32_t instance, int32_t budget)
 		more_work = 0;
 
 		for (i = 0; i < num_chans; i++) {
-			chan_work = ipc_channel_rx(instance, i, chan_budget);
+			if (i == chan_id)
+				chan_work = ipc_channel_rx(instance, i, chan_budget);
 			work += chan_work;
 
 			if (chan_work == chan_budget)
@@ -549,6 +554,8 @@ int32_t ipc_shm_init_instance(int32_t instance,
 		local_chan_shm += chan_size;
 		remote_chan_shm += chan_size;
 	}
+
+	ipc_shm_priv_data[instance].ipc_shm_mask = cfg->ipc_shm_mask;
 
 	ipc_shm_priv_data[instance].global->state = IPC_SHM_STATE_READY;
 	ipc_dbg("ipc shm initialized\n");
@@ -893,6 +900,9 @@ int32_t ipc_shm_tx(int32_t instance, int32_t chan_id, void *buf, size_t size)
 	struct ipc_shm_pool *pool;
 	struct ipc_shm_bd bd;
 	int32_t err;
+	int32_t mask;
+
+	mask = chan_id << (4 * instance + 1);
 
 	/* check if instance is used */
 	if (ipc_instance_is_free(instance) != IPC_SHM_INSTANCE_USED) {
@@ -901,6 +911,7 @@ int32_t ipc_shm_tx(int32_t instance, int32_t chan_id, void *buf, size_t size)
 		return -EINVAL;
 	}
 
+	writel(mask, ipc_shm_priv_data[instance].ipc_shm_mask);
 
 	chan = get_channel(instance, chan_id);
 	if ((chan == NULL) || (buf == NULL) || (size == 0u)) {

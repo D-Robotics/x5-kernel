@@ -70,23 +70,24 @@ struct mbox_share_res {
 static struct ipc_os_priv {
 	struct ipc_os_priv_instance id[MAX_NUM_INSTANCE];/**< private data per instance*/
 	int32_t (*rx_cb)(int32_t instance, int32_t budget);/**< upper layer rx callback*/
+	void __iomem *ipc_shm_mask;
 } priv;
 
 /* sotfirq routine for deferred interrupt handling */
 static void ipc_shm_softirq(unsigned long arg)
 {
 	unsigned long budget = IPC_SOFTIRQ_BUDGET;
-	// int32_t instance = (int32_t)arg;
-	uint8_t i = 0;
-
-	for (i = 0; i < MAX_NUM_INSTANCE; i ++) {
-		if ((priv.id[i].state != IPC_SHM_INSTANCE_ENABLED) ||
-			(priv.id[i].mbox_chan_idx == IPC_MBOX_NONE))
-			continue;
-
-		/* call upper layer callback */
-		(void)priv.rx_cb(i, budget);
+	int32_t mask = readl(priv.ipc_shm_mask);
+	int32_t instance = 0;
+	while (mask >>= 4) {
+		instance++;
 	}
+
+	if ((priv.id[instance].state != IPC_SHM_INSTANCE_ENABLED) ||
+			(priv.id[instance].mbox_chan_idx == IPC_MBOX_NONE))
+		return;
+
+	(void)priv.rx_cb(instance, budget);
 }
 
 static void ipc_os_handler(struct mbox_client *cl, void *mssg)
@@ -116,6 +117,7 @@ int32_t ipc_os_init(int32_t instance, const struct ipc_shm_cfg *cfg,
 		int32_t (*rx_cb)(int32_t, int32_t))
 {
 	int32_t err;
+	struct ipc_shm_cfg *ipc_cfg = (struct ipc_shm_cfg *)cfg;
 
 	/* check parameter */
 	if (!rx_cb) {
@@ -137,6 +139,8 @@ int32_t ipc_os_init(int32_t instance, const struct ipc_shm_cfg *cfg,
 
 		return -EINVAL;
 	}
+
+	ipc_cfg->ipc_shm_mask = priv.ipc_shm_mask;
 
 	priv.id[instance].timeout = cfg->timeout;
 	priv.id[instance].trans_flags = cfg->trans_flags;
@@ -466,6 +470,7 @@ int32_t ipc_os_mbox_notify(int32_t instance)
 {
 	int err = 0;
 	uint32_t tmp_data[NUM_DATA] = {0, 0, 0, 0, 0, 0, NUM_DATA};
+	int32_t mask = 0;
 
 	if (priv.id[instance].mbox_chan_idx == IPC_MBOX_NONE) {
 		return 0;//unused mailbox
@@ -478,6 +483,11 @@ int32_t ipc_os_mbox_notify(int32_t instance)
 	}
 
 	mutex_lock(&priv.id[instance].notify_mutex_lock);
+
+	mask = readl(priv.ipc_shm_mask);
+	mask = mask | (1 << (4 * instance));
+	writel(mask, priv.ipc_shm_mask);
+
 	err = mbox_send_message(priv.id[instance].mchan, tmp_data);
 	if (err < 0) {
 		mutex_unlock(&priv.id[instance].notify_mutex_lock);
@@ -513,6 +523,7 @@ static int32_t get_ipc_def_resource(struct platform_device *pdev,
 	struct resource res;
 	uint32_t local_offset;
 	uint32_t remote_offset;
+	uint32_t ipc_mask_offset;
 
 	if (!dev || !ipc_node || !def_info) {
 		dev_err(dev,"%s invalid parameter\n", __func__);
@@ -566,6 +577,20 @@ static int32_t get_ipc_def_resource(struct platform_device *pdev,
 
 	def_info->local_shm_addr = res.start + local_offset;
 	def_info->remote_shm_addr = res.start + remote_offset;
+
+	if (!priv.ipc_shm_mask) {
+		err = of_property_read_u32(ipc_node, "ipc-mask-offset", &ipc_mask_offset);
+		if (err) {
+			dev_err(dev, "ipc-mask-offset failed\n");
+			return err;
+		}
+		priv.ipc_shm_mask = ioremap(res.start + ipc_mask_offset, 0x4);
+		if (!priv.ipc_shm_mask) {
+			dev_err(dev, "ipc ioremap failed\n");
+			return -ENOMEM;
+		}
+		dev_dbg(dev, "base(0x%llx) offset 0x%x\n", res.start, ipc_mask_offset);
+        }
 
 	dev_dbg(dev, "base(0x%llx) local(0x%llx) remote(0x%llx)\n",
 		res.start, def_info->local_shm_addr, def_info->remote_shm_addr);
@@ -742,6 +767,7 @@ static int32_t hb_ipc_remove(struct platform_device *pdev)
 {
 	struct ipc_dev_instance *ipc_dev = (struct ipc_dev_instance *)platform_get_drvdata(pdev);
 
+	iounmap(priv.ipc_shm_mask);
 	mutex_destroy(&priv.id[ipc_dev->instance].ipc_init_mutex);
 
 	return 0;

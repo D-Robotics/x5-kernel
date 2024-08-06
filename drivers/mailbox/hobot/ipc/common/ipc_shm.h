@@ -36,6 +36,8 @@ struct ipc_shm_cfg {
 	uint32_t shm_size;/**< size of share memory, remote size is equal to local size*/
 	int32_t num_chans;/**< number of channel*/
 	struct ipc_channel_info *chans;/**< pointer to channels*/
+
+	void __iomem *ipc_shm_mask;/**< ipc instance/channel info*/
 };
 
 int32_t ipc_shm_init_instance_cfg(int32_t instance, const struct ipc_instance_cfg *cfg);
