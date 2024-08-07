@@ -54,6 +54,12 @@
 		spi5 = &spi5;
 		spi6 = &spi6;
 		spi7 = &qspi;
+		pwm0 = &pwm0;
+		pwm1 = &pwm1;
+		pwm2 = &pwm2;
+		pwm3 = &pwm3;
+		i2s0 = &dw_i2s0;
+		i2s1 = &dw_i2s1;
 
 		mmc0 = &emmc;
 		mmc1 = &sdio_0;
