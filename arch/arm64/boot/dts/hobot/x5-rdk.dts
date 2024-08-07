@@ -370,6 +370,24 @@
 	};
 };
 
+&pwm0 {
+	status = "disabled";
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_pwm0_0 &pinctrl_pwm0_1>;
+};
+
+&pwm1 {
+	status = "disabled";
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_pwm1_0 &pinctrl_pwm1_1>;
+};
+
+&pwm2 {
+	status = "disabled";
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_pwm2_0 &pinctrl_pwm2_1>;
+};
+
 &pwm3 {
 	/* LSIO_PWM_OUT6 and LSIO_PWM_OUT7 */
 	status = "okay";
