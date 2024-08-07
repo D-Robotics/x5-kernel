@@ -274,13 +274,13 @@
 		status = "okay";
 	};
 
-	bmi08xa:bmi08xa@0x19 {
+	bmi08xa:bmi08xa@19 {
 		compatible = "bmi08xa";
 		reg = <0x19>;
 		pinctrl-0 = <&dsp_gpio0_12>;
 		accel_irq_gpio = <&dsp_gpio_porta 12 GPIO_ACTIVE_HIGH>;
 	};
-	bmi08xg:bmi08xg@0x69{
+	bmi08xg:bmi08xg@69{
 		compatible = "bmi08xg";
 		reg = <0x69>;
 		pinctrl-0 = <&lsio_gpio0_2>;
@@ -480,7 +480,6 @@
 &dw_i2s0 {
 	status = "okay";
 	dwc-master = <1>;
-	#sound-dai-cells = <1>;
 };
 
 &dw_i2s1 {
