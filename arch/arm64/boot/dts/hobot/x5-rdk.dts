@@ -366,6 +366,7 @@
 		interrupt-parent = <&ls_gpio1_porta>;
 		interrupts = <4 IRQ_TYPE_EDGE_FALLING>;
 		device-wake-gpios = <&ls_gpio1_porta 6 GPIO_ACTIVE_LOW>;
+		reset-gpios = <&ls_gpio0_porta 7 GPIO_ACTIVE_HIGH>;
 	};
 };
 
