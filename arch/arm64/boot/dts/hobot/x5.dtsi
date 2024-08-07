@@ -14,6 +14,7 @@
 #include <dt-bindings/gpio/gpio.h>
 #include <dt-bindings/thermal/thermal.h>
 #include <dt-bindings/soc/drobot-x5-firewall.h>
+#include <dt-bindings/pinctrl/horizon-pinfunc.h>
 
 / {
 	aliases {
@@ -3152,7 +3153,7 @@
 				hs_gpio0_porta: gpio@0 {
 					compatible = "snps,dw-apb-gpio-port";
 					gpio-controller;
-					snps,nr-gpios = <32>;
+					snps,nr-gpios = <HSIO_GPIO0_NUM>;
 					reg = <0>;
 					#gpio-cells = <2>;
 					interrupt-parent = <&gic>;
@@ -3177,7 +3178,7 @@
 				hs_gpio1_porta: gpio@0 {
 					compatible = "snps,dw-apb-gpio-port";
 					gpio-controller;
-					snps,nr-gpios = <32>;
+					snps,nr-gpios = <HSIO_GPIO1_NUM>;
 					reg = <0>;
 					#gpio-cells = <2>;
 					interrupt-parent = <&gic>;
@@ -3474,7 +3475,7 @@
 				dsp_gpio_porta: gpio@dsp {
 					compatible = "snps,dw-apb-gpio-port";
 					gpio-controller;
-					snps,nr-gpios = <23>;
+					snps,nr-gpios = <DSP_GPIO_NUM>;
 					reg = <0>;
 					#gpio-cells = <2>;
 					interrupt-parent = <&gic>;
@@ -3923,7 +3924,7 @@
 				ls_gpio0_porta: gpio@0 {
 					compatible = "snps,dw-apb-gpio-port";
 					gpio-controller;
-					snps,nr-gpios = <32>;
+					snps,nr-gpios = <LSIO_GPIO0_NUM>;
 					reg = <0>;
 					#gpio-cells = <2>;
 					interrupt-parent = <&gic>;
@@ -3948,7 +3949,7 @@
 				ls_gpio1_porta: gpio@0 {
 					compatible = "snps,dw-apb-gpio-port";
 					gpio-controller;
-					snps,nr-gpios = <32>;
+					snps,nr-gpios = <LSIO_GPIO1_NUM>;
 					reg = <0>;
 					#gpio-cells = <2>;
 					interrupt-parent = <&gic>;

@@ -44,4 +44,14 @@
 #define AON_1V8 		0
 #define SOC_1V8 		1
 #define SOC_1V8_3V3		2
+
+/*GPIO pin numbers*/
+#define LSIO_GPIO0_NUM  32
+#define LSIO_GPIO1_NUM  17
+#define HSIO_GPIO0_NUM  31
+#define HSIO_GPIO1_NUM  18
+#define DSP_GPIO_NUM    23
+#define DISP_GPIO_NUM   17
+#define AON_GPIO_NUM    8
+
 #endif /* __HORIZON_PINFUNC_H */
