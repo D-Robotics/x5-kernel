@@ -40,6 +40,45 @@
 			wakeup-source;
 		};
 	};
+
+	gua_audio_rpc_wrapper:audio-rpc-wrapper {
+		compatible = "gua,audio-rpc-wrapper";
+		rpmsg-enable;
+		status = "okay";
+	};
+
+	ipc_wrapper:ipc-wrapper {
+		compatible = "gua,ipc-wrapper";
+		rpmsg-enable;
+		status = "okay";
+		gua-ipc = <&ipc_instance0>;
+	};
+
+	sound_misc_0:misc-hifi {
+		compatible = "gua,misc-hifi-core";
+		// core channel
+		control-rpmsg-channel-mapping = <0x00 0x00      // a core to hifi 0
+								>;
+		msg-wrapper = <&ipc_wrapper>;
+		memory-region = <&adsp_bsp_reserved>;
+		status = "okay";
+	};
+
+	sound_cpu:cpu-dai {
+		compatible = "gua,cpu-dai";
+		msg-wrapper = <&ipc_wrapper>;
+		gua,pcm-buffer-size = <0x1E000>;
+		pcm-rpmsg-channel-mapping = <0x00>, <0x00>, <0x00>, <0x00>, <0x00>, <0x00>;
+		status = "okay";
+	};
+
+	sound-machine {
+		compatible = "gua,sound-card";
+		model = "gua-audio";
+		cpu-dai = <&sound_cpu>;
+		memory-region = <&audio_reserved>;
+		status = "okay";
+	};
 };
 
 &cpu_0 {
@@ -849,6 +888,39 @@
 
 &virt_codec {
 	status = "okay";
+};
+
+&mailbox0 {
+	status = "okay";
+};
+
+&ipc_instance0 {
+	status = "okay";
+	shm-addr = <&adsp_ipc_reserved>;
+	local-offset = <0x0>;
+	remote-offset = <0x400>;
+};
+
+&ipc_instance1 {
+	status = "okay";
+	shm-addr = <&adsp_ipc_reserved>;
+	local-offset = <0x800>;
+	remote-offset = <0xc00>;
+};
+
+&ipc_instance2 {
+	status = "okay";
+	shm-addr = <&adsp_ipc_reserved>;
+	local-offset = <0x1000>;
+	remote-offset = <0x4000>;
+};
+
+&remoteproc_hifi5 {
+	status = "okay";
+	hifi5-rpmsg-channel-mapping = <0x00>, <0x00>;
+	msg-wrapper = <&ipc_wrapper>;
+	shm-addr = <&adsp_bsp_reserved>;
+	remoteproc-ipc = <&ipc_instance1>;
 };
 
 /* &hifi5_loader {
