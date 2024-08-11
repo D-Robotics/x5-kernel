@@ -926,6 +926,8 @@
 					<&hpsclks X5_CAM_DEWARP_AXI_CLK>,
 					<&hpsclks X5_CAM_VSE_AXI_CLK>,
 					<&hpsclks X5_CAM_DEWARP_HCLK>,
+					<&hpsclks X5_CAM_VSE_CORE_CLK>,
+					<&hpsclks X5_CAM_VSE_UPSCALE_CLK>,
                                         <&hpsclks X5_LSIO_SENSOR0_CLK>,
                                         <&hpsclks X5_LSIO_SENSOR1_CLK>,
                                         <&hpsclks X5_LSIO_SENSOR2_CLK>,
@@ -947,6 +949,8 @@
 				                "gdc_axi",
 						"vse_axi",
 						"gdc_hclk",
+						"vse_core",
+						"vse_ups",
                                                 "sensor0_mclk",
                                                 "sensor1_mclk",
                                                 "sensor2_mclk",
@@ -1021,9 +1025,9 @@
 					<&hpsclks X5_CAM_VSE_CORE_CLK>,
 					<&hpsclks X5_CAM_VSE_UPSCALE_CLK>,
 					<&hpsclks X5_CAM_VSE_AXI_CLK>,
-					<&hpsclks X5_CAM_DEWARP_AXI_CLK>,
+					<&hpsclks X5_CAM_DEWARP_CORE_CLK>,
 					<&hpsclks X5_CAM_DEWARP_HCLK>;
-				clock-names = "core", "ups", "axi", "gdc_axi", "gdc_hclk";
+				clock-names = "core", "ups", "axi", "gdc_core", "gdc_hclk";
 				resets = <&socrst CAM_DEWARP_RESET>;
 				reset-names = "rst";
 				instances = <7>;
@@ -1345,8 +1349,10 @@
 				clocks =
 					<&hpsclks X5_CAM_DEWARP_CORE_CLK>,
 					<&hpsclks X5_CAM_DEWARP_AXI_CLK>,
-					<&hpsclks X5_CAM_DEWARP_HCLK>;
-				clock-names = "core", "axi", "hclk";
+					<&hpsclks X5_CAM_DEWARP_HCLK>,
+					<&hpsclks X5_CAM_VSE_CORE_CLK>,
+					<&hpsclks X5_CAM_VSE_UPSCALE_CLK>;
+				clock-names = "core", "axi", "hclk", "vse_core", "vse_ups";
 				resets = <&socrst CAM_GDC_RESET>;
 				reset-names = "rst";
 				id = <0>;
