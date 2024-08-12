@@ -244,14 +244,6 @@
 						<&bt1120_bridge_out>;
 				};
 			};
-
-			port@1 {
-				reg = <1>;
-
-				bt1120_bridge_out: endpoint {
-					remote-endpoint = <&hdmi_bridge_in>;
-				};
-			};
 		};
 	};
 };
@@ -825,6 +817,17 @@
 	status = "okay";
 
 
+};
+
+&bt1120_bridge {
+	ports {
+		port@1 {
+			reg = <1>;
+			bt1120_bridge_out: endpoint {
+				remote-endpoint = <&hdmi_bridge_in>;
+			};
+		};
+	};
 };
 
 &bt1120_syscon_bridge {
