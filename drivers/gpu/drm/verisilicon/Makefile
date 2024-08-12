@@ -12,7 +12,6 @@ ccflags-y += \
 		-I$(VS_PATH)/dc/vs_sif \
 		-I$(VS_PATH)/dc \
 		-I$(VS_PATH) \
-		-DDEBUG
 
 ccflags-$(CONFIG_VERISILICON_DC8000_NANO) += \
 		-I$(VS_PATH)/dc/dc_hw/dc8000nano
