@@ -13,7 +13,7 @@
 #include <linux/kernel.h>
 #include <crypto/algapi.h>
 #include <crypto/ctr.h>
-
+#include "lca_te_driver.h"
 
 int lca_te_kpp_alloc(struct te_drvdata *drvdata);
 int lca_te_kpp_free(struct te_drvdata *drvdata);

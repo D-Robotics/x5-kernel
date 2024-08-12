@@ -68,5 +68,7 @@ te_crypto-y := $(TE_OBJECTS)                                \
                lca_te_otp.o                                 \
                lca_te_trng.o                                \
                lca_te_akcipher.o                            \
-               lca_te_kpp.o
+               lca_te_kpp.o                                 \
+               lca_te_ctx.o                                 \
+               lca_te_ra.o
 

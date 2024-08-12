@@ -34,12 +34,9 @@ void osal_mutex_lock(osal_mutex_t mutex)
     mutex_ctx_t *ctx = (mutex_ctx_t *)mutex;
 
     OSAL_ASSERT(ctx != NULL);
-    while (1) {
+    do {
         ret = mutex_lock_interruptible(&ctx->mutex);
-        if (-EINTR != ret) {
-            break;
-        }
-    }
+    } while (-EINTR == ret);
     return;
 }
 

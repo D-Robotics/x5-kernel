@@ -68,12 +68,9 @@ void osal_completion_wait(osal_completion_t *comp)
     }
 
     ctx = comp->ctx;
-    while (1) {
+    do {
         ret = wait_for_completion_interruptible(&ctx->comp);
-        if (-ERESTARTSYS != ret) {
-            break;
-        }
-    }
+    } while (-ERESTARTSYS == ret);
     return;
 }
 

@@ -480,6 +480,10 @@ int te_cbcmac_reset( te_cbcmac_ctx_t *ctx )
     }
     /* we can well slip out if the calling ctx is in START state */
     if (TE_DRV_SCA_STATE_START == te_sca_state(ctx->crypt)) {
+        prv_ctx = (sca_cbcmac_ctx_t *)cbcmac_priv_ctx(ctx);
+        if (prv_ctx != NULL) {
+            prv_ctx->npdlen = 0;
+        }
         ret = TE_SUCCESS;
         __CBCMAC_OUT__;
     }
@@ -897,9 +901,11 @@ int te_cbcmac_afinish( te_cbcmac_ctx_t *ctx, te_cmac_request_t *req )
     }
 
     if( prv_ctx->npdlen ) {
+        osal_memset(prv_ctx->npdata + prv_ctx->npdlen, 0,
+                    ctx->crypt->blk_size - prv_ctx->npdlen);
         ret = te_sca_update(ctx->crypt,
                             true,
-                            prv_ctx->npdlen,
+                            ctx->crypt->blk_size,
                             prv_ctx->npdata,
                             NULL);
         if ( ret != TE_SUCCESS ) {

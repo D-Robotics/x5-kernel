@@ -23,7 +23,7 @@ config CRYPTO_DEV_TE
 	select CRYPTO_XTS
 	select CRYPTO_RSA
 	help
-	  This selects the crypto driver for the TrustEngine-500 hardware. It supports
+	  This selects the crypto driver for the TrustEngine-600 hardware. It supports
 	  AES/SM4 with ECB, CBC, CTR, OFB and XTS modes. And for hash, it supports MD5,
 	  SHA1, SHA224, SHA256, SHA384 and SHA512. it also supports GCM and CCM.
 

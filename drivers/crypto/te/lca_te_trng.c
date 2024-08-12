@@ -10,14 +10,11 @@
 #include <linux/kernel.h>
 #include <linux/platform_device.h>
 #include <linux/random.h>
-#include "lca_te_driver.h"
+#include "lca_te_trng.h"
 
-//#include "driver/te_drv.h"
 #include "driver/te_drv_trng.h"
 
-
 #define TE_TRNG_QUALITY	512
-
 
 struct te_trng {
 	void *te_drv_h;
@@ -29,7 +26,7 @@ static int lca_te_trng_read(struct hwrng *rng, void *buf, size_t max, bool wait)
 {
 	struct te_trng *trng = NULL;
 	struct device *dev = NULL;
-	u32 ret;
+	int ret;
 
 	trng = container_of(rng, struct te_trng, rng);
 	dev = drvdata_to_dev(trng->drvdata);
@@ -37,8 +34,10 @@ static int lca_te_trng_read(struct hwrng *rng, void *buf, size_t max, bool wait)
 	pm_runtime_get_sync(dev);
 	ret = te_trng_read((te_trng_drv_t *)trng->te_drv_h, buf, max);
 	pm_runtime_put_autosuspend(dev);
-	if(ret != 0)
+	if(ret != TE_SUCCESS) {
+		dev_err(dev, "te_trng_read ret:0x%x\n", ret);
 		return 0;
+	}
 
 	return max;
 }
@@ -51,13 +50,14 @@ int lca_te_trng_alloc(struct te_drvdata *drvdata)
 	int ret;
 
 	trng = devm_kzalloc(&pdev->dev, sizeof(*trng), GFP_KERNEL);
-	if (!trng)
+	if (!trng) {
 		return -ENOMEM;
+	}
 
 	drvdata->trng_handle = trng;
 
-	te_drv_handle = te_drv_get(drvdata->h,TE_DRV_TYPE_TRNG);
-	if(te_drv_handle == NULL) {
+	te_drv_handle = te_drv_get(drvdata->h, TE_DRV_TYPE_TRNG);
+	if (NULL == te_drv_handle) {
 		devm_kfree(&pdev->dev, trng);
 		return -ENODEV;
 	}
@@ -70,9 +70,9 @@ int lca_te_trng_alloc(struct te_drvdata *drvdata)
 
 	ret = devm_hwrng_register(&pdev->dev, &trng->rng);
 	if (ret) {
-		te_drv_put(drvdata->h,TE_DRV_TYPE_TRNG);
+		te_drv_put(drvdata->h, TE_DRV_TYPE_TRNG);
 		devm_kfree(&pdev->dev, trng);
-		dev_err(&pdev->dev, "failed to register hwrng!\n");
+		dev_err(&pdev->dev, "failed to register hwrng %d\n", ret);
 	}
 
 	return ret;
@@ -85,9 +85,9 @@ int lca_te_trng_free(struct te_drvdata *drvdata)
 
 	trng = drvdata->trng_handle;
 	devm_hwrng_unregister(&pdev->dev, &trng->rng);
-	te_drv_put(drvdata->h,TE_DRV_TYPE_TRNG);
-	devm_kfree(&pdev->dev,trng);
+	te_drv_put(drvdata->h, TE_DRV_TYPE_TRNG);
+	devm_kfree(&pdev->dev, trng);
+	drvdata->trng_handle = NULL;
 	return 0;
 }
-
 

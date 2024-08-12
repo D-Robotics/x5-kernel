@@ -12,8 +12,6 @@
 
 #include "lca_te_driver.h"
 
-
-
 int lca_te_trng_alloc(struct te_drvdata *drvdata);
 int lca_te_trng_free(struct te_drvdata *drvdata);
 

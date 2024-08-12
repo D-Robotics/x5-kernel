@@ -14,15 +14,21 @@
 
 #include "lca_te_driver.h"
 
-int te_buf_mgr_gen_memlist_ex(struct scatterlist *sg_list,
-				unsigned int nbytes, te_memlist_t *list,
-				unsigned char * ext_data, unsigned int elen);
-int te_buf_mgr_gen_memlist(struct scatterlist *sg_list,
-			   unsigned int nbytes, te_memlist_t *list);
-void te_buf_mgr_free_memlist(te_memlist_t *list);
-int te_buf_mgr_init(struct te_drvdata *drvdata);
-int te_buf_mgr_fini(struct te_drvdata *drvdata);
+/* Create memlist for the src sg list */
+#define TE_BUF_MGR_GEN_MEMLIST_SRC(sg, nb, mlst)           \
+	te_buf_mgr_gen_memlist((sg), (nb), (mlst), false)
 
+/* Create memlist for the dst sg list */
+#define TE_BUF_MGR_GEN_MEMLIST_DST(sg, nb, mlst)           \
+	te_buf_mgr_gen_memlist((sg), (nb), (mlst), true)
+
+
+int te_buf_mgr_gen_memlist(struct scatterlist *sg_list,
+			   unsigned int nbytes,
+			   te_memlist_t *list,
+			   bool is_dst);
+
+void te_buf_mgr_free_memlist(te_memlist_t *list, int err);
 
 #endif /*__LCA_TE_BUF_MGR_H__*/
 
