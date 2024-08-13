@@ -112,3 +112,7 @@
 &isp {
 	memory-region = <&isp_cma>;
 };
+
+&range_1 {
+        memory-region = <&firewall_ddr_default>;
+};

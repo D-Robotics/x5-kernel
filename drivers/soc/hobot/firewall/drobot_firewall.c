@@ -194,8 +194,15 @@ void mpu_config(struct mpu_protection *mpu_prt, uint32_t regmap_base, struct mpu
 {
         struct regmap *map = mpu_prt->map;
         uint32_t region_reg_base = regmap_base + MPU_REGION_STEP * region->region_number;
+        uint32_t default_addr_high = 0;
+        uint32_t default_addr_low = 0;
+
+        default_addr_high = (region->default_addr - 0x80000000) >> 32;
+        default_addr_low = (region->default_addr - 0x80000000) & 0xffffffff;
 
 #ifdef DUMP_MPU_INFO
+        pr_err("default_addr_high:0x%x\n", default_addr_high);
+        pr_err("default_addr_low:0x%x\n", default_addr_low);
         dump_mpu_config(region);
 #endif
 
@@ -220,10 +227,10 @@ void mpu_config(struct mpu_protection *mpu_prt, uint32_t regmap_base, struct mpu
         regmap_write(map, region_reg_base + MPU_WR_DISABLE_31_0, region->disable_wr_userid_31_0);
         regmap_write(map, region_reg_base + MPU_WR_DISABLE_63_32, region->disable_wr_userid_63_32);
 
-        regmap_write(map, regmap_base + MPU_READ_DEFAULT_ADDR_31_0, 0x0FE7F000);
-        regmap_write(map, regmap_base + MPU_READ_DEFAULT_ADDR_63_32, 0x0);
-        regmap_write(map, regmap_base + MPU_WRITE_DEFAULT_ADDR_31_0, 0x0FE7F000);
-        regmap_write(map, regmap_base + MPU_WRITE_DEFAULT_ADDR_63_32, 0x0);
+        regmap_write(map, regmap_base + MPU_READ_DEFAULT_ADDR_31_0, default_addr_low);
+        regmap_write(map, regmap_base + MPU_READ_DEFAULT_ADDR_63_32, default_addr_high);
+        regmap_write(map, regmap_base + MPU_WRITE_DEFAULT_ADDR_31_0, default_addr_low);
+        regmap_write(map, regmap_base + MPU_WRITE_DEFAULT_ADDR_63_32, default_addr_high);
         for (int i = 0; i < 6; i++)
                 regmap_write(map, region_reg_base + MPU_WR_DISABLE_95_64 + 4 * i, 0xffffffff);
 
@@ -260,6 +267,8 @@ static int ddr_mpu_protect(struct mpu_protection *mpu_prt, struct mpu_region *re
 static int drobot_parse_dts(struct platform_device *pdev, struct device_node *np, struct mpu_region *region)
 {
         int32_t ret;
+        struct device_node *default_np = NULL;
+        struct resource resource = {0};
 
         if (region == NULL) {
                 pr_err("NO firewall region space to  parse DeviceTree\n");
@@ -336,6 +345,18 @@ static int drobot_parse_dts(struct platform_device *pdev, struct device_node *np
                 dev_err(&pdev->dev, "Can't get firewall base\n");
                 return ret;
         }
+        default_np = of_parse_phandle(np, "memory-region", 0);
+        if (!default_np) {
+                dev_err(&pdev->dev, "No %s specified\n", "memory-region");
+                return -1;
+        }
+        ret = of_address_to_resource(default_np, 0, &resource);
+        if (ret) {
+                dev_err(&pdev->dev, "No memory address assigned to the region\n");
+                return ret;
+        }
+
+        region->default_addr = resource.start;
         return 0;
 }
 

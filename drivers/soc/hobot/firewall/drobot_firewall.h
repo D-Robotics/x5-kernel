@@ -90,6 +90,7 @@ struct mpu_region {
         uint32_t disable_wr_userid_31_0;
         uint32_t disable_wr_userid_63_32;
         uint32_t disable_ns;
+        uint64_t default_addr;
         uint32_t lock;
 };
 
