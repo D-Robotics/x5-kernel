@@ -141,6 +141,14 @@
 	status = "okay";
 };
 
+//wifi antenna Onboard
+&dsp_gpio_porta {
+	pinctrl-names = "default";
+	pinctrl-0 = < &dsp_gpio0_17
+				  &dsp_gpio0_18
+				>;
+};
+
 // 40pin GPIO
 &ls_gpio0_porta {
 	pinctrl-names = "default";
