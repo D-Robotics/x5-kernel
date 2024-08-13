@@ -28,48 +28,48 @@
 			status = "okay";
 		};
 
-		linux,cma@88000000 {
+		isp_cma: linux,cma@88000000 {
 			compatible = "shared-dma-pool";
-			reg = <0x0 0x88000000 0x0 0x07E00000>; /* 126MB */
+			reg = <0x0 0x88000000 0x0 0x17E00000>; /* 382MB */
 			reusable;
 			linux,cma-default;
 		};
 
 		/* use as firewall default address */
-		firewall_ddr_default: firewall_ddr_default@8FE7F000 {
-			reg = <0x0 0x8FE7F000 0x0 0x00001000>;
+		firewall_ddr_default: firewall_ddr_default@9FE7F000 {
+			reg = <0x0 0x9FE7F000 0x0 0x00001000>;
 			no-map;
 		};
 
-		adsp_ddr: adsp_ddr@8FE80000 {
-			reg = <0x0 0x8FE80000 0x0 0x02200000>;
+		adsp_ddr: adsp_ddr@9FE80000 {
+			reg = <0x0 0x9FE80000 0x0 0x02200000>;
 			no-map;
 		};
 
-		audio_reserved: audio@92080000 {
+		audio_reserved: audio@A2080000 {
 			compatible = "shared-dma-pool";
 			no-map;
-			reg = <0x0 0x92080000 0x0 0x01000000>;
+			reg = <0x0 0xA2080000 0x0 0x01000000>;
 			status = "okay";
 		};
 
-		adsp_ipc_reserved: audio@93080000 {
+		adsp_ipc_reserved: audio@A3080000 {
 			compatible = "shared-dma-pool";
 			no-map;
-			reg = <0x0 0x93080000 0x0 0x00800000>;
+			reg = <0x0 0xA3080000 0x0 0x00800000>;
 			status = "okay";
 		};
 
-		adsp_bsp_reserved: audio@93880000 {
+		adsp_bsp_reserved: audio@A3880000 {
 			compatible = "shared-dma-pool";
 			no-map;
-			reg = <0x0 0x93880000 0x0 0x00800000>;
+			reg = <0x0 0xA3880000 0x0 0x00800000>;
 			status = "okay";
 		};
 
-		ramoops@94080000 {
+		ramoops@A4080000 {
 			compatible = "ramoops";
-			reg = <0x0 0x94080000 0x0 0x00040000>;
+			reg = <0x0 0xA4080000 0x0 0x00040000>;
 			console-size = <0x8000>;
 			pmg-size = <0x8000>;
 			ftrace-size = <0x8000>;
@@ -78,21 +78,15 @@
 			ecc-size = <0x0>;
 		};
 
-		isp_cma: linux,cma2@95000000 {
-			compatible = "shared-dma-pool";
-			reg = <0x0 0x95000000 0x0 0x0C800000>; /* 200MB */
-			reusable;
-		};
-
-		ion_reserved: ion_reserved@A1800000 {
+		ion_reserved: ion_reserved@A4100000 {
 			compatible = "ion-pool";
-			reg = <0x0 0xA1800000 0x0 0x20000000>; /* 512MB */
+			reg = <0x0 0xA4100000 0x0 0x20000000>; /* 512MB */
 			status = "okay";
 		};
 
-		ion_carveout: ion_carveout@C1800000 {
+		ion_carveout: ion_carveout@C4100000 {
 			compatible = "ion-carveout";
-			reg = <0x0 0xC1800000 0x0 0x20000000>; /* 512MB */
+			reg = <0x0 0xC4100000 0x0 0x20000000>; /* 512MB */
 			status = "okay";
 		};
 
@@ -100,7 +94,7 @@
 			compatible = "ion-cma";
 			alignment = <0x0 0x2000>;
 			reusable;
-			reg = <0x0 0xE1800000 0x0 0x0B800000>; /* 184MB */
+			reg = <0x0 0xE4100000 0x0 0x0B800000>; /* 184MB */
 			status = "okay";
 		};
 		/* The remaining memory is used as kernel heaps,
