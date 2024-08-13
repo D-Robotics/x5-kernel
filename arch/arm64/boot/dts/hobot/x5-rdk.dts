@@ -279,12 +279,14 @@
 		reg = <0x19>;
 		pinctrl-0 = <&dsp_gpio0_12>;
 		accel_irq_gpio = <&dsp_gpio_porta 12 GPIO_ACTIVE_HIGH>;
+		status = "disabled";
 	};
 	bmi08xg:bmi08xg@69{
 		compatible = "bmi08xg";
 		reg = <0x69>;
 		pinctrl-0 = <&lsio_gpio0_2>;
 		gyro_irq_gpio = <&ls_gpio1_porta 2 GPIO_ACTIVE_HIGH>;
+		status = "disabled";
 	};
 };
 
@@ -483,7 +485,7 @@
 };
 
 &dw_i2s1 {
-	status = "disabled";
+	status = "okay";
 	#sound-dai-cells = <1>;
 };
 
