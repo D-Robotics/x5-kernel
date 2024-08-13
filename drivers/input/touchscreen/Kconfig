@@ -43,6 +43,12 @@ config TOUCHSCREEN_ADS7846
 	  To compile this driver as a module, choose M here: the
 	  module will be called ads7846.
 
+config TOUCHSCREEN_FT5406
+	tristate "Touchscreen controller ft5406"
+	depends on I2C
+	help
+		Control FT5406 touch ic.
+
 config TOUCHSCREEN_AD7877
 	tristate "AD7877 based touchscreens"
 	depends on SPI_MASTER
