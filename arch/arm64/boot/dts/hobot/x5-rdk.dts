@@ -251,29 +251,6 @@
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_i2c5>;
 
-	es7210_0: es7210_0@40 {
-		compatible = "MicArray_0";
-		reg = <0x40>;
-		#sound-dai-cells = <1>;
-		channels = <8>;
-		adc_dev_num = <2>;
-		status = "okay";
-	};
-
-	es7210_1@42 {
-		compatible = "MicArray_2";
-		reg = <0x42>;
-		channels = <8>;
-		adc_dev_num = <2>;
-	};
-
-	es8156: es8156@8 {
-		compatible = "everest,es8156";
-		reg = <0x8>;
-		#sound-dai-cells = <0>;
-		status = "okay";
-	};
-
 	bmi08xa:bmi08xa@19 {
 		compatible = "bmi08xa";
 		reg = <0x19>;
@@ -482,11 +459,6 @@
 &dw_i2s0 {
 	status = "okay";
 	dwc-master = <1>;
-};
-
-&dw_i2s1 {
-	status = "okay";
-	#sound-dai-cells = <1>;
 };
 
 &archband_pdm {
