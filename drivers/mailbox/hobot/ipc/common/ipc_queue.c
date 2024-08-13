@@ -155,6 +155,8 @@ int32_t ipc_queue_init(struct ipc_queue *queue,
 
 	/* map pop ring in remote memory (init is done by remote) */
 	queue->pop_ring = (struct ipc_ring *) pop_ring_addr;
+	queue->pop_ring->write = 0;
+	queue->pop_ring->read = 0;
 
 	return 0;
 }
