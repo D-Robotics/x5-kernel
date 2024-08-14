@@ -196,20 +196,23 @@ n2d_error_t n2d_kernel_vidmem_node_unmap(n2d_kernel_t *kernel, n2d_uint32_t proc
 		       N2D_ALLOC_FLAG_RESERVED_ALLOCATOR;
 	dma_pool = (node->flag & N2D_ALLOC_FLAG_DMA_ALLOCATOR) == N2D_ALLOC_FLAG_DMA_ALLOCATOR;
 	if ((node->type & N2D_MAP_TO_KERNEL) && (node->klogical)) {
-		if (!reserve_pool && !dma_pool)
+		if (!reserve_pool && !dma_pool) {
 			ONERROR(n2d_kernel_os_unmap_cpu(kernel->os, process, node->klogical,
 							node->size, node->type));
-		node->klogical = N2D_NULL;
+			node->klogical = N2D_NULL;
+		}
 	}
 
 	if ((node->type & N2D_MAP_TO_GPU) && (node->address)) {
 		ONERROR(n2d_kernel_os_unmap_gpu(kernel->os, 0, node->address, node->size));
 		node->address = 0;
 	}
-    if ((node->flag & N2D_ALLOC_FLAG_WRAP_USER) && (node->handle)) {
-               ONERROR(n2d_kernel_os_free_wrapped_mem(kernel->os, node->flag, node->handle));
-               node->handle = 0;
-    }
+
+	if ((node->flag & N2D_ALLOC_FLAG_WRAP_USER) && (node->handle)) {
+		ONERROR(n2d_kernel_os_free_wrapped_mem(kernel->os, node->flag, node->handle));
+		node->handle = 0;
+	}
+
 	ONERROR(n2d_kernel_vidmem_node_dec(kernel, node));
 on_error:
 	if (get_mutex)

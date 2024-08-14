@@ -2041,6 +2041,7 @@ static int __devexit gpu_remove(struct platform_device *pdev)
 
 	struct device *dev_p = &(pdev->dev);
 	struct vs_n2d_aux *aux;
+	gpu_resume(pdev);
 	aux = dev_get_drvdata(dev_p);
 
 	dev_set_drvdata(&pdev->dev, NULL);
