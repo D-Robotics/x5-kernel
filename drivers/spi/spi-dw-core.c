@@ -944,6 +944,10 @@ static int dw_qspi_write_then_read(struct dw_spi *dws, struct spi_device *spi)
 		entries = readl_relaxed(dws->regs + DW_SPI_TXFLR);
 
 		room = min(dws->fifo_len - entries, len);
+
+		if (!room)
+			cpu_relax();
+
 		for (; room; --room, --len) {
 			txw = *(buf);
 			dw_write_io_reg(dws, DW_SPI_DR, txw);
@@ -961,6 +965,7 @@ static int dw_qspi_write_then_read(struct dw_spi *dws, struct spi_device *spi)
 				dev_err(&dws->master->dev, "FIFO overflow on Rx\n");
 				return -EIO;
 			}
+			cpu_relax();
 			continue;
 		}
 
@@ -984,6 +989,7 @@ static int dw_qspi_write_then_read(struct dw_spi *dws, struct spi_device *spi)
 					dev_err(&dws->master->dev, "FIFO overflow on Rx\n");
 					return -EIO;
 				}
+				cpu_relax();
 			}
 
 			if (entries) {
