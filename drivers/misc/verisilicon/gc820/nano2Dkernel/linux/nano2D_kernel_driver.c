@@ -1913,7 +1913,7 @@ static int __devinit gpu_probe(struct platform_device *pdev)
 {
 	n2d_error_t error;
 	n2d_uint32_t ret;
-
+	global_device = NULL;
 	struct device *dev_p = &(pdev->dev);
 	struct vs_n2d_aux *aux;
 	pm_message_t state = {0};
@@ -1999,8 +1999,17 @@ static int __devinit gpu_probe(struct platform_device *pdev)
 	return 0;
 
 on_error:
+    if (global_n2d) {
+		for (int i = 0; i < N2D_CH_MAX; i++) {
+				vio_unregister_device_node(&global_n2d->vps[i]);
+		}
+		n2d_kfree(global_n2d);
+    }
 	if (global_device)
 		n2d_kfree(global_device);
+
+    if (aux)
+		devm_kfree(dev_p, aux);
 
 	return 1;
 }
@@ -2030,6 +2039,10 @@ static int __devexit gpu_remove(struct platform_device *pdev)
 	int allocate_count = 0;
 	struct horizon_n2d_dev *n2d = global_n2d;
 
+	struct device *dev_p = &(pdev->dev);
+	struct vs_n2d_aux *aux;
+	aux = dev_get_drvdata(dev_p);
+
 	dev_set_drvdata(&pdev->dev, NULL);
 
 	horizon_n2d_device_node_deinit(n2d);
@@ -2049,7 +2062,10 @@ static int __devexit gpu_remove(struct platform_device *pdev)
 
 	n2d_check_allocate_count(&allocate_count);
 	if (allocate_count)
-		n2d_kernel_os_print("The remaining %d memory are not freed\n", allocate_count);
+		n2d_kernel_os_print("The remaining %d memory are not freed.\n", allocate_count);
+
+	if (aux)
+		devm_kfree(dev_p, aux);
 
 	return 0;
 }
