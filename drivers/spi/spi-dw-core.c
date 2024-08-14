@@ -823,11 +823,23 @@ static bool dw_qspi_supports_mem_op(struct spi_mem *mem,
 
 static int dw_qspi_adjust_mem_op_size(struct spi_mem *mem, struct spi_mem_op *op)
 {
-	if (op->data.nbytes % 4)
-		op->data.nbytes += (4 - op->data.nbytes % 4);
+	size_t len;
 
-	op->data.nbytes = clamp_val(op->data.nbytes, 0, (DW_SPI_NDF_MASK + 1) * 4);
+	if (op->data.buswidth == 4) {
+		op->data.nbytes = clamp_val(op->data.nbytes, 0, (DW_SPI_NDF_MASK + 1) * 4);
+	} else {
+		len = op->cmd.nbytes + op->addr.nbytes + op->dummy.nbytes;
 
+		if (len > spi_max_transfer_size(mem->spi))
+			return -EINVAL;
+
+		op->data.nbytes = min3((size_t)op->data.nbytes,
+				       spi_max_transfer_size(mem->spi),
+				       spi_max_message_size(mem->spi) -
+				       len);
+		if (!op->data.nbytes)
+			return -EINVAL;
+	}
 	return 0;
 }
 
@@ -879,6 +891,9 @@ static int dw_qspi_init_mem_buf(struct dw_spi *dws, const struct spi_mem_op *op)
 	if (op->data.dir == SPI_MEM_DATA_OUT)
 		len += op->data.nbytes;
 
+	if (len % 4)
+		len += (4 - len % 4);
+
 	if (len <= DW_SPI_BUF_SIZE) {
 		out = (u32*)dws->buf;
 	} else {
@@ -904,10 +919,10 @@ static int dw_qspi_init_mem_buf(struct dw_spi *dws, const struct spi_mem_op *op)
 
 	dws->n_bytes = 4;
 	dws->tx = out;
-	dws->tx_len = len / dws->n_bytes;
+	dws->tx_len = len;
 	if (op->data.dir == SPI_MEM_DATA_IN) {
 		dws->rx = op->data.buf.in;
-		dws->rx_len = op->data.nbytes / dws->n_bytes;
+		dws->rx_len = op->data.nbytes;
 	} else {
 		dws->rx = NULL;
 		dws->rx_len = 0;
@@ -921,8 +936,9 @@ static int dw_qspi_write_then_read(struct dw_spi *dws, struct spi_device *spi)
 	u32 room, entries, sts, txw, rxw;
 	unsigned int len;
 	u32 *buf;
+	u8 *buf_u8;
 
-	len = dws->tx_len;
+	len = dws->tx_len / dws->n_bytes;
 	buf = (u32 *)dws->tx;
 	while (len) {
 		entries = readl_relaxed(dws->regs + DW_SPI_TXFLR);
@@ -935,7 +951,7 @@ static int dw_qspi_write_then_read(struct dw_spi *dws, struct spi_device *spi)
 		}
 	}
 
-	len = dws->rx_len;
+	len = dws->rx_len / dws->n_bytes;
 	buf = (u32 *)dws->rx;
 	while (len) {
 		entries = readl_relaxed(dws->regs + DW_SPI_RXFLR);
@@ -954,6 +970,28 @@ static int dw_qspi_write_then_read(struct dw_spi *dws, struct spi_device *spi)
 				rxw = dw_read_io_reg(dws, DW_SPI_DR);
 				*(buf) = be32_to_cpu(rxw);
 				buf++;
+			}
+		}
+	}
+
+	if (dws->rx_len % 4) {
+		buf_u8 = (u8*)buf;
+		while(1) {
+			entries = readl_relaxed(dws->regs + DW_SPI_RXFLR);
+			if (!entries) {
+				sts = readl_relaxed(dws->regs + DW_SPI_RISR);
+				if (sts & DW_SPI_INT_RXOI) {
+					dev_err(&dws->master->dev, "FIFO overflow on Rx\n");
+					return -EIO;
+				}
+			}
+
+			if (entries) {
+				rxw = dw_read_io_reg(dws, DW_SPI_DR);
+				len = dws->rx_len % 4;
+				rxw = be32_to_cpu(rxw);
+				memcpy(buf_u8, (u8*)&rxw, len);
+				break;
 			}
 		}
 	}
