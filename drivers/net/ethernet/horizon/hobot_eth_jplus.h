@@ -436,6 +436,9 @@ struct plat_config_data {
 	struct clk *phy_ref_clk;
 	struct clk *clk_ptp_ref;
 
+	struct gpio_desc *phyreset;
+	struct reset_control *reset;
+
 	u32 rx_queues_to_use;
 	u32 tx_queues_to_use;
 	u8 rx_sched_algorithm;

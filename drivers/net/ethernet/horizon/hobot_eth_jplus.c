@@ -32,6 +32,7 @@
 #include <linux/of_address.h>
 #include <linux/of_mdio.h>
 #include <linux/tcp.h>
+#include <linux/gpio/consumer.h>
 #include <linux/reset.h>
 #include <linux/phylink.h>
 #include <net/pkt_cls.h>
@@ -579,6 +580,34 @@ err_ptp_clk:
 
 
 /**
+ * get_reset_dt
+ * @pdev: platform_device struct poniter
+ * @plat: plat_config_data struct pointer
+ * Description: get reset config from device tree.
+ * called by eth_probe_config_dt
+ * Return: 0 success; otherwise error
+ */
+static s32 get_reset_dt(struct platform_device *pdev, struct plat_config_data *plat)
+{
+	s32 ret = 0;
+
+	plat->reset = devm_reset_control_get_optional(&pdev->dev, "enet_rst");
+	if (IS_ERR_OR_NULL(plat->reset)) {
+		dev_dbg(&pdev->dev, "get reset control failed\n");
+		ret = -EINVAL;
+	}
+
+	plat->phyreset = devm_gpiod_get_optional(&pdev->dev, "phyreset", GPIOD_OUT_HIGH);
+	if (IS_ERR_OR_NULL(plat->phyreset)) {
+		dev_dbg(&pdev->dev, "get phyreset failed\n");
+		ret = -EINVAL;
+	}
+
+	return ret;
+}
+
+
+/**
  * get_burst_map_dt
  * @np: device_node struct poniter
  * @plat: plat_config_data struct pointer
@@ -684,12 +713,6 @@ static void get_axi_cfg_dt(struct device_node *np, struct plat_config_data *plat
 	get_burst_map_dt(np, plat);
 }
 
-
-
-
-
-
-
 /**
  * eth_probe_config_dt
  * @pdev: platform_device struct poniter
@@ -765,6 +788,9 @@ static struct plat_config_data *eth_probe_config_dt(struct platform_device *pdev
 		dev_err(&pdev->dev, "can not get clk dtb config\n");
 		goto free_axi;
 	}
+	ret = get_reset_dt(pdev, plat);
+	if (ret < 0)
+		dev_info(&pdev->dev, "can not get reset dtb config\n");
 
 	return plat;
 
@@ -7251,7 +7277,6 @@ err_netdev_init:
 	return ret;
 }
 
-
 /**
  * eth_reset
  * @dev: device struct pointer
@@ -7260,36 +7285,58 @@ err_netdev_init:
  */
 static s32 eth_reset(struct device *dev)
 {
-	struct device_node *np = dev->of_node;
-	struct reset_control * reset_control;
+	struct net_device *ndev;
+	struct hobot_priv *priv;
 	s32 err;
 
-	reset_control = of_reset_control_array_get_exclusive(np);
-	if (IS_ERR((void *)reset_control)) {
-		dev_dbg(dev, "get reset control err\n");/*PRQA S 0685, 1294*/
-		err = PTR_ERR((void *)reset_control);/*PRQA S 4460*/
-		goto err_get_reset;
+	ndev = (struct net_device *)dev_get_drvdata(dev);
+	priv = (struct hobot_priv *)netdev_priv(ndev);
+
+	if (!ndev || !priv || IS_ERR_OR_NULL(priv->plat->reset))
+		return -EINVAL;
+
+	err = reset_control_assert(priv->plat->reset);
+	if (err < 0) {
+		dev_dbg(dev, "eth reset assert err\n");/*PRQA S 0685, 1294*/
+		goto assert_error;
 	}
 
-	err = reset_control_assert(reset_control);
-	if (err < 0) {
-		dev_dbg(dev, "eth reset assert err\n");/*PRQA S 0685, 1294*/
-		goto free_control;
-	}
 	udelay(100);/*PRQA S 2880*/
-	err = reset_control_deassert(reset_control);
+	err = reset_control_deassert(priv->plat->reset);
 	if (err < 0) {
 		dev_dbg(dev, "eth reset assert err\n");/*PRQA S 0685, 1294*/
-		goto free_control;
+		goto deassert_error;
 	}
-free_control:
-	reset_control_put(reset_control);
-err_get_reset:
+
+assert_error:
+deassert_error:
 	return err;
 }
 
+/**
+ * eth_phy_reset
+ * @dev: device struct pointer
+ * Description: reset eth phy
+ * Return: 0 on success, otherwise error
+ */
+static s32 eth_phy_reset(struct device *dev)
+{
+	struct net_device *ndev;
+	struct hobot_priv *priv;
 
+	ndev = (struct net_device *)dev_get_drvdata(dev);
+	priv = (struct hobot_priv *)netdev_priv(ndev);
 
+	if (!ndev || !priv || IS_ERR_OR_NULL(priv->plat->phyreset))
+		return -EINVAL;
+
+	gpiod_set_value(priv->plat->phyreset, 0);
+	msleep(1);
+	gpiod_set_value(priv->plat->phyreset, 1);
+	msleep(32);
+
+	return 0;
+}
 
 /**
  * eth_probe
@@ -7321,17 +7368,23 @@ static s32 eth_probe(struct platform_device *pdev)
 		goto err_dt;
 	}
 
+	ret = eth_drv_probe(&pdev->dev, plat_dat, &mac_res);
+	if (ret < 0)
+		goto err_probe;
+
+	ret = eth_phy_reset(&pdev->dev);
+	if (ret < 0)
+		goto err_reset;
+
 	ret = eth_reset(&pdev->dev);
 	if (ret < 0)
 		goto err_reset;
 
-	ret = eth_drv_probe(&pdev->dev, plat_dat, &mac_res);
-	if (ret < 0)
-		goto err_probe;
 	(void)hobot_eth_end_probe(pdev);
 
 	return 0;
 
+err_reset:
 err_probe:
 	devm_kfree(&pdev->dev, (void *)plat_dat->axi);
 	plat_dat->axi = NULL;
@@ -7339,7 +7392,7 @@ err_probe:
 	plat_dat->dma_cfg = NULL;
 	devm_kfree(&pdev->dev, (void *)plat_dat);
 	plat_dat = NULL;
-err_reset:
+
 	devm_iounmap(&pdev->dev, mac_res.addr);
 err_dt:
 	return ret;
@@ -7527,6 +7580,7 @@ s32 eth_resume(struct device *dev)
 	(void)clk_prepare_enable(priv->plat->clk_ptp_ref);
 	(void)clk_prepare_enable(priv->plat->phy_ref_clk);
 
+	(void)eth_phy_reset(dev);
 	(void)eth_reset(dev);
 
 	/* Power Down bit, into the PM register, is cleared
