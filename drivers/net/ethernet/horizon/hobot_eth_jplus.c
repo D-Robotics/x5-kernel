@@ -7331,9 +7331,9 @@ static s32 eth_phy_reset(struct device *dev)
 		return -EINVAL;
 
 	gpiod_set_value(priv->plat->phyreset, 0);
-	msleep(1);
+	msleep(10);
 	gpiod_set_value(priv->plat->phyreset, 1);
-	msleep(32);
+	msleep(120);
 
 	return 0;
 }
