@@ -433,8 +433,11 @@ void dc_plane_destroy(struct vs_plane *vs_plane)
 
 	__dc_proc_destroy(&dc_plane->list);
 	if (vs_plane->info) {
-		if (vs_plane->info->modifiers && vs_plane->info->num_modifiers > NUM_MODIFIERS)
+		if (vs_plane->info->modifiers && vs_plane->info->num_modifiers > NUM_MODIFIERS) {
 			kfree(vs_plane->info->modifiers);
+			vs_plane->info->num_modifiers = NUM_MODIFIERS;
+			vs_plane->info->modifiers     = format_modifiers;
+		}
 	}
 
 	kfree(dc_plane);

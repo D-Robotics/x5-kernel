@@ -125,7 +125,7 @@ struct vs_plane {
 	struct drm_plane base;
 	/** belong to which display controller device. */
 	struct device *dev;
-	const struct vs_plane_info *info;
+	struct vs_plane_info *info;
 	const struct vs_plane_funcs *funcs;
 };
 

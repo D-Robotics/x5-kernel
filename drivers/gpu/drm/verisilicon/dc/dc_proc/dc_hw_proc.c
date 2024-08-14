@@ -680,7 +680,7 @@ static void dc_hw_proc_update_plane_info(struct dc_proc *dc_proc, void *plane_in
 
 	memcpy(tmp, info->modifiers, (info->num_modifiers - 1) * sizeof(u64));
 
-	if (info->modifiers != format_modifiers)
+	if (info->num_modifiers > NUM_MODIFIERS)
 		kfree(info->modifiers);
 
 	info->modifiers = tmp;
