@@ -21,6 +21,7 @@
 #include <sound/dmaengine_pcm.h>
 #include <sound/pcm_params.h>
 #include "gua_pcm.h"
+#include "gua_audio_rpc_protocol.h"
 
 extern void link_audio_info(struct gua_audio_info *audio_info);
 
@@ -220,6 +221,7 @@ int pcm_msg_recv_cb(uint8_t *payload, uint32_t payload_size, void *priv) {
 	struct gua_audio_info *au_info;
 	struct pcm_info *pcm_info;
 	int ret;
+	gua_audio_rpc_data_t *power_msg = (gua_audio_rpc_data_t*)&(((struct ipc_wrapper_rpmsg_r *)payload)->body);
 
 	au_info = (struct gua_audio_info *)priv;
 	pcm_info = &au_info->pcm_info;
@@ -230,6 +232,11 @@ int pcm_msg_recv_cb(uint8_t *payload, uint32_t payload_size, void *priv) {
 		ret = -EACCES;
 		dev_err(pcm_info->dev, "AUDIO : pcm msg callback type error\n");
 		return ret;
+	}
+
+	if (power_msg->header.group == GROUP_POWER) {
+		dev_dbg(pcm_info->dev, "AUDIO : pcm msg: GROUP_POWER, return\n");
+		return 0;
 	}
 
 	if (msg->param.cmd == PCM_TX_PERIOD_DONE) {
