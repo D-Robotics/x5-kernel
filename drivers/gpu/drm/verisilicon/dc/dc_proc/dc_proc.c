@@ -427,7 +427,7 @@ static void __dc_proc_resume(struct list_head *dc_proc_list)
 
 // dc_plane_proc APIs
 
-static void dc_plane_destroy(struct vs_plane *vs_plane)
+void dc_plane_destroy(struct vs_plane *vs_plane)
 {
 	struct dc_plane *dc_plane = to_dc_plane(vs_plane);
 
@@ -436,6 +436,8 @@ static void dc_plane_destroy(struct vs_plane *vs_plane)
 		if (vs_plane->info->modifiers && vs_plane->info->num_modifiers > NUM_MODIFIERS)
 			kfree(vs_plane->info->modifiers);
 	}
+
+	kfree(dc_plane);
 }
 
 static int dc_plane_check(struct vs_plane *vs_plane, struct drm_plane_state *state)
@@ -573,6 +575,8 @@ int dc_plane_init(struct dc_plane *dc_plane, struct dc_plane_info *dc_plane_info
 
 	dc_plane->info = dc_plane_info;
 
+	INIT_LIST_HEAD(&dc_plane->head);
+
 	return __dc_proc_init(dc_plane, &dc_plane->list, dc_plane_info->proc_info,
 			      dc_plane_info->num_proc, device_list, vs_plane_info);
 }
@@ -646,11 +650,13 @@ static void set_dc_crtc_state(struct drm_crtc_state *crtc_state)
 	}
 }
 
-static void dc_crtc_destroy(struct vs_crtc *vs_crtc)
+void dc_crtc_destroy(struct vs_crtc *vs_crtc)
 {
 	struct dc_crtc *dc_crtc = to_dc_crtc(vs_crtc);
 
 	__dc_proc_destroy(&dc_crtc->list);
+
+	kfree(dc_crtc);
 }
 
 static void dc_crtc_enable(struct vs_crtc *vs_crtc)
@@ -885,6 +891,8 @@ int dc_crtc_init(struct dc_crtc *dc_crtc, struct dc_crtc_info *dc_crtc_info,
 
 	dc_crtc->info = dc_crtc_info;
 
+	INIT_LIST_HEAD(&dc_crtc->head);
+
 	return __dc_proc_init(dc_crtc, &dc_crtc->list, dc_crtc_info->proc_info,
 			      dc_crtc_info->num_proc, device_list, vs_crtc_info);
 }
@@ -912,11 +920,13 @@ void dc_crtc_resume(struct vs_crtc *vs_crtc)
 
 // dc_wb_proc APIs
 
-static void dc_wb_destroy(struct vs_wb *vs_wb)
+void dc_wb_destroy(struct vs_wb *vs_wb)
 {
 	struct dc_wb *dc_wb = to_dc_wb(vs_wb);
 
 	__dc_proc_destroy(&dc_wb->list);
+
+	kfree(dc_wb);
 }
 
 void dc_wb_vblank(struct vs_wb *vs_wb)
@@ -1033,6 +1043,8 @@ int dc_wb_init(struct dc_wb *dc_wb, struct dc_wb_info *dc_wb_info, struct list_h
 	vs_wb->funcs = &vs_wb_funcs;
 
 	dc_wb->info = dc_wb_info;
+
+	INIT_LIST_HEAD(&dc_wb->head);
 
 	return __dc_proc_init(dc_wb, &dc_wb->list, dc_wb_info->proc_info, dc_wb_info->num_proc,
 			      device_list, vs_wb_info);

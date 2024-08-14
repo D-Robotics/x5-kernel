@@ -659,7 +659,7 @@ static int dc_hw_proc_check_format_mod(struct dc_proc *dc_proc, u32 format, u64 
 	return is_supported_format(info->mod_format_map, format, modifier);
 }
 
-static void dc_hw_update_info(struct dc_proc *dc_proc, void *plane_info)
+static void dc_hw_proc_update_plane_info(struct dc_proc *dc_proc, void *plane_info)
 {
 	const struct dc_proc_info *proc_info   = dc_proc->info;
 	struct vs_plane_info *info	       = plane_info;
@@ -723,7 +723,7 @@ static struct dc_proc *dc_hw_create_plane(struct device *dev, const struct dc_pr
 const struct dc_proc_funcs dc_hw_plane_funcs = {
 	.create		  = dc_hw_create_plane,
 	.update		  = dc_hw_proc_update_plane,
-	.update_info	  = dc_hw_update_info,
+	.update_info	  = dc_hw_proc_update_plane_info,
 	.disable	  = dc_hw_proc_disable_plane,
 	.check		  = dc_hw_proc_check_plane,
 	.commit		  = dc_hw_proc_commit_plane,

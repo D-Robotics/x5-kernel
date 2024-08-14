@@ -54,9 +54,11 @@ static int dc_bind(struct device *dev, struct device *master, void *data)
 	struct drm_device *drm_dev = data;
 	struct vs_dc *dc	   = dev_get_drvdata(dev);
 	const struct dc_info *dc_info;
-	struct drm_plane *drm_plane, *tmp_plane;
-	struct drm_crtc *drm_crtc, *tmp_crtc;
 	struct device_node *port;
+	struct dc_wb *dc_wb, *dc_wb_tmp;
+	struct dc_plane *dc_plane, *dc_plane_tmp;
+	struct dc_crtc *dc_crtc, *dc_crtc_tmp;
+
 	int i, ret;
 
 	if (!drm_dev || !dc) {
@@ -74,34 +76,35 @@ static int dc_bind(struct device *dev, struct device *master, void *data)
 
 	for (i = 0; i < dc_info->num_display; i++) {
 		struct dc_crtc_info *dc_crtc_info = &dc_info->displays[i];
-		struct dc_crtc *dc_crtc;
 		struct vs_crtc *vs_crtc;
 
-		dc_crtc = drmm_kzalloc(drm_dev, sizeof(*dc_crtc), GFP_KERNEL);
+		dc_crtc = kzalloc(sizeof(*dc_crtc), GFP_KERNEL);
 		if (!dc_crtc) {
 			ret = -ENOMEM;
-			goto err_cleanup_planes_crtcs;
+			goto err_cleanup_crtcs;
 		}
+
+		list_add_tail(&dc_crtc->head, &dc->crtc_list);
 
 		ret = dc_crtc_init(dc_crtc, dc_crtc_info, &dc->aux_list);
 		if (ret)
-			goto err_cleanup_planes_crtcs;
+			goto err_cleanup_crtcs;
 
 		vs_crtc	     = &dc_crtc->vs_crtc;
 		vs_crtc->dev = dc->dev;
 		ret	     = vs_crtc_init(drm_dev, vs_crtc);
 		if (ret)
-			goto err_cleanup_planes_crtcs;
+			goto err_cleanup_crtcs;
 
 		ret = dc_crtc_create_prop(dc_crtc);
 		if (ret)
-			goto err_cleanup_planes_crtcs;
+			goto err_cleanup_crtcs;
 
 		port = of_graph_get_port_by_id(dev->of_node, i);
 		if (!port) {
 			dev_err(dev, "no port node found\n");
 			ret = -EINVAL;
-			goto err_cleanup_planes_crtcs;
+			goto err_cleanup_crtcs;
 		}
 		of_node_put(port);
 		vs_crtc->base.port = port;
@@ -109,28 +112,29 @@ static int dc_bind(struct device *dev, struct device *master, void *data)
 
 	for (i = 0; i < dc_info->num_plane; i++) {
 		struct dc_plane_info *dc_plane_info = &dc_info->planes[i];
-		struct dc_plane *dc_plane;
 		struct vs_plane *vs_plane;
 
-		dc_plane = drmm_kzalloc(drm_dev, sizeof(*dc_plane), GFP_KERNEL);
+		dc_plane = kzalloc(sizeof(*dc_plane), GFP_KERNEL);
 		if (!dc_plane) {
 			ret = -ENOMEM;
-			goto err_cleanup_planes_crtcs;
+			goto err_cleanup_planes;
 		}
+
+		list_add_tail(&dc_plane->head, &dc->plane_list);
 
 		ret = dc_plane_init(dc_plane, dc_plane_info, &dc->aux_list);
 		if (ret)
-			goto err_cleanup_planes_crtcs;
+			goto err_cleanup_planes;
 
 		vs_plane      = &dc_plane->vs_plane;
 		vs_plane->dev = dc->dev;
 		ret	      = vs_plane_init(drm_dev, vs_plane);
 		if (ret)
-			goto err_cleanup_planes_crtcs;
+			goto err_cleanup_planes;
 
 		ret = dc_plane_create_prop(dc_plane);
 		if (ret)
-			goto err_cleanup_planes_crtcs;
+			goto err_cleanup_planes;
 
 		if (vs_plane->base.type == DRM_PLANE_TYPE_PRIMARY)
 			set_crtc_primary_plane(drm_dev, &vs_plane->base);
@@ -141,32 +145,33 @@ static int dc_bind(struct device *dev, struct device *master, void *data)
 
 	for (i = 0; i < dc_info->num_wb; i++) {
 		struct dc_wb_info *dc_wb_info = &dc_info->writebacks[i];
-		struct dc_wb *dc_wb;
 		struct vs_wb *vs_wb;
 
-		dc_wb = drmm_kzalloc(drm_dev, sizeof(*dc_wb), GFP_KERNEL);
+		dc_wb = kzalloc(sizeof(*dc_wb), GFP_KERNEL);
 		if (!dc_wb) {
 			ret = -ENOMEM;
-			goto err_cleanup_planes_crtcs;
+			goto err_cleanup_wbs;
 		}
+
+		list_add_tail(&dc_wb->head, &dc->wb_list);
 
 		ret = dc_wb_init(dc_wb, dc_wb_info, &dc->aux_list);
 		if (ret)
-			goto err_cleanup_planes_crtcs;
+			goto err_cleanup_wbs;
 
 		vs_wb	   = &dc_wb->vs_wb;
 		vs_wb->dev = dc->dev;
 		ret	   = vs_wb_init(drm_dev, vs_wb);
 		if (ret)
-			goto err_cleanup_planes_crtcs;
+			goto err_cleanup_wbs;
 
 		ret = dc_wb_post_create(dc_wb);
 		if (ret)
-			goto err_cleanup_planes_crtcs;
+			goto err_cleanup_wbs;
 
 		ret = dc_wb_create_prop(dc_wb);
 		if (ret)
-			goto err_cleanup_planes_crtcs;
+			goto err_cleanup_wbs;
 	}
 
 	drm_dev->mode_config.min_width	   = dc_info->min_width;
@@ -182,12 +187,15 @@ static int dc_bind(struct device *dev, struct device *master, void *data)
 
 	return 0;
 
-err_cleanup_planes_crtcs:
-	list_for_each_entry_safe (drm_plane, tmp_plane, &drm_dev->mode_config.plane_list, head)
-		drm_plane->funcs->destroy(drm_plane);
-
-	list_for_each_entry_safe (drm_crtc, tmp_crtc, &drm_dev->mode_config.crtc_list, head)
-		drm_crtc->funcs->destroy(drm_crtc);
+err_cleanup_wbs:
+	list_for_each_entry_safe (dc_wb, dc_wb_tmp, &dc->wb_list, head)
+		dc_wb_destroy(&dc_wb->vs_wb);
+err_cleanup_planes:
+	list_for_each_entry_safe (dc_plane, dc_plane_tmp, &dc->plane_list, head)
+		dc_plane_destroy(&dc_plane->vs_plane);
+err_cleanup_crtcs:
+	list_for_each_entry_safe (dc_crtc, dc_crtc_tmp, &dc->crtc_list, head)
+		dc_crtc_destroy(&dc_crtc->vs_crtc);
 
 	vs_drm_iommu_detach_device(drm_dev, dev);
 
@@ -422,6 +430,9 @@ static int dc_probe(struct platform_device *pdev)
 	}
 
 	INIT_LIST_HEAD(&dc->aux_list);
+	INIT_LIST_HEAD(&dc->crtc_list);
+	INIT_LIST_HEAD(&dc->plane_list);
+	INIT_LIST_HEAD(&dc->wb_list);
 
 	ret = dc_get_all_devices(dev);
 	if (ret) {

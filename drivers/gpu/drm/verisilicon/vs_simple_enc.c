@@ -56,7 +56,6 @@ static int encoder_bind(struct device *dev, struct device *master, void *data)
 	struct simple_encoder *simple = dev_get_drvdata(dev);
 	struct drm_encoder *encoder;
 	struct drm_bridge *bridge;
-	struct drm_panel *panel;
 	const char *name = NULL;
 	int ret;
 
@@ -70,15 +69,11 @@ static int encoder_bind(struct device *dev, struct device *master, void *data)
 	encoder->possible_crtcs = drm_of_find_possible_crtcs(drm_dev, dev->of_node);
 
 	/* output port is port1*/
-	ret = drm_of_find_panel_or_bridge(dev->of_node, 1, -1, &panel, &bridge);
-	if (ret) {
+	bridge = devm_drm_of_get_bridge(dev, dev->of_node, 1, -1);
+	if (IS_ERR(bridge)) {
+		ret = PTR_ERR(bridge);
 		dev_err(dev, "find bridge failed(err=%d)\n", ret);
 		goto err;
-	}
-	if (panel) {
-		bridge = drm_panel_bridge_add(panel);
-		if (IS_ERR(bridge))
-			goto err;
 	}
 
 	ret = drm_bridge_attach(encoder, bridge, NULL, (enum drm_bridge_attach_flags)0);

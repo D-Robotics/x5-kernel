@@ -62,6 +62,12 @@ struct vs_dc {
 	const char *out_bus_list[DC_OUT_BUS_MAX_NUM];
 	/** aux device list. */
 	struct list_head aux_list;
+	/** dc crtc list. */
+	struct list_head crtc_list;
+	/** dc plane list. */
+	struct list_head plane_list;
+	/** dc wb list. */
+	struct list_head wb_list;
 };
 
 extern struct platform_driver dc_platform_driver;
