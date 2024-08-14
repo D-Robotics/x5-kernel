@@ -661,8 +661,6 @@ void dc_crtc_destroy(struct vs_crtc *vs_crtc)
 	struct dc_crtc *dc_crtc = to_dc_crtc(vs_crtc);
 
 	__dc_proc_destroy(&dc_crtc->list);
-
-	kfree(dc_crtc);
 }
 
 static void dc_crtc_enable(struct vs_crtc *vs_crtc)
@@ -931,8 +929,6 @@ void dc_wb_destroy(struct vs_wb *vs_wb)
 	struct dc_wb *dc_wb = to_dc_wb(vs_wb);
 
 	__dc_proc_destroy(&dc_wb->list);
-
-	kfree(dc_wb);
 }
 
 void dc_wb_vblank(struct vs_wb *vs_wb, u32 irq_status)
