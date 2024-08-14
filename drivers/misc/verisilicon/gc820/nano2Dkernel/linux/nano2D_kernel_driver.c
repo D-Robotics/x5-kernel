@@ -1913,7 +1913,7 @@ static int __devinit gpu_probe(struct platform_device *pdev)
 {
 	n2d_error_t error;
 	n2d_uint32_t ret;
-	static u64 dma_mask  = 0;
+
 	struct device *dev_p = &(pdev->dev);
 	struct vs_n2d_aux *aux;
 	pm_message_t state = {0};
@@ -1927,11 +1927,7 @@ static int __devinit gpu_probe(struct platform_device *pdev)
 	}
 	memset(global_device, 0, sizeof(n2d_device_t));
 
-#if NANO2D_MMU_ENABLE
-	dma_mask = DMA_BIT_MASK(40);
-#else
-	dma_mask = DMA_BIT_MASK(32);
-#endif
+
 	/* Power and clock. */
 	if (platform->ops->getPower) {
 		ONERROR(platform->ops->getPower(platform));
@@ -1955,14 +1951,19 @@ static int __devinit gpu_probe(struct platform_device *pdev)
 
 	ONERROR(sync_param(&global_param));
 
+#if NANO2D_MMU_ENABLE
+    dev_p->coherent_dma_mask = DMA_BIT_MASK(40);
+#else
+    dev_p->coherent_dma_mask = DMA_BIT_MASK(32);
+#endif
+
 	if (global_param.iommu)
 #if IS_ENABLED(CONFIG_DROBOT_LITE_MMU)
-		dma_mask = DMA_BIT_MASK(40);
+		dev_p->coherent_dma_mask = DMA_BIT_MASK(40);
 #else
-		dma_mask = DMA_BIT_MASK(32);
+		dev_p->coherent_dma_mask = DMA_BIT_MASK(32);
 #endif
-	dev_p->dma_mask		 = &dma_mask;
-	dev_p->coherent_dma_mask = dma_mask;
+	dev_p->dma_mask = &(dev_p->coherent_dma_mask);
 
 	global_device->dev	= (n2d_pointer)dev_p;
 	global_device->platform = platform;
