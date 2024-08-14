@@ -927,7 +927,7 @@ static int horizon_pinctrl_parse_functions(struct device_node *np, struct horizo
 
 	/* Initialise function */
 	func->name	      = np->name;
-	func->num_group_names = of_get_child_count(np);
+	func->num_group_names = ipctl->pctl->num_groups;
 	if (func->num_group_names == 0) {
 		dev_err(ipctl->dev, "No groups defined in %pOF\n", np);
 		return -EINVAL;
@@ -938,19 +938,21 @@ static int horizon_pinctrl_parse_functions(struct device_node *np, struct horizo
 		return -ENOMEM;
 
 	for_each_child_of_node (np, child) {
-		group_names[i] = child->name;
+		if (of_property_read_bool(child, "horizon,pins")) {
+			group_names[i] = child->name;
 
-		grp = devm_kzalloc(ipctl->dev, sizeof(struct group_desc), GFP_KERNEL);
-		if (!grp) {
-			of_node_put(child);
-			return -ENOMEM;
+			grp = devm_kzalloc(ipctl->dev, sizeof(struct group_desc), GFP_KERNEL);
+			if (!grp) {
+				of_node_put(child);
+				return -ENOMEM;
+			}
+
+			mutex_lock(&ipctl->mutex);
+			radix_tree_insert(&pctl->pin_group_tree, ipctl->group_index++, grp);
+			mutex_unlock(&ipctl->mutex);
+
+			horizon_pinctrl_parse_groups(child, grp, ipctl, i++);
 		}
-
-		mutex_lock(&ipctl->mutex);
-		radix_tree_insert(&pctl->pin_group_tree, ipctl->group_index++, grp);
-		mutex_unlock(&ipctl->mutex);
-
-		horizon_pinctrl_parse_groups(child, grp, ipctl, i++);
 	}
 	func->group_names = group_names;
 
@@ -1052,10 +1054,13 @@ static int horizon_pinctrl_probe_dt(struct platform_device *pdev, struct horizon
 	pctl->num_functions = nfuncs;
 
 	ipctl->group_index = 0;
+	pctl->num_groups   = 0;
 	if (flat_funcs) {
-		pctl->num_groups = of_get_child_count(np);
+		for_each_child_of_node (np, child) {
+			if (of_property_read_bool(child, "horizon,pins"))
+				pctl->num_groups++;
+		}
 	} else {
-		pctl->num_groups = 0;
 		for_each_child_of_node (np, child)
 			pctl->num_groups += of_get_child_count(child);
 	}
