@@ -1155,6 +1155,7 @@
 				id = <0>;
 				instances = <4>;
 				cam-ctrl = <&cam_ctrl>;
+				cam-pulse = <&cam_pulse>;
 				status = "okay";
 				iommus = <&cam_sif_iommu>;
 			};
@@ -1180,6 +1181,7 @@
 				id = <1>;
 				instances = <2>;
 				cam-ctrl = <&cam_ctrl>;
+				cam-pulse = <&cam_pulse>;
 				status = "okay";
 				iommus = <&cam_sif_iommu>;
 			};
@@ -1205,6 +1207,7 @@
 				id = <2>;
 				instances = <4>;
 				cam-ctrl = <&cam_ctrl>;
+				cam-pulse = <&cam_pulse>;
 				status = "okay";
 				iommus = <&cam_sif_iommu>;
 			};
@@ -1230,6 +1233,7 @@
 				id = <3>;
 				instances = <2>;
 				cam-ctrl = <&cam_ctrl>;
+				cam-pulse = <&cam_pulse>;
 				status = "okay";
 				iommus = <&cam_sif_iommu>;
 			};
@@ -1333,6 +1337,18 @@
 				compatible = "verisilicon,cam-ctrl-sr";
 				reg = <0x3d0b0000 0x10>;
 				reg-names = "reg";
+				status = "okay";
+			};
+
+			cam_pulse: cam_pulse@3d0b008c {
+				compatible = "verisilicon,cam-pulse-gen";
+				reg = <0x3d0b008c 0x18>;
+				reg-names = "reg";
+				cam-pulse-width = <5>;
+				cam-pulse-wait = <0>;
+				cam-pulse-interval = <24000000>;
+				cam-pulse-offset = <0>;
+				cam-pulse-start-mode = <0>;
 				status = "okay";
 			};
 
