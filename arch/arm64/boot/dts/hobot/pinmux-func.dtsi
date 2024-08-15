@@ -344,6 +344,12 @@
 		>;
 	};
 
+	pinctrl_spi1_ssn1: spi1_ssn1grp {
+		horizon,pins = <
+			LSIO_SPI1_SSN_1  LSIO_PINMUX_0 BIT_OFFSET0  MUX_ALT0 &pconf_drv_pu_ds2_1v8
+		>;
+	};
+
 	pinctrl_spi2: spi2grp {
 		horizon,pins = <
 			LSIO_SPI2_SCLK LSIO_PINMUX_1 BIT_OFFSET16  MUX_ALT0 &pconf_drv_pu_ds2_3v3
