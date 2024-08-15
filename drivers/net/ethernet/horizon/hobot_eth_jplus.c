@@ -824,7 +824,7 @@ static s32 get_platform_resources(struct platform_device *pdev, struct mac_resou
 	}
 
 	/* wol_irq is optional */
-	mac_res->wol_irq = platform_get_irq(pdev, 1);
+	mac_res->wol_irq = platform_get_irq_optional(pdev, 1);
 	if (mac_res->wol_irq <= 0)
 		dev_info(&pdev->dev, "No wol_irq resouce.\n");
 
@@ -7663,4 +7663,3 @@ static struct platform_driver hobot_driver = {
 
 module_platform_driver(hobot_driver);/*PRQA S 0605, 0307*/
 MODULE_LICENSE("GPL v2");
-
