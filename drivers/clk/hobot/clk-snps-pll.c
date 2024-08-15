@@ -77,19 +77,21 @@ static void pll_get_params(struct drobot_clk_pll *pll,
 	rate->mfrac = (pll_fbdiv & PLL_MFRAC_MASK);
 }
 
-static void pll_wait_lock(struct drobot_clk_pll *pll)
+static int pll_wait_lock(struct drobot_clk_pll *pll)
 {
 	int i = 0;
 
 	while (!(readl(pll->cfg_reg + PLL_LOCK_OFFSET) & PLL_LOCK)) {
 		cpu_relax();
-		udelay(10);
+		udelay(PLL_LOCK_DELAY_US);
 		i++;
-		if (i > 1000) {
+		if (i > PLL_LOCK_CHECK_COUNT) {
 			pr_err("%s: lock timeout for pll clk %s\n", __func__, __clk_get_name(pll->hw.clk));
-			break;
+			return -ETIMEDOUT;
 		}
 	}
+
+        return 0;
 }
 
 static int pll_is_enabled(struct clk_hw *hw)
@@ -227,6 +229,8 @@ static int pll_set_rate_table(struct clk_hw *hw, unsigned long rate,
 {
 	struct drobot_clk_pll *pll = to_clk_pll(hw);
 	const struct pll_rate_table *rate_table;
+        int ret = 0;
+	u32 retry = 0;
 
 	/* Get required rate settings from table */
 	if (rate == pll_recalc_rate(hw, parent_rate)) {
@@ -239,9 +243,17 @@ static int pll_set_rate_table(struct clk_hw *hw, unsigned long rate,
 		return -EINVAL;
 	}
 
+pll_relock:
 	pll_set_regs(pll, rate_table, parent_rate);
 
-	pll_wait_lock(pll);
+	ret = pll_wait_lock(pll);
+	if (ret) {
+                if (retry++ < PLL_LOCK_RETRY)
+			goto pll_relock;
+		else
+			return -ETIMEDOUT;
+	}
+
 	pll_enable(hw);
 
 	return 0;

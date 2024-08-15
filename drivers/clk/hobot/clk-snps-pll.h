@@ -62,7 +62,6 @@ struct drobot_clk_pll {
 #define PLL_DIVVCOR_SHIFT	(18)
 #define PLL_MINT_SHIFT		(16)
 
-
 #define PLL_PREDIV_MASK		GENMASK(10, PLL_PREDIV_SHIFT)
 #define PLL_DIVVCOP_MASK	GENMASK(11, PLL_DIVVCOP_SHIFT)
 #define PLL_POSTDIVP_MASK	GENMASK(7, PLL_POSTDIVP_SHIFT)
@@ -93,6 +92,9 @@ struct drobot_clk_pll {
 #define PLL_FRAC_EN		BIT(0)
 #define PLL_BYPASS_SYNC		(BIT(3) | BIT(4))
 #define PLL_CTRL_DEFAULT	0x2838
+#define PLL_LOCK_DELAY_US    	1
+#define PLL_LOCK_CHECK_COUNT 	1000
+#define PLL_LOCK_RETRY       	3
 
 struct clk_hw *clk_hw_register_pll(const char *name, const char *parent_name,
 				void __iomem *cfg_reg, void __iomem *internal_reg,
