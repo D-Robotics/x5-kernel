@@ -34,6 +34,11 @@ struct _reg_info {
 	u32 reg_info[4];
 };
 
+struct _DDR_vendor_info {
+	u8 vendor_id;
+	char *vendor_name;
+};
+
 const char *soc_id;
 const char *bootmode;
 const char *socuid;
@@ -52,13 +57,73 @@ static unsigned int secure_chip = 0;
 static void __iomem *sec_flag_addr;
 struct _reg_info g_bak_slot_info;
 struct _reg_info g_boot_count;
-const static char *ddr_vendor_array[] = {"unkown", "Samsung", "unkown",
-                                         "unkown", "unkown", "Nanya",
-                                         "SK hynix", "unkown", "Winbond",
-                                         "ESMT", "unkown", "unkown",
-                                         "unkown", "unkown", "unkown",
-                                         "unkown", "unkown", "unkown",
-                                         "unkown", "cxmt"};
+
+const static struct _DDR_vendor_info ddr_vendor_info[] = {
+	{
+		.vendor_id = 0x1,
+		.vendor_name = "Samsung",
+	},
+	{
+		.vendor_id = 0x5,
+		.vendor_name = "Nanya",
+	},
+	{
+		.vendor_id = 0x6,
+		.vendor_name = "SK hynix",
+	},
+	{
+		.vendor_id = 0x8,
+		.vendor_name = "Winbond",
+	},
+	{
+		.vendor_id = 0x9,
+		.vendor_name = "ESMT",
+	},
+	{
+		.vendor_id = 0x13,
+		.vendor_name = "cxmt",
+	},
+	{
+		.vendor_id = 0x1A,
+		.vendor_name = "Xi'an UniIC Semiconductors",
+	},
+	{
+		.vendor_id = 0x1B,
+		.vendor_name = "ISSI",
+	},
+	{
+		.vendor_id = 0x1C,
+		.vendor_name = "JSC",
+	},
+	{
+		.vendor_id = 0xC5,
+		.vendor_name = "SINKER",
+	},
+	{
+		.vendor_id = 0xE5,
+		.vendor_name = "Dosilicon Co,Ltd",
+	},
+	{
+		.vendor_id = 0xF8,
+		.vendor_name = "Fidelix",
+	},
+	{
+		.vendor_id = 0xF9,
+		.vendor_name = "Ultra Memory",
+	},
+	{
+		.vendor_id = 0xFD,
+		.vendor_name = "AP Memory",
+	},
+	{
+		.vendor_id = 0xFF,
+		.vendor_name = "Micron",
+	},
+	{
+		.vendor_id = 0x00,
+		.vendor_name = "unkown",
+	},
+};
 const char *ddr_freq_array[] = {"unkown", "3200", "3733", "4266"};
 const char *ddr_type_array[] = {"unkown", "lpddr4", "lpddr4x"};
 const char *ddr_size_array[] = {"1G", "2G", "4G", "8G"};
@@ -372,7 +437,7 @@ MODULE_DEVICE_TABLE(of, socinfo_of_match);
 
 static int socinfo_probe(struct platform_device *pdev)
 {
-	int ret = 0;
+	int ret = 0, i;
 	struct resource *resource = NULL;
 	static void __iomem *ddr_info_addr = NULL;
 	uint32_t ddr_info = 0;
@@ -473,10 +538,16 @@ static int socinfo_probe(struct platform_device *pdev)
 		return (int32_t)PTR_ERR(ddr_info_addr);
 	}
 	ddr_info = readl(ddr_info_addr);
-	ddr_vendor = ddr_vendor_array[DR_DDR_VENDOR(ddr_info)];
 	ddr_freq = ddr_freq_array[DR_DDR_FREQ(ddr_info)];
 	ddr_size = ddr_size_array[DR_DDR_SIZE(ddr_info)];
 	ddr_type = ddr_type_array[DR_DDR_TYPE(ddr_info)];
+	for (i = 0; i < ARRAY_SIZE(ddr_vendor_info); i++) {
+		if (DR_DDR_VENDOR(ddr_info) == ddr_vendor_info[i].vendor_id ||
+			i == ARRAY_SIZE(ddr_vendor_info) - 1) {
+			ddr_vendor = ddr_vendor_info[i].vendor_name;
+			break;
+		}
+	}
 
 	ret = class_register(&socinfo_class);
 	dev_info(&pdev->dev, "Socinfo probe end with retval: %d\n", ret);
