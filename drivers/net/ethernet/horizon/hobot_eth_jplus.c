@@ -5559,6 +5559,7 @@ static const struct net_device_ops netdev_ops = {
 	.ndo_stop = eth_netdev_stop,
 	.ndo_start_xmit = eth_netdev_do_start_xmit,
 	.ndo_do_ioctl = eth_netdev_do_ioctl,
+	.ndo_eth_ioctl = eth_netdev_do_ioctl,
 	.ndo_setup_tc = eth_netdev_setup_tc,
 	.ndo_set_rx_mode = eth_netdev_set_rx_mode,
 	.ndo_set_mac_address = eth_mac_addr,
