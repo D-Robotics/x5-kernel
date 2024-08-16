@@ -2041,7 +2041,9 @@ static int __devexit gpu_remove(struct platform_device *pdev)
 
 	struct device *dev_p = &(pdev->dev);
 	struct vs_n2d_aux *aux;
-	gpu_resume(pdev);
+	if (platform->ops->set_power) {
+		platform->ops->set_power(platform, 1, N2D_TRUE);
+	}
 	aux = dev_get_drvdata(dev_p);
 
 	dev_set_drvdata(&pdev->dev, NULL);
@@ -2049,6 +2051,10 @@ static int __devexit gpu_remove(struct platform_device *pdev)
 	horizon_n2d_device_node_deinit(n2d);
 
 	drv_exit();
+
+	if (platform->ops->set_power) {
+		platform->ops->set_power(platform, 1, N2D_FALSE);
+	}
 
 	if (global_device) {
 		n2d_kfree(global_device);
