@@ -337,9 +337,9 @@ struct dc_hw_cursor {
 	/** buffer address of cursor. */
 	u32 address;
 	/** cursor horizontal offset of background. */
-	u16 x;
+	s16 x;
 	/** cursor vertical offset of background. */
-	u16 y;
+	s16 y;
 	/** horizontal offset to cursor hotspot. */
 	u16 hot_x;
 	/** vertical offset to cursor hotspot. */

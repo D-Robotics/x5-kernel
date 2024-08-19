@@ -307,12 +307,12 @@ static void plane_update_cursor(struct dc_hw *hw, const struct dc_hw_proc_info *
 
 	dc_write(hw, GCREG_CURSOR_ADDRESS_Address, cursor->address);
 
-	config = VS_SET_FIELD(0, GCREG_CURSOR_LOCATION, X, cursor->x) |
-		 VS_SET_FIELD(0, GCREG_CURSOR_LOCATION, Y, cursor->y);
+	config = VS_SET_FIELD(0, GCREG_CURSOR_LOCATION, X, cursor->x < 0 ? 0: cursor->x) |
+		 VS_SET_FIELD(0, GCREG_CURSOR_LOCATION, Y, cursor->y < 0 ? 0: cursor->y);
 	dc_write(hw, GCREG_CURSOR_LOCATION_Address, config);
 
-	config = VS_SET_FIELD(0, GCREG_CURSOR_CONFIG, HOT_SPOT_X, cursor->x) |
-		 VS_SET_FIELD(0, GCREG_CURSOR_CONFIG, HOT_SPOT_Y, cursor->y) |
+	config = VS_SET_FIELD(0, GCREG_CURSOR_CONFIG, HOT_SPOT_X, cursor->hot_x) |
+		 VS_SET_FIELD(0, GCREG_CURSOR_CONFIG, HOT_SPOT_Y, cursor->hot_y) |
 		 VS_SET_FIELD(0, GCREG_CURSOR_CONFIG, FORMAT,
 			      (cursor->masked ? GCREG_CURSOR_CONFIG_FORMAT_MASKED :
 						GCREG_CURSOR_CONFIG_FORMAT_A8R8G8B8));
