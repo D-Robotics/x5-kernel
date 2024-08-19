@@ -42,6 +42,7 @@ void bpu_core_update(struct bpu_core *core, struct bpu_fc *fc)
 	uint64_t tmp_start_point;
 	uint64_t tmp_time;
 	unsigned long flags;
+	unsigned long user_flags;
 	int32_t prio;
 
 	if ((core == NULL) || (fc == NULL)) {
@@ -92,12 +93,12 @@ void bpu_core_update(struct bpu_core *core, struct bpu_fc *fc)
 	}
 	spin_unlock(&g_bpu->group_spin_lock);
 
-	spin_lock(&g_bpu->user_spin_lock);
+	spin_lock_irqsave(&g_bpu->user_spin_lock, user_flags);
 	tmp_user = bpu_get_user(fc, &core->user_list);
 	if (tmp_user != NULL) {
 		tmp_user->p_run_time += tmp_time;
 	}
-	spin_unlock(&g_bpu->user_spin_lock);
+	spin_unlock_irqrestore(&g_bpu->user_spin_lock, user_flags);
 
 	core->last_done_point = fc->end_point;
 
@@ -156,8 +157,9 @@ int32_t bpu_stat_reset(struct bpu *bpu)
 	struct bpu_fc_group *tmp_fc_group;
 	struct bpu_user *tmp_user;
 	unsigned long group_flags;
+	unsigned long tmp_user_flags;
+	unsigned long bpu_flags;
 	unsigned long user_flags;
-	unsigned long flags;
 	int32_t ret;
 
 	/* reset the global slowest time in reset period */
@@ -174,7 +176,7 @@ int32_t bpu_stat_reset(struct bpu *bpu)
 		}
 	}
 
-	spin_lock_irqsave(&bpu->spin_lock, flags);
+	spin_lock_irqsave(&bpu->spin_lock, bpu_flags);
 	spin_lock(&bpu->group_spin_lock);
 	/* reset the bpu group p_run_time */
 	list_for_each_safe(pos, pos_n, &bpu->group_list) {
@@ -187,18 +189,18 @@ int32_t bpu_stat_reset(struct bpu *bpu)
 	}
 	spin_unlock(&bpu->group_spin_lock);
 
-	spin_lock(&bpu->user_spin_lock);
+	spin_lock_irqsave(&bpu->user_spin_lock, user_flags);
 	/* reset the bpu user p_run_time */
 	list_for_each_safe(pos, pos_n, &bpu->user_list) {
 		tmp_user = (struct bpu_user *)list_entry(pos, struct bpu_user, node);/*PRQA S 0497*/ /* Linux Macro */
 		if (tmp_user != NULL) {
-			spin_lock_irqsave(&tmp_user->spin_lock, user_flags);
+			spin_lock_irqsave(&tmp_user->spin_lock, tmp_user_flags);
 			tmp_user->p_run_time /= P_RESET_COEF;
-			spin_unlock_irqrestore(&tmp_user->spin_lock, user_flags);
+			spin_unlock_irqrestore(&tmp_user->spin_lock, tmp_user_flags);
 		}
 	}
-	spin_unlock(&bpu->user_spin_lock);
-	spin_unlock_irqrestore(&bpu->spin_lock, flags);
+	spin_unlock_irqrestore(&bpu->user_spin_lock, user_flags);
+	spin_unlock_irqrestore(&bpu->spin_lock, bpu_flags);
 
 	return 0;
 }
@@ -345,6 +347,7 @@ static int32_t bpu_check_fc_run_time_from_core(struct bpu_core *core,
 	uint64_t tmp_start_point;
 	struct bpu_user *tmp_user;
 	unsigned long flags;
+	unsigned long user_flags;
 	uint32_t user_id;
 	int32_t ret, i;
 	int32_t prio_num;
@@ -355,7 +358,7 @@ static int32_t bpu_check_fc_run_time_from_core(struct bpu_core *core,
 
 	user_id = (uint32_t)task_pid_nr(current->group_leader);
 	prio_num = BPU_CORE_PRIO_NUM(core);
-	spin_lock(&core->spin_lock);
+	spin_lock_irqsave(&core->spin_lock, flags);
 	for (i = 0; i < (int32_t)prio_num; i++) {
 		if (kfifo_is_empty(&core->run_fc_fifo[i])) {
 			continue;
@@ -365,10 +368,10 @@ static int32_t bpu_check_fc_run_time_from_core(struct bpu_core *core,
 			continue;
 		}
 
-		spin_lock_irqsave(&g_bpu->user_spin_lock, flags);
+		spin_lock_irqsave(&g_bpu->user_spin_lock, user_flags);
 		tmp_user = bpu_get_user(&tmp_bpu_fc, &core->user_list);
 		if (tmp_user == NULL) {
-			spin_unlock_irqrestore(&g_bpu->user_spin_lock, flags);
+			spin_unlock_irqrestore(&g_bpu->user_spin_lock, user_flags);
 			continue;
 		}
 
@@ -376,11 +379,11 @@ static int32_t bpu_check_fc_run_time_from_core(struct bpu_core *core,
 				&& (user_id == (uint32_t)(tmp_user->id & USER_MASK))) {
 			if ((tmp_bpu_fc.info.id == fc_run_time->id) || (fc_run_time->id == 0)) {
 				match_bpu_fc = &tmp_bpu_fc;
-				spin_unlock_irqrestore(&g_bpu->user_spin_lock, flags);
+				spin_unlock_irqrestore(&g_bpu->user_spin_lock, user_flags);
 				break;
 			}
 		}
-		spin_unlock_irqrestore(&g_bpu->user_spin_lock, flags);
+		spin_unlock_irqrestore(&g_bpu->user_spin_lock, user_flags);
 	}
 
 	if (match_bpu_fc == NULL) {
@@ -396,7 +399,7 @@ static int32_t bpu_check_fc_run_time_from_core(struct bpu_core *core,
 		fc_run_time->run_time = (uint32_t)(time_interval(tmp_start_point, check_point) / NSEC_PER_USEC);
 		ret = 1;
 	}
-	spin_unlock(&core->spin_lock);
+	spin_unlock_irqrestore(&core->spin_lock, flags);
 
 	return ret;
 }
@@ -498,15 +501,15 @@ EXPORT_SYMBOL(bpu_core_bufferd_time);/*PRQA S 0307*/ /*PRQA S 0779*/ /* Linux Ma
 /**
  * @NO{S04E02C01I}
  * @brief get the bpu core last done time
- * 
+ *
  * @param[in] core: bpu core struct pointer
- * 
+ *
  * @return the time stamp value
- * 
+ *
  * @data_read None
  * @data_updated None
  * @compatibility None
- *  
+ *
  * @callgraph
  * @callergraph
  * @design
@@ -524,15 +527,15 @@ EXPORT_SYMBOL(bpu_core_last_done_time);
 /**
  * @NO{S04E02C01I}
  * @brief get bpu core buffer task estimate time
- * 
+ *
  * @param[in] core: bpu core struct pointer
- * 
- * @return total buffer task estimate time 
- * 
+ *
+ * @return total buffer task estimate time
+ *
  * @data_read None
  * @data_updated None
  * @compatibility None
- *  
+ *
  * @callgraph
  * @callergraph
  * @design

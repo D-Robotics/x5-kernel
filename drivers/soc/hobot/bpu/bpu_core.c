@@ -770,6 +770,7 @@ static struct bpu_user *bpu_core_create_user(struct bpu_core *core)
 {
 	struct bpu_user *user;
 	unsigned long flags;
+	unsigned long user_flags;
 	int32_t ret;
 
 	user = (struct bpu_user *)kzalloc(sizeof(struct bpu_user), GFP_KERNEL);
@@ -791,9 +792,9 @@ static struct bpu_user *bpu_core_create_user(struct bpu_core *core)
 
 	init_waitqueue_head(&user->poll_wait);
 	spin_lock_irqsave(&core->spin_lock, flags);
-	spin_lock(&core->host->user_spin_lock);
+	spin_lock_irqsave(&core->host->user_spin_lock, user_flags);
 	list_add((struct list_head *)user, &core->user_list);
-	spin_unlock(&core->host->user_spin_lock);
+	spin_unlock_irqrestore(&core->host->user_spin_lock, user_flags);
 	spin_unlock_irqrestore(&core->spin_lock, flags);
 	user->host = (void *)core;
 	spin_lock_init(&user->spin_lock);/*PRQA S 3334*/ /* Linux Macro */
@@ -806,9 +807,11 @@ static struct bpu_user *bpu_core_create_user(struct bpu_core *core)
 /* break E1, no error return logic inside the function */
 static void bpu_core_discard_user(struct bpu_user *user)
 {
-	spin_lock(&((struct bpu_core *)user->host)->host->user_spin_lock);
+	unsigned long user_flags;
+
+	spin_lock_irqsave(&((struct bpu_core *)user->host)->host->user_spin_lock, user_flags);
 	list_del((struct list_head *)user);
-	spin_unlock(&((struct bpu_core *)user->host)->host->user_spin_lock);
+	spin_unlock_irqrestore(&((struct bpu_core *)user->host)->host->user_spin_lock, user_flags);
 	kfifo_free(&user->done_fcs);
 	kfree((void *)user);
 }

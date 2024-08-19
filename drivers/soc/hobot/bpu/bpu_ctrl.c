@@ -726,6 +726,8 @@ int32_t bpu_core_process_recover(struct bpu_core *core)
 	DECLARE_KFIFO_PTR(recovery_kfifo[MAX_HW_FIFO_NUM], struct bpu_fc);/*PRQA S 1061*/ /*PRQA S 1062*/ /* Linux Macro */
 	struct bpu_user *tmp_user;
 	unsigned long flags;
+	unsigned long user_flags;
+	unsigned long hwio_flags;
 	int32_t prio_num;
 	int32_t ret;
 	int32_t i;
@@ -752,21 +754,21 @@ int32_t bpu_core_process_recover(struct bpu_core *core)
 
 			spin_lock_irqsave(&core->spin_lock, flags);
 			/* not recovery exit user's task */
-			spin_lock(&g_bpu->user_spin_lock);
+			spin_lock_irqsave(&g_bpu->user_spin_lock, user_flags);
 			tmp_user = bpu_get_user(&tmp_bpu_fc, &core->user_list);
 			if (tmp_user == NULL) {
-				spin_unlock(&g_bpu->user_spin_lock);
+				spin_unlock_irqrestore(&g_bpu->user_spin_lock, user_flags);
 				spin_unlock_irqrestore(&core->spin_lock, flags);
 				continue;
 			}
-			spin_unlock(&g_bpu->user_spin_lock);
+			spin_unlock_irqrestore(&g_bpu->user_spin_lock, user_flags);
 
-			spin_lock(&core->hw_io_spin_lock);
+			spin_lock_irqsave(&core->hw_io_spin_lock, hwio_flags);
 			if (core->hw_io != NULL) {
 				if ((core->hw_io->ops.write_fc != NULL) && (tmp_bpu_fc.fc_data != NULL)) {
 					ret = core->hw_io->ops.write_fc(&core->inst, &tmp_bpu_fc, 0);
 					if (ret < 0) {
-						spin_unlock(&core->hw_io_spin_lock);
+						spin_unlock_irqrestore(&core->hw_io_spin_lock, hwio_flags);
 						spin_unlock_irqrestore(&core->spin_lock, flags);
 						dev_err(core->dev, "TO recovery bpu core%d failed\n",
 								core->index);
@@ -774,7 +776,7 @@ int32_t bpu_core_process_recover(struct bpu_core *core)
 					}
 				}
 			}
-			spin_unlock(&core->hw_io_spin_lock);
+			spin_unlock_irqrestore(&core->hw_io_spin_lock, hwio_flags);
 
 			spin_unlock_irqrestore(&core->spin_lock, flags);
 		}

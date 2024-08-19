@@ -517,6 +517,8 @@ int32_t bpu_write_fc_to_core(struct bpu_core *core,
 {
 	struct bpu_user *tmp_user;
 	unsigned long flags;
+	unsigned long user_flags;
+	unsigned long hwio_flags;
 	int32_t ret;
 	int32_t write_fc_num;
 	uint32_t prio;
@@ -532,23 +534,23 @@ int32_t bpu_write_fc_to_core(struct bpu_core *core,
 	}
 
 	/* write data to bpu task range */
-	spin_lock_irqsave(&core->hw_io_spin_lock, flags);
+	spin_lock_irqsave(&core->hw_io_spin_lock, hwio_flags);
 	if (core->hw_io == NULL) {
-		spin_unlock_irqrestore(&core->hw_io_spin_lock, flags);
+		spin_unlock_irqrestore(&core->hw_io_spin_lock, hwio_flags);
 			bpu_fc_clear(bpu_fc);
 			dev_err(core->dev, "No BPU HW IO for Core to use!\n");
 			return -ENODEV;
 	}
 
 	if (core->hw_io->ops.write_fc != NULL) {
-		spin_unlock_irqrestore(&core->hw_io_spin_lock, flags);
+		spin_unlock_irqrestore(&core->hw_io_spin_lock, hwio_flags);
 		prio = bpu_fc_confirm_hw_id(core, bpu_fc, offpos);
 
 		spin_lock_irqsave(&core->spin_lock, flags);
-		spin_lock(&g_bpu->user_spin_lock);
+		spin_lock_irqsave(&g_bpu->user_spin_lock, user_flags);
 		tmp_user = bpu_get_valid_user(core, bpu_fc);
 		if (tmp_user == NULL) {
-			spin_unlock(&g_bpu->user_spin_lock);
+			spin_unlock_irqrestore(&g_bpu->user_spin_lock, user_flags);
 			spin_unlock_irqrestore(&core->spin_lock, flags);
 			/* no user, so report fake complete */
 			ret = (int32_t)bpu_fc->info.slice_num - (int32_t)offpos;
@@ -557,24 +559,24 @@ int32_t bpu_write_fc_to_core(struct bpu_core *core,
 			return ret;
 		}
 
-		spin_lock(&core->hw_io_spin_lock);
+		spin_lock_irqsave(&core->hw_io_spin_lock, hwio_flags);
 		if (core->hw_io != NULL) {
 			if (core->hw_io->ops.write_fc != NULL) {
 				write_fc_num = core->hw_io->ops.write_fc(&core->inst, bpu_fc, offpos);
 			}
 		} else {
-			spin_unlock(&core->hw_io_spin_lock);
-			spin_unlock(&g_bpu->user_spin_lock);
+			spin_unlock_irqrestore(&core->hw_io_spin_lock, hwio_flags);
+			spin_unlock_irqrestore(&g_bpu->user_spin_lock, user_flags);
 			spin_unlock_irqrestore(&core->spin_lock, flags);
 			bpu_fc_clear(bpu_fc);
 			dev_err(core->dev, "No BPU HW IO for Core to use!\n");
 			return -ENODEV;
 		}
-		spin_unlock(&core->hw_io_spin_lock);
+		spin_unlock_irqrestore(&core->hw_io_spin_lock, hwio_flags);
 
 		if (write_fc_num != ((int32_t)bpu_fc->info.slice_num - (int32_t)offpos)) {
 			/* write raw task to hw fifo not complete or error */
-			spin_unlock(&g_bpu->user_spin_lock);
+			spin_unlock_irqrestore(&g_bpu->user_spin_lock, user_flags);
 			spin_unlock_irqrestore(&core->spin_lock, flags);
 			return write_fc_num;
 		}
@@ -586,7 +588,7 @@ int32_t bpu_write_fc_to_core(struct bpu_core *core,
 			if (ret < 1) {
 				core->running_task_num--;
 				tmp_user->running_task_num--;
-				spin_unlock(&g_bpu->user_spin_lock);
+				spin_unlock_irqrestore(&g_bpu->user_spin_lock, user_flags);
 				spin_unlock_irqrestore(&core->spin_lock, flags);
 				dev_err(core->dev, "bpu request to fifo failed\n");
 				return -EBUSY;
@@ -595,10 +597,10 @@ int32_t bpu_write_fc_to_core(struct bpu_core *core,
 		} else {
 			bpu_fc_clear(bpu_fc);
 		}
-		spin_unlock(&g_bpu->user_spin_lock);
+		spin_unlock_irqrestore(&g_bpu->user_spin_lock, user_flags);
 		spin_unlock_irqrestore(&core->spin_lock, flags);
 	} else {
-		spin_unlock_irqrestore(&core->hw_io_spin_lock, flags);
+		spin_unlock_irqrestore(&core->hw_io_spin_lock, hwio_flags);
 		bpu_fc_clear(bpu_fc);
 		dev_err(core->dev, "no real bpu to process\n");
 		return -ENODEV;
@@ -1103,6 +1105,7 @@ static int bpu_open(struct inode *inode, struct file *filp)
 	struct bpu *bpu = (struct bpu *)container_of(filp->private_data, struct bpu, miscdev);/*PRQA S 0497*/ /* Linux Macro */
 	struct bpu_user *user;
 	unsigned long flags;
+	unsigned long user_flags;
 	int32_t ret;
 
 	mutex_lock(&bpu->mutex_lock);
@@ -1139,9 +1142,9 @@ static int bpu_open(struct inode *inode, struct file *filp)
 	user->host = (void *)bpu;
 	user->p_file_private = &filp->private_data;
 	spin_lock_irqsave(&bpu->spin_lock, flags);
-	spin_lock(&bpu->user_spin_lock);
+	spin_lock_irqsave(&bpu->user_spin_lock, user_flags);
 	list_add((struct list_head *)user, &g_bpu->user_list);
-	spin_unlock(&bpu->user_spin_lock);
+	spin_unlock_irqrestore(&bpu->user_spin_lock, user_flags);
 	spin_unlock_irqrestore(&bpu->spin_lock, flags);
 	spin_lock_init(&user->spin_lock);/*PRQA S 3334*/ /* Linux Macro */
 	mutex_init(&user->mutex_lock);/*PRQA S 3334*/ /* Linux Macro */
@@ -1165,6 +1168,7 @@ static int bpu_release(struct inode *inode, struct file *filp)
 	struct list_head *pos, *pos_n;
 	struct bpu_fc_group *tmp_group;
 	unsigned long flags;
+	unsigned long user_flags;
 
 	mutex_lock(&bpu->mutex_lock);
 	user->is_alive = 0;
@@ -1204,9 +1208,9 @@ static int bpu_release(struct inode *inode, struct file *filp)
 	}
 
 	spin_lock_irqsave(&bpu->spin_lock, flags);
-	spin_lock(&g_bpu->user_spin_lock);
+	spin_lock_irqsave(&g_bpu->user_spin_lock, user_flags);
 	list_del((struct list_head *)user);
-	spin_unlock(&g_bpu->user_spin_lock);
+	spin_unlock_irqrestore(&g_bpu->user_spin_lock, user_flags);
 	kfifo_free(&user->done_fcs);
 	kfree((void *)user);
 	filp->private_data = NULL;
