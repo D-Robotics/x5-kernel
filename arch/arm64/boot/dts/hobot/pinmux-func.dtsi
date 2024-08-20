@@ -237,8 +237,8 @@
 &dsp_iomuxc {
 	pinctrl_dsp_i2c7: dsp_i2c7grp {
 		horizon,pins = <
-			DSP_I2C7_SDA  DSP_PINMUX_0  BIT_OFFSET0  MUX_ALT0 &pconf_drv_pu_ds7_1v8
-			DSP_I2C7_SCL  DSP_PINMUX_0  BIT_OFFSET2  MUX_ALT0 &pconf_drv_pu_ds7_1v8
+			DSP_I2C7_SDA  DSP_PINMUX_0  BIT_OFFSET0  MUX_ALT0 &pconf_drv_pu_ds2_1v8
+			DSP_I2C7_SCL  DSP_PINMUX_0  BIT_OFFSET2  MUX_ALT0 &pconf_drv_pu_ds2_1v8
 		>;
 	};
 
@@ -402,8 +402,8 @@
 
 	pinctrl_i2c2: i2c2grp {
 		horizon,pins = <
-			LSIO_I2C2_SCL  LSIO_PINMUX_2 BIT_OFFSET24  MUX_ALT0 &pconf_drv_pu_ds7_1v8
-			LSIO_I2C2_SDA  LSIO_PINMUX_2 BIT_OFFSET26  MUX_ALT0 &pconf_drv_pu_ds7_1v8
+			LSIO_I2C2_SCL  LSIO_PINMUX_2 BIT_OFFSET24  MUX_ALT0 &pconf_drv_pu_ds2_1v8
+			LSIO_I2C2_SDA  LSIO_PINMUX_2 BIT_OFFSET26  MUX_ALT0 &pconf_drv_pu_ds2_1v8
 		>;
 	};
 
@@ -416,8 +416,8 @@
 
 	pinctrl_i2c4: i2c4grp {
 		horizon,pins = <
-			LSIO_I2C4_SCL  LSIO_PINMUX_3 BIT_OFFSET0  MUX_ALT0 &pconf_drv_pu_ds7_1v8
-			LSIO_I2C4_SDA  LSIO_PINMUX_3 BIT_OFFSET2  MUX_ALT0 &pconf_drv_pu_ds7_1v8
+			LSIO_I2C4_SCL  LSIO_PINMUX_3 BIT_OFFSET0  MUX_ALT0 &pconf_drv_pu_ds2_1v8
+			LSIO_I2C4_SDA  LSIO_PINMUX_3 BIT_OFFSET2  MUX_ALT0 &pconf_drv_pu_ds2_1v8
 		>;
 	};
 
