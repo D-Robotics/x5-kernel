@@ -55,6 +55,7 @@ static void bpu_core_tasklet(unsigned long data)
 	struct bpu_fc tmp_bpu_fc;
 	uint64_t tmp_done_hw_id;
 	uint32_t tmp_hw_id, err, prio;
+	unsigned long flags;
 	int32_t lost_report;
 	int32_t ret;
 
@@ -122,7 +123,7 @@ static void bpu_core_tasklet(unsigned long data)
 
 			tmp_bpu_fc.info.run_c_mask = ((uint64_t)0x1 << (uint32_t)core->index);
 
-			spin_lock(&core->host->user_spin_lock);
+			spin_lock_irqsave(&core->host->user_spin_lock, flags);
 			tmp_user = bpu_get_user(&tmp_bpu_fc, &core->user_list);
 			if (tmp_user != NULL) {
 				if (tmp_user->is_alive > 0u) {
@@ -134,7 +135,7 @@ static void bpu_core_tasklet(unsigned long data)
 
 					ret = kfifo_in(&tmp_user->done_fcs, &tmp_bpu_fc.info, 1);/*PRQA S 4461*/ /* Linux Macro */
 					if (ret < 1) {
-						spin_unlock(&core->host->user_spin_lock);
+						spin_unlock_irqrestore(&core->host->user_spin_lock, flags);
 						bpu_sched_seed_update();
 						dev_err(core->dev, "bpu buffer bind user error\n");
 						return;
@@ -147,7 +148,7 @@ static void bpu_core_tasklet(unsigned long data)
 					complete(&tmp_user->no_task_comp);
 				}
 			}
-			spin_unlock(&core->host->user_spin_lock);
+			spin_unlock_irqrestore(&core->host->user_spin_lock, flags);
 
 			core->running_task_num--;
 			if (core->running_task_num <= 0) {
