@@ -3342,6 +3342,7 @@
 				clock-frequency = <100000>;
 				status = "disabled";
 				resets = <&dsprst DSP_I2C_RESET>;
+				i2c-sda-hold-time-ns = <30>;
 			};
 
 			dsp_axi_dma: dma-controller@32080000 {
@@ -3835,6 +3836,7 @@
 				#size-cells = <0>;
 				clock-frequency = <100000>;
 				resets = <&socrst LSIO_I2C0_APB_RESET>;
+				i2c-sda-hold-time-ns = <30>;
 			};
 
 			i2c1: i2c@340c0000 {
@@ -3849,6 +3851,7 @@
 				#size-cells = <0>;
 				clock-frequency = <100000>;
 				resets = <&socrst LSIO_I2C1_APB_RESET>;
+				i2c-sda-hold-time-ns = <30>;
 			};
 
 			i2c2: i2c@340d0000 {
@@ -3863,6 +3866,7 @@
 				#size-cells = <0>;
 				clock-frequency = <100000>;
 				resets = <&socrst LSIO_I2C2_APB_RESET>;
+				i2c-sda-hold-time-ns = <30>;
 			};
 
 			i2c3: i2c@340e0000 {
@@ -3877,6 +3881,7 @@
 				#size-cells = <0>;
 				clock-frequency = <100000>;
 				resets = <&socrst LSIO_I2C3_APB_RESET>;
+				i2c-sda-hold-time-ns = <30>;
 			};
 
 			i2c4: i2c@340f0000 {
@@ -3891,6 +3896,7 @@
 				#size-cells = <0>;
 				clock-frequency = <100000>;
 				resets = <&socrst LSIO_I2C4_APB_RESET>;
+				i2c-sda-hold-time-ns = <30>;
 			};
 
 			lpwm0: lpwm@34100000 {
@@ -4107,6 +4113,7 @@
 				#size-cells = <0>;
 				clock-frequency = <100000>;
 				resets = <&socrst LSIO_I2C5_APB_RESET>;
+				i2c-sda-hold-time-ns = <30>;
 			};
 
 			i2c6: i2c@341d0000 {
@@ -4121,6 +4128,7 @@
 				#size-cells = <0>;
 				clock-frequency = <100000>;
 				resets = <&socrst LSIO_I2C6_APB_RESET>;
+				i2c-sda-hold-time-ns = <30>;
 			};
 		};
 
