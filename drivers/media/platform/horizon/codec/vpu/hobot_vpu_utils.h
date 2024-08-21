@@ -26,8 +26,8 @@
 #define VPU_VCPU_BPU_CLK_NAME "vpu_bclk"
 #define VPU_VCE_CLK_NAME "vpu_cclk"
 
-#define VPU_MAX_VENC_CAPACITY (3840UL*2160UL*60UL)	// Fix me, max venc fps test on j6x
-#define VPU_MAX_VDEC_CAPACITY (3840UL*2160UL*86UL)	// Fix me, max vdec fps test on j6x
+#define VPU_MAX_VENC_CAPACITY (3840UL*2160UL*100UL)	// Fix me, max venc fps test on j6x
+#define VPU_MAX_VDEC_CAPACITY (3840UL*2160UL*120UL)	// Fix me, max vdec fps test on j6x
 #define VPU_MAX_RADIO (1000UL)
 
 extern struct ion_device *hb_ion_dev;
@@ -83,6 +83,16 @@ typedef struct hb_vpu_drv_resmem {
 	size_t size;
 } hb_vpu_drv_resmem_t;
 #endif
+#ifdef RESERVED_WORK_MEMORY
+typedef struct hb_vpu_work_resmem {
+	uint64_t base;
+	uint32_t size;
+	uint64_t phys_addr;
+	//coverity[misra_c_2012_rule_5_7_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
+	uint64_t iova;
+	void *vaddr;		/* vmap addr */
+} hb_vpu_work_resmem_t;
+#endif
 
 typedef struct hb_vpu_dev {
 	//coverity[misra_c_2012_rule_5_7_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
@@ -90,7 +100,6 @@ typedef struct hb_vpu_dev {
 	hb_vpu_platform_data_t *plat_data;
 	const hb_vpu_driver_data_t *drv_data;
 	struct resource *vpu_mem;
-	struct resource codec_mem_reserved;
 	void __iomem *regs_base;
 	uint32_t irq;
 	uint32_t vpu_dev_num;
@@ -110,7 +119,9 @@ typedef struct hb_vpu_dev {
 	struct ion_client *vpu_ion_client;
 	struct ion_handle *vpu_com_mem_handle;
 
+	osal_sem_t vpu_free_inst_sem;
 	DECLARE_BITMAP(vpu_inst_bitmap, MAX_NUM_VPU_INSTANCE); /* PRQA S 1840,3408 */
+	DECLARE_BITMAP(vpu_crash_inst_bitmap, MAX_NUM_VPU_INSTANCE); /* PRQA S 1840,3408 */
 
 	osal_waitqueue_t poll_int_wait_q[MAX_NUM_VPU_INSTANCE];
 	int64_t poll_int_event[MAX_NUM_VPU_INSTANCE];
@@ -152,7 +163,12 @@ typedef struct hb_vpu_dev {
 
 	hb_vpu_drv_buffer_t instance_pool;
 	hb_vpu_drv_buffer_t common_memory;
-#if defined(CONFIG_HOBOT_FPGA_J5) || defined(CONFIG_HOBOT_J5) || defined(CONFIG_HOBOT_FPGA_HAPS_J5) || defined(CONFIG_PCIE_HOBOT_EP_FUN_AI)
+#ifdef RESERVED_WORK_MEMORY
+#if defined(CONFIG_HOBOT_FPGA_J5) || defined(CONFIG_HOBOT_J5) || defined(CONFIG_HOBOT_FPGA_HAPS_J5)
+	struct resource codec_mem_reserved;
+#else
+	hb_vpu_work_resmem_t codec_mem_reserved2;
+#endif
 	hb_vpu_drv_buffer_t dec_work_memory[MAX_NUM_VPU_INSTANCE];
 	hb_vpu_drv_buffer_t enc_work_memory[MAX_NUM_VPU_INSTANCE];
 #endif
@@ -197,6 +213,7 @@ typedef struct hb_vpu_dev {
 	uint64_t vdec_loading;
 	osal_time_t vpu_loading_ts;
 	uint64_t vpu_loading_setting;
+	uint64_t vpu_irqenable;
 } hb_vpu_dev_t;
 
 typedef struct hb_vpu_priv {

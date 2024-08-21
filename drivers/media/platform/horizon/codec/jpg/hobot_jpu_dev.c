@@ -181,7 +181,7 @@ static int32_t jpu_alloc_dma_buffer(hb_jpu_dev_t *dev,
 #endif
 
 	if ((jb == NULL) || (dev == NULL)) {
-		JPU_ERR("Invalid parameters jb=%p, dev=%p\n", jb, dev);
+		JPU_ERR("Invalid parameters jb=%pK, dev=%pK\n", jb, dev);
 		jpu_send_diag_error_event((u16)EventIdJPUDevAllocDMABufErr, (u8)ERR_SEQ_0, 0, __LINE__);
 		return -EINVAL;
 	}
@@ -221,7 +221,7 @@ static int32_t jpu_alloc_dma_buffer(hb_jpu_dev_t *dev,
 	handle = ion_alloc(dev->jpu_ion_client, jb->size, 0,
 		ION_HEAP_TYPE_CMA_RESERVED_MASK, jb->flags);
 	if (IS_ERR_OR_NULL(handle)) {
-		JPU_ERR_DEV(dev->device, "failed to allocate ion memory, ret = %p.\n", handle);
+		JPU_ERR_DEV(dev->device, "failed to allocate ion memory, ret = %pK.\n", handle);
 		jpu_send_diag_error_event((u16)EventIdJPUDevAllocDMABufErr, (u8)ERR_SEQ_3, 0, __LINE__);
 		return (int32_t)PTR_ERR(handle);
 	}
@@ -268,7 +268,7 @@ static int32_t jpu_free_dma_buffer(hb_jpu_dev_t *dev,
 #endif
 
 	if ((jb == NULL) || (dev == NULL)) {
-		JPU_ERR("Invalid parameters jb=%p, dev=%p\n", jb, dev);
+		JPU_ERR("Invalid parameters jb=%pK, dev=%pK\n", jb, dev);
 		jpu_send_diag_error_event((u16)EventIdJPUDevAddrErr, (u8)ERR_SEQ_0, 0, __LINE__);
 		return -EINVAL;
 	}
@@ -560,6 +560,7 @@ static int32_t jdi_lock_release(const struct file *filp, hb_jpu_dev_t *dev,
 	unsigned long flags_mp; /* PRQA S 5209 */
 	/* jpu wait timeout to 50 msec */
 	unsigned long timeout = jiffies + (50 * HZ) / 1000; /* PRQA S 5209,1840 */
+	uint32_t reg_val = 0U;
 
 	if ((type < JPUDRV_MUTEX_JPU) || (type >= JPUDRV_MUTEX_MAX)) {
 		JPU_ERR_DEV(dev->device, "unknown MUTEX_TYPE type=%d\n", type);
@@ -568,7 +569,7 @@ static int32_t jdi_lock_release(const struct file *filp, hb_jpu_dev_t *dev,
 	if (dev->current_jdi_lock_pid[type] == (int64_t)filp) {
 		// PRQA S 3432,4543,4403,4558,4542,1861,3344 ++
 		JPU_INFO_DEV(dev->device, "MUTEX_TYPE: %d, JDI_LOCK_PID: %lld, current->pid: %d, "
-			"current->tgid=%d, filp=%px\n", type, dev->current_jdi_lock_pid[type],
+			"current->tgid=%d, filp=%pK\n", type, dev->current_jdi_lock_pid[type],
 			current->pid, current->tgid, filp);
 
 		// PRQA S 1021,3473,1020,3432,2996,3200 ++
@@ -590,6 +591,7 @@ static int32_t jdi_lock_release(const struct file *filp, hb_jpu_dev_t *dev,
 			} else {
 				//coverity[misra_c_2012_rule_18_4_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
 				if (JPU_READL(MJPEG_PIC_STATUS_REG(i)) != 0U) {
+					JPU_DBG_DEV(dev->device, "Ignore irq pid %d\n", current->pid);
 					dev->ignore_irq = 1;
 				}
 			}
@@ -598,6 +600,7 @@ static int32_t jdi_lock_release(const struct file *filp, hb_jpu_dev_t *dev,
 			//coverity[misra_c_2012_rule_18_4_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
 			val = JPU_READL(MJPEG_INST_CTRL_STATUS_REG);
 			if ((val >> 4) == (uint32_t)INST_CTRL_ENC) {
+				JPU_DBG_DEV(dev->device, "Ignore irq pid %d\n", current->pid);
 				dev->ignore_irq = 1;
 			}
 		}
@@ -615,16 +618,21 @@ static int32_t jdi_lock_release(const struct file *filp, hb_jpu_dev_t *dev,
 		// PRQA S 1021,3473,1020,3432,2996,3200 --
 		for (i = 0; i < MAX_HW_NUM_JPU_INSTANCE; i++) {
 			//coverity[misra_c_2012_rule_18_4_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
-			if (JPU_READL(MJPEG_PIC_STATUS_REG(i)) != 0U) {
+			reg_val = (uint32_t)(JPU_READL(MJPEG_INST_CTRL_STATUS_REG) >> 4);
+			if ((JPU_READL(MJPEG_PIC_STATUS_REG(i)) != 0U) ||
+				(reg_val == (uint32_t)INST_CTRL_PIC_DONE) || (reg_val == (uint32_t)INST_CTRL_SLC_DONE)) {
 				jpu_clear_status(dev, 0);
 				dev->ignore_irq = 0;
 				break;
+			} else if (reg_val != 0) {
+				JPU_DBG_DEV(dev->device, "Not expeceted MJPEG_INST_CTRL_STATUS_REG status 0x%x (pid %d)\n",
+					reg_val, current->pid);
 			}
 		}
 		osal_spin_unlock_irqrestore(&dev->irq_spinlock, (uint64_t *)&flags_mp);
 
 		if (i < MAX_HW_NUM_JPU_INSTANCE) {
-			JPU_INFO_DEV(dev->device, "Clear status(pid %d).\n", current->pid);
+			JPU_INFO_DEV(dev->device, "Clear status 0x%x (pid %d).\n", reg_val, current->pid);
 		}
 
 		// PRQA S 3432,4543,4403,4558,4542,1861,3344 --
@@ -700,7 +708,7 @@ static void jpu_free_lock(const struct file *filp, hb_jpu_dev_t *dev, hb_jpu_drv
 		(instance_pool_size_per_core -
 		(uint32_t)PTHREAD_MUTEX_T_HANDLE_SIZE * JDI_NUM_LOCK_HANDLES));
 	JPU_INFO_DEV(dev->device, "force to destroy "
-		"jdi_mutexes_base=%p in userspace \n",
+		"jdi_mutexes_base=%pK in userspace \n",
 		jdi_mutexes_base);
 	if (jdi_mutexes_base) {
 		uint32_t i;
@@ -754,7 +762,7 @@ static int32_t jpu_free_instances(const struct file *filp)
 			jip_base = (void *)(dev->instance_pool.base + /* PRQA S 1891 */
 						((uint64_t)instance_pool_size_per_core * (uint64_t)core_idx));
 			JPU_INFO_DEV(dev->device, "jpu_free_instances detect instance crash "
-				"instIdx=%d, jip_base=%p, instance_pool_size_per_core=%u, current_pid=%d, tgid=%d, filp=%px\n",
+				"instIdx=%d, jip_base=%pK, instance_pool_size_per_core=%u, current_pid=%d, tgid=%d, filp=%pK\n",
 				vil->inst_idx, jip_base,
 				instance_pool_size_per_core,
 				current->pid, current->tgid, filp);
@@ -956,6 +964,7 @@ static irqreturn_t jpu_irq_handler(int32_t irq, void *dev_id) /* PRQA S 3206 */
 			dev->interrupt_flag[0] = 0;
 			dev->ignore_irq = 0;
 			enable_irq(dev->irq);
+			JPU_DBG_DEV(dev->device, "jpu_irq_handler interrupt flag empty!\n");
 		}
 		osal_spin_unlock(&dev->irq_spinlock);
 #endif
@@ -1322,18 +1331,15 @@ static int32_t jpu_wait_interrupt(hb_jpu_dev_t *dev, u_long arg)
 		dev->interrupt_reason[instance_no]);
 	// PRQA S 3432,4543,4403,4558,4542,1861,3344 --
 
+	osal_spin_lock_irqsave(&dev->irq_spinlock, (uint64_t *)&flags_mp);
 	info.intr_reason = dev->interrupt_reason[instance_no];
 	dev->interrupt_flag[instance_no] = 0;
 	dev->interrupt_reason[instance_no] = 0;
 #ifdef JPU_IRQ_CONTROL
-	// PRQA S 1021,3473,1020,3432,2996,3200 ++
-	osal_spin_lock_irqsave(&dev->irq_spinlock, (uint64_t *)&flags_mp);
-	// PRQA S 1021,3473,1020,3432,2996,3200 --
 	if (dev->irq_trigger == 1) {
 		enable_irq(dev->irq);
 		dev->irq_trigger = 0;
 	}
-	osal_spin_unlock_irqrestore(&dev->irq_spinlock, (uint64_t *)&flags_mp);
 #endif
 
 	// PRQA S 1021,3473,1020,3432,2996,3200 ++
@@ -1350,6 +1356,7 @@ static int32_t jpu_wait_interrupt(hb_jpu_dev_t *dev, u_long arg)
 		dev->poll_int_event, dev->total_release);
 	// PRQA S 3432,4543,4403,4558,4542,1861,3344 --
 	osal_spin_unlock_irqrestore(&dev->poll_int_wait.lock, (uint64_t *)&flags_mp);
+	osal_spin_unlock_irqrestore(&dev->irq_spinlock, (uint64_t *)&flags_mp);
 
 	//coverity[misra_c_2012_rule_11_6_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
 	ret = (int32_t)osal_copy_to_app((void __user *)arg, (void *)&info,
@@ -2071,14 +2078,14 @@ static int32_t jpu_do_map_ion_fd(struct file *filp, hb_jpu_dev_t *dev,
 			(jil_tmp->filp == filp)) {
 			osal_kfree((void *)ion_dma_data);
 			JPU_ERR_DEV(dev->device, "Failed to map ion handle due to same fd(%d), "
-				"same filp(0x%p) and same tgid(%d).\n",
+				"same filp(0x%pK) and same tgid(%d).\n",
 				dma_map.fd, filp, current->tgid);
 			//coverity[misra_c_2012_rule_18_4_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
 			//coverity[misra_c_2012_rule_11_5_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
 			//coverity[misra_c_2012_rule_20_7_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
 			osal_list_for_each_entry_safe(jil_tmp, n, &dev->dma_data_list_head, list) {
 				JPU_ERR_DEV(dev->device, "Existing List items fd(%d), "
-					"filp(%p).\n", jil_tmp->fd, jil_tmp->filp);
+					"filp(%pK).\n", jil_tmp->fd, jil_tmp->filp);
 			}
 			osal_spin_unlock(&dev->jpu_spinlock);
 			jpu_send_diag_error_event((u16)EventIdJPUDevDmaMapExistErr, (u8)ERR_SEQ_0, 0, __LINE__);
@@ -2210,7 +2217,7 @@ static int32_t jpu_do_map_ion_phy(struct file *filp,
 			(jil_tmp->filp == filp)) {
 			osal_spin_unlock(&dev->jpu_spinlock);
 			JPU_ERR_DEV(dev->device, "Failed to map ion phy due to same phys(0x%llx) "
-				"same size(%d) and same filp(0x%p).\n",
+				"same size(%d) and same filp(0x%pK).\n",
 				dma_map.phys_addr, jil_tmp->size, filp);
 			jpu_send_diag_error_event((u16)EventIdJPUDevDmaMapExistErr, (u8)ERR_SEQ_0, 0, __LINE__);
 			return -EINVAL;
@@ -2365,7 +2372,7 @@ static int32_t jpu_get_version_info(hb_jpu_dev_t *dev, u_long arg)
 //coverity[HIS_metric_violation:SUPPRESS]
 static long jpu_ioctl(struct file *filp, u_int cmd, u_long arg) /* PRQA S 5209 */
 {
-	int32_t ret;
+	int32_t ret = 0;
 	hb_jpu_dev_t *dev;
 	hb_jpu_priv_t *priv;
 
@@ -2429,7 +2436,8 @@ static long jpu_ioctl(struct file *filp, u_int cmd, u_long arg) /* PRQA S 5209 *
 	//coverity[misra_c_2012_rule_10_1_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
 	//coverity[misra_c_2012_rule_10_4_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
 	case JDI_IOCTL_RESET: /* PRQA S 4513,4599,4542,4543,1841,0499 */
-		ret = hb_jpu_hw_reset();
+		// ret = hb_jpu_hw_reset();
+		JPU_DEBUG("Application JDI_IOCTL_RESET Requset Skip.\n");
 		break;
 	//coverity[misra_c_2012_rule_10_1_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
 	//coverity[misra_c_2012_rule_10_4_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
@@ -2549,6 +2557,7 @@ static void jpu_release_internal_res(hb_jpu_dev_t *dev,
 {
 	hb_jpu_drv_instance_pool_t *jip;
 	uint32_t open_count, i;
+	unsigned long flags_mp;
 
 	osal_spin_lock(&dev->jpu_spinlock);	//check this place
 	/* found and free the not closed instance by user applications */
@@ -2583,8 +2592,10 @@ static void jpu_release_internal_res(hb_jpu_dev_t *dev,
 			dev->inst_open_flag[i] = 0;
 		}
 
+		osal_spin_lock_irqsave(&dev->poll_int_wait.lock, (uint64_t *)&flags_mp);
 		dev->total_poll = 0;
 		dev->total_release = 0;
+		osal_spin_unlock_irqrestore(&dev->poll_int_wait.lock, (uint64_t *)&flags_mp);
 	}
 	JPU_INFO_DEV(dev->device, "finish %s, current_pid=%d, tgid=%d\n", __func__, current->pid, current->tgid);
 }
@@ -3359,7 +3370,7 @@ static int32_t __init jpu_init_system_mem(struct platform_device *pdev,
 	//coverity[misra_c_2012_rule_10_3_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
 	JPU_DBG_DEV(&pdev->dev,
 		"jpu IO memory resource: physical base addr = 0x%llx,"
-		"virtual base addr = %p\n", dev->jpu_mem->start,
+		"virtual base addr = %pK\n", dev->jpu_mem->start,
 		dev->regs_base);
 	// PRQA S 3432,4543,4403,4558,4542,1861,3344 --
 
