@@ -203,6 +203,34 @@
 	status = "okay";
 };
 
+&csi0 {
+	status = "okay";
+
+	ports {
+		port@0 {
+			x5_mipi_csi0_from_ov5640: endpoint {
+				remote-endpoint = <&ov5640_to_mipi_csi0>;
+				clock-lanes = <0>;
+				data-lanes = <1 2>;
+			};
+		};
+	};
+};
+
+&csi1 {
+	status = "okay";
+
+	ports {
+		port@0 {
+			x5_mipi_csi1_from_ov5640: endpoint {
+				remote-endpoint = <&ov5640_to_mipi_csi1>;
+				clock-lanes = <0>;
+				data-lanes = <1 2>;
+			};
+		};
+	};
+};
+
 &i2c0 {
 	status = "okay";
 	pinctrl-names = "default";
@@ -214,6 +242,28 @@
 		address-width = <16>;
 		pagesize = <16>;
 	};
+
+	ov5640_sensor0: camera@3c {
+		compatible = "ovti,ov5640";
+		pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_sensor2_mclk &aon_gpio_0 &aon_gpio_1>;
+		powerdown-gpios = <&aon_gpio_porta 0 GPIO_ACTIVE_HIGH>;
+		reset-gpios = <&aon_gpio_porta 1 GPIO_ACTIVE_LOW>;
+		reg = <0x3c>;
+		clocks = <&hpsclks X5_LSIO_SENSOR0_CLK>;
+		clock-names = "xclk";
+		rotation = <0>;
+
+		port {
+			/* MIPI CSI-2 bus endpoint */
+			ov5640_to_mipi_csi0: endpoint {
+				remote-endpoint = <&x5_mipi_csi0_from_ov5640>;
+				clock-lanes = <0>;
+				data-lanes = <1 2>;
+			};
+		};
+	};
+
 };
 
 &i2c1 {
@@ -246,6 +296,27 @@
 			};
 		};
 	};
+
+	ov5640_sensor1: camera@3c {
+		compatible = "ovti,ov5640";
+ 		pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_sensor3_mclk &aon_gpio_2 &aon_gpio_5>;
+		powerdown-gpios = <&aon_gpio_porta 2 GPIO_ACTIVE_HIGH>;
+		reset-gpios = <&aon_gpio_porta 5 GPIO_ACTIVE_LOW>;
+		reg = <0x3c>;
+		clocks = <&hpsclks X5_LSIO_SENSOR1_CLK>;
+		clock-names = "xclk";
+		rotation = <0>;
+		port {
+			/* MIPI CSI-2 bus endpoint */
+			ov5640_to_mipi_csi1: endpoint {
+				remote-endpoint = <&x5_mipi_csi1_from_ov5640>;
+				clock-lanes = <0>;
+				data-lanes = <1 2>;
+ 			};
+ 		};
+ 	};
+
 };
 
 &i2c2 {
