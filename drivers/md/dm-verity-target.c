@@ -45,8 +45,9 @@
 #ifdef CONFIG_ARCH_HOBOT_X5
 #define AON_STATUS_REG_BASE         0x31021000
 #define AON_STATUS_REG1         (AON_STATUS_REG_BASE + 0x04)
-#define AON_AB_SLOT_OFFSET  (0)
-#define AON_AB_SLOT_CORRUTED_MASK    (0x0CL)
+#define AON_AB_SWITCH_REASON_OFFSET  (20)
+#define AON_AB_SWITCH_REASON_MASK    (0xFL)
+#define DM_VERITY_CORRUTED    (0x3L)
 #endif
 
 static unsigned int dm_verity_prefetch_cluster = DM_VERITY_DEFAULT_PREFETCH_SIZE;
@@ -227,7 +228,8 @@ static void set_verity_corrupted(void)
 {
 	unsigned int aon_status1;
 	aon_status1 = readl(ioremap(AON_STATUS_REG1, 4));
-	aon_status1 |= AON_AB_SLOT_CORRUTED_MASK;
+	aon_status1 &= ~(AON_AB_SWITCH_REASON_MASK << AON_AB_SWITCH_REASON_OFFSET);
+	aon_status1 |= DM_VERITY_CORRUTED << AON_AB_SWITCH_REASON_OFFSET;
 	writel(aon_status1, ioremap(AON_STATUS_REG1, 4));
 	return;
 }
