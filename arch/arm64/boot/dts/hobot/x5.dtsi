@@ -3694,7 +3694,7 @@
 				clocks = <&hpsclks X5_LSIO_SPI1_CLK>;
 				interrupt-parent = <&gic>;
 				interrupts = <GIC_SPI 76 IRQ_TYPE_LEVEL_HIGH>;
-				num-cs = <1>;
+				num-cs = <2>;
 				reg-io-width = <4>;
 				#address-cells = <1>;
 				#size-cells = <0>;
