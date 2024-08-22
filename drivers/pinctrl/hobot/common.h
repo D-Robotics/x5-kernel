@@ -86,6 +86,7 @@ struct horizon_pinctrl {
 	struct horizon_pin *pin_regs;
 	unsigned int group_index;
 	struct mutex mutex; /* mutex */
+	unsigned int *mux_val;
 };
 
 extern const struct pinmux_ops horizon_pmx_ops;
