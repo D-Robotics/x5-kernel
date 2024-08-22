@@ -3226,12 +3226,7 @@
 					dr_mode = "otg"; // peripheral/host
 					usb-role-switch;
 					usb-phy = <&usb3_u2phy>;
-					snps,dis_enblslpm_quirk;
 					snps,dis_u2_susphy_quirk;
-					snps,dis_u3_susphy_quirk;
-					snps,rx_detect_poll_quirk;
-					snps,del_phy_power_chg_quirk;
-					snps,quirk-frame-length-adjustment = <0x20>;
 					interrupt-parent = <&gic>;
 					interrupts = <GIC_SPI 30 IRQ_TYPE_LEVEL_HIGH>;
 
@@ -3270,9 +3265,7 @@
 					usb-role-switch;
 					maximum-speed = "high-speed";
 					// usb-phy = <&usb2phy>;
-					snps,dis_enblslpm_quirk;
 					snps,dis_u2_susphy_quirk;
-					snps,quirk-frame-length-adjustment = <0x20>;
 					interrupt-parent = <&gic>;
 					interrupts = <GIC_SPI 29 IRQ_TYPE_LEVEL_HIGH>;
 
