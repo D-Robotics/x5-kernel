@@ -34,6 +34,12 @@
 #include <linux/miscdevice.h>
 #include <linux/kfifo.h>
 
+#include <linux/dma-buf.h>
+#include <linux/iommu.h>
+#if IS_ENABLED(CONFIG_HOBOT_IOMMU)
+#include "../smmu/hobot_iovmm.h"
+#endif
+
 #include <uapi/ion.h>
 
 /**
@@ -213,7 +219,10 @@ struct ion_device {
 	struct dentry *clients_debug_root;	/**< clients debug file root */
 	struct rb_root share_buffers;	/**< an rb tree of all the share buffers */
 	struct mutex share_lock;	/**< share handle mutex lock */
-	struct idr idr;			/**< ion device idr tree */
+	struct mutex share_group_lock;	/**< share group mutex lock */
+	struct idr shd_idr;			/**< ion device idr tree */
+	struct idr group_idr;
+	struct rb_root share_groups;
 	int32_t multi_cma;		/**< the number of cma heaps */
 	struct rb_root share_pool_buffers;	/**< ion share pool handle rbtree.*/
 	struct dentry *ion_buf_debug_file;	/**< the ion buffer debugfs.*/
@@ -244,21 +253,23 @@ struct ion_device {
  * @NO{S21E04C01I}
  */
 struct ion_client {
-	struct rb_node node;	/**< node in the tree of all clients */
+	struct rb_node hb_node;	/**< node in the tree of all clients */
 	struct ion_device *dev;	/**< backpointer to ion device */
 	struct rb_root handles;	/**< an rb tree of all the handles in this client */
-	struct idr idr;			/**< an idr space for allocating handle ids*/
+	struct idr handle_idr;			/**< an idr space for allocating handle ids*/
 	struct mutex lock;		/**< lock protecting the tree of handles */
 	const char *name;		/**< used for debugging */
 	char *display_name;		/**< used for debugging (unique version of @name) */
 	int display_serial;		/**< used for debugging (to make display_name unique) */
 	struct task_struct *task;	/**< used for debugging */
-	pid_t pid;				/**< the pid of the client creator */
+	pid_t hb_pid;				/**< the pid of the client creator */
 	struct dentry *debug_root;	/**< debug file root */
 	wait_queue_head_t wq;	/**< wait queue.*/
 	int wq_cnt;				/**< waiy queue count.*/
-	struct kfifo fifo;		/**< data fifo*/
+	struct kfifo hb_fifo;		/**< data fifo*/
 	spinlock_t fifo_lock;	/**< fifo lock*/
+	struct mutex group_lock;
+	struct rb_root group_datas;
 };
 
 /**
@@ -321,7 +332,7 @@ struct ion_buffer {
 	int handle_count;			/**< count of handles referencing this buffer */
 	int32_t share_id;			/**< the share handle id.*/
 	char task_comm[TASK_COMM_LEN];	/**< taskcomm of last client to reference this buffer in a handle, used for debugging */
-	pid_t pid;					/**< pid of last client to reference this buffer in a handle, used for debugging*/
+	pid_t hb_pid;					/**< pid of last client to reference this buffer in a handle, used for debugging*/
 	void *priv_buffer;			/**< the next buffer address for sram scatterlist.*/
 };
 
@@ -346,7 +357,7 @@ struct ion_handle {
 	struct kref ref;				/**< reference count */
 	struct ion_client *client;		/**< back pointer to the client the buffer resides in */
 	struct ion_buffer *buffer;		/**< pointer to the buffer */
-	struct rb_node node;			/**< node in the client's handle rbtree */
+	struct rb_node hb_node;			/**< node in the client's handle rbtree */
 	unsigned int kmap_cnt;			/**< count of times this client has mapped to kernel */
 	int id;							/**< client-unique id allocated by client->idr */
 	int share_id;					/**< unique id for share handle */
@@ -452,7 +463,7 @@ struct ion_heap {
 	unsigned long flags;		/**< flags */
 	unsigned int id;			/**< id of heap, also indicates priority of this heap when allocating*/
 	const char *name;			/**< heap name, used for debugging*/
-	struct shrinker shrinker;	/**< a shrinker for the heap */
+	struct shrinker hb_shrinker;	/**< a shrinker for the heap */
 	struct list_head free_list;	/**< free list head if deferred free is used */
 	size_t free_list_size;		/**< size of the deferred free list in bytes */
 	spinlock_t free_lock;		/**< protects the free list */
@@ -504,6 +515,8 @@ void *ion_heap_map_kernel(struct ion_heap *heap, struct ion_buffer *buffer);
  */
 void ion_heap_unmap_kernel(struct ion_heap *heap, struct ion_buffer *buffer);
 
+struct dma_buf *ion_share_dma_buf(struct ion_client *client, struct ion_handle *handle);
+
 /**
  * ion_heap_map_user - map ion buffer for user
  * @heap:		the heap to map
@@ -527,11 +540,11 @@ int ion_heap_buffer_zero(struct ion_buffer *buffer);
 
 /**
  * ion_heap_pages_zero - make pages zero
- * @page:		the page to do zero
+ * @heap_page:  the page to do zero
  * @size:		the page size
  * @pgprot:		the page property
  */
-int ion_heap_pages_zero(struct page *page, size_t size, pgprot_t pgprot);
+int ion_heap_pages_zero(struct page *heap_page, size_t size, pgprot_t pgprot);
 
 /**
  * ion_heap_init_shrinker
@@ -622,13 +635,12 @@ void ion_carveout_heap_destroy(struct ion_heap *);
 
 struct ion_heap *ion_chunk_heap_create(struct ion_platform_heap *);
 void ion_chunk_heap_destroy(struct ion_heap *);
-struct ion_heap *ion_cma_heap_create(struct ion_platform_heap *);
-void ion_cma_heap_destroy(struct ion_heap *);
 struct ion_heap *ion_custom_heap_create(struct ion_platform_heap *heap_data);
 int ion_cma_get_info(struct ion_device *dev, phys_addr_t *base, size_t *size,
 		enum ion_heap_type type);
 int ion_add_cma_heaps(struct ion_device *idev);
 int ion_del_cma_heaps(struct ion_device *idev);
+struct sg_table *ion_sg_table(struct ion_client *client, struct ion_handle *handle);
 
 /**
  * The carveout heap returns physical addresses, since 0 may be a valid
@@ -638,7 +650,7 @@ int ion_del_cma_heaps(struct ion_device *idev);
  * kernel api to allocate/free from carveout -- used when carveout is
  * used to back an architecture specific custom heap
  */
-int32_t get_carveout_info(struct ion_heap *heap, uint32_t *avail, uint32_t *max_contigous);
+int32_t get_carveout_info(struct ion_heap *heap, uint64_t *avail, uint64_t *max_contigous);
 phys_addr_t ion_carveout_allocate(struct ion_heap *heap, unsigned long size,
 				      unsigned long align);
 void ion_carveout_free(struct ion_heap *heap, phys_addr_t addr,
@@ -759,8 +771,6 @@ struct ion_client *ion_client_create(struct ion_device *dev,
  * @design
  */
 void ion_client_destroy(struct ion_client *client);
-
-/* struct ion_buffer *ion_handle_buffer(struct ion_handle *handle); */
 
 /**
  * @NO{S21E04C01I}
@@ -892,7 +902,7 @@ void ion_unmap_kernel(struct ion_client *client, struct ion_handle *handle);
  * @callergraph
  * @design
  */
-int ion_check_in_heap_carveout(phys_addr_t paddr, size_t size);
+int ion_check_in_heap_carveout(phys_addr_t start, size_t size);
 
 /**
  * hobot_get_heap_size - get the heap total size
@@ -953,9 +963,11 @@ uint32_t hbmem_flag_to_ion_flag(int64_t flags, uint32_t *heap_id_mask, int32_t *
  * @callergraph
  * @design
  */
-int64_t ion_flag_to_hbmem_flag(uint32_t ion_flag, uint32_t heap_id_mask, int64_t pool_flag, int64_t port);
+int64_t ion_flag_to_hbmem_flag(uint32_t ion_flag, uint32_t heap_id_mask, int64_t pool_flag, int64_t prot);
 
 struct ion_handle *ion_handle_get_by_id_nolock(struct ion_client *client, int id);
+
+int ion_handle_put(struct ion_handle *handle);
 
 /**
  * @NO{S21E04C01I}
@@ -994,10 +1006,7 @@ struct ion_handle *ion_import_dma_buf_with_shareid(struct ion_client *client, in
  */
 struct ion_device *hobot_ion_get_ion_device(void);
 
-#include <linux/dma-buf.h>
-#include <linux/iommu.h>
 #if IS_ENABLED(CONFIG_HOBOT_IOMMU)
-#include "../smmu/hobot_iovmm.h"
 /**
  * @struct ion_iovm_map
  * @brief Define the ion iovmm map information
@@ -1036,8 +1045,13 @@ struct ion_phy_data_pac {
 	uint64_t reserved;			/**< reserved.*/
 };
 
-#ifdef CONFIG_PCIE_HOBOT_EP_AI
+#ifdef CONFIG_PCIE_HOBOT_EP_FUN_AI
 #define ION_NAME_LEN_PAC	32		/**< pac ion name length*/
+
+struct ion_shareid_import_info_data {
+	ion_user_handle_t handle;		/**< ion handle id.*/
+	int32_t share_id;		/**< share_id.*/
+};
 
 /**
  * @struct ion_data_pac
@@ -1063,6 +1077,11 @@ struct ion_data_pac{
 		struct ion_share_handle_data share_hd;	/**< ion share handle data structure @ion_share_handle_data*/
 		struct ion_share_info_data share_info;	/**< ion share info data structure @ion_share_info_data*/
 		struct ion_phy_data_pac phy_data;		/**< ion phy pac data structure @ion_phy_data_pac*/
+		struct ion_share_and_phy_data share_phy_data;
+		struct ion_process_info_data process_info;
+		struct ion_consume_info_data consume_info;
+		struct ion_version_info_data version_info;
+		struct ion_shareid_import_info_data share_import_data;
 	}data;						/**< union for data within use space and kernel space */
 	char module_name[ION_NAME_LEN_PAC];	/**< the module name */
 	int32_t return_value;		/**< the return value from EP.
@@ -1079,6 +1098,7 @@ struct ion_data_pac{
  */
 struct ion_heap_range_data_pac{
 	struct ion_heap_range heap[ION_HEAP_TYPE_DMA_EX + 1];	/**< array for ion heap range */
+	dma_addr_t heap_iovas[ION_HEAP_TYPE_DMA_EX + 1];        /**< array for heap iova*/
 	uint32_t message_flag;		/**< message flag use for handshake
 								 * range:[0,1]; default: 0
 								 */

@@ -51,13 +51,13 @@ typedef int32_t ion_share_handle_t;	/**< ion share handle id */
 enum ion_heap_type {
 	ION_HEAP_TYPE_SYSTEM,	/**< memory allocated via vmalloc */
 	ION_HEAP_TYPE_SYSTEM_CONTIG,	/**< memory allocated via kmalloc */
-	ION_HEAP_TYPE_CARVEOUT,	/**< memory allocated from a prereserved 
+	ION_HEAP_TYPE_CARVEOUT,	/**< memory allocated from a prereserved
 							 * carveout heap, allocations are physically
 							 * contiguous*/
 	ION_HEAP_TYPE_CHUNK,	/**< chunk memory */
 	ION_HEAP_TYPE_DMA,		/**< memory allocated via DMA API*/
 	ION_HEAP_TYPE_CUSTOM,	/**< memory allocaedf from SRAM heap*/
-	ION_HEAP_TYPE_CMA_RESERVED,	/**< memory allocated from a prereserved 
+	ION_HEAP_TYPE_CMA_RESERVED,	/**< memory allocated from a prereserved
 								 * carveout heap, allocations are physically
 								 * contiguous*/
 	ION_HEAP_TYPE_SRAM_LIMIT,	/**< memory allocated from sram limit heap.*/
@@ -70,16 +70,16 @@ enum ion_heap_type {
  */
 };
 
-#define ION_HEAP_SYSTEM_MASK		(1 << ION_HEAP_TYPE_SYSTEM)				/**< system heap mask */
-#define ION_HEAP_SYSTEM_CONTIG_MASK	(1 << ION_HEAP_TYPE_SYSTEM_CONTIG)		/**< system contigious heap mask */
-#define ION_HEAP_CARVEOUT_MASK		(1 << ION_HEAP_TYPE_CARVEOUT)			/**< carveout heap mask */
-#define ION_HEAP_CHUNK_MASK		(1 << ION_HEAP_TYPE_CHUNK)					/**< chunk heap mask */
-#define ION_HEAP_TYPE_DMA_MASK		(1 << ION_HEAP_TYPE_DMA)				/**< dma heap mask */
-#define ION_HEAP_TYPE_CUSTOM_MASK	(1 << ION_HEAP_TYPE_CUSTOM)				/**< custom heap mask */
-#define ION_HEAP_TYPE_CMA_RESERVED_MASK	(1 << ION_HEAP_TYPE_CMA_RESERVED)	/**< cma reserved heap mask */
-#define ION_HEAP_TYPE_SRAM_LIMIT_MASK	(1 << ION_HEAP_TYPE_SRAM_LIMIT)	/**< limit sram heap mask.*/
-#define ION_HEAP_TYPE_INLINE_ECC_MASK	(1 << ION_HEAP_TYPE_INLINE_ECC)		/**< inline ecc heap mask.*/
-#define ION_HEAP_TYPE_DMA_EX_MASK	(1 << ION_HEAP_TYPE_DMA_EX)				/**< dma ex heap mask */
+#define ION_HEAP_SYSTEM_MASK		(uint32_t)((uint32_t)1U << (uint32_t)ION_HEAP_TYPE_SYSTEM)				/**< system heap mask */
+#define ION_HEAP_SYSTEM_CONTIG_MASK	(uint32_t)((uint32_t)1U << (uint32_t)ION_HEAP_TYPE_SYSTEM_CONTIG)		/**< system contigious heap mask */
+#define ION_HEAP_CARVEOUT_MASK		(uint32_t)((uint32_t)1U << (uint32_t)ION_HEAP_TYPE_CARVEOUT)			/**< carveout heap mask */
+#define ION_HEAP_CHUNK_MASK		(uint32_t)((uint32_t)1U << (uint32_t)ION_HEAP_TYPE_CHUNK)					/**< chunk heap mask */
+#define ION_HEAP_TYPE_DMA_MASK		(uint32_t)((uint32_t)1U << (uint32_t)ION_HEAP_TYPE_DMA)				/**< dma heap mask */
+#define ION_HEAP_TYPE_CUSTOM_MASK	(uint32_t)((uint32_t)1U << (uint32_t)ION_HEAP_TYPE_CUSTOM)				/**< custom heap mask */
+#define ION_HEAP_TYPE_CMA_RESERVED_MASK	(uint32_t)((uint32_t)1U << (uint32_t)ION_HEAP_TYPE_CMA_RESERVED)	/**< cma reserved heap mask */
+#define ION_HEAP_TYPE_SRAM_LIMIT_MASK	(uint32_t)((uint32_t)1U << (uint32_t)ION_HEAP_TYPE_SRAM_LIMIT)	/**< limit sram heap mask.*/
+#define ION_HEAP_TYPE_INLINE_ECC_MASK	(uint32_t)((uint32_t)1U << (uint32_t)ION_HEAP_TYPE_INLINE_ECC)		/**< inline ecc heap mask.*/
+#define ION_HEAP_TYPE_DMA_EX_MASK	(uint32_t)((uint32_t)1U << (uint32_t)ION_HEAP_TYPE_DMA_EX)				/**< dma ex heap mask */
 
 #define ION_NUM_HEAP_IDS		(sizeof(unsigned int) * 8)		/**< ion heap ids number*/
 
@@ -225,9 +225,9 @@ struct ion_handle_data {
  */
 struct ion_share_and_phy_data {
 	ion_user_handle_t handle;	/**< ion handle address.*/
- 	int fd;						/**< share fd of ion buffer.*/
-	phys_addr_t paddr;				/**< buffer physical address.*/
-	size_t len;				/**< buffer size.*/
+	int hb_fd;					/**< share fd of ion buffer.*/
+	phys_addr_t paddr;			/**< buffer physical address.*/
+	size_t len;					/**< buffer size.*/
 	uint64_t reserved;			/**< reserved.*/
 };
 
@@ -294,7 +294,7 @@ struct ion_share_info_data {
 struct ion_process_info_data {
 	int32_t share_id;		/**< share handle id*/
 	int32_t num;			/**< the process number of the buffer*/
-	int32_t pid[MAX_PROCESS_INFO];	/**< the process id of the buffer*/
+	int32_t hb_pid[MAX_PROCESS_INFO];	/**< the process id of the buffer*/
 };
 
 /**
@@ -340,12 +340,41 @@ struct ion_consume_info_data {
 	int32_t cur_consume_cnt;		/**< the current consume count.*/
 };
 
+#define ION_MAX_BUFFER_NUM		8	/**< max graphic buffer number of a group*/
+#define ION_MAX_SUB_BUFFER_NUM		3	/**< max sub buffer number of a graphic buffer */
+
+/**
+ * @struct ion_register_buf_group_data
+ * Define the descriptor of register buffer group data.
+ * @NO{S21E04C02I}
+ */
+struct ion_register_buf_group_data {
+	uint32_t bitmap;		/**< graphic buffer bitmap*/
+	ion_share_handle_t share_id[ION_MAX_BUFFER_NUM * ION_MAX_SUB_BUFFER_NUM];	/**< share id of sub bufer*/
+	int32_t group_id;		/**< the retur group id*/
+};
+
+/**
+ * @struct ion_register_buf_group_data
+ * Define the descriptor of register buffer group data.
+ * @NO{S21E04C02I}
+ */
+struct ion_import_buf_group_data {
+	uint32_t bitmap;
+	ion_share_handle_t share_id[ION_MAX_BUFFER_NUM * ION_MAX_SUB_BUFFER_NUM];
+	int32_t group_id;
+	uint64_t paddr[ION_MAX_BUFFER_NUM * ION_MAX_SUB_BUFFER_NUM];		/**< buffer physical address.*/
+	uint64_t len[ION_MAX_BUFFER_NUM * ION_MAX_SUB_BUFFER_NUM];		/**< buffer size.*/
+	int64_t flags[ION_MAX_BUFFER_NUM];
+};
+
 #define ION_CUSTOM_OPEN (4)			/**< the open custom cmd.*/
 #define ION_CUSTOM_RELEASE (5)		/**< the release custom cmd.*/
 #define ION_SHARE_FD_RELEASE (6)	/**< the share fd release cmd.*/
 #define ION_CHECK_IN_HEAP (7)		/**< the check whether alloc from ION custom cmd.*/
+#define ION_IMPORT_WITH_SHARE_ID	(8)	/**< ion import with share id cmd for pac*/
 
-#define ION_IOC_MAGIC		'I'		/**< ion driver command magic */
+#define ION_IOC_MAGIC		0x49U		/**< ion driver command magic */
 
 /**
  * DOC: ION_IOC_ALLOC - allocate memory
@@ -357,7 +386,7 @@ struct ion_consume_info_data {
  * @def ION_IOC_ALLOC
  * ion driber alloc buffer command
  */
-#define ION_IOC_ALLOC		_IOWR(ION_IOC_MAGIC, 0, \
+#define ION_IOC_ALLOC		_IOWR(ION_IOC_MAGIC, 0U, \
 				      struct ion_allocation_data)
 
 /**
@@ -365,7 +394,7 @@ struct ion_consume_info_data {
  *
  * Takes an ion_handle_data struct and frees the handle.
  */
-#define ION_IOC_FREE		_IOWR(ION_IOC_MAGIC, 1, struct ion_handle_data)	/**< ion driver buffer free command */
+#define ION_IOC_FREE		_IOWR(ION_IOC_MAGIC, 1U, struct ion_handle_data)	/**< ion driver buffer free command */
 
 /**
  * DOC: ION_IOC_MAP - get a file descriptor to mmap
@@ -375,7 +404,7 @@ struct ion_consume_info_data {
  * descriptor open in the current address space.  This file descriptor
  * can then be used as an argument to mmap.
  */
-#define ION_IOC_MAP		_IOWR(ION_IOC_MAGIC, 2, struct ion_fd_data)	/**< ion driver map fd command */
+#define ION_IOC_MAP		_IOWR(ION_IOC_MAGIC, 2U, struct ion_fd_data)	/**< ion driver map fd command */
 
 /**
  * DOC: ION_IOC_SHARE - creates a file descriptor to use to share an allocation
@@ -386,7 +415,7 @@ struct ion_consume_info_data {
  * can then be passed to another process.  The corresponding opaque handle can
  * be retrieved via ION_IOC_IMPORT.
  */
-#define ION_IOC_SHARE		_IOWR(ION_IOC_MAGIC, 4, struct ion_fd_data)	/**< ion driver relates buffer with share fd command */
+#define ION_IOC_SHARE		_IOWR(ION_IOC_MAGIC, 4U, struct ion_fd_data)	/**< ion driver relates buffer with share fd command */
 
 /**
  * DOC: ION_IOC_IMPORT - imports a shared file descriptor
@@ -395,7 +424,7 @@ struct ion_consume_info_data {
  * descriptor obtained from ION_IOC_SHARE and returns the struct with the handle
  * filed set to the corresponding opaque handle.
  */
-#define ION_IOC_IMPORT		_IOWR(ION_IOC_MAGIC, 5, struct ion_fd_data)	/**< ion driver buffer import command */
+#define ION_IOC_IMPORT		_IOWR(ION_IOC_MAGIC, 5U, struct ion_fd_data)	/**< ion driver buffer import command */
 
 /**
  * DOC: ION_IOC_CUSTOM - call architecture specific ion ioctl
@@ -403,7 +432,7 @@ struct ion_consume_info_data {
  * Takes the argument of the architecture specific ioctl to call and
  * passes appropriate userdata for that ioctl
  */
-#define ION_IOC_CUSTOM		_IOWR(ION_IOC_MAGIC, 6, struct ion_custom_data)	/**< ion driver custom command */
+#define ION_IOC_CUSTOM		_IOWR(ION_IOC_MAGIC, 6U, struct ion_custom_data)	/**< ion driver custom command */
 
 /**
  * DOC: ION_IOC_SYNC - syncs a shared file descriptors to memory
@@ -413,7 +442,7 @@ struct ion_consume_info_data {
  * If necessary should be used after touching a cached buffer from the cpu,
  * this will make the buffer in memory coherent.
  */
-#define ION_IOC_SYNC		_IOWR(ION_IOC_MAGIC, 7, struct ion_fd_data)	/**< ion driver buffer sync command */
+#define ION_IOC_SYNC		_IOWR(ION_IOC_MAGIC, 7U, struct ion_fd_data)	/**< ion driver buffer sync command */
 
 /**
  * DOC: ION_IOC_HEAP_QUERY - information about available heaps
@@ -425,49 +454,57 @@ struct ion_consume_info_data {
  * @def ION_IOC_HEAP_QUERY
  * ion driber heap query command
  */
-#define ION_IOC_HEAP_QUERY     _IOWR(ION_IOC_MAGIC, 8, \
+#define ION_IOC_HEAP_QUERY     _IOWR(ION_IOC_MAGIC, 8U, \
 					struct ion_heap_query)
 
-#define ION_IOC_IMPORT_SHARE_ID  _IOWR(ION_IOC_MAGIC, 9, struct ion_share_handle_data)		/**< ion driver buffer import with share id command */
+#define ION_IOC_IMPORT_SHARE_ID  _IOWR(ION_IOC_MAGIC, 9U, struct ion_share_handle_data)		/**< ion driver buffer import with share id command */
 
-#define ION_IOC_GET_SHARE_INFO  _IOWR(ION_IOC_MAGIC, 10, struct ion_share_info_data)		/**< ion driver get share information command */
+#define ION_IOC_GET_SHARE_INFO  _IOWR(ION_IOC_MAGIC, 10U, struct ion_share_info_data)		/**< ion driver get share information command */
 
-#define ION_IOC_WAIT_SHARE_ID  _IOWR(ION_IOC_MAGIC, 11, struct ion_share_info_data)			/**< ion driver wait for client ref count command */
+#define ION_IOC_WAIT_SHARE_ID  _IOWR(ION_IOC_MAGIC, 11U, struct ion_share_info_data)			/**< ion driver wait for client ref count command */
 
-#define ION_IOC_SHARE_POOL_REGISTER  _IOWR(ION_IOC_MAGIC, 12, struct ion_share_pool_data)	/**< ion driver register the share pool buffer.*/
+#define ION_IOC_SHARE_POOL_REGISTER  _IOWR(ION_IOC_MAGIC, 12U, struct ion_share_pool_data)	/**< ion driver register the share pool buffer.*/
 
-#define ION_IOC_SHARE_POOL_UNREGISTER  _IOWR(ION_IOC_MAGIC, 13, struct ion_share_pool_data)	/**< ion driver unregister the share pool buffer.*/
+#define ION_IOC_SHARE_POOL_UNREGISTER  _IOWR(ION_IOC_MAGIC, 13U, struct ion_share_pool_data)	/**< ion driver unregister the share pool buffer.*/
 
-#define ION_IOC_SHARE_POOL_GET_REF_CNT  _IOWR(ION_IOC_MAGIC, 14, struct ion_share_pool_data) /**< ion driver get the share pool buffer reference count.*/
+#define ION_IOC_SHARE_POOL_GET_REF_CNT  _IOWR(ION_IOC_MAGIC, 14U, struct ion_share_pool_data) /**< ion driver get the share pool buffer reference count.*/
 
-#define ION_IOC_SHARE_POOL_MONITOR_REF_CNT  _IOWR(ION_IOC_MAGIC, 15, struct ion_share_pool_data)	/**< ion driver get the monitor reference count.*/
+#define ION_IOC_SHARE_POOL_MONITOR_REF_CNT  _IOWR(ION_IOC_MAGIC, 15U, struct ion_share_pool_data)	/**< ion driver get the monitor reference count.*/
 
-#define ION_IOC_SHARE_POOL_WAKE_UP_MONITOR  _IOWR(ION_IOC_MAGIC, 16, struct ion_share_pool_data)	/**< ion driver wake up the monitor thread.*/
+#define ION_IOC_SHARE_POOL_WAKE_UP_MONITOR  _IOWR(ION_IOC_MAGIC, 16U, struct ion_share_pool_data)	/**< ion driver wake up the monitor thread.*/
 
-#define ION_IOC_GET_BUFFER_PROCESS_INFO  _IOWR(ION_IOC_MAGIC, 30, struct ion_process_info_data)		/**< ion driver get process info of the buffer.*/
+#define ION_IOC_GET_BUFFER_PROCESS_INFO  _IOWR(ION_IOC_MAGIC, 30U, struct ion_process_info_data)		/**< ion driver get process info of the buffer.*/
 
-#define ION_IOC_INC_CONSUME_CNT  _IOWR(ION_IOC_MAGIC, 31, struct ion_share_handle_data)		/**< ion dirver increase the consume count command.*/
+#define ION_IOC_INC_CONSUME_CNT  _IOWR(ION_IOC_MAGIC, 31U, struct ion_share_handle_data)		/**< ion dirver increase the consume count command.*/
 
-#define ION_IOC_DEC_CONSUME_CNT  _IOWR(ION_IOC_MAGIC, 32, struct ion_share_handle_data)		/**< ion driver decrease the consume count command*/
+#define ION_IOC_DEC_CONSUME_CNT  _IOWR(ION_IOC_MAGIC, 32U, struct ion_share_handle_data)		/**< ion driver decrease the consume count command*/
 
-#define ION_IOC_GET_CONSUME_INFO  _IOWR(ION_IOC_MAGIC, 33, struct ion_consume_info_data)	/**< ion driver get the consume count command.*/
+#define ION_IOC_GET_CONSUME_INFO  _IOWR(ION_IOC_MAGIC, 33U, struct ion_consume_info_data)	/**< ion driver get the consume count command.*/
 
-#define ION_IOC_WAIT_CONSUME_STATUS  _IOWR(ION_IOC_MAGIC, 34, struct ion_consume_info_data)	/**< ion driver wait for the consume count command.*/
+#define ION_IOC_WAIT_CONSUME_STATUS  _IOWR(ION_IOC_MAGIC, 34U, struct ion_consume_info_data)	/**< ion driver wait for the consume count command.*/
 
-#define ION_IOC_GET_VERSION_INFO  _IOWR(ION_IOC_MAGIC, 35, struct ion_version_info_data)	/**< ion driver get driver version info.*/
+#define ION_IOC_GET_VERSION_INFO  _IOWR(ION_IOC_MAGIC, 35U, struct ion_version_info_data)	/**< ion driver get driver version info.*/
 
-#ifdef CONFIG_PCIE_HOBOT_EP_AI
-#define ION_IOC_OPEN  _IO(ION_IOC_MAGIC, 17)		/**< ion driver device open command */
+#ifdef CONFIG_PCIE_HOBOT_EP_FUN_AI
+#define ION_IOC_OPEN  _IO(ION_IOC_MAGIC, 17U)		/**< ion driver device open command */
 
-#define ION_IOC_FD_RELEASE  _IO(ION_IOC_MAGIC, 18)	/**< ion driver share fd release command*/
+#define ION_IOC_FD_RELEASE  _IO(ION_IOC_MAGIC, 18U)	/**< ion driver share fd release command*/
 
-#define ION_IOC_RELEASE  _IO(ION_IOC_MAGIC, 19)		/**< ion driver device relase command*/
+#define ION_IOC_RELEASE  _IO(ION_IOC_MAGIC, 19U)		/**< ion driver device relase command*/
 
-#define ION_IOC_MAP_KERNEL _IO(ION_IOC_MAGIC, 20)	/**< ion driver map kernel virtual address command */
+#define ION_IOC_MAP_KERNEL _IO(ION_IOC_MAGIC, 20U)	/**< ion driver map kernel virtual address command */
 
-#define ION_IOC_UNMAP_KERNEL _IO(ION_IOC_MAGIC, 21)	/**< ion driver unmap kernel virtual address commad */
+#define ION_IOC_UNMAP_KERNEL _IO(ION_IOC_MAGIC, 21U)	/**< ion driver unmap kernel virtual address commad */
 #endif
 
-#define ION_IOC_SHARE_AND_PHY  _IOWR(ION_IOC_MAGIC, 22, struct ion_share_and_phy_data)	/**< ion driver relates buffer with share fd and get physical address command*/
+#define ION_IOC_SHARE_AND_PHY  _IOWR(ION_IOC_MAGIC, 22U, struct ion_share_and_phy_data)	/**< ion driver relates buffer with share fd and get physical address command*/
+
+#define ION_IOC_REGISTER_GRAPH_BUF_GROUP	_IOWR(ION_IOC_MAGIC, 36U, struct ion_register_buf_group_data)	/**< ion driver register graphic buffer group command.*/
+
+#define ION_IOC_UNREGISTER_GRAPH_BUF_GROUP	_IOWR(ION_IOC_MAGIC, 37U, struct ion_register_buf_group_data)	/**< ion driver unregister graphic buffer group command.*/
+
+#define ION_IOC_IMPORT_GRAPH_BUF_GROUP		_IOWR(ION_IOC_MAGIC, 38U, struct ion_import_buf_group_data)	/**< ion driver import graphic buffer group command.*/
+
+#define ION_IOC_FREE_GRAPH_BUF_GROUP		_IOWR(ION_IOC_MAGIC, 39U, struct ion_import_buf_group_data)	/**< ion driver free graphic buffer group command.*/
 
 #endif /* _UAPI_LINUX_ION_H */

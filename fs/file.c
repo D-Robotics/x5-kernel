@@ -246,6 +246,49 @@ repeat:
 	return expanded;
 }
 
+int hb_expand_files(struct files_struct *files, unsigned int nr)
+{
+	struct fdtable *fdt;
+	int expanded = 0;
+
+	spin_lock(&files->file_lock);
+repeat:
+	fdt = files_fdtable(files);
+
+	/* Do we need to expand? */
+	if (nr < fdt->max_fds) {
+		spin_unlock(&files->file_lock);
+
+		return expanded;
+	}
+
+	/* Can we expand? */
+	if (nr >= sysctl_nr_open) {
+		spin_unlock(&files->file_lock);
+
+		return -EMFILE;
+	}
+
+	if (unlikely(files->resize_in_progress)) {
+		spin_unlock(&files->file_lock);
+		expanded = 1;
+		wait_event(files->resize_wait, !files->resize_in_progress);
+		spin_lock(&files->file_lock);
+		goto repeat;
+	}
+
+	/* All good, so we try */
+	files->resize_in_progress = true;
+	expanded = expand_fdtable(files, nr);
+	files->resize_in_progress = false;
+
+	wake_up_all(&files->resize_wait);
+	spin_unlock(&files->file_lock);
+
+	return expanded;
+}
+EXPORT_SYMBOL(hb_expand_files);
+
 static inline void __set_close_on_exec(unsigned int fd, struct fdtable *fdt)
 {
 	__set_bit(fd, fdt->close_on_exec);

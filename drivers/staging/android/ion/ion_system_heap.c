@@ -27,6 +27,7 @@
 
 #define NUM_ORDERS ARRAY_SIZE(orders)
 
+//coverity[misra_c_2012_rule_8_9_violation:SUPPRESS], ## violation reason SYSSW_V_8.9_02
 static gfp_t high_order_gfp_flags = (GFP_HIGHUSER | __GFP_ZERO | __GFP_NOWARN |
 				     __GFP_NORETRY) & ~__GFP_RECLAIM;
 static gfp_t low_order_gfp_flags  = GFP_HIGHUSER | __GFP_ZERO;
@@ -36,7 +37,7 @@ static int order_to_index(unsigned int order)
 {
 	int i;
 
-	for (i = 0; i < NUM_ORDERS; i++)
+	for (i = 0; (uint32_t)i < ARRAY_SIZE(orders); i++)
 		if (order == orders[i])
 			return i;
 	BUG();
@@ -45,7 +46,7 @@ static int order_to_index(unsigned int order)
 
 static inline unsigned int order_to_size(int order)
 {
-	return PAGE_SIZE << order;
+	return (uint32_t)(PAGE_SIZE << (uint32_t)order);
 }
 
 struct ion_system_heap {
@@ -57,27 +58,27 @@ static struct page *alloc_buffer_page(struct ion_system_heap *heap,
 				      struct ion_buffer *buffer,
 				      unsigned long order)
 {
-	struct ion_page_pool *pool = heap->pools[order_to_index(order)];
+	struct ion_page_pool *pool = heap->pools[order_to_index((uint32_t)order)];
 
 	return ion_page_pool_alloc(pool);
 }
 
 
 static void free_buffer_page(struct ion_system_heap *heap,
-			     struct ion_buffer *buffer, struct page *page)
+			     struct ion_buffer *buffer, struct page *heap_page)
 {
 	struct ion_page_pool *pool;
-	unsigned int order = compound_order(page);
+	unsigned int order = compound_order(heap_page);
 
 	/* go to system */
 	if (buffer->private_flags & ION_PRIV_FLAG_SHRINKER_FREE) {
-		__free_pages(page, order);
+		__free_pages(heap_page, order);
 		return;
 	}
 
 	pool = heap->pools[order_to_index(order)];
 
-	ion_page_pool_free(pool, page);
+	ion_page_pool_free(pool, heap_page);
 }
 
 
@@ -86,38 +87,42 @@ static struct page *alloc_largest_available(struct ion_system_heap *heap,
 					    unsigned long size,
 					    unsigned int max_order)
 {
-	struct page *page;
+	struct page *heap_page;
 	int i;
 
-	for (i = 0; i < NUM_ORDERS; i++) {
-		if (size < order_to_size(orders[i]))
+	for (i = 0; (uint32_t)i < ARRAY_SIZE(orders); i++) {
+		if (size < order_to_size((int)orders[i]))
 			continue;
 		if (max_order < orders[i])
 			continue;
 
-		page = alloc_buffer_page(heap, buffer, orders[i]);
-		if (!page)
+		heap_page = alloc_buffer_page(heap, buffer, orders[i]);
+		if (heap_page == NULL)
 			continue;
 
-		return page;
+		return heap_page;
 	}
 
 	return NULL;
 }
 
+//coverity[HIS_VOCF:SUPPRESS], ## violation reason SYSSW_V_VOCF_01
 static int ion_system_heap_allocate(struct ion_heap *heap,
 				     struct ion_buffer *buffer,
 				     unsigned long size, unsigned long align,
 				     unsigned long flags)
 
 {
+	//coverity[misra_c_2012_rule_20_7_violation:SUPPRESS], ## violation reason SYSSW_V_20.7_01
+	//coverity[misra_c_2012_rule_18_4_violation:SUPPRESS], ## violation reason SYSSW_V_18.4_03
+	//coverity[misra_c_2012_rule_11_5_violation:SUPPRESS], ## violation reason SYSSW_V_11.5_01
 	struct ion_system_heap *sys_heap = container_of(heap,
 							struct ion_system_heap,
 							heap);
 	struct sg_table *table;
 	struct scatterlist *sg;
 	struct list_head pages;
-	struct page *page, *tmp_page;
+	struct page *heap_page, *tmp_page;
 	int i = 0;
 	unsigned long size_remaining = PAGE_ALIGN(size);
 	unsigned long size_alloc;
@@ -130,36 +135,52 @@ static int ion_system_heap_allocate(struct ion_heap *heap,
 		return -ENOMEM;
 
 	INIT_LIST_HEAD(&pages);
-	while (size_remaining > 0) {
-		page = alloc_largest_available(sys_heap, buffer, size_remaining,
+	while (size_remaining > 0U) {
+		heap_page = alloc_largest_available(sys_heap, buffer, size_remaining,
 						max_order);
-		if (!page)
+		if (heap_page == NULL) {
+			//coverity[misra_c_2012_rule_15_1_violation:SUPPRESS], ## violation reason SYSSW_V_15.1_01
 			goto free_pages;
-		list_add_tail(&page->lru, &pages);
-		size_remaining -= page_size(page);
+		}
+		list_add_tail(&heap_page->lru, &pages);
+		size_remaining -= page_size(heap_page);
 
 		/* the page may used for instruction or data which still cached */
-		size_alloc = page_size(page);
-		flush_icache_range((unsigned long)page_address(page),
-				(unsigned long)(page_address(page) + size_alloc));
-		dcache_inval_poc((unsigned long)page_address(page), (unsigned long)page_address(page) + size_alloc);
-		dcache_clean_inval_poc((unsigned long)page_address(page), (unsigned long)page_address(page) + size_alloc);
+		size_alloc = page_size(heap_page);
+		//coverity[misra_c_2012_rule_11_6_violation:SUPPRESS], ## violation reason SYSSW_V_11.6_02
+		flush_icache_range((unsigned long)page_address(heap_page),
+				//coverity[misra_c_2012_rule_18_4_violation:SUPPRESS], ## violation reason SYSSW_V_18.4_03s
+				//coverity[misra_c_2012_rule_11_6_violation:SUPPRESS], ## violation reason SYSSW_V_11.6_02
+				(unsigned long)(page_address(heap_page) + size_alloc));
+		//coverity[misra_c_2012_rule_11_6_violation:SUPPRESS], ## violation reason SYSSW_V_11.6_02
+		dcache_inval_poc((unsigned long)page_address(heap_page), (unsigned long)page_address(heap_page) + size_alloc);
+		//coverity[misra_c_2012_rule_11_6_violation:SUPPRESS], ## violation reason SYSSW_V_11.6_02
+		dcache_clean_inval_poc((unsigned long)page_address(heap_page), (unsigned long)page_address(heap_page) + size_alloc);
 
-		max_order = compound_order(page);
+		max_order = compound_order(heap_page);
 		i++;
 	}
+	//coverity[misra_c_2012_directive_4_12_violation], ## violation reason SYSSW_V_4.12_02
+	//coverity[misra_c_2012_rule_11_5_violation:SUPPRESS], ## violation reason SYSSW_V_11.5_02
 	table = kmalloc(sizeof(*table), GFP_KERNEL);
-	if (!table)
+	if (table == NULL) {
+		//coverity[misra_c_2012_rule_15_1_violation:SUPPRESS], ## violation reason SYSSW_V_15.1_01
 		goto free_pages;
+	}
 
-	if (sg_alloc_table(table, i, GFP_KERNEL))
+	if (sg_alloc_table(table, i, GFP_KERNEL)) {
+		//coverity[misra_c_2012_rule_15_1_violation:SUPPRESS], ## violation reason SYSSW_V_15.1_01
 		goto free_table;
+	}
 
 	sg = table->sgl;
-	list_for_each_entry_safe(page, tmp_page, &pages, lru) {
-		sg_set_page(sg, page, page_size(page), 0);
+	//coverity[misra_c_2012_rule_20_7_violation:SUPPRESS], ## violation reason SYSSW_V_20.7_01
+	//coverity[misra_c_2012_rule_18_4_violation:SUPPRESS], ## violation reason SYSSW_V_18.4_03
+	//coverity[misra_c_2012_rule_11_5_violation:SUPPRESS], ## violation reason SYSSW_V_11.5_01
+	list_for_each_entry_safe(heap_page, tmp_page, &pages, lru) {
+		sg_set_page(sg, heap_page, (uint32_t)page_size(heap_page), 0);
 		sg = sg_next(sg);
-		list_del(&page->lru);
+		list_del(&heap_page->lru);
 	}
 
 	buffer->priv_virt = table;
@@ -169,24 +190,31 @@ static int ion_system_heap_allocate(struct ion_heap *heap,
 free_table:
 	kfree(table);
 free_pages:
-	list_for_each_entry_safe(page, tmp_page, &pages, lru)
-		free_buffer_page(sys_heap, buffer, page);
+	//coverity[misra_c_2012_rule_20_7_violation:SUPPRESS], ## violation reason SYSSW_V_20.7_01
+	//coverity[misra_c_2012_rule_18_4_violation:SUPPRESS], ## violation reason SYSSW_V_18.4_03
+	//coverity[misra_c_2012_rule_11_5_violation:SUPPRESS], ## violation reason SYSSW_V_11.5_01
+	list_for_each_entry_safe(heap_page, tmp_page, &pages, lru)
+		free_buffer_page(sys_heap, buffer, heap_page);
 	return -ENOMEM;
 }
 
 static void ion_system_heap_free(struct ion_buffer *buffer)
 {
+	//coverity[misra_c_2012_rule_20_7_violation:SUPPRESS], ## violation reason SYSSW_V_20.7_01
+	//coverity[misra_c_2012_rule_18_4_violation:SUPPRESS], ## violation reason SYSSW_V_18.4_03
+	//coverity[misra_c_2012_rule_11_5_violation:SUPPRESS], ## violation reason SYSSW_V_11.5_01
 	struct ion_system_heap *sys_heap = container_of(buffer->heap,
 							struct ion_system_heap,
 							heap);
 	struct sg_table *table = buffer->sg_table;
 	struct scatterlist *sg;
-	int i;
+	uint32_t i;
 
 	/* zero the buffer before goto page pool */
-	if (!(buffer->private_flags & ION_PRIV_FLAG_SHRINKER_FREE))
-		ion_heap_buffer_zero(buffer);
+	if ((buffer->private_flags & ION_PRIV_FLAG_SHRINKER_FREE) == 0UL)
+		(void)ion_heap_buffer_zero(buffer);
 
+	//coverity[misra_c_2012_rule_20_7_violation:SUPPRESS], ## violation reason SYSSW_V_20.7_01
 	for_each_sgtable_sg(table, sg, i)
 		free_buffer_page(sys_heap, buffer, sg_page(sg));
 	sg_free_table(table);
@@ -196,6 +224,7 @@ static void ion_system_heap_free(struct ion_buffer *buffer)
 static struct sg_table *ion_system_heap_map_dma(struct ion_heap *heap,
 						struct ion_buffer *buffer)
 {
+	//coverity[misra_c_2012_rule_11_5_violation:SUPPRESS], ## violation reason SYSSW_V_11.5_02
 	return buffer->priv_virt;
 }
 
@@ -213,12 +242,15 @@ static int ion_system_heap_shrink(struct ion_heap *heap, gfp_t gfp_mask,
 	int i, nr_freed;
 	int only_scan = 0;
 
+	//coverity[misra_c_2012_rule_20_7_violation:SUPPRESS], ## violation reason SYSSW_V_20.7_01
+	//coverity[misra_c_2012_rule_18_4_violation:SUPPRESS], ## violation reason SYSSW_V_18.4_03
+	//coverity[misra_c_2012_rule_11_5_violation:SUPPRESS], ## violation reason SYSSW_V_11.5_01
 	sys_heap = container_of(heap, struct ion_system_heap, heap);
 
-	if (!nr_to_scan)
+	if (nr_to_scan == 0)
 		only_scan = 1;
 
-	for (i = 0; i < NUM_ORDERS; i++) {
+	for (i = 0; (uint32_t)i < ARRAY_SIZE(orders); i++) {
 		pool = sys_heap->pools[i];
 
 		if (only_scan) {
@@ -239,6 +271,7 @@ static int ion_system_heap_shrink(struct ion_heap *heap, gfp_t gfp_mask,
 	return nr_total;
 }
 
+//coverity[misra_c_2012_rule_8_9_violation:SUPPRESS], ## violation reason SYSSW_V_8.9_02
 static struct ion_heap_ops system_heap_ops = {
 	.allocate = ion_system_heap_allocate,
 	.free = ion_system_heap_free,
@@ -253,13 +286,15 @@ static struct ion_heap_ops system_heap_ops = {
 static int ion_system_heap_debug_show(struct ion_heap *heap, struct seq_file *s,
 				      void *unused)
 {
-
+	//coverity[misra_c_2012_rule_20_7_violation:SUPPRESS], ## violation reason SYSSW_V_20.7_01
+	//coverity[misra_c_2012_rule_18_4_violation:SUPPRESS], ## violation reason SYSSW_V_18.4_03
+	//coverity[misra_c_2012_rule_11_5_violation:SUPPRESS], ## violation reason SYSSW_V_11.5_01
 	struct ion_system_heap *sys_heap = container_of(heap,
 							struct ion_system_heap,
 							heap);
 	int i;
 
-	for (i = 0; i < NUM_ORDERS; i++) {
+	for (i = 0; (uint32_t)i < ARRAY_SIZE(orders); i++) {
 		struct ion_page_pool *pool = sys_heap->pools[i];
 
 		seq_printf(s, "%d order %u highmem pages in pool = %lu total\n",
@@ -277,24 +312,30 @@ struct ion_heap *ion_system_heap_create(struct ion_platform_heap *unused)
 	struct ion_system_heap *heap;
 	int i;
 
+	//coverity[misra_c_2012_rule_11_5_violation:SUPPRESS], ## violation reason SYSSW_V_11.5_02
 	heap = kzalloc(sizeof(struct ion_system_heap) +
-			sizeof(struct ion_page_pool *) * NUM_ORDERS,
+			sizeof(struct ion_page_pool *) * (size_t)ARRAY_SIZE(orders),
 			GFP_KERNEL);
-	if (!heap)
+	if (heap == NULL) {
+		//coverity[misra_c_2012_rule_11_5_violation:SUPPRESS], ## violation reason SYSSW_V_11.5_02
 		return ERR_PTR(-ENOMEM);
+	}
 	heap->heap.ops = &system_heap_ops;
 	heap->heap.type = ION_HEAP_TYPE_SYSTEM;
 	heap->heap.flags = ION_HEAP_FLAG_DEFER_FREE;
 
-	for (i = 0; i < NUM_ORDERS; i++) {
+	//coverity[misra_c_2012_rule_10_4_violation:SUPPRESS], ## violation reason SYSSW_V_10.4_01
+	for (i = 0; (uint32_t)i < NUM_ORDERS; i++) {
 		struct ion_page_pool *pool;
 		gfp_t gfp_flags = low_order_gfp_flags;
 
-		if (orders[i] > 4)
+		if (orders[i] > 4U)
 			gfp_flags = high_order_gfp_flags;
-		pool = ion_page_pool_create(gfp_flags, orders[i], false);
-		if (!pool)
+		pool = ion_page_pool_create(gfp_flags, orders[i], (bool)0);
+		if (pool == NULL) {
+			//coverity[misra_c_2012_rule_15_1_violation:SUPPRESS], ## violation reason SYSSW_V_15.1_01
 			goto destroy_pools;
+		}
 		heap->pools[i] = pool;
 	}
 
@@ -305,17 +346,22 @@ destroy_pools:
 	while (i--)
 		ion_page_pool_destroy(heap->pools[i]);
 	kfree(heap);
+	//coverity[misra_c_2012_rule_11_5_violation:SUPPRESS], ## violation reason SYSSW_V_11.5_02
 	return ERR_PTR(-ENOMEM);
 }
 
 void ion_system_heap_destroy(struct ion_heap *heap)
 {
+	//coverity[misra_c_2012_rule_20_7_violation:SUPPRESS], ## violation reason SYSSW_V_20.7_01
+	//coverity[misra_c_2012_rule_18_4_violation:SUPPRESS], ## violation reason SYSSW_V_18.4_03
+	//coverity[misra_c_2012_rule_11_5_violation:SUPPRESS], ## violation reason SYSSW_V_11.5_01
 	struct ion_system_heap *sys_heap = container_of(heap,
 							struct ion_system_heap,
 							heap);
 	int i;
 
-	for (i = 0; i < NUM_ORDERS; i++)
+	//coverity[misra_c_2012_rule_10_4_violation:SUPPRESS], ## violation reason SYSSW_V_10.4_01
+	for (i = 0; (uint32_t)i < NUM_ORDERS; i++)
 		ion_page_pool_destroy(sys_heap->pools[i]);
 	kfree(sys_heap);
 }
@@ -327,52 +373,67 @@ static int ion_system_contig_heap_allocate(struct ion_heap *heap,
 					   unsigned long flags)
 {
 	int order = get_order(len);
-	struct page *page;
+	struct page *heap_page;
 	struct sg_table *table;
 	unsigned long i;
 	int ret;
 
-	if (align > (PAGE_SIZE << order))
+	if (align > (PAGE_SIZE << (uint32_t)order))
 		return -EINVAL;
 
-	page = alloc_pages(low_order_gfp_flags | __GFP_NOWARN, order);
-	if (!page)
+	heap_page = alloc_pages(low_order_gfp_flags | __GFP_NOWARN, order);
+	if (heap_page == NULL)
 		return -ENOMEM;
 
-	split_page(page, order);
+	split_page(heap_page, (uint32_t)order);
 
+	//coverity[misra_c_2012_rule_10_4_violation:SUPPRESS], ## violation reason SYSSW_V_10.4_01
 	len = PAGE_ALIGN(len);
-	for (i = len >> PAGE_SHIFT; i < (1 << order); i++)
-		__free_page(page + i);
+	for (i = len >> PAGE_SHIFT; i < ((uint64_t)1U << (uint64_t)order); i++) {
+		//coverity[misra_c_2012_rule_18_4_violation:SUPPRESS], ## violation reason SYSSW_V_18.4_03
+		__free_page(heap_page + i);
+	}
 
+	//coverity[misra_c_2012_directive_4_12_violation], ## violation reason SYSSW_V_4.12_02
+	//coverity[misra_c_2012_rule_11_5_violation:SUPPRESS], ## violation reason SYSSW_V_11.5_02
 	table = kmalloc(sizeof(*table), GFP_KERNEL);
-	if (!table) {
+	if (table == NULL) {
 		ret = -ENOMEM;
+		//coverity[misra_c_2012_rule_15_1_violation:SUPPRESS], ## violation reason SYSSW_V_15.1_01
 		goto free_pages;
 	}
 
 	ret = sg_alloc_table(table, 1, GFP_KERNEL);
-	if (ret)
+	if (ret) {
+		//coverity[misra_c_2012_rule_15_1_violation:SUPPRESS], ## violation reason SYSSW_V_15.1_01
 		goto free_table;
+	}
 
-	sg_set_page(table->sgl, page, len, 0);
+	sg_set_page(table->sgl, heap_page, (uint32_t)len, 0);
 
 	buffer->priv_virt = table;
 	buffer->sg_table = table;
 
 	/* the page may used for instruction or data which still cached */
-	flush_icache_range((unsigned long)page_address(page),
-			(unsigned long)(page_address(page) + len));
-	dcache_inval_poc((unsigned long)page_address(page), (unsigned long)page_address(page) + len);
-	dcache_clean_inval_poc((unsigned long)page_address(page), (unsigned long)page_address(page) + len);
+	//coverity[misra_c_2012_rule_11_6_violation:SUPPRESS], ## violation reason SYSSW_V_11.6_02
+	flush_icache_range((unsigned long)page_address(heap_page),
+			//coverity[misra_c_2012_rule_18_4_violation:SUPPRESS], ## violation reason SYSSW_V_18.4_03s
+			//coverity[misra_c_2012_rule_11_6_violation:SUPPRESS], ## violation reason SYSSW_V_11.6_02
+			(unsigned long)(page_address(heap_page) + len));
+	//coverity[misra_c_2012_rule_11_6_violation:SUPPRESS], ## violation reason SYSSW_V_11.6_02
+	dcache_inval_poc((unsigned long)page_address(heap_page), (unsigned long)page_address(heap_page) + len);
+	//coverity[misra_c_2012_rule_11_6_violation:SUPPRESS], ## violation reason SYSSW_V_11.6_02
+	dcache_clean_inval_poc((unsigned long)page_address(heap_page), (unsigned long)page_address(heap_page) + len);
 
 	return 0;
 
 free_table:
 	kfree(table);
 free_pages:
-	for (i = 0; i < len >> PAGE_SHIFT; i++)
-		__free_page(page + i);
+	for (i = 0; i < len >> PAGE_SHIFT; i++) {
+		//coverity[misra_c_2012_rule_18_4_violation:SUPPRESS], ## violation reason SYSSW_V_18.4_03
+		__free_page(heap_page + i);
+	}
 
 	return ret;
 }
@@ -380,12 +441,15 @@ free_pages:
 static void ion_system_contig_heap_free(struct ion_buffer *buffer)
 {
 	struct sg_table *table = buffer->sg_table;
-	struct page *page = sg_page(table->sgl);
+	struct page *heap_page = sg_page(table->sgl);
+	//coverity[misra_c_2012_rule_10_4_violation:SUPPRESS], ## violation reason SYSSW_V_10.4_01
 	unsigned long pages = PAGE_ALIGN(buffer->size) >> PAGE_SHIFT;
 	unsigned long i;
 
-	for (i = 0; i < pages; i++)
-		__free_page(page + i);
+	for (i = 0; i < pages; i++) {
+		//coverity[misra_c_2012_rule_18_4_violation:SUPPRESS], ## violation reason SYSSW_V_18.4_03
+		__free_page(heap_page + i);
+	}
 	sg_free_table(table);
 	kfree(table);
 }
@@ -394,9 +458,13 @@ static int ion_system_contig_heap_phys(struct ion_heap *heap,
 				       struct ion_buffer *buffer,
 				       phys_addr_t *addr, size_t *len)
 {
+	//coverity[misra_c_2012_rule_11_5_violation:SUPPRESS], ## violation reason SYSSW_V_11.5_02
 	struct sg_table *table = buffer->priv_virt;
-	struct page *page = sg_page(table->sgl);
-	*addr = page_to_phys(page);
+	struct page *heap_page = sg_page(table->sgl);
+	//coverity[misra_c_2012_rule_18_4_violation:SUPPRESS], ## violation reason SYSSW_V_18.4_03
+	//coverity[misra_c_2012_rule_10_4_violation:SUPPRESS], ## violation reason SYSSW_V_10.4_01
+	//coverity[misra_c_2012_rule_10_1_violation:SUPPRESS], ## violation reason SYSSW_V_10.1_01
+	*addr = page_to_phys(heap_page);
 	*len = buffer->size;
 	return 0;
 }
@@ -404,6 +472,7 @@ static int ion_system_contig_heap_phys(struct ion_heap *heap,
 static struct sg_table *ion_system_contig_heap_map_dma(struct ion_heap *heap,
 						struct ion_buffer *buffer)
 {
+	//coverity[misra_c_2012_rule_11_5_violation:SUPPRESS], ## violation reason SYSSW_V_11.5_02
 	return buffer->priv_virt;
 }
 
@@ -412,6 +481,7 @@ static void ion_system_contig_heap_unmap_dma(struct ion_heap *heap,
 {
 }
 
+//coverity[misra_c_2012_rule_8_9_violation:SUPPRESS], ## violation reason SYSSW_V_8.9_02
 static struct ion_heap_ops kmalloc_ops = {
 	.allocate = ion_system_contig_heap_allocate,
 	.free = ion_system_contig_heap_free,
@@ -427,9 +497,12 @@ struct ion_heap *ion_system_contig_heap_create(struct ion_platform_heap *unused)
 {
 	struct ion_heap *heap;
 
+	//coverity[misra_c_2012_rule_11_5_violation:SUPPRESS], ## violation reason SYSSW_V_11.5_02
 	heap = kzalloc(sizeof(*heap), GFP_KERNEL);
-	if (!heap)
+	if (heap == NULL) {
+		//coverity[misra_c_2012_rule_11_5_violation:SUPPRESS], ## violation reason SYSSW_V_11.5_02
 		return ERR_PTR(-ENOMEM);
+	}
 	heap->ops = &kmalloc_ops;
 	heap->type = ION_HEAP_TYPE_SYSTEM_CONTIG;
 	heap->name = "ion_system_contig_heap";
