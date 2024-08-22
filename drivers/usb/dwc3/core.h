@@ -1341,6 +1341,8 @@ struct dwc3 {
 	unsigned		async_callbacks:1;
 	unsigned		suspended:1;
 
+	unsigned		xhci_reset_on_resume_quirk:1;
+
 	u16			imod_interval;
 
 	int			max_cfg_eps;

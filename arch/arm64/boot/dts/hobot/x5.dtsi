@@ -3227,6 +3227,7 @@
 					usb-role-switch;
 					usb-phy = <&usb3_u2phy>;
 					snps,dis_u2_susphy_quirk;
+					xhci,reset-on-resume-quirk;
 					interrupt-parent = <&gic>;
 					interrupts = <GIC_SPI 30 IRQ_TYPE_LEVEL_HIGH>;
 
@@ -3266,6 +3267,7 @@
 					maximum-speed = "high-speed";
 					// usb-phy = <&usb2phy>;
 					snps,dis_u2_susphy_quirk;
+					xhci,reset-on-resume-quirk;
 					interrupt-parent = <&gic>;
 					interrupts = <GIC_SPI 29 IRQ_TYPE_LEVEL_HIGH>;
 
