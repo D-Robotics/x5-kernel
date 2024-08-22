@@ -43,6 +43,14 @@ config GPIO_ACPI
 	def_bool y
 	depends on ACPI
 
+config HOBOT_GPIO_DEBUG
+	tristate "A simple driver to parse pinmux-gpio.dtsi"
+	depends on ARCH_HOBOT_X5
+	help
+	  The GPIO information can be exported via debugfs, including pin node and pin name information,
+	  which facilitates debugging and printing at the application layer.
+	  It can be used in conjunction with gpiochipinfo at the application layer.
+
 config GPIOLIB_IRQCHIP
 	select IRQ_DOMAIN
 	bool
