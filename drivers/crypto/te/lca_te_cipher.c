@@ -604,7 +604,7 @@ static const struct te_alg_template skcipher_algs[] = {
 	{
 		.name = "xts(aes)",
 		.driver_name = "xts-aes-te",
-		.blocksize = 1,
+		.blocksize = AES_BLOCK_SIZE,
 		.template_skcipher = {
 			.setkey = lca_te_cipher_setkey,
 			.encrypt = lca_te_cipher_encrypt,
@@ -618,7 +618,7 @@ static const struct te_alg_template skcipher_algs[] = {
 	{
 		.name = "xts(sm4)",
 		.driver_name = "xts-sm4-te",
-		.blocksize = 1,
+		.blocksize = AES_BLOCK_SIZE,
 		.template_skcipher = {
 			.setkey = lca_te_cipher_setkey,
 			.encrypt = lca_te_cipher_encrypt,
