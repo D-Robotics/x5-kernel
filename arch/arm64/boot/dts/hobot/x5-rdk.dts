@@ -327,7 +327,7 @@
 &spi1 {
 	status = "okay";
 	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_spi1>;
+	pinctrl-0 = <&pinctrl_spi1 &pinctrl_spi1_ssn1>;
 	dma-names = "tx", "rx";
 	dmas = <&axi_dmac 23>, <&axi_dmac 22>;
 
@@ -335,6 +335,12 @@
 		compatible = "dr,x5-spidev";
 		spi-max-frequency = <32000000>;
 		reg = <0>;
+	};
+
+	spidev@1 {
+		compatible = "dr,x5-spidev";
+		spi-max-frequency = <32000000>;
+		reg = <1>;
 	};
 };
 
