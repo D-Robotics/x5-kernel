@@ -100,7 +100,11 @@ static inline void osal_free(void *ptr)
  */
 static inline size_t osal_copy_from_app(void *to, const void  __user *from, size_t n)
 {
+#ifdef CONFIG_PREEMPT_RT
 	return copy_from_user(to, from, n);
+#else
+	return copy_from_user_nofault(to, from, n);
+#endif
 }
 
 /**
@@ -114,7 +118,11 @@ static inline size_t osal_copy_from_app(void *to, const void  __user *from, size
  */
 static inline size_t osal_copy_to_app(void __user *to, const void *from, size_t n)
 {
+#ifdef CONFIG_PREEMPT_RT
 	return copy_to_user(to, from, n);
+#else
+	return copy_to_user_nofault(to, from, n);
+#endif
 }
 
 #endif
