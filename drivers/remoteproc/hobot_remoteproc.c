@@ -47,6 +47,7 @@
 #include "gua_audio_ipc.h"
 #include "gua_audio_struct_define.h"
 #include "gua_pcm.h"
+#include "remoteproc_elf_helpers.h"
 
 typedef struct _control {
 	smf_packet_head_t header;
@@ -583,10 +584,135 @@ static int32_t hobot_dsp_rproc_pre_stop(struct rproc *rproc)
 	return 0;
 }
 
+/*
+ * copy from remoteproc_elf_loader.c
+ * Parse the firmware, and use find_table func to find the address of the resource_table within the firmware when updating the resource_table.
+ */
+static const void *
+find_table(struct device *dev, const struct firmware *fw)
+{
+	const void *shdr, *name_table_shdr;
+	int i;
+	const char *name_table;
+	struct resource_table *table = NULL;
+	const u8 *elf_data = (void *)fw->data;
+	u8 class = fw_elf_get_class(fw);
+	size_t fw_size = fw->size;
+	const void *ehdr = elf_data;
+	u16 shnum = elf_hdr_get_e_shnum(class, ehdr);
+	u32 elf_shdr_get_size = elf_size_of_shdr(class);
+	u16 shstrndx = elf_hdr_get_e_shstrndx(class, ehdr);
+
+	/* look for the resource table and handle it */
+	/* First, get the section header according to the elf class */
+	shdr = elf_data + elf_hdr_get_e_shoff(class, ehdr);
+	/* Compute name table section header entry in shdr array */
+	name_table_shdr = shdr + (shstrndx * elf_shdr_get_size);
+	/* Finally, compute the name table section address in elf */
+	name_table = elf_data + elf_shdr_get_sh_offset(class, name_table_shdr);
+
+	for (i = 0; i < shnum; i++, shdr += elf_shdr_get_size) {
+		u64 size = elf_shdr_get_sh_size(class, shdr);
+		u64 offset = elf_shdr_get_sh_offset(class, shdr);
+		u32 name = elf_shdr_get_sh_name(class, shdr);
+
+		if (strcmp(name_table + name, ".resource_table"))
+			continue;
+
+		table = (struct resource_table *)(elf_data + offset);
+
+		/* make sure we have the entire table */
+		if (offset + size > fw_size || offset + size < size) {
+			dev_err(dev, "resource table truncated\n");
+			return NULL;
+		}
+
+		/* make sure table has at least the header */
+		if (sizeof(struct resource_table) > size) {
+			dev_err(dev, "header-less resource table\n");
+			return NULL;
+		}
+
+		/* we don't support any version beyond the first */
+		if (table->ver != 1) {
+			dev_err(dev, "unsupported fw ver: %d\n", table->ver);
+			return NULL;
+		}
+
+		/* make sure reserved bytes are zeroes */
+		if (table->reserved[0] || table->reserved[1]) {
+			dev_err(dev, "non zero reserved bytes\n");
+			return NULL;
+		}
+
+		/* make sure the offsets array isn't truncated */
+		if (struct_size(table, offset, table->num) > size) {
+			dev_err(dev, "resource table incomplete\n");
+			return NULL;
+		}
+
+		return shdr;
+	}
+
+	return NULL;
+}
+
+static int32_t hobot_dsp_resource_table_update(struct rproc *rproc, const struct firmware *fw) {
+	const void *shdr;
+	struct device *dev = &rproc->dev;
+	struct resource_table *table = NULL;
+	const u8 *elf_data = fw->data;
+	size_t tablesz;
+	u8 class = fw_elf_get_class(fw);
+	u64 sh_offset;
+	struct hobot_rproc_pdata *pdata = rproc->priv;
+
+	shdr = find_table(dev, fw);
+	if (!shdr)
+		return -EINVAL;
+
+	sh_offset = elf_shdr_get_sh_offset(class, shdr);
+	table = (struct resource_table *)(elf_data + sh_offset);
+	tablesz = elf_shdr_get_sh_size(class, shdr);
+
+	for (int i = 0; i < table->num; i++) {
+		int offset = table->offset[i];
+		struct fw_rsc_hdr *hdr = (void *)table + offset;
+		int avail = tablesz - offset - sizeof(*hdr);
+		void *_rsc = (void *)hdr + sizeof(*hdr);
+
+		if (avail < 0) {
+			dev_err(dev, "%s failed\n", __func__);
+			return -EINVAL;
+		}
+
+		struct fw_rsc_devmem *rsc = _rsc;
+		if (i == 0) //sram0
+			rsc->pa = pdata->sram0.pa;
+		else if (i == 1) //sram1
+			rsc->pa = pdata->sram0.pa + (AON_SRAM1_BASE - AON_SRAM0_BASE);
+		else if (i == 3) //ddr0
+			rsc->pa = pdata->sram0.pa + (AON_DDR_BASE - AON_SRAM0_BASE);
+		else if (i == 4) //adsp bsp
+			rsc->pa = pdata->bsp.pa;
+		else if (i == 5) //adsp ipc
+			rsc->pa = pdata->ipc.pa;
+		dev_dbg(dev, "%s da = 0x%x pa = 0x%x\n", __func__, rsc->da, rsc->pa);
+	}
+
+       return 0;
+}
+
 static int32_t hobot_dsp_elf_load_rsc_table(struct rproc *rproc, const struct firmware *fw)
 {
 	int32_t ret = 0;
 	pr_debug("%s\n", __FUNCTION__);// dump_stack();
+
+	ret = hobot_dsp_resource_table_update(rproc, fw);
+	if (ret) {
+		return ret;
+	}
+
 	ret = rproc_elf_load_rsc_table(rproc, fw);
 	if (ret)
 		pr_debug("%s load resource table failed, ret = %d\n", __FUNCTION__, ret);
@@ -1901,6 +2027,39 @@ static void deinit_reserve_mem(struct platform_device *pdev) {
 	}
 }
 
+static int32_t hobot_resource_table_init(struct platform_device *pdev) {
+	struct hobot_rproc_pdata *pdata = platform_get_drvdata(pdev);
+	struct device_node *node;
+	struct resource res;
+	int32_t ret = 0;
+
+	node = of_parse_phandle(pdev->dev.of_node, "adsp-sram0-addr", 0);
+	ret = of_address_to_resource(node, 0, &res);
+	if (ret) {
+		return ret;
+	}
+	pdata->sram0.pa = res.start;
+
+	node = of_parse_phandle(pdev->dev.of_node, "adsp-bsp-addr", 0);
+	ret = of_address_to_resource(node, 0, &res);
+	if (ret) {
+		return ret;
+	}
+	pdata->bsp.pa = res.start;
+
+	node = of_parse_phandle(pdev->dev.of_node, "adsp-ipc-addr", 0);
+	ret = of_address_to_resource(node, 0, &res);
+	if (ret) {
+		return ret;
+	}
+	pdata->ipc.pa = res.start;
+
+	dev_dbg(&pdev->dev, "sram0 0x%x bsp 0x%x ipc 0x%x\n", pdata->sram0.pa, pdata->bsp.pa, pdata->ipc.pa);
+
+	return 0;
+}
+
+
 static int32_t hobot_remoteproc_probe(struct platform_device *pdev)
 {
 	int32_t device_index = 0;
@@ -1965,6 +2124,12 @@ static int32_t hobot_remoteproc_probe(struct platform_device *pdev)
 	ret = hobot_remoteproc_smf_init(pdev);
 	if (ret < 0) {
 		dev_err(&pdev->dev, "log_init error\n");
+		goto deinit_irq_out;
+	}
+
+	ret = hobot_resource_table_init(pdev);
+	if (ret < 0) {
+		dev_err(&pdev->dev, "resource_table_init error\n");
 		goto deinit_irq_out;
 	}
 

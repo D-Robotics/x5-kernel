@@ -27,6 +27,7 @@
 
 #define HIFI5_RUNSTALL_OFFSET (0x30)
 
+#define AON_DDR_BASE (0x20300000)
 #define AON_SRAM0_BASE (0x1fe80000)
 #define AON_SRAM1_BASE (0x1ff00000)
 #define HIFI5_IRAM_BASE (0x20200000)
@@ -122,6 +123,11 @@ struct rproc_ipc_ops {
 struct log_readindex_addr_pid {
         int32_t pid;
         uint32_t read_index;
+};
+
+struct hobot_rsc_table {
+	uint32_t da;
+	uint32_t pa;
 };
 
 /**
@@ -227,6 +233,10 @@ struct hobot_rproc_pdata {
 	int32_t should_stop;
 	int32_t vring0;
 #endif
+
+	struct hobot_rsc_table sram0;
+	struct hobot_rsc_table bsp;
+	struct hobot_rsc_table ipc;
 };
 
 static inline void *log_memcpy(void *dest, void *src, unsigned int num)

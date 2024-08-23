@@ -3561,6 +3561,11 @@
 			timesync-sec-offset = <0x7fff00>;
 			timesync-sec-diff-offset = <0x7fff08>;
 			timesync-nanosec-offset = <0x7fff04>;
+
+			adsp-sram0-addr = <&adsp_ddr>;
+			adsp-bsp-addr = <&adsp_bsp_reserved>;
+			adsp-ipc-addr = <&adsp_ipc_reserved>;
+
 			clocks = <&dspclks X5_DSP_HIFI5_CLK>, <&dspclks X5_DSP_HIFI5_APB_CLK>;
 			clock-names = "hifi5_clk", "hifi5_pbclk";
 			power-domains = <&power X5_DSP_HIFI5>;
