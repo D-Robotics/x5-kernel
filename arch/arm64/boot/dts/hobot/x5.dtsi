@@ -1028,11 +1028,17 @@
 					<&hpsclks X5_CAM_DEWARP_CORE_CLK>,
 					<&hpsclks X5_CAM_DEWARP_HCLK>;
 				clock-names = "core", "ups", "axi", "gdc_core", "gdc_hclk";
-				resets = <&socrst CAM_DEWARP_RESET>;
-				reset-names = "rst";
 				instances = <7>;
 				cam-ctrl = <&cam_ctrl>;
+				dw-crc = <&dw_crc>;
 				iommus = <&vse_iommu>;
+				status = "okay";
+			};
+
+			dw_crc: dw_crc@0 {
+				compatible = "verisilicon,dw-cr-ctrl";
+				resets = <&socrst CAM_DEWARP_RESET>, <&socrst CAM_GDC_RESET>;
+				reset-names = "vse", "gdc";
 				status = "okay";
 			};
 
@@ -1353,11 +1359,10 @@
 					<&hpsclks X5_CAM_VSE_CORE_CLK>,
 					<&hpsclks X5_CAM_VSE_UPSCALE_CLK>;
 				clock-names = "core", "axi", "hclk", "vse_core", "vse_ups";
-				resets = <&socrst CAM_GDC_RESET>;
-				reset-names = "rst";
 				id = <0>;
 				instances = <2>;
 				cam-ctrl = <&cam_ctrl>;
+				dw-crc = <&dw_crc>;
 				iommus = <&gdc_iommu>;
 				status = "okay";
 			};
