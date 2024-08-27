@@ -298,8 +298,8 @@
 &lsio_iomuxc {
 	pinctrl_uart1: uart1grp {
 		horizon,pins = <
-			LSIO_UART1_RX	LSIO_PINMUX_3 BIT_OFFSET12  MUX_ALT0	&pconf_drv_pu_mid_3v3
-			LSIO_UART1_TX	LSIO_PINMUX_3 BIT_OFFSET14  MUX_ALT0	&pconf_drv_pu_mid_3v3
+			LSIO_UART1_RX	LSIO_PINMUX_3 BIT_OFFSET12  MUX_ALT0	&pconf_drv_pu_ds2_3v3
+			LSIO_UART1_TX	LSIO_PINMUX_3 BIT_OFFSET14  MUX_ALT0	&pconf_drv_pu_ds2_3v3
 		>;
 	};
 
