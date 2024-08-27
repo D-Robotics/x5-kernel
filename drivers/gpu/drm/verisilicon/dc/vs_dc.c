@@ -78,7 +78,7 @@ static int dc_bind(struct device *dev, struct device *master, void *data)
 		struct dc_crtc_info *dc_crtc_info = &dc_info->displays[i];
 		struct vs_crtc *vs_crtc;
 
-		dc_crtc = drmm_kzalloc(drm_dev, sizeof(*dc_crtc), GFP_KERNEL);
+		dc_crtc = kzalloc(sizeof(*dc_crtc), GFP_KERNEL);
 		if (!dc_crtc) {
 			ret = -ENOMEM;
 			goto err_cleanup_crtcs;
@@ -114,7 +114,7 @@ static int dc_bind(struct device *dev, struct device *master, void *data)
 		struct dc_plane_info *dc_plane_info = &dc_info->planes[i];
 		struct vs_plane *vs_plane;
 
-		dc_plane = drmm_kzalloc(drm_dev, sizeof(*dc_plane), GFP_KERNEL);
+		dc_plane = kzalloc(sizeof(*dc_plane), GFP_KERNEL);
 		if (!dc_plane) {
 			ret = -ENOMEM;
 			goto err_cleanup_planes;
@@ -147,7 +147,7 @@ static int dc_bind(struct device *dev, struct device *master, void *data)
 		struct dc_wb_info *dc_wb_info = &dc_info->writebacks[i];
 		struct vs_wb *vs_wb;
 
-		dc_wb = drmm_kzalloc(drm_dev, sizeof(*dc_wb), GFP_KERNEL);
+		dc_wb = kzalloc(sizeof(*dc_wb), GFP_KERNEL);
 		if (!dc_wb) {
 			ret = -ENOMEM;
 			goto err_cleanup_wbs;
