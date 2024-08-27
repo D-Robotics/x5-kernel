@@ -63,7 +63,7 @@
 		compatible = "gua,cpu-dai";
 		msg-wrapper = <&ipc_wrapper>;
 		gua,pcm-buffer-size = <0x1E000>;
-		pcm-rpmsg-channel-mapping = <0x00>, <0x00>, <0x00>, <0x00>, <0x00>;
+		pcm-rpmsg-channel-mapping = <0x00>, <0x00>, <0x00>, <0x00>, <0x00>, <0x00>;
 		status = "okay";
 	};
 
@@ -202,6 +202,7 @@
 		status = "okay";
 		hpu3501-regulator {
 			master;
+			en_pin_map = <0x15>;
 			regulators {
 				vdd08_bpu_1_reg: BUCK2 {
 					regulator-name = "VCC_BPU";
@@ -777,3 +778,8 @@ the following ports need to be deleted */
 	};
 };
 
+&efuse{
+	/* use aon gpio7 as efuse power */
+	pinctrl-names = "default";
+	pinctrl-0 = <&aon_gpio_7>;
+};
