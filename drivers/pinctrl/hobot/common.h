@@ -80,12 +80,14 @@ struct horizon_pinctrl {
 	const struct horizon_pin_desc *pins;
 	unsigned int npins;
 	void __iomem *base;
-	void __iomem **gpio_bank_base;
 	void __iomem *mscon;
-	unsigned int gpio_bank_num;
+	unsigned int gpio_pin_num;
 	struct horizon_pin *pin_regs;
 	unsigned int group_index;
 	struct mutex mutex; /* mutex */
+	unsigned int *mux_val;
+	const __be32 *phandle;
+	struct dwapb_gpio *gpio[];
 };
 
 extern const struct pinmux_ops horizon_pmx_ops;
