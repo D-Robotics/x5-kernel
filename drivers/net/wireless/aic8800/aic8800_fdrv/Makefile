@@ -303,7 +303,6 @@ ccflags-$(CONFIG_ONE_TXQ)  += -DCONFIG_ONE_TXQ
 ccflags-$(CONFIG_TX_NETIF_FLOWCTRL) += -DCONFIG_TX_NETIF_FLOWCTRL
 
 ccflags-y += -DAIC_TRACE_INCLUDE_PATH=$(src)
-MAKEFLAGS +=-j$(shell nproc)
 
 ########## Platform support list ##########
 CONFIG_PLATFORM_ROCKCHIP ?= n

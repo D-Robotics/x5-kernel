@@ -6,8 +6,6 @@ obj-$(CONFIG_AIC8800_BTLPM_SUPPORT) += aic8800_btlpm/
 obj-$(CONFIG_AIC8800_WLAN_SUPPORT) += aic8800_fdrv/
 obj-$(CONFIG_AIC_WLAN_SUPPORT) += aic8800_bsp/
 
-MAKEFLAGS +=-j$(shell nproc)
-
 ########## config option ##########
 export CONFIG_USE_FW_REQUEST = n
 export CONFIG_PREALLOC_RX_SKB = n
