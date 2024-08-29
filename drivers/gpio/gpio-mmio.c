@@ -566,22 +566,10 @@ static int bgpio_setup_direction(struct gpio_chip *gc,
 static int bgpio_request(struct gpio_chip *chip, unsigned gpio_pin)
 {
 	if (gpio_pin < chip->ngpio)
-#ifdef CONFIG_ARCH_HOBOT_X5
-		return pinctrl_gpio_request(chip->base + gpio_pin);
-#else
 		return 0;
-#endif
 
 	return -EINVAL;
 }
-
-#ifdef CONFIG_ARCH_HOBOT_X5
-static void bgpio_free(struct gpio_chip *chip, unsigned gpio_pin)
-{
-	if (gpio_pin < chip->ngpio)
-		pinctrl_gpio_free(chip->base + gpio_pin);
-}
-#endif
 
 /**
  * bgpio_init() - Initialize generic GPIO accessor functions
@@ -630,9 +618,6 @@ int bgpio_init(struct gpio_chip *gc, struct device *dev,
 	gc->base = -1;
 	gc->ngpio = gc->bgpio_bits;
 	gc->request = bgpio_request;
-#ifdef CONFIG_ARCH_HOBOT_X5
-	gc->free = bgpio_free;
-#endif
 	gc->be_bits = !!(flags & BGPIOF_BIG_ENDIAN);
 
 	ret = bgpio_setup_io(gc, dat, set, clr, flags);
