@@ -565,19 +565,9 @@ static int pinmux_functions_show(struct seq_file *s, void *what)
 			continue;
 		}
 
-#ifndef CONFIG_ARCH_HOBOT_X5
 		seq_printf(s, "function %d: %s, groups = [ ", func_selector, func);
 		for (i = 0; i < num_groups; i++)
 			seq_printf(s, "%s ", groups[i]);
-#else
-		seq_printf(s, "function %d: %s\ngroups = [ ", func_selector, func);
-		for (i = 0; i < num_groups; i++) {
-			seq_printf(s, "%s ", groups[i]);
-			if(!(i % 6) && i != 0) {
-				seq_puts(s, "\n           ");
-			}
-		}
-#endif
 		seq_puts(s, "]\n");
 
 		func_selector++;

@@ -616,13 +616,8 @@ static struct dwapb_platform_data *dwapb_gpio_get_pdata(struct device *dev)
 
 		pp->gpio_base	= -1;
 
-		/* FIXME: Properly align GPIO base with pinctrl pins instead of
-		 * hardcode them in dtsi.
-		 */
-#if !IS_ENABLED(CONFIG_ARCH_HOBOT_X5)
 		/* For internal use only, new platforms mustn't exercise this */
 		if (is_software_node(fwnode))
-#endif
 			fwnode_property_read_u32(fwnode, "gpio-base", &pp->gpio_base);
 
 		/*
