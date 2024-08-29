@@ -509,6 +509,11 @@ static const struct snd_soc_dai_ops dw_i2s_dai_ops = {
 static int dw_i2s_runtime_suspend(struct device *dev)
 {
 	struct dw_i2s_dev *dw_dev = dev_get_drvdata(dev);
+	uint32_t tvalue = i2s_read_reg(dw_dev->i2s_base, ITER);
+	uint32_t rvalue = i2s_read_reg(dw_dev->i2s_base, IRER);
+
+	if (tvalue != 0 || rvalue != 0)
+		return -EBUSY;
 
 	if (dw_dev->capability & DW_I2S_MASTER) {
 		clk_disable(dw_dev->sclk);
@@ -522,7 +527,7 @@ static int dw_i2s_runtime_resume(struct device *dev)
 	int ret;
 
 	if (dw_dev->capability & DW_I2S_MASTER) {
-		ret = clk_prepare_enable(dw_dev->sclk);
+		ret = clk_enable(dw_dev->sclk);
 		if (ret)
 			return ret;
 	}
@@ -901,6 +906,11 @@ static int dw_i2s_probe(struct platform_device *pdev)
 		}
 
 		ret = clk_prepare_enable(dev->mclk);
+		if (ret) {
+			return ret;
+		}
+
+		ret = clk_prepare_enable(dev->sclk);
 		if (ret) {
 			return ret;
 		}
