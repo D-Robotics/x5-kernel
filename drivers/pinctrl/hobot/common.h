@@ -4,12 +4,10 @@
  * Copyright(C) 2024, D-Robotics Co., Ltd. All rights reserved
  */
 
-#ifndef __DRIVERS_PINCTRL_HORIZON_H
-#define __DRIVERS_PINCTRL_HORIZON_H
+#ifndef __DRIVERS_PINCTRL_HORIZON_COMMON_H
+#define __DRIVERS_PINCTRL_HORIZON_COMMON_H
 
-#include <linux/types.h>
 #include <dt-bindings/pinctrl/horizon-pinfunc.h>
-#include <linux/pinctrl/pinconf-generic.h>
 #include <linux/pinctrl/pinmux.h>
 
 /* horizon pin description */
@@ -92,12 +90,12 @@ struct horizon_pinctrl {
 
 extern const struct pinmux_ops horizon_pmx_ops;
 extern const struct dev_pm_ops horizon_pinctrl_pm_ops;
+extern const struct pinconf_ops horizon_pinconf_ops;
 
-int horizon_pinconf_get(struct pinctrl_dev *pctldev, unsigned int pin, unsigned long *config,
-			const struct horizon_pinctrl *info);
+int horizon_pinconf_get(struct pinctrl_dev *pctldev, unsigned int pin, unsigned long *config);
 int horizon_pinconf_set(struct pinctrl_dev *pctldev, unsigned int pin, unsigned long *configs,
-			unsigned int num_configs, const struct horizon_pinctrl *info);
-int horizon_pinctrl_probe(struct platform_device *pdev, const struct horizon_pinctrl *info,
+			unsigned int num_configs);
+int horizon_pinctrl_probe(struct platform_device *pdev, struct horizon_pinctrl *info,
 			  const struct pinconf_ops *ops);
 
-#endif /* __DRIVERS_PINCTRL_HORIZON_H */
+#endif /* __DRIVERS_PINCTRL_HORIZON_COMMON_H */

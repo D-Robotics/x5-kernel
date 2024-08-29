@@ -215,19 +215,19 @@ static const struct horizon_pin_desc horizon_dsp_pins_desc[] = {
 	     DS_DSP_SPI6_SCLK, PE_DSP_SPI6_SCLK, PS_DSP_SPI6_SCLK, PU_DSP_SPI6_SCLK,
 	     INVALID_PULL_BIT, ST_DSP_SPI6_SCLK, INVALID_MS_BIT, SOC_1V8),
 };
-static const struct horizon_pinctrl horizon_dsp_pinctrl_info = {
+static struct horizon_pinctrl horizon_dsp_pinctrl_info = {
 	.pins  = horizon_dsp_pins_desc,
 	.npins = ARRAY_SIZE(horizon_dsp_pins_desc),
 };
 static inline int horizon_dsp_pinconf_get(struct pinctrl_dev *pctldev, unsigned int pin,
 					  unsigned long *config)
 {
-	return horizon_pinconf_get(pctldev, pin, config, &horizon_dsp_pinctrl_info);
+	return horizon_pinconf_get(pctldev, pin, config);
 }
 static inline int horizon_dsp_pinconf_set(struct pinctrl_dev *pctldev, unsigned int pin,
 					  unsigned long *configs, unsigned int num_configs)
 {
-	return horizon_pinconf_set(pctldev, pin, configs, num_configs, &horizon_dsp_pinctrl_info);
+	return horizon_pinconf_set(pctldev, pin, configs, num_configs);
 }
 static const struct pinconf_ops horizon_dsp_pinconf_ops = {
 	.is_generic	= true,
@@ -243,8 +243,10 @@ static const struct of_device_id horizon_dsp_pinctrl_of_match[] = {
 		.compatible = "d-robotics,horizon-dsp-iomuxc",
 		.data	    = &horizon_dsp_pinctrl_info,
 	},
-	{}};
+	{/* sentinel */},
+};
 MODULE_DEVICE_TABLE(of, horizon_dsp_pinctrl_of_match);
+
 static struct platform_driver horizon_dsp_pinctrl_driver = {
 	.probe = horizon_dsp_pinctrl_probe,
 	.driver =

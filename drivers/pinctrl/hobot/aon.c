@@ -65,7 +65,7 @@ static const struct horizon_pin_desc horizon_aon_pins_desc[] = {
 	_PIN(AON_XTAL_24M,  "aon_xtal_24m", AON_PINCTRL_5, INVALID_REG_DOMAIN, DS_AON_1,INVALID_PULL_BIT, INVALID_PULL_BIT, INVALID_PULL_BIT, INVALID_PULL_BIT, INVALID_PULL_BIT, INVALID_MS_BIT, AON_1V8),
 };
 
-static const struct horizon_pinctrl horizon_aon_pinctrl_info = {
+static struct horizon_pinctrl horizon_aon_pinctrl_info = {
 	.pins = horizon_aon_pins_desc,
 	.npins = ARRAY_SIZE(horizon_aon_pins_desc),
 };
@@ -73,14 +73,14 @@ static const struct horizon_pinctrl horizon_aon_pinctrl_info = {
 static inline int horizon_aon_pinconf_get(struct pinctrl_dev *pctldev,
 			  unsigned int pin, unsigned long *config)
 {
-	return horizon_pinconf_get(pctldev, pin, config, &horizon_aon_pinctrl_info);
+	return horizon_pinconf_get(pctldev, pin, config);
 }
 
 static inline int horizon_aon_pinconf_set(struct pinctrl_dev *pctldev,
 			  unsigned int pin, unsigned long *configs,
 			   unsigned int num_configs)
 {
-	return horizon_pinconf_set(pctldev, pin, configs, num_configs, &horizon_aon_pinctrl_info);
+	return horizon_pinconf_set(pctldev, pin, configs, num_configs);
 }
 
 static const struct pinconf_ops horizon_aon_pinconf_ops = {
@@ -98,7 +98,7 @@ static const struct of_device_id horizon_aon_pinctrl_of_match[] = {
 	{
 		.compatible = "d-robotics,x5-aon-iomuxc",
 		.data = &horizon_aon_pinctrl_info, },
-	{ }
+	{/* Sentinel */},
 };
 MODULE_DEVICE_TABLE(of, horizon_aon_pinctrl_of_match);
 

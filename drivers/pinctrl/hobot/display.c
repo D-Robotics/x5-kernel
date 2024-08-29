@@ -96,32 +96,14 @@ static const struct horizon_pin_desc horizon_disp_pins_desc[] = {
 	     PU_DISP_BT1120, PD_DISP_BT1120, ST_DISP_BT1120, MS_DISP_BT1120_DATA12_15_CLK, SOC_1V8_3V3),
 };
 
-static const struct horizon_pinctrl horizon_disp_pinctrl_info = {
+static struct horizon_pinctrl horizon_disp_pinctrl_info = {
 	.pins  = horizon_disp_pins_desc,
 	.npins = ARRAY_SIZE(horizon_disp_pins_desc),
 };
 
-static inline int horizon_disp_pinconf_get(struct pinctrl_dev *pctldev, unsigned int pin,
-					   unsigned long *config)
-{
-	return horizon_pinconf_get(pctldev, pin, config, &horizon_disp_pinctrl_info);
-}
-
-static inline int horizon_disp_pinconf_set(struct pinctrl_dev *pctldev, unsigned int pin,
-					   unsigned long *configs, unsigned int num_configs)
-{
-	return horizon_pinconf_set(pctldev, pin, configs, num_configs, &horizon_disp_pinctrl_info);
-}
-
-static const struct pinconf_ops horizon_disp_pinconf_ops = {
-	.is_generic	= true,
-	.pin_config_get = horizon_disp_pinconf_get,
-	.pin_config_set = horizon_disp_pinconf_set,
-};
-
 static inline int horizon_disp_pinctrl_probe(struct platform_device *pdev)
 {
-	return horizon_pinctrl_probe(pdev, &horizon_disp_pinctrl_info, &horizon_disp_pinconf_ops);
+	return horizon_pinctrl_probe(pdev, &horizon_disp_pinctrl_info, &horizon_pinconf_ops);
 }
 
 static const struct of_device_id horizon_disp_pinctrl_of_match[] = {
@@ -129,9 +111,10 @@ static const struct of_device_id horizon_disp_pinctrl_of_match[] = {
 		.compatible = "d-robotics,x5-disp-iomuxc",
 		.data	    = &horizon_disp_pinctrl_info,
 	},
-	{}};
-
+	{/* sentinel */},
+};
 MODULE_DEVICE_TABLE(of, horizon_disp_pinctrl_of_match);
+
 static struct platform_driver horizon_disp_pinctrl_driver = {
 	.probe = horizon_disp_pinctrl_probe,
 	.driver =
@@ -145,7 +128,7 @@ static int __init horizon_disp_pinctrl_init(void)
 {
 	return platform_driver_register(&horizon_disp_pinctrl_driver);
 }
-
 arch_initcall(horizon_disp_pinctrl_init);
+
 MODULE_DESCRIPTION("Horizon disp pinctrl driver");
 MODULE_LICENSE("GPL v2");

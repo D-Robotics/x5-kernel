@@ -403,32 +403,14 @@ static const struct horizon_pin_desc horizon_hsio_pins_desc[] = {
 	     ST_HSIO_EMMC_CMD, MS_HSIO_EMMC, SOC_1V8_3V3),
 };
 
-static const struct horizon_pinctrl horizon_hsio_pinctrl_info = {
+static struct horizon_pinctrl horizon_hsio_pinctrl_info = {
 	.pins  = horizon_hsio_pins_desc,
 	.npins = ARRAY_SIZE(horizon_hsio_pins_desc),
 };
 
-static inline int horizon_hsio_pinconf_get(struct pinctrl_dev *pctldev, unsigned int pin,
-					   unsigned long *config)
-{
-	return horizon_pinconf_get(pctldev, pin, config, &horizon_hsio_pinctrl_info);
-}
-
-static inline int horizon_hsio_pinconf_set(struct pinctrl_dev *pctldev, unsigned int pin,
-					   unsigned long *configs, unsigned int num_configs)
-{
-	return horizon_pinconf_set(pctldev, pin, configs, num_configs, &horizon_hsio_pinctrl_info);
-}
-
-static const struct pinconf_ops horizon_hsio_pinconf_ops = {
-	.is_generic	= true,
-	.pin_config_get = horizon_hsio_pinconf_get,
-	.pin_config_set = horizon_hsio_pinconf_set,
-};
-
 static inline int horizon_hsio_pinctrl_probe(struct platform_device *pdev)
 {
-	return horizon_pinctrl_probe(pdev, &horizon_hsio_pinctrl_info, &horizon_hsio_pinconf_ops);
+	return horizon_pinctrl_probe(pdev, &horizon_hsio_pinctrl_info, &horizon_pinconf_ops);
 }
 
 static const struct of_device_id horizon_hsio_pinctrl_of_match[] = {
@@ -436,7 +418,8 @@ static const struct of_device_id horizon_hsio_pinctrl_of_match[] = {
 		.compatible = "d-robotics,x5-hsio-iomuxc",
 		.data	    = &horizon_hsio_pinctrl_info,
 	},
-	{}};
+	{/* sentinel */},
+};
 MODULE_DEVICE_TABLE(of, horizon_hsio_pinctrl_of_match);
 
 static struct platform_driver horizon_hsio_pinctrl_driver = {

@@ -132,22 +132,22 @@ static const struct group_desc *horizon_pinctrl_find_group_by_name(struct pinctr
 }
 
 static void horizon_pin_power_source(struct horizon_pinctrl *ipctl, unsigned int pin,
-				  unsigned int flags, const struct horizon_pinctrl *info)
+				     unsigned int flags)
 {
 	void __iomem *mode_select_regs;
 	unsigned int ms_reg_domain, ms_bits_offset = 0;
 	int i;
 	u32 val;
 
-	for (i = 0; i < info->npins; i++) {
-		if (info->pins[i].pin_id == pin) {
-			ms_reg_domain  = info->pins[i].ms_reg_domain;
-			ms_bits_offset = info->pins[i].ms_bits_offset;
+	for (i = 0; i < ipctl->npins; i++) {
+		if (ipctl->pins[i].pin_id == pin) {
+			ms_reg_domain  = ipctl->pins[i].ms_reg_domain;
+			ms_bits_offset = ipctl->pins[i].ms_bits_offset;
 			break;
 		}
 	}
 
-	if (i >= info->npins)
+	if (i >= ipctl->npins)
 		return;
 
 	if (ms_bits_offset == INVALID_MS_BIT)
@@ -177,29 +177,31 @@ static void horizon_pin_power_source(struct horizon_pinctrl *ipctl, unsigned int
 	dev_dbg(ipctl->dev, "write pin-%d ms_reg_domain val:0x%x\n", pin, val);
 }
 
-static void horizon_pin_pull_disable(struct horizon_pinctrl *ipctl, unsigned int pin,
-				     const struct horizon_pinctrl *info)
+static void horizon_pin_pull_disable(struct horizon_pinctrl *ipctl, unsigned int pin)
 {
 	void __iomem *pull_en_regs;
 	void __iomem *pull_up_regs;
 	void __iomem *pull_down_regs;
 	unsigned int val, reg_domain, pe_bits_offset, pu_bits_offset, pd_bits_offset = 0;
 	int i;
-	if (!info || !info->pins || !info->npins) {
+
+	if (!ipctl->pins || !ipctl->npins) {
 		dev_err(ipctl->dev, "wrong pinctrl info\n");
 	}
-	for (i = 0; i < info->npins; i++) {
-		if (info->pins[i].pin_id == pin) {
-			reg_domain     = info->pins[i].reg_domain;
-			pe_bits_offset = info->pins[i].pe_bits_offset;
-			pu_bits_offset = info->pins[i].pu_bits_offset;
-			pd_bits_offset = info->pins[i].pd_bits_offset;
+
+	for (i = 0; i < ipctl->npins; i++) {
+		if (ipctl->pins[i].pin_id == pin) {
+			reg_domain     = ipctl->pins[i].reg_domain;
+			pe_bits_offset = ipctl->pins[i].pe_bits_offset;
+			pu_bits_offset = ipctl->pins[i].pu_bits_offset;
+			pd_bits_offset = ipctl->pins[i].pd_bits_offset;
 			break;
 		}
 	}
 
-	if (i >= info->npins)
+	if (i >= ipctl->npins)
 		return;
+
 	if (pe_bits_offset != INVALID_PULL_BIT) {
 		pull_en_regs = ipctl->base + reg_domain;
 		mutex_lock(&ipctl->mutex);
@@ -228,8 +230,7 @@ static void horizon_pin_pull_disable(struct horizon_pinctrl *ipctl, unsigned int
 	}
 }
 
-static void horizon_pin_pull_en(struct horizon_pinctrl *ipctl, unsigned int pin, unsigned int flags,
-				const struct horizon_pinctrl *info)
+static void horizon_pin_pull_en(struct horizon_pinctrl *ipctl, unsigned int pin, unsigned int flags)
 {
 	void __iomem *pull_en_regs;
 	void __iomem *pull_select_regs;
@@ -239,18 +240,18 @@ static void horizon_pin_pull_en(struct horizon_pinctrl *ipctl, unsigned int pin,
 		pd_bits_offset = 0;
 	int i;
 
-	for (i = 0; i < info->npins; i++) {
-		if (info->pins[i].pin_id == pin) {
-			reg_domain     = info->pins[i].reg_domain;
-			pe_bits_offset = info->pins[i].pe_bits_offset;
-			ps_bits_offset = info->pins[i].ps_bits_offset;
-			pu_bits_offset = info->pins[i].pu_bits_offset;
-			pd_bits_offset = info->pins[i].pd_bits_offset;
+	for (i = 0; i < ipctl->npins; i++) {
+		if (ipctl->pins[i].pin_id == pin) {
+			reg_domain     = ipctl->pins[i].reg_domain;
+			pe_bits_offset = ipctl->pins[i].pe_bits_offset;
+			ps_bits_offset = ipctl->pins[i].ps_bits_offset;
+			pu_bits_offset = ipctl->pins[i].pu_bits_offset;
+			pd_bits_offset = ipctl->pins[i].pd_bits_offset;
 			break;
 		}
 	}
 
-	if (i >= info->npins)
+	if (i >= ipctl->npins)
 		return;
 
 	/* We have two regs(marked as domain) for horizon pins pull en setting */
@@ -271,6 +272,7 @@ static void horizon_pin_pull_en(struct horizon_pinctrl *ipctl, unsigned int pin,
 
 		writel(val, pull_select_regs);
 		mutex_unlock(&ipctl->mutex);
+
 		dev_dbg(ipctl->dev, "write pin-%d pull en reg_domain: 0x%x val:0x%x\n", pin, reg_domain, val);
 		dev_dbg(ipctl->dev, "write pin-%d pull select reg_domain: 0x%x val:0x%x\n", pin, reg_domain,
 			val);
@@ -294,30 +296,28 @@ static void horizon_pin_pull_en(struct horizon_pinctrl *ipctl, unsigned int pin,
 
 		writel(val, pull_down_regs);
 		mutex_unlock(&ipctl->mutex);
+
 		dev_dbg(ipctl->dev, "write pin-%d pull up reg_domain: 0x%x val:0x%x\n", pin, reg_domain, val);
 		dev_dbg(ipctl->dev, "write pin-%d pull down reg_domain: 0x%x val:0x%x\n", pin, reg_domain, val);
 	}
 }
 
 static void horizon_pin_schmit_en(struct horizon_pinctrl *ipctl, unsigned int pin,
-				  unsigned int flags, const struct horizon_pinctrl *info)
+				  unsigned int flags)
 {
 	void __iomem *schmit_tg_regs;
 	unsigned int val, reg_domain, st_bits_offset = 0;
 	int i;
 
-	/* We have two regs(marked as domain) for
-	 * horizon pins schmitter trigger setting
-	 */
-	for (i = 0; i < info->npins; i++) {
-		if (info->pins[i].pin_id == pin) {
-			reg_domain     = info->pins[i].reg_domain;
-			st_bits_offset = info->pins[i].st_bits_offset;
+	for (i = 0; i < ipctl->npins; i++) {
+		if (ipctl->pins[i].pin_id == pin) {
+			reg_domain     = ipctl->pins[i].reg_domain;
+			st_bits_offset = ipctl->pins[i].st_bits_offset;
 			break;
 		}
 	}
 
-	if (i >= info->npins)
+	if (i >= ipctl->npins)
 		return;
 
 	schmit_tg_regs = ipctl->base + reg_domain;
@@ -331,28 +331,26 @@ static void horizon_pin_schmit_en(struct horizon_pinctrl *ipctl, unsigned int pi
 
 	writel(val, schmit_tg_regs);
 	mutex_unlock(&ipctl->mutex);
+
 	dev_dbg(ipctl->dev, "write pin-%d schmit en reg_domain: 0x%x val:0x%x\n", pin, reg_domain, val);
 }
 
 static void horizon_pin_drv_str_set(struct horizon_pinctrl *ipctl, unsigned int pin,
-				    unsigned int arg, const struct horizon_pinctrl *info)
+				    unsigned int arg)
 {
 	void __iomem *drv_str_regs;
 	unsigned int val, reg_domain, ds_bits_offset = 0;
 	int i;
 
-	/* We have two regs(marked as domain) for
-	 * horizon pins schmitter trigger setting
-	 */
-	for (i = 0; i < info->npins; i++) {
-		if (info->pins[i].pin_id == pin) {
-			reg_domain     = info->pins[i].reg_domain;
-			ds_bits_offset = info->pins[i].ds_bits_offset;
+	for (i = 0; i < ipctl->npins; i++) {
+		if (ipctl->pins[i].pin_id == pin) {
+			reg_domain     = ipctl->pins[i].reg_domain;
+			ds_bits_offset = ipctl->pins[i].ds_bits_offset;
 			break;
 		}
 	}
 
-	if (i >= info->npins)
+	if (i >= ipctl->npins)
 		return;
 
 	drv_str_regs = ipctl->base + reg_domain;
@@ -363,6 +361,7 @@ static void horizon_pin_drv_str_set(struct horizon_pinctrl *ipctl, unsigned int 
 	val |= arg << ds_bits_offset;
 	writel(val, drv_str_regs);
 	mutex_unlock(&ipctl->mutex);
+
 	dev_dbg(ipctl->dev, "write pin-%d drv str reg_domain: 0x%x arg:%#x val:0x%x\n", pin, reg_domain, arg, val);
 }
 
@@ -401,10 +400,9 @@ static int horizon_dt_node_to_map(struct pinctrl_dev *pctldev, struct device_nod
 
 	/* create mux map */
 	parent = of_get_parent(np);
-	if (!parent) {
-		devm_kfree(ipctl->dev, new_map);
+	if (!parent)
 		return -EINVAL;
-	}
+
 	new_map[0].type		     = PIN_MAP_TYPE_MUX_GROUP;
 	new_map[0].data.mux.function = parent->name;
 	new_map[0].data.mux.group    = np->name;
@@ -430,40 +428,12 @@ static int horizon_dt_node_to_map(struct pinctrl_dev *pctldev, struct device_nod
 	return 0;
 }
 
-static void horizon_dt_free_map(struct pinctrl_dev *pctldev, struct pinctrl_map *map,
-				unsigned int num_maps)
-{
-	devm_kfree(pctldev->dev, map);
-}
-
 static const struct pinctrl_ops horizon_pctrl_ops = {
 	.get_groups_count = pinctrl_generic_get_group_count,
 	.get_group_name	  = pinctrl_generic_get_group_name,
 	.get_group_pins	  = pinctrl_generic_get_group_pins,
 	.dt_node_to_map	  = horizon_dt_node_to_map,
-	.dt_free_map	  = horizon_dt_free_map,
 };
-
-static int horizon_pinctrl_parse_gpio_group(struct horizon_pinctrl *ipctl, unsigned int gpio_group)
-{
-	struct device_node *sub_np;
-	struct platform_device *ppdev;
-	int i;
-
-	for (i = 0; i <= gpio_group; i++, ipctl->phandle++) {
-		sub_np = of_find_node_by_phandle(be32_to_cpup(ipctl->phandle));
-		if (!sub_np)
-			return -EINVAL;
-		ppdev = of_find_device_by_node(sub_np);
-		if (!ppdev)
-			return -EINVAL;
-	}
-	ipctl->gpio[gpio_group] = platform_get_drvdata(ppdev);
-	dev_dbg(&ppdev->dev, "find gpio_group: %d\n", gpio_group);
-	if (!ipctl->gpio[gpio_group])
-		return -EINVAL;
-	return 0;
-}
 
 static int horizon_pmx_set_one_pin(struct horizon_pinctrl *ipctl, struct horizon_pin *horizon_pin)
 {
@@ -560,25 +530,17 @@ static int horizon_pmx_set(struct pinctrl_dev *pctldev, unsigned int selector, u
 static int horizon_gpio_get_direction(struct pinctrl_dev *pctldev, int pin)
 {
 	struct horizon_pinctrl *ipctl = pinctrl_dev_get_drvdata(pctldev);
-	unsigned int gpio_pin, gpio_group;
-
 	struct pinctrl_gpio_range *gpio_range;
-	dev_dbg(ipctl->dev, "get pin = %d direction\n", pin);
+	unsigned int gpio_pin;
+
+	dev_dbg(ipctl->dev, "get pin-%d direction\n", pin);
+
 	gpio_range = pinctrl_find_gpio_range_from_pin_nolock(pctldev, pin);
 	if (!gpio_range) {
-		dev_err(ipctl->dev, "pin = %d can not find corresponding gpio id\n", pin);
+		dev_err(ipctl->dev, "pin-%d can not find corresponding gpio id\n", pin);
 		return -ENOTSUPP;
 	}
 	gpio_pin = pin - gpio_range->pin_base;
-	if (ipctl->gpio_pin_num > 1)
-		gpio_group = (gpio_range->npins >= 31) ? 0 : 1;
-	else
-		gpio_group = 0;
-	dev_dbg(ipctl->dev, "map pin%d to gpio[%d] - %d\n", pin, gpio_group, gpio_pin);
-
-	if (!ipctl->gpio[gpio_group]) {
-		horizon_pinctrl_parse_gpio_group(ipctl, gpio_group);
-	}
 
 	return gpiod_get_direction(gpiochip_get_desc(gpio_range->gc, gpio_pin));
 }
@@ -587,24 +549,18 @@ static int horizon_gpio_set_direction(struct pinctrl_dev *pctldev, int pin, bool
 				      int output_val)
 {
 	struct horizon_pinctrl *ipctl = pinctrl_dev_get_drvdata(pctldev);
-	unsigned int gpio_pin, gpio_group;
-
 	struct pinctrl_gpio_range *gpio_range;
-	dev_info(ipctl->dev, "set pin = %d direction to %s\n", pin, input ? "input" : "output");
+	unsigned int gpio_pin;
+
+	dev_dbg(ipctl->dev, "set pin-%d direction to %s\n", pin, input ? "input" : "output");
+
 	gpio_range = pinctrl_find_gpio_range_from_pin_nolock(pctldev, pin);
 	if (!gpio_range) {
-		dev_err(ipctl->dev, "pin = %d can not find corresponding gpio id\n", pin);
+		dev_err(ipctl->dev, "pin-%d can not find corresponding gpio id\n", pin);
 		return -ENOTSUPP;
 	}
 	gpio_pin = pin - gpio_range->pin_base;
-	if (ipctl->gpio_pin_num > 1)
-		gpio_group = (gpio_range->npins >= 31) ? 0 : 1;
-	else
-		gpio_group = 0;
-	dev_dbg(ipctl->dev, "map pin%d to gpio[%d] - %d\n", pin, gpio_group, gpio_pin);
-	if (!ipctl->gpio[gpio_group]) {
-		horizon_pinctrl_parse_gpio_group(ipctl, gpio_group);
-	}
+
 	if (input)
 		return gpiod_direction_input(gpiochip_get_desc(gpio_range->gc, gpio_pin));
 	else
@@ -621,25 +577,17 @@ static int horizon_gpio_set_direction_ops(struct pinctrl_dev *pctldev,
 static int horizon_gpio_get_level(struct pinctrl_dev *pctldev, int pin)
 {
 	struct horizon_pinctrl *ipctl = pinctrl_dev_get_drvdata(pctldev);
-	unsigned int gpio_pin, gpio_group;
-
 	struct pinctrl_gpio_range *gpio_range;
-	dev_dbg(ipctl->dev, "get pin = %d level\n", pin);
+	unsigned int gpio_pin;
+
+	dev_dbg(ipctl->dev, "get pin-%d level\n", pin);
+
 	gpio_range = pinctrl_find_gpio_range_from_pin_nolock(pctldev, pin);
 	if (!gpio_range) {
-		dev_err(ipctl->dev, "pin = %d can not find corresponding gpio id\n", pin);
+		dev_err(ipctl->dev, "pin-%d can not find corresponding gpio id\n", pin);
 		return -ENOTSUPP;
 	}
 	gpio_pin = pin - gpio_range->pin_base;
-	if (ipctl->gpio_pin_num > 1)
-		gpio_group = (gpio_range->npins >= 31) ? 0 : 1;
-	else
-		gpio_group = 0;
-	dev_dbg(ipctl->dev, "map pin%d to gpio[%d] - %d\n", pin, gpio_group, gpio_pin);
-
-	if (!ipctl->gpio[gpio_group]) {
-		horizon_pinctrl_parse_gpio_group(ipctl, gpio_group);
-	}
 
 	return gpiod_get_value(gpiochip_get_desc(gpio_range->gc, gpio_pin));
 }
@@ -661,6 +609,7 @@ static struct horizon_pin *horizon_parse_gpio_pin(struct pinctrl_dev *pctldev,
 	dev_dbg(ipctl->dev, "gpio request gpio pin %d\n", pin);
 	pin_num = pin;
 	ngroups = pctldev->num_groups;
+
 	while (selector < ngroups) {
 		grp = radix_tree_lookup(&pctldev->pin_group_tree, selector);
 		if (strstr(grp->name, "gpio") != NULL) {
@@ -687,7 +636,8 @@ static int horizon_gpio_request_enable(struct pinctrl_dev *pctldev,
 {
 	struct horizon_pin *horizon_pin;
 	struct horizon_pinctrl *ipctl = pinctrl_dev_get_drvdata(pctldev);
-	horizon_pin		      = horizon_parse_gpio_pin(pctldev, range, pin);
+
+	horizon_pin = horizon_parse_gpio_pin(pctldev, range, pin);
 	return horizon_pmx_set_one_pin(ipctl, horizon_pin);
 }
 
@@ -696,7 +646,8 @@ static void horizon_gpio_disable_free(struct pinctrl_dev *pctldev, struct pinctr
 {
 	struct horizon_pin *horizon_pin;
 	struct horizon_pinctrl *ipctl = pinctrl_dev_get_drvdata(pctldev);
-	horizon_pin		      = horizon_parse_gpio_pin(pctldev, range, pin);
+
+	horizon_pin = horizon_parse_gpio_pin(pctldev, range, pin);
 	dev_dbg(ipctl->dev, "horizon pinctrl free gpio request and restore pin func\n");
 	horizon_pmx_restore_one_pin(ipctl, horizon_pin);
 }
@@ -716,8 +667,7 @@ const struct pinmux_ops horizon_pmx_ops = {
 	.gpio_set_direction  = horizon_gpio_set_direction_ops,
 };
 
-int horizon_pinconf_get(struct pinctrl_dev *pctldev, unsigned int pin, unsigned long *config,
-			const struct horizon_pinctrl *info)
+int horizon_pinconf_get(struct pinctrl_dev *pctldev, unsigned int pin, unsigned long *config)
 {
 	/* Get the pin config settings for a specific pin */
 	struct horizon_pinctrl *ipctl = pinctrl_dev_get_drvdata(pctldev);
@@ -733,28 +683,26 @@ int horizon_pinconf_get(struct pinctrl_dev *pctldev, unsigned int pin, unsigned 
 	bool level;
 	int i;
 
-	if (!info || !info->pins || !info->npins) {
+	if (!ipctl->pins || !ipctl->npins) {
 		dev_err(ipctl->dev, "wrong pinctrl info\n");
 		return -EINVAL;
 	}
-	/* We have two regs(marked as domain) for
-	 * horizon pins schmitter trigger setting
-	 */
-	for (i = 0; i < info->npins; i++) {
-		if (info->pins[i].pin_id == pin) {
-			reg_domain     = info->pins[i].reg_domain;
-			ds_bits_offset = info->pins[i].ds_bits_offset;
-			pe_bits_offset = info->pins[i].pe_bits_offset;
-			ps_bits_offset = info->pins[i].ps_bits_offset;
-			pu_bits_offset = info->pins[i].pu_bits_offset;
-			pd_bits_offset = info->pins[i].pd_bits_offset;
-			st_bits_offset = info->pins[i].st_bits_offset;
-			cell_type      = info->pins[i].cell_type;
+
+	for (i = 0; i < ipctl->npins; i++) {
+		if (ipctl->pins[i].pin_id == pin) {
+			reg_domain     = ipctl->pins[i].reg_domain;
+			ds_bits_offset = ipctl->pins[i].ds_bits_offset;
+			pe_bits_offset = ipctl->pins[i].pe_bits_offset;
+			ps_bits_offset = ipctl->pins[i].ps_bits_offset;
+			pu_bits_offset = ipctl->pins[i].pu_bits_offset;
+			pd_bits_offset = ipctl->pins[i].pd_bits_offset;
+			st_bits_offset = ipctl->pins[i].st_bits_offset;
+			cell_type      = ipctl->pins[i].cell_type;
 			break;
 		}
 	}
 
-	if (i >= info->npins)
+	if (i >= ipctl->npins)
 		return -ENOTSUPP;
 
 	pull_en_regs	 = ipctl->base + reg_domain;
@@ -843,7 +791,7 @@ int horizon_pinconf_get(struct pinctrl_dev *pctldev, unsigned int pin, unsigned 
 }
 
 int horizon_pinconf_set(struct pinctrl_dev *pctldev, unsigned int pin, unsigned long *configs,
-			unsigned int num_configs, const struct horizon_pinctrl *info)
+			unsigned int num_configs)
 {
 	struct horizon_pinctrl *ipctl = pinctrl_dev_get_drvdata(pctldev);
 	unsigned int arg;
@@ -862,25 +810,25 @@ int horizon_pinconf_set(struct pinctrl_dev *pctldev, unsigned int pin, unsigned 
 
 		switch (param) {
 		case PIN_CONFIG_POWER_SOURCE:
-			horizon_pin_power_source(ipctl, pin, arg, info);
+			horizon_pin_power_source(ipctl, pin, arg);
 			break;
 		case PIN_CONFIG_BIAS_DISABLE:
-			horizon_pin_pull_disable(ipctl, pin, info);
+			horizon_pin_pull_disable(ipctl, pin);
 			break;
 		case PIN_CONFIG_DRIVE_OPEN_DRAIN:
 			/* horizon do not support those configs */
 			break;
 		case PIN_CONFIG_BIAS_PULL_UP:
-			horizon_pin_pull_en(ipctl, pin, HORIZON_PULL_UP, info);
+			horizon_pin_pull_en(ipctl, pin, HORIZON_PULL_UP);
 			break;
 		case PIN_CONFIG_BIAS_PULL_DOWN:
-			horizon_pin_pull_en(ipctl, pin, HORIZON_PULL_DOWN, info);
+			horizon_pin_pull_en(ipctl, pin, HORIZON_PULL_DOWN);
 			break;
 		case PIN_CONFIG_INPUT_SCHMITT_ENABLE:
-			horizon_pin_schmit_en(ipctl, pin, arg, info);
+			horizon_pin_schmit_en(ipctl, pin, arg);
 			break;
 		case PIN_CONFIG_DRIVE_STRENGTH:
-			horizon_pin_drv_str_set(ipctl, pin, arg, info);
+			horizon_pin_drv_str_set(ipctl, pin, arg);
 			break;
 		case PIN_CONFIG_OUTPUT:
 			ret = horizon_gpio_set_direction(pctldev, pin, false, arg);
@@ -897,6 +845,12 @@ int horizon_pinconf_set(struct pinctrl_dev *pctldev, unsigned int pin, unsigned 
 
 	return ret;
 }
+
+const struct pinconf_ops horizon_pinconf_ops = {
+	.is_generic	= true,
+	.pin_config_get = horizon_pinconf_get,
+	.pin_config_set = horizon_pinconf_set,
+};
 
 static void horizon_pinctrl_parse_pin(struct horizon_pinctrl *ipctl, unsigned int *pin,
 				      struct horizon_pin *horizon_pin, const __be32 **list_p,
@@ -1130,7 +1084,6 @@ static int horizon_pinctrl_probe_dt(struct platform_device *pdev, struct horizon
 
 /*
  * horizon_free_resources() - free memory used by this driver
- * @info: info driver instance
  */
 static inline void horizon_free_resources(struct horizon_pinctrl *ipctl)
 {
@@ -1138,7 +1091,7 @@ static inline void horizon_free_resources(struct horizon_pinctrl *ipctl)
 		pinctrl_unregister(ipctl->pctl);
 }
 
-int horizon_pinctrl_probe(struct platform_device *pdev, const struct horizon_pinctrl *info,
+int horizon_pinctrl_probe(struct platform_device *pdev, struct horizon_pinctrl *info,
 			  const struct pinconf_ops *ops)
 {
 	struct pinctrl_desc *horizon_pinctrl_desc;
@@ -1148,9 +1101,7 @@ int horizon_pinctrl_probe(struct platform_device *pdev, const struct horizon_pin
 	int ret, i;
 
 	/* Create device for this driver */
-	ipctl = devm_kzalloc(&pdev->dev, sizeof(*ipctl), GFP_KERNEL);
-	if (!ipctl)
-		return -ENOMEM;
+	ipctl = info;
 
 	ipctl->base = devm_platform_ioremap_resource(pdev, 0);
 	if (IS_ERR(ipctl->base))
@@ -1162,21 +1113,20 @@ int horizon_pinctrl_probe(struct platform_device *pdev, const struct horizon_pin
 	/* parse horizon gpio bank */
 	ret = horizon_pinctrl_parse_gpio_bank(pdev, ipctl);
 
-	ipctl->npins = info->npins;
 
 	pin_desc = devm_kzalloc(&pdev->dev, ipctl->npins * sizeof(*pin_desc), GFP_KERNEL);
 	if (!pin_desc)
 		return -ENOMEM;
 
 	ipctl->mux_val =
-		devm_kmalloc_array(&pdev->dev, ipctl->npins, sizeof(unsigned int), GFP_KERNEL);
+		devm_kzalloc(&pdev->dev, ipctl->npins * sizeof(*ipctl->mux_val), GFP_KERNEL);
 	if (!ipctl->mux_val)
 		return -ENOMEM;
 
 	/* Get pinctrl pin desc from horizon pin desc */
-	for (i = 0; i < info->npins; i++) {
-		pin_desc[i].number = info->pins[i].pin_id;
-		pin_desc[i].name   = info->pins[i].name;
+	for (i = 0; i < ipctl->npins; i++) {
+		pin_desc[i].number = ipctl->pins[i].pin_id;
+		pin_desc[i].name   = ipctl->pins[i].name;
 	}
 
 	horizon_pinctrl_desc = devm_kzalloc(&pdev->dev, sizeof(*horizon_pinctrl_desc), GFP_KERNEL);
@@ -1186,7 +1136,7 @@ int horizon_pinctrl_probe(struct platform_device *pdev, const struct horizon_pin
 	/* Initial a pinctrl description device */
 	horizon_pinctrl_desc->name    = dev_name(&pdev->dev);
 	horizon_pinctrl_desc->pins    = pin_desc;
-	horizon_pinctrl_desc->npins   = info->npins;
+	horizon_pinctrl_desc->npins   = ipctl->npins;
 	horizon_pinctrl_desc->pctlops = &horizon_pctrl_ops;
 	horizon_pinctrl_desc->pmxops  = &horizon_pmx_ops;
 	horizon_pinctrl_desc->confops = ops;
