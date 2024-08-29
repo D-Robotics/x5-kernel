@@ -580,7 +580,7 @@ static int horizon_gpio_get_direction(struct pinctrl_dev *pctldev, int pin)
 		horizon_pinctrl_parse_gpio_group(ipctl, gpio_group);
 	}
 
-	return gpiod_get_direction(gpio_to_desc(gpio_pin));
+	return gpiod_get_direction(gpio_to_desc(pin));
 }
 
 static int horizon_gpio_set_direction(struct pinctrl_dev *pctldev, int pin, bool input,
@@ -606,9 +606,9 @@ static int horizon_gpio_set_direction(struct pinctrl_dev *pctldev, int pin, bool
 		horizon_pinctrl_parse_gpio_group(ipctl, gpio_group);
 	}
 	if (input)
-		return gpiod_direction_input(gpio_to_desc(gpio_pin));
+		return gpiod_direction_input(gpio_to_desc(pin));
 	else
-		return gpiod_direction_output(gpio_to_desc(gpio_pin), output_val);
+		return gpiod_direction_output(gpio_to_desc(pin), output_val);
 }
 
 static int horizon_gpio_set_direction_ops(struct pinctrl_dev *pctldev,
@@ -641,7 +641,7 @@ static int horizon_gpio_get_level(struct pinctrl_dev *pctldev, int pin)
 		horizon_pinctrl_parse_gpio_group(ipctl, gpio_group);
 	}
 
-	return gpiod_get_value(gpio_to_desc(gpio_pin));
+	return gpiod_get_value(gpio_to_desc(pin));
 }
 
 static struct horizon_pin *horizon_parse_gpio_pin(struct pinctrl_dev *pctldev,
