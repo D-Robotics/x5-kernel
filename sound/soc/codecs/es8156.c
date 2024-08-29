@@ -283,6 +283,7 @@ static int es8156_set_bias_level(struct snd_soc_component *codec,
 	switch (level)
 	{
 		case SND_SOC_BIAS_ON:
+			snd_soc_component_write(codec,  ES8156_VOLUME_CONTROL_REG14, 0xbf);
 			break;
 
 		case SND_SOC_BIAS_PREPARE:
@@ -438,6 +439,7 @@ static int es8156_suspend(struct snd_soc_component *codec)
 
 static int es8156_resume(struct snd_soc_component *codec)
 {
+	es8156_set_bias_level(codec, SND_SOC_BIAS_ON);
 	return 0;
 }
 
