@@ -46,8 +46,7 @@ static int horizon_efuse_read(void *context, unsigned int offset,
 {
 	struct horizon_efuse_chip *efuse = context;
 	u8 *out_value, *read_ptr;
-	u32 read_value;
-	int ret = 0;
+	int ret = 0, i = 0;
 	ret = clk_prepare_enable(efuse->clk);
 	if (ret < 0) {
 		dev_err(efuse->dev, "failed to prepare/enable efuse clk\n");
@@ -57,14 +56,9 @@ static int horizon_efuse_read(void *context, unsigned int offset,
 	if (IS_ERR_OR_NULL(out_value))
 		return -ENOMEM;
 
-	read_value = readl(efuse->base + offset);
-	read_value &= ~BANK_MASK;
-	writel(read_value, efuse->base + offset);
 	read_ptr = out_value;
-	while (bytes) {
-		*read_ptr = readb(efuse->base + offset);
-		read_ptr++;
-		bytes--;
+	for (i = 0; i < bytes; i++) {
+		*(out_value + i) = readb(efuse->base + offset + i);
 	}
 	memcpy(val, out_value, bytes);
 	kfree(out_value);
