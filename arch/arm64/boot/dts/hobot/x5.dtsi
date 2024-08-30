@@ -4077,6 +4077,8 @@
 				guc,passwd = <12345678>;
 				#address-cells = <1>;
 				#size-cells = <0>;
+				guc,sample-rate=<300000>;
+				guc,scan;
 				resets = <&socrst LSIO_ADC_RESET>;
 				reset-names = "guc-adc";
 			};
