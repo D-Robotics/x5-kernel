@@ -392,6 +392,7 @@
 /* SD Card */
 &sdio_0 {
 	status = "okay";
+	cd-inverted;
 
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_sd &hsio_gpio0_26 &hsio_gpio1_1>;
