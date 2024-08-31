@@ -884,7 +884,7 @@ the following ports need to be deleted*/
 };
 
 &gmac_tsn {
-	status = "okay";
+	status = "disabled";
 
 	phy-mode = "rgmii-id";
 	pinctrl-names = "default";
