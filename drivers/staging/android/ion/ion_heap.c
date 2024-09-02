@@ -24,6 +24,7 @@
 #include <linux/scatterlist.h>
 #include <linux/vmalloc.h>
 #include <linux/ion.h>
+#include <asm/cacheflush.h>
 
 #define HOBOT_ION_MAX_BLOCK		2
 
@@ -213,6 +214,7 @@ int ion_heap_buffer_zero_ex(struct sg_table * table, unsigned long flags)
 			if (addr == NULL)
 				return -ENOMEM;
 			(void)memset(addr, 0, PAGE_SIZE * (uint32_t)p);
+			dcache_clean_inval_poc((uint64_t)addr, (uint64_t)(addr + (PAGE_SIZE * (uint32_t)p)));
 			vunmap(addr);
 			p = 0;
 		}
@@ -222,6 +224,7 @@ int ion_heap_buffer_zero_ex(struct sg_table * table, unsigned long flags)
 		if (addr == NULL)
 			return -ENOMEM;
 		(void)memset(addr, 0, PAGE_SIZE * (uint32_t)p);
+		dcache_clean_inval_poc((uint64_t)addr, (uint64_t)(addr + (PAGE_SIZE * (uint32_t)p)));
 		vunmap(addr);
 	}
 
