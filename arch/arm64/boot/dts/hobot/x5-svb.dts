@@ -231,6 +231,34 @@
 	};
 };
 
+&csi2 {
+	status = "okay";
+
+	ports {
+		port@0 {
+			x5_mipi_csi2_from_ov5640: endpoint {
+				remote-endpoint = <&ov5640_to_mipi_csi2>;
+				clock-lanes = <0>;
+				data-lanes = <1 2>;
+			};
+		};
+	};
+};
+
+&csi3 {
+	status = "okay";
+
+	ports {
+		port@0 {
+			x5_mipi_csi3_from_ov5640: endpoint {
+				remote-endpoint = <&ov5640_to_mipi_csi3>;
+				clock-lanes = <0>;
+				data-lanes = <1 2>;
+			};
+		};
+	};
+};
+
 &i2c0 {
 	status = "okay";
 	pinctrl-names = "default";
@@ -250,7 +278,7 @@
 		powerdown-gpios = <&aon_gpio_porta 0 GPIO_ACTIVE_HIGH>;
 		reset-gpios = <&aon_gpio_porta 1 GPIO_ACTIVE_LOW>;
 		reg = <0x3c>;
-		clocks = <&hpsclks X5_LSIO_SENSOR0_CLK>;
+		clocks = <&hpsclks X5_LSIO_SENSOR2_CLK>;
 		clock-names = "xclk";
 		rotation = <0>;
 
@@ -304,7 +332,7 @@
 		powerdown-gpios = <&aon_gpio_porta 2 GPIO_ACTIVE_HIGH>;
 		reset-gpios = <&aon_gpio_porta 5 GPIO_ACTIVE_LOW>;
 		reg = <0x3c>;
-		clocks = <&hpsclks X5_LSIO_SENSOR1_CLK>;
+		clocks = <&hpsclks X5_LSIO_SENSOR3_CLK>;
 		clock-names = "xclk";
 		rotation = <0>;
 		port {
@@ -502,6 +530,27 @@
 	status = "okay";
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_i2c3>;
+
+	ov5640_sensor3: camera@3c {
+		compatible = "ovti,ov5640";
+		pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_sensor1_mclk &lsio_gpio0_22 &lsio_gpio0_23>;
+		powerdown-gpios = <&ls_gpio0_porta 22 GPIO_ACTIVE_HIGH>;
+		reset-gpios = <&ls_gpio0_porta 23 GPIO_ACTIVE_LOW>;
+		reg = <0x3c>;
+		clocks = <&hpsclks X5_LSIO_SENSOR1_CLK>;
+		clock-names = "xclk";
+		rotation = <0>;
+
+		port {
+			/* MIPI CSI-2 bus endpoint */
+			ov5640_to_mipi_csi3: endpoint {
+				remote-endpoint = <&x5_mipi_csi3_from_ov5640>;
+				clock-lanes = <0>;
+				data-lanes = <1 2>;
+			};
+		};
+	};
 };
 
 &i2c4 {
@@ -942,6 +991,29 @@
 
 &i2c7 {
 	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_dsp_i2c7>;
+
+	ov5640_sensor2: camera@3c {
+		compatible = "ovti,ov5640";
+		pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_sensor0_mclk &aon_gpio_7 &aon_gpio_6>;
+		powerdown-gpios = <&aon_gpio_porta 7 GPIO_ACTIVE_HIGH>;
+		reset-gpios = <&aon_gpio_porta 6 GPIO_ACTIVE_LOW>;
+		reg = <0x3c>;
+		clocks = <&hpsclks X5_LSIO_SENSOR0_CLK>;
+		clock-names = "xclk";
+		rotation = <0>;
+
+		port {
+			/* MIPI CSI-2 bus endpoint */
+			ov5640_to_mipi_csi2: endpoint {
+				remote-endpoint = <&x5_mipi_csi2_from_ov5640>;
+				clock-lanes = <0>;
+				data-lanes = <1 2>;
+			};
+		};
+	};
 };
 
 &dsp_axi_dma {
