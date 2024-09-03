@@ -1964,6 +1964,8 @@ n2d_error_t n2d_kernel_hardware_construct(n2d_kernel_t *kernel, n2d_uint32_t cor
 #endif
 	*hardware = _hardware;
 
+	ONERROR(n2d_kernel_os_mutex_create(kernel->os, &_hardware->power_mutex));
+
 	ONERROR(n2d_kernel_hardware_initialize(_hardware));
 
 #if NANO2D_WAIT_LINK_ONLY
@@ -2010,6 +2012,8 @@ n2d_error_t n2d_kernel_hardware_destroy(n2d_hardware_t *hardware)
 	ONERROR(n2d_kernel_hardware_command_destroy(hardware));
 	ONERROR(n2d_kernel_event_center_destroy(hardware, hardware->event_center));
 	ONERROR(n2d_kernel_hardware_deinitialize(hardware));
+	if (hardware->power_mutex)
+		ONERROR(n2d_kernel_os_mutex_delete(hardware->os, hardware->power_mutex));
 	ONERROR(n2d_kernel_os_free(os, hardware));
 
 on_error:
