@@ -127,10 +127,13 @@ static void gpu_proc_disable_plane(struct dc_proc *dc_proc, void *old_state)
 		context.opened = 0;
 	}
 
-	if (plane_info->features & GPU_PLANE_IN) {
+	if (plane_info->features & GPU_PLANE_OUT) {
 		pr_debug("[disable]removing fb display\n");
 		drm_framebuffer_assign(&context.fb_display, NULL);
 		drm_framebuffer_assign(&context.gpu_out, NULL);
+		// crtc disable is immediately take effect, this flag shall not be cleared in vblank
+		// handler, so need reset the flag here.
+		hw_plane->updating = false;
 	}
 }
 
@@ -405,10 +408,10 @@ static void gpu_proc_update_plane(struct dc_proc *dc_proc, void *old_drm_plane_s
 	if (plane_info->features & GPU_PLANE_OUT) {
 		drm_framebuffer_assign(&plane_state->fb, context.fb_tmp);
 		drm_framebuffer_assign(&context.fb_tmp, NULL);
+		hw_plane->updating = true;
 		return;
 	}
 
-	hw_plane->updating = true;
 	if (!context.gpu_out) {
 		if (create_fb(dc_proc) != 0) {
 			return;
