@@ -334,11 +334,25 @@ static int dump_trigger_store(const char __user *buf, size_t count, void *data)
 	return count;
 }
 
+static int load_show(struct seq_file *m, void *data)
+{
+	int i = 0, j = 0;
+	for (i = 0; i < global_device->kernel->dev_num; i++) {
+		for (j = 0; j < global_device->kernel->dev_core_num; j++) {
+			if (global_device->kernel->sub_dev[i]->hardware[j])
+				n2d_kernel_hardware_query_load(
+					global_device->kernel->sub_dev[i]->hardware[j]);
+		}
+	}
+	return 0;
+}
+
 static n2d_debug_info_t info_list[] = {
 #if NANO2D_MMU_ENABLE
 	{"mmu", mmuinfo_show},
 #endif
 	{"dump_trigger", dump_trigger_show, dump_trigger_store},
+	{"load", load_show},
 };
 #endif
 

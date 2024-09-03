@@ -1057,9 +1057,13 @@ n2d_error_t n2d_kernel_hardware_set_power(n2d_hardware_t *hardware, n2d_kernel_p
 	n2d_error_t error	    = N2D_SUCCESS;
 	n2d_cmd_buf_t *cmd_buf	    = &hardware->cmd_buf;
 	n2d_bool_t get_commit_mutex = N2D_FALSE;
+	n2d_bool_t get_power_mutex = N2D_FALSE;
 
 	ONERROR(n2d_kernel_os_mutex_acquire(hardware->os, cmd_buf->commit_mutex, 0));
 	get_commit_mutex = N2D_TRUE;
+
+	ONERROR(n2d_kernel_os_mutex_acquire(hardware->os, hardware->power_mutex, N2D_INFINITE));
+	get_power_mutex = N2D_TRUE;
 
 	if (state > hardware->power_state)
 		ONERROR(_hardware_set_power_off(hardware, state));
@@ -1068,6 +1072,9 @@ n2d_error_t n2d_kernel_hardware_set_power(n2d_hardware_t *hardware, n2d_kernel_p
 
 	hardware->power_state = state;
 on_error:
+	if (get_power_mutex)
+		n2d_kernel_os_mutex_release(hardware->os, hardware->power_mutex);
+
 	if (get_commit_mutex)
 		n2d_kernel_os_mutex_release(hardware->os, cmd_buf->commit_mutex);
 	return error;
@@ -1293,6 +1300,65 @@ n2d_error_t n2d_kernel_hardware_dump_gpu_state(n2d_hardware_t *hardware)
 
 	/* Success. */
 	return N2D_SUCCESS;
+}
+
+#define GCREG_TOTAL_CYCLES_Address 0x00078
+#define GCREG_IDLE_CYCLES_Address 0x0007C
+
+n2d_error_t n2d_kernel_hardware_query_load(n2d_hardware_t *hardware)
+{
+	n2d_uint32_t total_cycles = 0,idle_cycles = 0;
+	n2d_uint32_t load = 0;
+	n2d_uint32_t core = hardware->core;
+	n2d_os_t *os	  = hardware->os;
+	n2d_bool_t get_power_mutex = N2D_FALSE;
+	n2d_bool_t  not_a_second = N2D_FALSE;
+	n2d_error_t error	   = N2D_SUCCESS;
+
+	ONERROR(n2d_kernel_os_mutex_acquire(hardware->os, hardware->power_mutex, N2D_INFINITE));
+	get_power_mutex = N2D_TRUE;
+	if (hardware->power_state == N2D_POWER_OFF)
+		goto on_error;
+
+	/* clear cycle count */
+	n2d_kernel_os_poke_with_core(os, core, GCREG_IDLE_CYCLES_Address, 0);
+	n2d_kernel_os_poke_with_core(os, core, GCREG_TOTAL_CYCLES_Address, 0);
+	n2d_kernel_os_mutex_release(hardware->os, hardware->power_mutex);
+	get_power_mutex = N2D_FALSE;
+
+	n2d_kernel_os_delay(os, 1000);
+
+	ONERROR(n2d_kernel_os_mutex_acquire(hardware->os, hardware->power_mutex, N2D_INFINITE));
+	get_power_mutex = N2D_TRUE;
+	if (hardware->power_state == N2D_POWER_OFF) {
+		not_a_second = N2D_TRUE;
+		goto on_error;
+	}
+
+	/* read idle cycle count and total cycle count */
+	idle_cycles = n2d_kernel_os_peek_with_core(os, core, GCREG_IDLE_CYCLES_Address);
+	total_cycles = n2d_kernel_os_peek_with_core(os, core, GCREG_TOTAL_CYCLES_Address);
+	n2d_kernel_os_mutex_release(hardware->os, hardware->power_mutex);
+	get_power_mutex = N2D_FALSE;
+
+	if (total_cycles == 0) {
+		n2d_kernel_os_print(
+			"The current HW doesn't support use AHB register to read cycle counter.\n");
+	} else {
+		pr_debug("idle_cycles = %d, total_cycles= %d.\n", idle_cycles, total_cycles);
+		load = 100 - idle_cycles * 100 / total_cycles;
+	}
+
+on_error:
+	if (get_power_mutex)
+		n2d_kernel_os_mutex_release(hardware->os, hardware->power_mutex);
+
+	if (not_a_second)
+		n2d_kernel_os_print("test case shorter than 1s to query load.\n");
+	else
+		n2d_kernel_os_print("core: %d, load = %d\n", core, load);
+
+	return error;
 }
 
 #if NANO2D_MMU_ENABLE

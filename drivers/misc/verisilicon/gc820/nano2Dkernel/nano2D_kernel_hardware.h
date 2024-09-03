@@ -173,6 +173,8 @@ n2d_error_t n2d_kernel_harware_dump_command(n2d_hardware_t *hardware);
 
 n2d_error_t n2d_kernel_hardware_dump_gpu_state(n2d_hardware_t *hardware);
 
+n2d_error_t n2d_kernel_hardware_query_load(n2d_hardware_t *hardware);
+
 n2d_error_t n2d_kernel_hardware_recovery(n2d_hardware_t *hardware);
 
 n2d_error_t n2d_kernel_hardware_construct(n2d_kernel_t *kernel, n2d_uint32_t core,
