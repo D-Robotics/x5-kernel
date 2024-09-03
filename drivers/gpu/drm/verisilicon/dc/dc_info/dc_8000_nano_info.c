@@ -66,6 +66,8 @@ static const u32 primary_overlay_formats[] = {
 	DRM_FORMAT_YVYU,     //
 	DRM_FORMAT_NV12,     //
 	DRM_FORMAT_NV21,     //
+	DRM_FORMAT_XRGB8888, //
+	DRM_FORMAT_XBGR8888, //
 };
 
 static const u32 gc_overlay_formats[] = {
@@ -193,6 +195,16 @@ static const struct vs_color_format_mapping format_map[] = {
 		DRM_FORMAT_NV21,
 		DC_8000_NANO_FORMAT_NV12,
 		DC_SWIZZLE_VU,
+	},
+	{
+		DRM_FORMAT_XRGB8888,
+		DC_8000_NANO_FORMAT_A8R8G8B8,
+		DC_SWIZZLE_ARGB,
+	},
+	{
+		DRM_FORMAT_XBGR8888,
+		DC_8000_NANO_FORMAT_A8R8G8B8,
+		DC_SWIZZLE_ABGR,
 	},
 	{
 		DRM_FORMAT_TABLE_END,
