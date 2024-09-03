@@ -446,8 +446,8 @@ static struct dc_plane_info dc_plane_info[] = {
 				.num_formats = ARRAY_SIZE(gc_overlay_formats),
 				.formats     = gc_overlay_formats,
 				.rotation    = DRM_MODE_ROTATE_MASK | DRM_MODE_REFLECT_MASK,
-				.min_scale   = FRAC_16_16(1, 3),
-				.max_scale   = FRAC_16_16(3, 1),
+				.min_scale   = FRAC_16_16(1, 8),
+				.max_scale   = FRAC_16_16(8, 1),
 #else
 				.num_formats = ARRAY_SIZE(primary_overlay_formats),
 				.formats     = primary_overlay_formats,
