@@ -65,7 +65,7 @@ static struct drm_framebuffer *vs_create_fb_internal(struct drm_device *dev,
 						     const struct drm_mode_fb_cmd2 *mode_cmd)
 {
 	struct vs_gem_object *objs[MAX_NUM_PLANES];
-	unsigned int height, size;
+	unsigned int height, size = 0;
 	const struct drm_format_info *info;
 	struct drm_framebuffer *fb;
 	int ret;
@@ -78,13 +78,20 @@ static struct drm_framebuffer *vs_create_fb_internal(struct drm_device *dev,
 	for (i = 0; i < info->num_planes; i++) {
 		height = drm_format_info_plane_height(info, mode_cmd->height, i);
 		size   = height * mode_cmd->pitches[i] + mode_cmd->offsets[i];
+	}
 
-		objs[i] = vs_gem_create_object(dev, size);
-		if (IS_ERR(objs[i])) {
-			dev_err(dev->dev, "Failed to create GEM object.\n");
-			ret = -ENXIO;
-			goto err;
-		}
+	objs[0] = vs_gem_create_object(dev, size);
+	if (IS_ERR(objs[0])) {
+		dev_err(dev->dev, "Failed to create GEM object.\n");
+		ret = -ENXIO;
+		return ERR_PTR(ret);
+	}
+
+	for (i = 1; i < info->num_planes; i++) {
+		drm_gem_object_get(&objs[0]->base);
+		// 2d GPU use one buffer to hold multiple color planes, but drm_framebuffer need
+		// drm_gem_object for each plane, so bind same drm_gem_object to each color planes
+		objs[i] = objs[0];
 	}
 
 	fb = vs_fb_alloc(dev, mode_cmd, objs, info->num_planes);
@@ -95,8 +102,8 @@ static struct drm_framebuffer *vs_create_fb_internal(struct drm_device *dev,
 
 	return fb;
 err:
-	for (; i > 0; i--)
-		drm_gem_object_put(&objs[i - 1]->base);
+	for (i = 0; i < info->num_planes; i++)
+		drm_gem_object_put(&objs[i]->base);
 
 	return ERR_PTR(ret);
 }
@@ -355,14 +362,24 @@ static int create_fb(struct dc_proc *dc_proc)
 	struct drm_plane_state *plane_state	= plane->state;
 	struct drm_rect *dst			= &plane_state->dst;
 	struct drm_framebuffer *fb;
+	int i;
 	struct drm_mode_fb_cmd2 fbreq = {
 		.width	      = drm_rect_width(dst),
 		.height	      = drm_rect_height(dst),
 		.pixel_format = plane_info->fourcc,
-		.pitches      = {drm_rect_width(dst) * 4},
 	};
+	const struct drm_format_info *info = drm_get_format_info(drm_dev, &fbreq);
 
-	fbreq.pitches[0] = num_align(fbreq.pitches[0], priv->pitch_alignment);
+	WARN_ON(!info);
+
+	for (i = 0; i < info->num_planes; i++) {
+		fbreq.pitches[i] = num_align(
+			drm_format_info_plane_width(info, fbreq.width, i) * info->char_per_block[i],
+			priv->pitch_alignment);
+		if (i > 0)
+			fbreq.offsets[i] = fbreq.pitches[i - 1] *
+					   drm_format_info_plane_height(info, fbreq.height, i - 1);
+	}
 
 	if (context.priv_fb) { /* if size changes, realloc the buffer */
 		if (context.priv_fb->width != fbreq.width ||
