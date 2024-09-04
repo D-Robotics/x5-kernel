@@ -466,10 +466,13 @@ static irqreturn_t guc_adc_thread_irq(int irq, void *dev_id)
 			iio_trigger_notify_done(indio_dev->trig);
 			info->sample_nums = 0;
 		} else {
-			guc_adc_fifo_read_enable(info, true);
-			guc_adc_nor_fifo_read(info);
-			guc_adc_fifo_read_enable(info, false);
-			complete(&info->completion);
+			val = readl_relaxed(info->regs + GUC_CTRL_NOR_STS0);
+			if (!(val & 0x01u)) {
+				guc_adc_fifo_read_enable(info, true);
+				guc_adc_nor_fifo_read(info);
+				guc_adc_fifo_read_enable(info, false);
+				complete(&info->completion);
+			}
 		}
 	}
 	writel_relaxed(0x01u, info->regs + GUC_CTRL_NOR_CTRL8);
