@@ -309,6 +309,12 @@ static int simple_dai_link_of(struct asoc_simple_priv *priv,
 	if (ret < 0)
 		goto dai_link_of_err;
 
+	ret = snd_soc_of_get_dai_link_codecs(dev, codec, dai_link);
+	if (ret) {
+		dev_err(dev, "snd_soc_of_get_dai_link_codecs error\n");
+		goto dai_link_of_err;
+	}
+
 	ret = simple_parse_node(priv, codec, li, prefix, NULL);
 	if (ret < 0)
 		goto dai_link_of_err;
@@ -374,6 +380,7 @@ static int __simple_for_each_link(struct asoc_simple_priv *priv,
 			ret = -ENODEV;
 			goto error;
 		}
+
 		/* get platform */
 		plat = of_get_child_by_name(node, is_top ?
 					    PREFIX "plat" : "plat");
