@@ -4481,19 +4481,15 @@
 
 
 	__overrides__ {
-		uart0 = <&uart0>,"status";
 		uart1 = <&uart1>,"status";
-		uart5 = <&uart5>,"status";
+		uart2 = <&uart2>,"status";
+		uart3 = <&uart3>,"status";
+		uart6 = <&uart6>,"status";
 		spi1 = <&spi1>,"status";
-		spi5 = <&spi5>,"status";
+		spi2 = <&spi2>,"status";
 		i2c0 = <&i2c0>,"status";
-		i2c2 = <&i2c2>,"status";
-		i2c3 = <&i2c3>,"status";
-		i2c4 = <&i2c4>,"status";
+		i2c1 = <&i2c1>,"status";
 		i2c5 = <&i2c5>,"status";
-		i2c6 = <&i2c6>,"status";
-		i2c7 = <&i2c7>,"status";
-		dw_i2s0 = <&dw_i2s0>,"status";
 		dw_i2s1 = <&dw_i2s1>,"status";
 	};
 };
