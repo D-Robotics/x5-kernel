@@ -15,7 +15,7 @@
 #include <autoconf.h>
 
 / {
-	model = "D-Robotics RDK X5 V0.1";
+	model = "D-Robotics RDK X5 V1.0";
 	compatible = "Horizon, x5";
 
 	#address-cells = <2>;
@@ -146,7 +146,7 @@
 	pinctrl-names = "default";
 	pinctrl-0 = < &dsp_gpio0_17
 				  &dsp_gpio0_18
-				  &dsp_gpio0_22 //USB HUB RESET high
+				  &dsp_gpio0_14 //LED_SYS_STATUS
 				>;
 };
 
@@ -159,6 +159,7 @@
 				  &lsio_gpio0_3
 				  &lsio_gpio0_8
 				  &lsio_gpio0_9
+				  &lsio_gpio0_13_rdk_v1p0 //USB HUB RESET high
 				  &lsio_gpio0_20
 				  &lsio_gpio0_21
 				  &lsio_gpio0_22
@@ -349,7 +350,7 @@
 &spi5 {
 	status = "okay";
 	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_spi5 &lsio_gpio0_7 &lsio_gpio1_4 &lsio_gpio1_6>;
+	pinctrl-0 = <&pinctrl_spi5 &lsio_gpio0_7 &lsio_gpio0_12 &lsio_gpio1_6>;
 
 	tcan4x5x: tcan4x5x@0 {
 		compatible = "ti,tcan4x5x";
@@ -358,8 +359,8 @@
 		#size-cells = <1>;
 		spi-max-frequency = <10000000>;
 		bosch,mram-cfg = <0x0 0 0 16 0 0 1 1>;
-		interrupt-parent = <&ls_gpio1_porta>;
-		interrupts = <4 IRQ_TYPE_EDGE_FALLING>;
+		interrupt-parent = <&ls_gpio0_porta>;
+		interrupts = <12 IRQ_TYPE_EDGE_FALLING>;
 		device-wake-gpios = <&ls_gpio1_porta 6 GPIO_ACTIVE_LOW>;
 		reset-gpios = <&ls_gpio0_porta 7 GPIO_ACTIVE_HIGH>;
 	};
@@ -600,11 +601,11 @@
 &vin_vcon0 {
 	status = "okay";
 	/* camera sensor
-	 * reset gpio:	LSIO_GPIO0_PIN12:	391
+	 * reset gpio:	LSIO_GPIO1_PIN6:	353
 	 */
 	pinctrl-names = "default";
-	pinctrl-0 = <&lsio_gpio0_12>;
-	gpio_oth = <391>;   // reset gpio
+	pinctrl-0 = <&lsio_gpio1_6>;
+	gpio_oth = <353>;   // reset gpio
 	bus = <6>; // i2c bus
 };
 
@@ -617,11 +618,11 @@
 &vin_vcon2 {
 	status = "okay";
 	/* camera sensor
-	 * reset gpio:	LSIO_GPIO0_PIN13:	392
+	 * reset gpio:	LSIO_GPIO1_PIN4:	351
 	 */
 	pinctrl-names = "default";
-	pinctrl-0 = <&lsio_gpio0_13>;
-	gpio_oth = <392>;   // reset gpio
+	pinctrl-0 = <&lsio_gpio1_4>;
+	gpio_oth = <351>;   // reset gpio
 	bus = <4>;  // i2c bus
 };
 
