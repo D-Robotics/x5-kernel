@@ -96,7 +96,7 @@
 
 	dsp_gpio0_14: dsp_gpio0_14 {
 		horizon,pins = <
-			DSP_PDM_CKO  DSP_PINMUX_0  BIT_OFFSET24  MUX_ALT1  &pconf_input_en_1v8
+			DSP_PDM_CKO  DSP_PINMUX_0  BIT_OFFSET24  MUX_ALT1  &pconf_output_high
 		>;
 	};
 
@@ -144,7 +144,7 @@
 
 	dsp_gpio0_22: dsp_gpio0_22 {
 		horizon,pins = <
-			DSP_SPI6_MOSI  DSP_PINMUX_1  BIT_OFFSET4  MUX_ALT1  &pconf_input_en_1v8
+			DSP_SPI6_MOSI  DSP_PINMUX_1  BIT_OFFSET4  MUX_ALT1  &pconf_output_high
 		>;
 	};
 };
@@ -233,6 +233,12 @@
 	lsio_gpio0_13: lsio_gpio0_13 {
 		horizon,pins = <
 			LSIO_UART4_TX	LSIO_PINMUX_3 BIT_OFFSET26	MUX_ALT2	&pconf_input_en_3v3
+		>;
+	};
+
+	lsio_gpio0_13_rdk_v1p0: lsio_gpio0_13_rdk_v1p0 {
+		horizon,pins = <
+			LSIO_UART4_TX	LSIO_PINMUX_3 BIT_OFFSET26	MUX_ALT2	&pconf_output_high
 		>;
 	};
 
