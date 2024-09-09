@@ -819,3 +819,7 @@ the following ports need to be deleted*/
 	pinctrl-names = "default";
 	pinctrl-0 = <&aon_gpio_7>;
 };
+
+&hobot_pps {
+	status = "okay";
+};
