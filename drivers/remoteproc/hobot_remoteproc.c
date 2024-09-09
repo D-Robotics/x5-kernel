@@ -70,6 +70,9 @@ typedef struct _control {
 
 #define HIFI5_LOW_POWER_DEV 3
 
+#define DSP_LOGLEVEL "loglevel"
+#define DBG_TYPE_LEVEL (3)
+
 // static struct clk *hifi5_clk;
 // static struct completion hifi5_coredump_complete;
 
@@ -1749,6 +1752,113 @@ static ssize_t hb_show_wakeup_status(struct device *dev,/*PRQA S ALL*/
 
 static DEVICE_ATTR(wakeup_status, 0644, hb_show_wakeup_status, hb_store_wakeup_status);
 
+static ssize_t hb_store_loglevel(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count) {
+	struct hobot_rproc_pdata *pdata = dev_get_drvdata(dev);
+	int32_t ret = 0;
+	uint32_t value;
+	uint8_t *send_buf;
+	int32_t size = 16;
+	int32_t instance = 1;
+	int32_t channel = 2;
+
+	ret = kstrtouint(buf, 10, &value);
+	if (ret) {
+		dev_err(pdata->dev, "%s Invalid Injection.\n", __func__);
+		return ret;
+	}
+
+	if (value > DBG_TYPE_LEVEL) {
+		dev_err(pdata->dev, "%s Invalid log value %d\n", __func__, value);
+		return -EINVAL;
+	}
+
+	sprintf(pdata->loglevel, "%s%d", DSP_LOGLEVEL, value);
+
+	ret = hb_ipc_acquire_buf(instance, channel, size, &send_buf);
+	if (ret < 0) {
+		dev_err(pdata->dev, "%s ipc acquire buffer failed\n", __func__);
+		return ret;
+	}
+
+	strcpy(send_buf, pdata->loglevel);
+
+	ret = hb_ipc_send(instance, channel, send_buf, size);
+	if (ret < 0) {
+		dev_err(pdata->dev, "%s ipc send buffer failed\n", __func__);
+		return ret;
+	}
+
+	return strnlen(buf, count);
+}
+
+static ssize_t hb_show_loglevel(struct device *dev,
+		struct device_attribute *attr, char *buf) {
+	struct hobot_rproc_pdata *pdata = dev_get_drvdata(dev);
+
+	return snprintf(buf, sizeof(pdata->loglevel), "%s\n", pdata->loglevel);
+}
+
+static DEVICE_ATTR(loglevel, 0644, hb_show_loglevel, hb_store_loglevel);
+
+static ssize_t hb_store_dspthread(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count) {
+	struct hobot_rproc_pdata *pdata = dev_get_drvdata(dev);
+	int32_t ret = 0;
+	int32_t size = 16;
+	uint8_t *send_buf;
+	int32_t instance = 1;
+	int32_t channel = 1;
+
+	sprintf(pdata->thread_status, "%s", buf);
+
+	if (strcmp(pdata->thread_status, "on") && strcmp(pdata->thread_status, "off")) {
+		dev_err(pdata->dev, "%s Invalid thread_status %s\n", __func__, pdata->thread_status);
+		return -EINVAL;
+	}
+
+	if (strcmp(pdata->thread_status, "on") == 0) {
+		ret = hb_ipc_acquire_buf(instance, channel, size, &send_buf);
+		if (ret < 0) {
+			dev_err(pdata->dev, "%s ipc acquire buffer failed\n", __func__);
+			return ret;
+		}
+
+		strcpy(send_buf, "thread_on");
+
+		ret = hb_ipc_send(instance, channel, send_buf, size);
+		if (ret < 0) {
+			dev_err(pdata->dev, "%s ipc send buffer failed\n", __func__);
+			return ret;
+		}
+	} else {
+		ret = hb_ipc_acquire_buf(instance, channel, size, &send_buf);
+		if (ret < 0) {
+			dev_err(pdata->dev, "%s ipc acquire buffer failed\n", __func__);
+			return ret;
+		}
+
+		strcpy(send_buf, "thread_off");
+
+		ret = hb_ipc_send(instance, channel, send_buf, size);
+		if (ret < 0) {
+			dev_err(pdata->dev, "%s ipc send buffer failed\n", __func__);
+			return ret;
+		}
+	}
+
+	return strnlen(buf, count);
+}
+
+static ssize_t hb_show_dspthread(struct device *dev,
+		struct device_attribute *attr, char *buf) {
+	struct hobot_rproc_pdata *pdata = dev_get_drvdata(dev);
+
+	return snprintf(buf, sizeof(pdata->thread_status), "%s\n", pdata->thread_status);
+}
+
+static DEVICE_ATTR(dspthread, 0644, hb_show_dspthread, hb_store_dspthread);
+
 static ssize_t hb_show_hifi5_clk_rate(struct device *dev, struct device_attribute *attr, char *buf) {
 	struct platform_device *pdev = to_platform_device(dev);
 	struct hobot_rproc_pdata *pdata = platform_get_drvdata(pdev);
@@ -2207,6 +2317,18 @@ static int32_t hobot_remoteproc_probe(struct platform_device *pdev)
 		goto create_file_out3;
 	}
 
+	ret = device_create_file(&pdev->dev, &dev_attr_dspthread);
+	if (ret != 0) {
+		dev_err(&pdev->dev, "BUG: Can not create dspthread\n");
+		goto create_file_out4;
+	}
+
+	ret = device_create_file(&pdev->dev, &dev_attr_loglevel);
+	if (ret != 0) {
+		dev_err(&pdev->dev, "BUG: Can not create loglevel\n");
+		goto create_file_out5;
+	}
+
 #ifdef CONFIG_HOBOT_REMOTEPROC_PM
 	ret = hobot_remoteproc_pm_ctrl(pdata, 0, 0);
 	if (ret < 0) {
@@ -2219,6 +2341,8 @@ static int32_t hobot_remoteproc_probe(struct platform_device *pdev)
 	pr_info("hobot_remoteproc_probe end\n");
 
 	return 0;
+create_file_out5:
+	device_remove_file(&pdev->dev, &dev_attr_loglevel);
 create_file_out4:
 	device_remove_file(&pdev->dev, &dev_attr_hifi5_clk_rate);
 create_file_out3:
@@ -2251,6 +2375,8 @@ static int32_t hobot_remoteproc_remove(struct platform_device *pdev) {
 	device_remove_file(&pdev->dev, &dev_attr_suspend_test);
 	device_remove_file(&pdev->dev, &dev_attr_wakeup_status);
 	device_remove_file(&pdev->dev, &dev_attr_hifi5_clk_rate);
+	device_remove_file(&pdev->dev, &dev_attr_dspthread);
+	device_remove_file(&pdev->dev, &dev_attr_loglevel);
 
 #ifdef CONFIG_HOBOT_ADSP_CTRL
 	iounmap(timesync_acore_to_adsp);

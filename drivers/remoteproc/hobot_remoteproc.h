@@ -237,6 +237,9 @@ struct hobot_rproc_pdata {
 	struct hobot_rsc_table sram0;
 	struct hobot_rsc_table bsp;
 	struct hobot_rsc_table ipc;
+
+	int8_t thread_status[8];
+	int8_t loglevel[10];
 };
 
 static inline void *log_memcpy(void *dest, void *src, unsigned int num)
