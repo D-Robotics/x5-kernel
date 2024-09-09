@@ -1835,13 +1835,20 @@ static int ov5640_set_stream_mipi(struct ov5640_dev *sensor, bool on)
 	 * [2] = 1/0	: MIPI interface enable/disable
 	 * [1:0] = 01/00: FIXME: 'debug'
 	 */
-	ret = ov5640_write_reg(sensor, OV5640_REG_IO_MIPI_CTRL00,
-			       on ? 0x45 : 0x40);
-	if (ret)
-		return ret;
+	 if (on) {
+		 ret = ov5640_write_reg(sensor, OV5640_REG_IO_MIPI_CTRL00, 0x45);
+		 if (ret)
+			 return ret;
 
-	return ov5640_write_reg(sensor, OV5640_REG_FRAME_CTRL01,
-				on ? 0x00 : 0x0f);
+		 return ov5640_write_reg(sensor, OV5640_REG_FRAME_CTRL01, 0x00);
+	 } else {
+		 ret = ov5640_write_reg(sensor, OV5640_REG_FRAME_CTRL01, 0x0f);
+		 if (ret)
+			 return ret;
+
+		 msleep(100);
+		 return ov5640_write_reg(sensor, OV5640_REG_IO_MIPI_CTRL00, 0x40);
+	 }
 }
 
 static int ov5640_get_sysclk(struct ov5640_dev *sensor)
