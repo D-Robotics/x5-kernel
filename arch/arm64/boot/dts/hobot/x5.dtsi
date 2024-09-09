@@ -3629,7 +3629,7 @@
 			mboxes = <&mailbox0 0 1 0 1 0 1 0 1 0>;
 			instance = <1>;
 			def_mode = <1>;
-			num_chans = <1>;
+			num_chans = <3>;
 			shm_size = <0x400>;
 			ipc-mask-offset = <0x8000>;
 			ipc_channel0 {
@@ -3643,6 +3643,13 @@
 				num_pools = <1>;
 				ipc_pool0 {
 					num_bufs = /bits/ 16 <8>;//note big-endian and little-endian
+					buf_size = <32>;
+				};
+			};
+			ipc_channel2 {
+				num_pools = <1>;
+				ipc_pool0 {
+					num_bufs = /bits/ 16 <2>;
 					buf_size = <32>;
 				};
 			};
