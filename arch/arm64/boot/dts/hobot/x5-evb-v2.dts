@@ -215,12 +215,56 @@
 		};
 
 	};
+
+	sc230ai@30 {
+		status = "okay";
+		compatible = "smartsens,sc230ai";
+		pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_sensor2_mclk &aon_gpio_4>;
+		reset-gpios = <&aon_gpio_porta 4 GPIO_ACTIVE_HIGH>;	/* HIGH is ACTIVE LEVEL */
+		reg = <0x30>;
+		clocks = <&hpsclks X5_LSIO_SENSOR2_CLK>;
+		clock-names = "xclk";
+
+		port {
+			/* MIPI CSI-2 bus endpoint */
+			sc230ai_to_mipi_csi2: endpoint {
+				remote-endpoint = <&x5_mipi_csi2_from_sc230ai>;
+				clock-lanes = <0>;
+				data-lanes = <1>;	//1 lane
+				lane-rate = <800>;
+				vc_id = <0>;
+			};
+		};
+	};
+
 };
 
 &i2c1 {
 	status = "okay";
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_i2c1>;
+
+	sc230ai@30 {
+		status = "okay";
+		compatible = "smartsens,sc230ai";
+		pinctrl-names = "default";
+		pinctrl-0 = <&lsio_gpio0_30>;
+		reset-gpios = <&ls_gpio0_porta 30 GPIO_ACTIVE_HIGH>;	/* HIGH is ACTIVE LEVEL */
+		reg = <0x30>;
+		/* In svb 1B board, we use extern clk for sensor */
+		//clocks = <&hpsclks X5_LSIO_SENSOR1_CLK>;
+		//clock-names = "xclk";
+
+		port {
+			/* MIPI CSI-2 bus endpoint */
+			sc230ai_to_mipi_csi1: endpoint {
+				remote-endpoint = <&x5_mipi_csi1_from_sc230ai>;
+				clock-lanes = <0>;
+				data-lanes = <1>;	//1 lane
+			};
+		};
+	};
 };
 
 &i2c5 {
@@ -290,12 +334,52 @@
 			};
 		};
 	};
+
+	sc230ai@30 {
+		status = "okay";
+		compatible = "smartsens,sc230ai";
+		pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_sensor0_mclk &aon_gpio_0>;
+		reset-gpios = <&aon_gpio_porta 0 GPIO_ACTIVE_HIGH>;	/* HIGH is ACTIVE LEVEL */
+		reg = <0x30>;
+		clocks = <&hpsclks X5_LSIO_SENSOR0_CLK>;
+		clock-names = "xclk";
+
+		port {
+			/* MIPI CSI-2 bus endpoint */
+			sc230ai_to_mipi_csi0: endpoint {
+				remote-endpoint = <&x5_mipi_csi0_from_sc230ai>;
+				clock-lanes = <0>;
+				data-lanes = <1>;	//1 lane
+			};
+		};
+	};
 };
 
 &i2c7 {
 	status = "okay";
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_dsp_i2c7>;
+
+	sc230ai@30 {
+		status = "okay";
+		compatible = "smartsens,sc230ai";
+		pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_sensor3_mclk &lsio_gpio1_6>;
+		reset-gpios = <&ls_gpio1_porta 6 GPIO_ACTIVE_HIGH>;	/* HIGH is ACTIVE LEVEL */
+		reg = <0x30>;
+		clocks = <&hpsclks X5_LSIO_SENSOR3_CLK>;
+		clock-names = "xclk";
+
+		port {
+			/* MIPI CSI-2 bus endpoint */
+			sc230ai_to_mipi_csi3: endpoint {
+				remote-endpoint = <&x5_mipi_csi3_from_sc230ai>;
+				clock-lanes = <0>;
+				data-lanes = <1>;	//1 lane
+			};
+		};
+	};
 };
 
 &lpwm0 {
@@ -512,6 +596,70 @@
 		};
 		dummy_master1: codec {
 				sound-dai = <&virt_codec>;
+		};
+	};
+};
+
+&csi0 {
+	status = "okay";
+
+	ports {
+		port@0 {
+			x5_mipi_csi0_from_sc230ai: endpoint {
+				remote-endpoint = <&sc230ai_to_mipi_csi0>;
+				clock-lanes = <0>;
+				data-lanes = <1>;
+				lane-rate = <800>;
+				vc_id = <0>;
+			};
+		};
+	};
+};
+
+&csi1 {
+	status = "okay";
+
+	ports {
+		port@0 {
+			x5_mipi_csi1_from_sc230ai: endpoint {
+				remote-endpoint = <&sc230ai_to_mipi_csi1>;
+				clock-lanes = <0>;
+				data-lanes = <1>;
+				lane-rate = <800>;
+				vc_id = <0>;
+			};
+		};
+	};
+};
+
+&csi2 {
+	status = "okay";
+
+	ports {
+		port@0 {
+			x5_mipi_csi2_from_sc230ai: endpoint {
+				remote-endpoint = <&sc230ai_to_mipi_csi2>;
+				clock-lanes = <0>;
+				data-lanes = <1>;
+				lane-rate = <800>;
+				vc_id = <0>;
+			};
+		};
+	};
+};
+
+&csi3 {
+	status = "okay";
+
+	ports {
+		port@0 {
+			x5_mipi_csi3_from_sc230ai: endpoint {
+				remote-endpoint = <&sc230ai_to_mipi_csi3>;
+				clock-lanes = <0>;
+				data-lanes = <1>;
+				lane-rate = <800>;
+				vc_id = <0>;
+			};
 		};
 	};
 };
