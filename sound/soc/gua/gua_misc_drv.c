@@ -28,10 +28,14 @@
 #include <linux/sched/signal.h>
 #include <linux/signal.h>
 
+#include "hb_ipc_interface.h"
 #include "ipc_wrapper.h"
 #include "gua_audio_ipc.h"
 #include "gua_misc_drv.h"
 #include "gua_audio_rpc_protocol.h"
+
+/* the data segment used by IPC for interaction between acore and DSP, such as logs and shared data. */
+#define IPC_DATA_SIZE (0x800000)
 
 typedef struct _control {
 	smf_packet_head_t header;
@@ -325,14 +329,17 @@ static s32 gua_audio_misc_probe(struct platform_device *pdev)
 	const char *full_name = of_node_full_name(np_root);
 	s32 ret = 0;
 	struct device_node *wrapper_np = NULL;
-	struct device_node *mem_np = NULL;
-	struct resource res;
 	struct platform_device *wrapper_pdev = NULL;
 	ipc_wrapper_data_t *wrapper_data = NULL;
 	u32 core = 0U;
 	u32 channel = 0U;
 	u32 core_channel_pair_size = 0;
 	u32 i = 0;
+	struct device_node *ipc_np;
+	struct platform_device *ipc_pdev;
+	struct ipc_dev_instance *ipc_dev;
+	struct ipc_instance_cfg *ipc_cfg;
+	struct ipc_instance_info_m1 *info;
 
 	gua_misc_priv = devm_kzalloc(dev, sizeof(*gua_misc_priv), GFP_KERNEL);
 	if (IS_ERR_OR_NULL(gua_misc_priv)) {
@@ -393,17 +400,26 @@ static s32 gua_audio_misc_probe(struct platform_device *pdev)
 		gua_misc_priv->ipc_wrapper->poster[channel].recv_msg_cb[0] = ipc_wrapper_recv_cb;
 	}
 
-// get reserved memory region for log/data dump, currently only have one region
-	mem_np = of_parse_phandle(np_root, "memory-region", 0);
-	ret = of_address_to_resource(mem_np, 0, &res);
-	if (ret) {
-		dev_err(&pdev->dev, "AUDIO : unable to resolve memory region\n");
-		goto err_misc_dts;
+	// get reserved memory region for log/data dump, currently only have one region
+	ipc_np = of_parse_phandle(pdev->dev.of_node, "gua-ipc", 0);
+	if (!ipc_np) {
+		dev_err(&pdev->dev, "get gua-ipc error\n");
+		return -1;
 	}
-	g_debug_info.phy_mem_addr = (uint32_t)res.start;
-	g_debug_info.phy_mem_size = (uint32_t)resource_size(&res);
+	ipc_pdev = of_find_device_by_node(ipc_np);
+	if (!ipc_pdev) {
+		dev_err(&pdev->dev, "find gua-ipc error\n");
+		return -1;
+	}
 
-	dev_info(&pdev->dev,
+	ipc_dev = (struct ipc_dev_instance *)platform_get_drvdata(ipc_pdev);
+	ipc_cfg = &ipc_dev->ipc_info;
+	info = &ipc_dev->ipc_info.info.custom_cfg;
+
+	g_debug_info.phy_mem_addr = (uint32_t)info->ipc_phy_base;
+	g_debug_info.phy_mem_size = IPC_DATA_SIZE;
+
+	dev_dbg(&pdev->dev,
 		 "AUDIO: allocate reserved memory for log/data dump, phy_addr_base : 0x%x, mem_size : 0x%x.\n",
 		 g_debug_info.phy_mem_addr, g_debug_info.phy_mem_size);
 

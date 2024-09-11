@@ -23,7 +23,11 @@
 #include <sound/pcm_params.h>
 #include <sound/soc-dapm.h>
 #include <linux/pinctrl/consumer.h>
+#include <linux/dma-mapping.h>
 #include "gua_pcm.h"
+
+/* the data segment used by SSF for interaction between acore and DSP, such as logs and shared data. */
+#define SSF_DATA_SIZE (0x01000000)
 
 /* make sure : bind with pcms_hw_info & cpu_dais */
 static struct snd_soc_dai_link gua_dai_links[] = {
@@ -109,13 +113,11 @@ static int gua_machine_probe(struct platform_device *pdev)
 	struct device_node *cpu_np;
 	struct platform_device *cpu_pdev;
 	struct device *dev = &pdev->dev;
-	struct device_node *np = dev->of_node;
-	struct device_node *node;
 	struct gua_audio_data *data;
 	struct gua_audio_info *au_info;
 	struct snd_soc_dai_link_component *dlc;
-	struct resource res;
 	int i, ret;
+	dma_addr_t phy_dma;
 
 	dlc = devm_kzalloc(&pdev->dev, 3 * sizeof(*dlc), GFP_KERNEL);
 	if (!dlc)
@@ -144,22 +146,14 @@ static int gua_machine_probe(struct platform_device *pdev)
 		goto fail;
 	}
 
-	ret = of_reserved_mem_device_init_by_idx(&pdev->dev, pdev->dev.of_node, 0);
-	if (ret)
-		dev_err(&pdev->dev, "AUDIO : no reserved audio share memory for Arm <-> DSP\n");
-
 	au_info = platform_get_drvdata(cpu_pdev);
 
-	node = of_parse_phandle(np, "memory-region", 0);
-	ret = of_address_to_resource(node, 0, &res);
-	if (ret) {
-		dev_err(&pdev->dev, "AUDIO : unable to resolve memory region\n");
-		return ret;
-	}
-	au_info->mem_info.phy_addr_base = res.start;
-	au_info->mem_info.mem_addr = (unsigned char *)memremap(res.start, resource_size(&res), MEMREMAP_WC);
-	au_info->mem_info.mem_size = resource_size(&res);
-	dev_info(&pdev->dev, "AUDIO : Share Memory. base-addr:%p, mem-size:%d\n", au_info->mem_info.mem_addr, au_info->mem_info.mem_size);
+	au_info->mem_info.mem_addr = dma_alloc_coherent(dev, SSF_DATA_SIZE, &phy_dma, GFP_KERNEL);
+	if(!au_info->mem_info.mem_addr)
+		return -ENOMEM;
+	au_info->mem_info.phy_addr_base = phy_dma;
+	au_info->mem_info.mem_size = 0x1000000;
+	dev_dbg(&pdev->dev, "AUDIO : Share Memory. phy_addr 0x%llx, base-addr:%px, mem-size:%d\n", phy_dma, au_info->mem_info.mem_addr, au_info->mem_info.mem_size);
 
 	for (i = 0; i < data->num_dai_links; i++) {
 		data->dai_links[i].cpus = &dlc[0];
