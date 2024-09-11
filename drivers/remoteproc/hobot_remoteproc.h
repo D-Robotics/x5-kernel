@@ -238,6 +238,9 @@ struct hobot_rproc_pdata {
 	struct hobot_rsc_table bsp;
 	struct hobot_rsc_table ipc;
 
+	void *bsp_base;
+	void *ipc_base;
+
 	int8_t thread_status[8];
 	int8_t loglevel[10];
 };

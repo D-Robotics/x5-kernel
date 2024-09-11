@@ -223,16 +223,17 @@ static int32_t hobot_dsp_rproc_stop(struct rproc *rproc)
 	pr_debug("%s\n", __FUNCTION__);// dump_stack();
 	pdata->ipc_ops->release_remoteproc(pdata);
 
+	ret = hobot_dsp_ipc_close_instance();
+        if (ret < 0)
+                return ret;
+
 	list_for_each_entry_safe(entry, tmp, &rproc->mappings, node) {
-		iounmap(entry->va);
+		if (entry->da == AON_SRAM0_BASE || entry->da == AON_SRAM1_BASE || entry->da == HIFI5_IRAM_BASE || entry->da == AON_DDR_BASE)
+			iounmap(entry->va);
 
 		list_del(&entry->node);
 		kfree(entry);
 	}
-
-	ret = hobot_dsp_ipc_close_instance();
-	if (ret < 0)
-		return ret;
 
 	return 0;
 }
@@ -756,6 +757,7 @@ static int32_t hobot_dsp_handle_rsc(struct rproc *rproc, u32 rsc_type, void *_rs
 	int ret = 0;
 	dma_addr_t pa;
 	uint32_t da_hi, pa_hi, da_of;
+	struct hobot_rproc_pdata *pdata = rproc->priv;
 
 	mapping = kzalloc(sizeof(*mapping), GFP_KERNEL);
 	if (!mapping)
@@ -764,11 +766,18 @@ static int32_t hobot_dsp_handle_rsc(struct rproc *rproc, u32 rsc_type, void *_rs
 	if (rsc_type == RSC_LITE_DEVMEM) {
 		pa = rsc->pa & 0xFFFFFFFF;
 		pa |= ((dma_addr_t)(rsc->reserved & X5_DDR_HIGH_MASK)) << 32;
-		mapping->va = ioremap(pa, rsc->len);
-		if (!mapping->va) {
-			ret = -1;
-			pr_err("%s ioremap_nocache error\n", __func__);
-			goto out;
+
+		if (strcmp(rsc->name, "bsp devmem") == 0) {
+			mapping->va = pdata->bsp_base;
+		} else if (strcmp(rsc->name, "ipc devmem") == 0) {
+			mapping->va = pdata->ipc_base;
+		} else {
+			mapping->va = ioremap(pa, rsc->len);
+			if (!mapping->va) {
+				ret = -1;
+				pr_err("%s ioremap_nocache error\n", __func__);
+				goto out;
+			}
 		}
 		mapping->dma = rsc->pa;
 		mapping->da = rsc->da;
@@ -1243,18 +1252,9 @@ static int timesync_init(struct platform_device *pdev) {
 	u32 timesync_sec_diff_offset;
 	u32 timesync_nanosec_offset;
 	//void __iomem *aon_sram_base_va;
-	struct device_node *node;
-	struct resource res;
-
-	node = of_parse_phandle(pdev->dev.of_node, "shm-addr", 0);
-	ret = of_address_to_resource(node, 0, &res);
-	if (ret) {
-		dev_err(&pdev->dev, "Get adsp_bsp_reserved failed\n");
-		return ret;
-	}
 
 #ifdef CONFIG_HOBOT_ADSP_CTRL
-	timesync_acore_to_adsp = ioremap(res.start + TIMESYNC_ADSP_NOTIFY_OFF, 0x4);
+	timesync_acore_to_adsp = pdata->bsp_base + TIMESYNC_ADSP_NOTIFY_OFF;
 #endif
 
 	ret = of_property_read_u32(pdev->dev.of_node, "timesync-sec-offset", &timesync_sec_offset);
@@ -1262,8 +1262,7 @@ static int timesync_init(struct platform_device *pdev) {
 		dev_err(&pdev->dev, "get timesync-sec-offset error\n");
 		return -1;
 	}
-	pdata->timesync_sec_reg_va = //aon_sram_base_va + (timesync_sec_reg - AON_SRAM_BASE);
-		ioremap(res.start + timesync_sec_offset, 0x4);
+	pdata->timesync_sec_reg_va = pdata->bsp_base + timesync_sec_offset;
 
 	ret = of_property_read_u32(pdev->dev.of_node, "timesync-sec-diff-offset", &timesync_sec_diff_offset);
 	if (ret) {
@@ -1271,21 +1270,19 @@ static int timesync_init(struct platform_device *pdev) {
 		return -1;
 	}
 
-	pdata->timesync_sec_diff_reg_va = //aon_sram_base_va + (timesync_sec_diff_reg - AON_SRAM_BASE);
-		ioremap(res.start + timesync_sec_diff_offset, 0x4);
+	pdata->timesync_sec_diff_reg_va = pdata->bsp_base + timesync_sec_diff_offset;
 
 	ret = of_property_read_u32(pdev->dev.of_node, "timesync-nanosec-offset", &timesync_nanosec_offset);
 	if (ret) {
 		dev_err(&pdev->dev, "get timesync-nanosec-offset error\n");
 		return -1;
 	}
-	pdata->timesync_nanosec_reg_va = //aon_sram_base_va + (timesync_nanosec_reg - AON_SRAM_BASE);
-		ioremap(res.start + timesync_nanosec_offset, 0x4);
+	pdata->timesync_nanosec_reg_va = pdata->bsp_base + timesync_nanosec_offset;
 
 
-	dev_dbg(&pdev->dev, "base (0x%llx) sec (0x%llx) nsec(0x%llx) diff(0x%llx)\n",
-		res.start, res.start + timesync_sec_offset, res.start + timesync_sec_diff_offset,
-		res.start + timesync_nanosec_offset);
+	dev_dbg(&pdev->dev, "base (0x%x) sec (0x%x) nsec(0x%x) diff(0x%x)\n",
+		pdata->bsp.pa, timesync_sec_offset, timesync_sec_diff_offset,
+		timesync_nanosec_offset);
 	return 0;
 }
 
@@ -1333,31 +1330,7 @@ static int32_t log_init(struct platform_device *pdev) {
 	u32 log_offset;
 	u32 log_size;
 	u32 log_write_index_offset;
-	u32 log_read_index_reg;
-	struct device_node *ipc_np;
-	struct platform_device *ipc_pdev;
-	struct ipc_dev_instance *ipc_dev;
-	struct device_node *node;
-	struct resource res;
-
-	node = of_parse_phandle(pdev->dev.of_node, "shm-addr", 0);
-	ret = of_address_to_resource(node, 0, &res);
-	if (ret) {
-		dev_err(&pdev->dev, "Get adsp_bsp_reserved failed\n");
-		return ret;
-	}
-	ipc_np = of_parse_phandle(pdev->dev.of_node, "remoteproc-ipc", 0);
-	if (!ipc_np) {
-		dev_err(&pdev->dev, "get remoteproc-ipc error\n");
-		return -1;
-	}
-	ipc_pdev = of_find_device_by_node(ipc_np);
-	if (!ipc_pdev) {
-		dev_err(&pdev->dev, "find remoteproc-ipc error\n");
-		return -1;
-	}
-	ipc_dev = (struct ipc_dev_instance *)platform_get_drvdata(ipc_pdev);
-	pdata->ipc_cfg = &ipc_dev->ipc_info;
+	dma_addr_t phy_dma = pdata->bsp.pa;
 
 	ret = of_property_read_u32(pdev->dev.of_node, "log-offset", &log_offset);
 	if (ret) {
@@ -1371,7 +1344,17 @@ static int32_t log_init(struct platform_device *pdev) {
 		return -1;
 	}
 
-	pdata->log_addr_va = ioremap(res.start + log_offset, log_size);
+	ret = of_property_read_u32(pdev->dev.of_node, "log-write-index-offset",
+		&log_write_index_offset);
+	if (ret) {
+		dev_err(&pdev->dev, "get log-write-index-offset error\n");
+		return -1;
+	}
+
+	dev_dbg(&pdev->dev, "start(0x%llx) offset(0x%llx) index(0x%llx)\n",
+                        phy_dma, phy_dma + log_offset, phy_dma + log_write_index_offset);
+
+	pdata->log_addr_va = pdata->bsp_base + log_offset;
 	if (pdata->log_addr_va == NULL) {
 		dev_err(&pdev->dev, "ioremap log_addr error\n");
 		return -1;
@@ -1379,26 +1362,15 @@ static int32_t log_init(struct platform_device *pdev) {
 
 	pdata->log_size = log_size;
 
-	ret = of_property_read_u32(pdev->dev.of_node, "log-write-index-offset",
-		&log_write_index_offset);
-	if (ret) {
-		dev_err(&pdev->dev, "get log-write-index-offset error\n");
-		return -1;
-	}
-	pdata->log_write_index_reg_va = //aon_sram_base_va + (log_write_index_reg - AON_SRAM_BASE);
-		ioremap(res.start + log_write_index_offset, 0x4);
+	pdata->log_write_index_reg_va = pdata->bsp_base + log_write_index_offset;
 	(void)memset(pdata->log_write_index_reg_va, 0, 0x4);
 
-	log_read_index_reg = res.start + log_write_index_offset;
-	pdata->log_read_index_reg_va = //aon_sram_base_va + (log_read_index_reg - AON_SRAM_BASE);
-		ioremap(log_read_index_reg, 0x4);
+	pdata->log_read_index_reg_va = pdata->bsp_base + log_write_index_offset;
 
 	init_completion(&pdata->completion_log);
 	spin_lock_init(&(pdata->r_index_lock));
 	spin_lock_init(&(pdata->w_index_lock));
 
-	dev_dbg(&pdev->dev, "start(0x%llx) offset(0x%llx) index(0x%llx)\n",
-			res.start, res.start + log_offset, res.start + log_write_index_offset);
 	return 0;
 }
 
@@ -2086,7 +2058,7 @@ static int32_t parse_reserve_mem(struct platform_device *pdev) {
                 return -EINVAL;
         }
 
-	node = of_parse_phandle(pdev->dev.of_node, "dsp_ddr", 0);
+	node = of_parse_phandle(pdev->dev.of_node, "adsp-sram0-addr", 0);
         ret = of_address_to_resource(node, 0, &res);
         if (ret) {
                 dev_err(&pdev->dev, "Get adsp_ddr failed\n");
@@ -2142,6 +2114,26 @@ static int32_t hobot_resource_table_init(struct platform_device *pdev) {
 	struct device_node *node;
 	struct resource res;
 	int32_t ret = 0;
+	dma_addr_t phy_dma;
+	struct device_node *ipc_np;
+	struct platform_device *ipc_pdev;
+        struct ipc_dev_instance *ipc_dev;
+	struct ipc_instance_info_m1 *info;
+
+	ipc_np = of_parse_phandle(pdev->dev.of_node, "remoteproc-ipc", 0);
+	if (!ipc_np) {
+		dev_err(&pdev->dev, "get remoteproc-ipc error\n");
+		return -1;
+	}
+	ipc_pdev = of_find_device_by_node(ipc_np);
+	if (!ipc_pdev) {
+		dev_err(&pdev->dev, "find remoteproc-ipc error\n");
+		return -1;
+	}
+
+	ipc_dev = (struct ipc_dev_instance *)platform_get_drvdata(ipc_pdev);
+	pdata->ipc_cfg = &ipc_dev->ipc_info;
+	info = &pdata->ipc_cfg->info.custom_cfg;
 
 	node = of_parse_phandle(pdev->dev.of_node, "adsp-sram0-addr", 0);
 	ret = of_address_to_resource(node, 0, &res);
@@ -2150,19 +2142,13 @@ static int32_t hobot_resource_table_init(struct platform_device *pdev) {
 	}
 	pdata->sram0.pa = res.start;
 
-	node = of_parse_phandle(pdev->dev.of_node, "adsp-bsp-addr", 0);
-	ret = of_address_to_resource(node, 0, &res);
-	if (ret) {
-		return ret;
-	}
-	pdata->bsp.pa = res.start;
+	pdata->bsp_base = dma_alloc_coherent(&pdev->dev, 0x00800000, &phy_dma, GFP_KERNEL);
+	if (!pdata->bsp_base)
+		return -ENOMEM;
+	pdata->bsp.pa = phy_dma;
 
-	node = of_parse_phandle(pdev->dev.of_node, "adsp-ipc-addr", 0);
-	ret = of_address_to_resource(node, 0, &res);
-	if (ret) {
-		return ret;
-	}
-	pdata->ipc.pa = res.start;
+	pdata->ipc_base = info->ipc_base;
+	pdata->ipc.pa = info->ipc_phy_base;
 
 	dev_dbg(&pdev->dev, "sram0 0x%x bsp 0x%x ipc 0x%x\n", pdata->sram0.pa, pdata->bsp.pa, pdata->ipc.pa);
 
@@ -2219,6 +2205,12 @@ static int32_t hobot_remoteproc_probe(struct platform_device *pdev)
 	}
 	pdata->ipc_ops = &hobot_hifi5_ipc_ops;
 
+	ret = hobot_resource_table_init(pdev);
+	if (ret < 0) {
+		dev_err(&pdev->dev, "resource_table_init error\n");
+		goto deinit_irq_out;
+	}
+
 	ret = timesync_init(pdev);
 	if (ret < 0) {
 		dev_err(&pdev->dev, "timesync_init error\n");
@@ -2234,12 +2226,6 @@ static int32_t hobot_remoteproc_probe(struct platform_device *pdev)
 	ret = hobot_remoteproc_smf_init(pdev);
 	if (ret < 0) {
 		dev_err(&pdev->dev, "log_init error\n");
-		goto deinit_irq_out;
-	}
-
-	ret = hobot_resource_table_init(pdev);
-	if (ret < 0) {
-		dev_err(&pdev->dev, "resource_table_init error\n");
 		goto deinit_irq_out;
 	}
 
