@@ -21,6 +21,9 @@
 /* softirq work budget used to prevent CPU starvation */
 #define IPC_SOFTIRQ_BUDGET		128
 
+/* the data segment content required for IPC. */
+#define IPC_DATA_SIZE                   (0x00800000)
+
 #define IPC_SHM_INSTANCE_DISABLED	0
 #define IPC_SHM_INSTANCE_ENABLED	1
 

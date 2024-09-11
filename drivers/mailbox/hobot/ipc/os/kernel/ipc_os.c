@@ -21,6 +21,7 @@
 #include <linux/mailbox_client.h>
 #include <linux/mailbox_controller.h>
 #include <linux/mutex.h>
+#include <linux/dma-mapping.h>
 
 #include "ipc_os.h"
 #include "mbox_platform.h"
@@ -34,6 +35,8 @@
 #define NO_DEF_MODE		(0x6e646566u)
 #define DEV_MEM_START		(0x20000000u)/**< device memory start address*/
 #define DEV_MEM_END		(0x3fffffffu)/**< device memory end address*/
+
+void *global_ipc_base;
 
 /**
  * @struct ipc_os_priv_instance
@@ -55,6 +58,8 @@ struct ipc_os_priv_instance {
 	struct ipc_dev_instance *ipc_dev;/**< private data*/
 	struct mutex notify_mutex_lock;/** notify mutex lock*/
 	struct mutex ipc_init_mutex;/**< lock when opening and closing*/
+	uint32_t local_shm_offset;/**< local shared memory offset based on ipc data base*/
+	uint32_t remote_shm_offset;/**< remote shared memory offset based on ipc data base*/
 };
 
 struct mbox_share_res {
@@ -70,7 +75,8 @@ struct mbox_share_res {
 static struct ipc_os_priv {
 	struct ipc_os_priv_instance id[MAX_NUM_INSTANCE];/**< private data per instance*/
 	int32_t (*rx_cb)(int32_t instance, int32_t budget);/**< upper layer rx callback*/
-	void __iomem *ipc_shm_mask;
+	void __iomem *ipc_shm_mask;/**< ipc shm mask virtual addr*/
+	dma_addr_t ipc_phy_base;/**< ipc data phy base*/
 } priv;
 
 /* sotfirq routine for deferred interrupt handling */
@@ -171,8 +177,7 @@ int32_t ipc_os_init(int32_t instance, const struct ipc_shm_cfg *cfg,
 			return -EINVAL;
 		}
 		else {
-			priv.id[instance].local_virt_shm = (uint64_t)ioremap_wc(cfg->local_shm_addr,
-										cfg->shm_size);
+			priv.id[instance].local_virt_shm = (uint64_t)(global_ipc_base + priv.id[instance].local_shm_offset);
 			if (!priv.id[instance].local_virt_shm) {
 				ipc_err("local share memory ioremap failed\n");
 				ipc_os_mbox_close(instance);
@@ -181,8 +186,7 @@ int32_t ipc_os_init(int32_t instance, const struct ipc_shm_cfg *cfg,
 				return -ENOMEM;
 			}
 
-			priv.id[instance].remote_virt_shm = (uint64_t)ioremap_wc(cfg->remote_shm_addr,
-										 cfg->shm_size);
+			priv.id[instance].remote_virt_shm = (uint64_t)(global_ipc_base + priv.id[instance].remote_shm_offset);
 			if (!priv.id[instance].remote_virt_shm)
 			{
 				ipc_err("remote share memory ioremap failed\n");
@@ -239,8 +243,8 @@ void ipc_os_free(int32_t instance)
 	memset((void *)priv.id[instance].local_virt_shm, 0, priv.id[instance].shm_size);
 	memset((void *)priv.id[instance].remote_virt_shm, 0, priv.id[instance].shm_size);
 	// if (instance < BPU_INSTANCE) {
-		iounmap((void *)priv.id[instance].local_virt_shm);
-		iounmap((void *)priv.id[instance].remote_virt_shm);
+		//iounmap((void *)priv.id[instance].local_virt_shm);
+		//iounmap((void *)priv.id[instance].remote_virt_shm);
 	// }
 	priv.id[instance].state = IPC_SHM_INSTANCE_DISABLED;
 	mutex_unlock(&priv.id[instance].ipc_init_mutex);
@@ -519,11 +523,10 @@ static int32_t get_ipc_def_resource(struct platform_device *pdev,
 	char node_name[NODE_NAME_MAX_LEN];
 	struct ipc_channel_info *chans, *chancfg;
 	struct ipc_pool_info *pools, *poolcfg;
-	struct device_node *node;
-	struct resource res;
 	uint32_t local_offset;
 	uint32_t remote_offset;
 	uint32_t ipc_mask_offset;
+	struct ipc_dev_instance *ipc_dev = platform_get_drvdata(pdev);
 
 	if (!dev || !ipc_node || !def_info) {
 		dev_err(dev,"%s invalid parameter\n", __func__);
@@ -558,12 +561,6 @@ static int32_t get_ipc_def_resource(struct platform_device *pdev,
 		return -EINVAL;
 	}
 
-	node = of_parse_phandle(ipc_node, "shm-addr", 0);
-	err = of_address_to_resource(node, 0, &res);
-	if (err) {
-		dev_err(dev, "Get adsp_ipc_reserved failed\n");
-		return err;
-	}
 	err = of_property_read_u32(ipc_node, "local-offset", &local_offset);
 	if (err) {
 		dev_err(dev, "Get local-offset failed\n");
@@ -575,8 +572,20 @@ static int32_t get_ipc_def_resource(struct platform_device *pdev,
 		return err;
 	}
 
-	def_info->local_shm_addr = res.start + local_offset;
-	def_info->remote_shm_addr = res.start + remote_offset;
+	if (!priv.ipc_phy_base) {
+		global_ipc_base = dma_alloc_coherent(dev, IPC_DATA_SIZE, &priv.ipc_phy_base, GFP_KERNEL);
+		if (!global_ipc_base) {
+			return -ENOMEM;
+		}
+	}
+	def_info->ipc_base = global_ipc_base;
+	def_info->ipc_phy_base = priv.ipc_phy_base;
+
+	priv.id[ipc_dev->instance].local_shm_offset = local_offset;
+	priv.id[ipc_dev->instance].remote_shm_offset = remote_offset;
+
+	def_info->local_shm_addr = priv.ipc_phy_base + local_offset;
+	def_info->remote_shm_addr = priv.ipc_phy_base + remote_offset;
 
 	if (!priv.ipc_shm_mask) {
 		err = of_property_read_u32(ipc_node, "ipc-mask-offset", &ipc_mask_offset);
@@ -584,16 +593,16 @@ static int32_t get_ipc_def_resource(struct platform_device *pdev,
 			dev_err(dev, "ipc-mask-offset failed\n");
 			return err;
 		}
-		priv.ipc_shm_mask = ioremap(res.start + ipc_mask_offset, 0x4);
+		priv.ipc_shm_mask = global_ipc_base + ipc_mask_offset;
 		if (!priv.ipc_shm_mask) {
 			dev_err(dev, "ipc ioremap failed\n");
 			return -ENOMEM;
 		}
-		dev_dbg(dev, "base(0x%llx) offset 0x%x\n", res.start, ipc_mask_offset);
+		dev_dbg(dev, "base(0x%llx) offset 0x%x\n", def_info->ipc_phy_base, ipc_mask_offset);
         }
 
 	dev_dbg(dev, "base(0x%llx) local(0x%llx) remote(0x%llx)\n",
-		res.start, def_info->local_shm_addr, def_info->remote_shm_addr);
+		def_info->ipc_phy_base, def_info->local_shm_addr, def_info->remote_shm_addr);
 
 	chans = devm_kzalloc(dev, sizeof(*chans) * def_info->num_chans, GFP_KERNEL);
 	if (!chans) {

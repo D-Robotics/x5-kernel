@@ -75,7 +75,8 @@ struct ipc_instance_info_m1 {
 	uint32_t shm_size;/**< size of share memory, remote size is equal to local size*/
 	int32_t num_chans;/**< number of channel*/
 	struct ipc_channel_info *chans;/**< pointer to channels*/
-
+	dma_addr_t ipc_phy_base;/**< ipc data phy base*/
+	void *ipc_base;/**< ipc data virtual base*/
 };
 
 /**

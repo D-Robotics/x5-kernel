@@ -56,6 +56,9 @@ typedef struct _control {
 
 #define CONFIG_HOBOT_ADSP_CTRL 1
 
+/* the data segment used by BSP for interaction between acore and DSP, such as logs and shared data. */
+#define BSP_DATA_SIZE (0x00800000)
+
 #define HORIZON_SIP_HIFI5_VEC_SET		0xc2000007
 #define HORIZON_SIP_HIFI5_VEC_GET		0xc2000008
 
@@ -2199,7 +2202,7 @@ static int32_t hobot_resource_table_init(struct platform_device *pdev) {
 	}
 	pdata->sram0.pa = res.start;
 
-	pdata->bsp_base = dma_alloc_coherent(&pdev->dev, 0x00800000, &phy_dma, GFP_KERNEL);
+	pdata->bsp_base = dma_alloc_coherent(&pdev->dev, BSP_DATA_SIZE, &phy_dma, GFP_KERNEL);
 	if (!pdata->bsp_base)
 		return -ENOMEM;
 	pdata->bsp.pa = phy_dma;
