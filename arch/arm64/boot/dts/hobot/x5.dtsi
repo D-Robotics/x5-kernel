@@ -3563,6 +3563,9 @@
 
 			adsp-sram0-addr = <&adsp_ddr>;
 
+			dspthread-info-offset = <0x600004>;
+			dspthread-status-offset = <0x600000>;
+
 			clocks = <&dspclks X5_DSP_HIFI5_CLK>, <&dspclks X5_DSP_HIFI5_APB_CLK>;
 			clock-names = "hifi5_clk", "hifi5_pbclk";
 			power-domains = <&power X5_DSP_HIFI5>;
