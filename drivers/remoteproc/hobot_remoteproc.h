@@ -243,6 +243,9 @@ struct hobot_rproc_pdata {
 
 	int8_t thread_status[8];
 	int8_t loglevel[10];
+
+	void *dspthread_info_addr_va;
+	void *dspthread_status_reg_va;
 };
 
 static inline void *log_memcpy(void *dest, void *src, unsigned int num)

@@ -1374,6 +1374,34 @@ static int32_t log_init(struct platform_device *pdev) {
 	return 0;
 }
 
+static int32_t dspthread_init(struct platform_device *pdev) {
+		struct hobot_rproc_pdata *pdata = (struct hobot_rproc_pdata *)(pdev->dev.driver_data);
+	u32 dspthread_info_offset;
+	u32 dspthread_status_offset;
+	dma_addr_t dma = pdata->bsp.pa;
+	int32_t ret = 0;
+
+	ret = of_property_read_u32(pdev->dev.of_node, "dspthread-info-offset", &dspthread_info_offset);
+	if (ret) {
+		dev_err(&pdev->dev, "get dspthread-info-offset error\n");
+		return -1;
+	}
+
+	ret = of_property_read_u32(pdev->dev.of_node, "dspthread-status-offset", &dspthread_status_offset);
+	if (ret) {
+		dev_err(&pdev->dev, "get dspthread-status-offset error\n");
+		return -1;
+	}
+
+	pdata->dspthread_info_addr_va = pdata->bsp_base + dspthread_info_offset;
+	pdata->dspthread_status_reg_va = pdata->bsp_base + dspthread_status_offset;
+
+	dev_dbg(&pdev->dev, "dspthread-info 0x%llx dspthread-status 0x%llx\n",
+		dma + dspthread_info_offset, dma + dspthread_status_offset);
+
+	return 0;
+}
+
 static ssize_t hb_store_remoteproc_fw_dump(struct device *dev,/*PRQA S ALL*/
 	struct device_attribute *attr, const char *buf, size_t count)/*PRQA S ALL*/
 {
@@ -1723,6 +1751,35 @@ static ssize_t hb_show_wakeup_status(struct device *dev,/*PRQA S ALL*/
 }
 
 static DEVICE_ATTR(wakeup_status, 0644, hb_show_wakeup_status, hb_store_wakeup_status);
+
+static ssize_t hb_store_thread_info(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count) {
+	return 0;
+}
+
+static ssize_t hb_show_thread_info(struct device *dev,
+		struct device_attribute *attr, char *buf) {
+	struct hobot_rproc_pdata *pdata = dev_get_drvdata(dev);
+	uint8_t *p;
+	uint32_t len = 4096;
+	void __iomem *dspthread_info_addr_va;
+
+	dspthread_info_addr_va = pdata->dspthread_info_addr_va;
+
+	if (strcmp(pdata->thread_status, "on")) {
+		pr_err("Check dspthread status not enable\n");
+		return -EINVAL;
+	}
+
+	if (readl(pdata->dspthread_status_reg_va) == 0) {
+		p = (uint8_t *)(dspthread_info_addr_va);
+		return snprintf(buf, len, "%s\n", (char *)p);
+	}
+
+	return len;
+}
+
+static DEVICE_ATTR(thread_info, 0644, hb_show_thread_info, hb_store_thread_info);
 
 static ssize_t hb_store_loglevel(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t count) {
@@ -2223,6 +2280,12 @@ static int32_t hobot_remoteproc_probe(struct platform_device *pdev)
 		goto deinit_irq_out;
 	}
 
+	ret = dspthread_init(pdev);
+	if (ret < 0) {
+		dev_err(&pdev->dev, "dspthread_init error\n");
+		goto deinit_irq_out;
+	}
+
 	ret = hobot_remoteproc_smf_init(pdev);
 	if (ret < 0) {
 		dev_err(&pdev->dev, "log_init error\n");
@@ -2315,11 +2378,16 @@ static int32_t hobot_remoteproc_probe(struct platform_device *pdev)
 		goto create_file_out5;
 	}
 
+	ret = device_create_file(&pdev->dev, &dev_attr_thread_info);
+	if (ret != 0) {
+		goto create_file_out6;
+	}
+
 #ifdef CONFIG_HOBOT_REMOTEPROC_PM
 	ret = hobot_remoteproc_pm_ctrl(pdata, 0, 0);
 	if (ret < 0) {
 		dev_err(&pdev->dev, "HIFI pm disable error\n");
-		goto create_file_out4;
+		goto create_file_out7;
 	}
 #endif
 
@@ -2327,8 +2395,12 @@ static int32_t hobot_remoteproc_probe(struct platform_device *pdev)
 	pr_info("hobot_remoteproc_probe end\n");
 
 	return 0;
-create_file_out5:
+create_file_out7:
+	device_remove_file(&pdev->dev, &dev_attr_thread_info);
+create_file_out6:
 	device_remove_file(&pdev->dev, &dev_attr_loglevel);
+create_file_out5:
+	device_remove_file(&pdev->dev, &dev_attr_dspthread);
 create_file_out4:
 	device_remove_file(&pdev->dev, &dev_attr_hifi5_clk_rate);
 create_file_out3:
@@ -2363,6 +2435,7 @@ static int32_t hobot_remoteproc_remove(struct platform_device *pdev) {
 	device_remove_file(&pdev->dev, &dev_attr_hifi5_clk_rate);
 	device_remove_file(&pdev->dev, &dev_attr_dspthread);
 	device_remove_file(&pdev->dev, &dev_attr_loglevel);
+	device_remove_file(&pdev->dev, &dev_attr_thread_info);
 
 #ifdef CONFIG_HOBOT_ADSP_CTRL
 	iounmap(timesync_acore_to_adsp);
