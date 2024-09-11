@@ -37,7 +37,6 @@
 		control-rpmsg-channel-mapping = <0x00 0x00	// a core to hifi 0
 										>;
 		msg-wrapper = <&ipc_wrapper>;
-		memory-region = <&adsp_bsp_reserved>;
 		status = "disabled";
 	};
 
@@ -53,7 +52,6 @@
 		compatible = "gua,sound-card";
 		model = "gua-audio";
 		cpu-dai = <&sound_cpu>;
-		memory-region = <&audio_reserved>;
 		status = "disabled";
 	};
 

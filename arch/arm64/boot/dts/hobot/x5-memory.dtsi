@@ -46,27 +46,6 @@
 			no-map;
 		};
 
-		audio_reserved: audio@A2080000 {
-			compatible = "shared-dma-pool";
-			no-map;
-			reg = <0x0 0xA2080000 0x0 0x01000000>;
-			status = "okay";
-		};
-
-		adsp_ipc_reserved: audio@A3080000 {
-			compatible = "shared-dma-pool";
-			no-map;
-			reg = <0x0 0xA3080000 0x0 0x00800000>;
-			status = "okay";
-		};
-
-		adsp_bsp_reserved: audio@A3880000 {
-			compatible = "shared-dma-pool";
-			no-map;
-			reg = <0x0 0xA3880000 0x0 0x00800000>;
-			status = "okay";
-		};
-
 		ramoops@A4080000 {
 			compatible = "ramoops";
 			reg = <0x0 0xA4080000 0x0 0x00040000>;

@@ -55,7 +55,7 @@
 		control-rpmsg-channel-mapping = <0x00 0x00	// a core to hifi 0
 										>;
 		msg-wrapper = <&ipc_wrapper>;
-		memory-region = <&adsp_bsp_reserved>;
+		gua-ipc = <&ipc_instance0>;
 		status = "okay";
 	};
 
@@ -71,7 +71,6 @@
 		compatible = "gua,sound-card";
 		model = "gua-audio";
 		cpu-dai = <&sound_cpu>;
-		memory-region = <&audio_reserved>;
 		status = "okay";
 	};
 
@@ -437,21 +436,18 @@
 
 &ipc_instance0 {
 	status = "okay";
-	shm-addr = <&adsp_ipc_reserved>;
 	local-offset = <0x0>;
 	remote-offset = <0x400>;
 };
 
 &ipc_instance1 {
 	status = "okay";
-	shm-addr = <&adsp_ipc_reserved>;
 	local-offset = <0x800>;
 	remote-offset = <0xc00>;
 };
 
 &ipc_instance2 {
 	status = "okay";
-	shm-addr = <&adsp_ipc_reserved>;
 	local-offset = <0x1000>;
 	remote-offset = <0x4000>;
 };
@@ -464,7 +460,6 @@
 	status = "okay";
 	hifi5-rpmsg-channel-mapping = <0x00>, <0x00>;
 	msg-wrapper = <&ipc_wrapper>;
-	shm-addr = <&adsp_bsp_reserved>;
 	remoteproc-ipc = <&ipc_instance1>;
 };
 
