@@ -350,7 +350,7 @@
 &spi5 {
 	status = "okay";
 	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_spi5 &lsio_gpio0_7 &lsio_gpio0_12 &lsio_gpio1_6>;
+	pinctrl-0 = <&pinctrl_spi5 &lsio_gpio0_7 &lsio_gpio0_12>;
 
 	tcan4x5x: tcan4x5x@0 {
 		compatible = "ti,tcan4x5x";
@@ -361,7 +361,6 @@
 		bosch,mram-cfg = <0x0 0 0 16 0 0 1 1>;
 		interrupt-parent = <&ls_gpio0_porta>;
 		interrupts = <12 IRQ_TYPE_EDGE_FALLING>;
-		device-wake-gpios = <&ls_gpio1_porta 6 GPIO_ACTIVE_LOW>;
 		reset-gpios = <&ls_gpio0_porta 7 GPIO_ACTIVE_HIGH>;
 	};
 };
