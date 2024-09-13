@@ -548,8 +548,6 @@ static int guc_adc_hw_init(struct guc_adc *info)
 		writel_relaxed(0x1, info->regs + GUC_CTRL_NOR_CTRL0);
 		/* initial internal circuit */
 		writel_relaxed(0x33, info->regs + GUC_TOP_ANA_CTRL1);
-		init_completion(&info->completion);
-		info->nb.notifier_call = guc_adc_volt_notify;
 	}
 	return ret;
 }
@@ -794,6 +792,8 @@ static int guc_adc_probe(struct platform_device *pdev)
 		return ret;
 	}
 
+	init_completion(&info->completion);
+	info->nb.notifier_call = guc_adc_volt_notify;
 	mutex_init(&info->adc_lock);
 	dev_info(&pdev->dev, "GUC Initialize Finish\n");
 	return devm_iio_device_register(&pdev->dev, indio_dev);
