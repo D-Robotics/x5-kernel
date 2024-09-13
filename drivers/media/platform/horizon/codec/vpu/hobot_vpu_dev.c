@@ -367,7 +367,7 @@ static int32_t vdi_lock_release(struct file *filp, hb_vpu_dev_t *dev, hb_vpu_ins
 			//coverity[misra_c_2012_rule_18_4_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
 			while (VPU_READL(WAVE_VPU_BUSY_STATUS) != 0U) { /* PRQA S 1006,0497,1843,1021 */
 				if (time_after(jiffies, timeout)) { /* PRQA S 3469,3415,4394,4558,4115,1021,1020,2996 */
-					VPU_INFO_DEV(dev->device, "Wait Interrupt BUSY timeout pid %d\n", current->pid);
+					VPU_ERR_DEV(dev->device, "Wait Interrupt BUSY timeout pid %d\n", current->pid);
 					osal_spin_lock_irqsave(&dev->irq_spinlock, (uint64_t *)&flags_mp);
 					dev->ignore_irq = 0;
 					osal_spin_unlock_irqrestore(&dev->irq_spinlock, (uint64_t *)&flags_mp);
@@ -476,7 +476,7 @@ static int32_t vdi_lock_base(struct file *filp, hb_vpu_dev_t *dev, hb_vpu_mutex_
 		//coverity[misra_c_2012_rule_11_4_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
 		dev->current_vdi_lock_pid[type] = (int64_t)filp;
 	} else {
-		VPU_INFO_DEV(dev->device, "down_interruptible error ret=%d\n", ret);
+		VPU_ERR_DEV(dev->device, "down_interruptible error ret=%d\n", ret);
 	}
 	// PRQA S 3432,4543,4403,4558,4542,1861,3344 ++
 #ifndef CONFIG_PREEMPT_RT
@@ -588,13 +588,13 @@ static int32_t vdi_lock_release(struct file *filp, hb_vpu_dev_t *dev, hb_vpu_ins
 	//coverity[misra_c_2012_rule_11_4_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
 	if (dev->current_vdi_lock_pid[type] == (int64_t)filp) {
 		// PRQA S 3432,4543,4403,4558,4542,1861,3344 ++
-		VPU_INFO_DEV(dev->device, "MUTEX_TYPE: %d, VDI_LOCK_PID: %lld, current->pid: %d, "
+		VPU_DBG_DEV(dev->device, "MUTEX_TYPE: %d, VDI_LOCK_PID: %lld, current->pid: %d, "
 			"current->tgid=%d, filp=%pK\n", type, dev->current_vdi_lock_pid[type],
 			current->pid, current->tgid, filp);
 
 		// PRQA S 3432,4543,4403,4558,4542,1861,3344 --
 		if (type == VPUDRV_MUTEX_VPU) {
-			VPU_INFO_DEV(dev->device, "Free pendingInst=%pK, pendingInstIdxPlus1=%d\n",
+			VPU_DBG_DEV(dev->device, "Free pendingInst=%pK, pendingInstIdxPlus1=%d\n",
 				vip->pendingInst, vip->pendingInstIdxPlus1);
 			vip->pendingInst = NULL;
 			vip->pendingInstIdxPlus1 = 0;
@@ -637,7 +637,7 @@ static int32_t vdi_lock_release(struct file *filp, hb_vpu_dev_t *dev, hb_vpu_ins
 			//coverity[misra_c_2012_rule_18_4_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
 			while (VPU_READL(WAVE_VPU_BUSY_STATUS) != 0U) { /* PRQA S 1006,0497,1843,1021 */
 				if (time_after(jiffies, timeout)) { /* PRQA S 3469,3415,4394,4558,4115,1021,1020,2996 */
-					VPU_INFO_DEV(dev->device, "Wait Interrupt BUSY timeout pid %d\n", current->pid);
+					VPU_ERR_DEV(dev->device, "Wait Interrupt BUSY timeout pid %d\n", current->pid);
 					osal_spin_lock_irqsave(&dev->irq_spinlock, (uint64_t *)&flags_mp);
 					dev->ignore_irq = 0;
 					osal_spin_unlock_irqrestore(&dev->irq_spinlock, (uint64_t *)&flags_mp);
@@ -1126,7 +1126,7 @@ static int32_t vpuapi_sw_reset(struct file *filp, hb_vpu_dev_t *dev, uint32_t co
 
 	if (reset_mode == 0) {
 		ret = wave_sleep_wake(dev, core, VPU_SLEEP_MODE);
-		VPU_INFO_DEV(dev->device, "Sleep done ret=%d\n", ret);
+		VPU_DBG_DEV(dev->device, "Sleep done ret=%d\n", ret);
 		if (ret != (int32_t)VPUAPI_RET_SUCCESS) {
 			return ret;
 		}
@@ -1405,7 +1405,7 @@ int32_t vpuapi_dec_set_stream_end(struct file *filp, hb_vpu_dev_t *dev, uint32_t
 		val = VPU_READL(W5_RET_SUCCESS);
 		if (val == 0U) {
 			ret = (int32_t)VPUAPI_RET_FAILURE;
-			VPU_INFO_DEV(dev->device, "inst[%02d] ret=%d\n", inst, ret);
+			VPU_ERR_DEV(dev->device, "inst[%02d] ret=%d\n", inst, ret);
 			return ret;
 		}
 	} else {
@@ -1519,7 +1519,7 @@ static void *vpu_vmap_work_buffer_memory(hb_vpu_work_resmem_t *reserved)
 	uint32_t i, page_count = 0;
 	pgprot_t pgprot;
 
-	VPU_INFO("%s phys=0x%llx, size=%d\n", __func__, reserved->base, reserved->size);
+	VPU_DEBUG("%s phys=0x%llx, size=%d\n", __func__, reserved->base, reserved->size);
 	page_count = reserved->size / PAGE_SIZE;	// must be align.
 	pages = kmalloc_array(page_count, sizeof(struct page *), GFP_KERNEL);
 	for (i = 0; i < page_count; i++) {
@@ -1805,7 +1805,7 @@ static void vpu_force_free_lock(hb_vpu_dev_t *dev, uint32_t core)
 
 	for (i = 0; i < (int32_t)VPUDRV_MUTEX_MAX; i++) {
 		if (dev->current_vdi_lock_pid[i] != 0) {
-			VPU_INFO_DEV(dev->device, "RELEASE MUTEX_TYPE: %d, VDI_LOCK_PID: %lld, current->pid: %d, current->tgid: %d.\n",
+			VPU_DBG_DEV(dev->device, "RELEASE MUTEX_TYPE: %d, VDI_LOCK_PID: %lld, current->pid: %d, current->tgid: %d.\n",
 			i, dev->current_vdi_lock_pid[i], current->pid, current->tgid);
 			vdi_unlock(dev, i);
 		}
@@ -1847,7 +1847,7 @@ static void vpu_free_lock(struct file *filp, hb_vpu_dev_t *dev,
 	vdi_mutexes_base = (vip +
 		(instance_pool_size_per_core -
 		(uint32_t)PTHREAD_MUTEX_T_HANDLE_SIZE * VDI_NUM_LOCK_HANDLES));
-	VPU_INFO_DEV(dev->device, "force to destroy "
+	VPU_DBG_DEV(dev->device, "force to destroy "
 		"vdi_mutexes_base=%pK in userspace \n",
 		vdi_mutexes_base);
 	if (vdi_mutexes_base) {
@@ -3573,7 +3573,7 @@ static void vpu_instance_status_display(hb_vpu_dev_t *dev)
 	all_crash_inst_mask = *dev->vpu_crash_inst_bitmap;
 	all_free_inst_mask = ((1ULL << MAX_NUM_VPU_INSTANCE) - 1) & (~all_alloc_inst_mask);
 	osal_spin_unlock(&dev->vpu_spinlock);
-	VPU_INFO_DEV(dev->device, "VPU INST STAT (free=0x%llx, alloc=0x%llx, crash=0x%llx)\n",
+	VPU_DBG_DEV(dev->device, "VPU INST STAT (free=0x%llx, alloc=0x%llx, crash=0x%llx)\n",
 		all_free_inst_mask, all_alloc_inst_mask, all_crash_inst_mask);
 }
 
@@ -7094,7 +7094,7 @@ static int32_t __init vpu_init_system_mem(struct platform_device *pdev,
 		dev->dec_work_memory[i].iova = dev->codec_mem_reserved2.iova + tmp_offset;
 		dev->dec_work_memory[i].size = WAVE521DEC_WORKBUF_SIZE;
 		//coverity[misra_c_2012_rule_8_6_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
-		VPU_INFO_DEV(&pdev->dev, "Reserverd Codec Dec MEM[%02d] phys 0x%llx, iova 0x%llx, size %d\n",
+		VPU_DBG_DEV(&pdev->dev, "Reserverd Codec Dec MEM[%02d] phys 0x%llx, iova 0x%llx, size %d\n",
 			i, dev->dec_work_memory[i].phys_addr, dev->dec_work_memory[i].iova, dev->dec_work_memory[i].size);
 	}
 	for (i = 0; i < MAX_NUM_VPU_INSTANCE; i++) {
@@ -7104,7 +7104,7 @@ static int32_t __init vpu_init_system_mem(struct platform_device *pdev,
 		dev->enc_work_memory[i].iova = dev->codec_mem_reserved2.iova + tmp_offset;
 		dev->enc_work_memory[i].size = WAVE521ENC_WORKBUF_SIZE;
 		//coverity[misra_c_2012_rule_8_6_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
-		VPU_INFO_DEV(&pdev->dev, "Reserverd Codec Enc MEM[%02d] phys 0x%llx, iova 0x%llx, size %d\n",
+		VPU_DBG_DEV(&pdev->dev, "Reserverd Codec Enc MEM[%02d] phys 0x%llx, iova 0x%llx, size %d\n",
 			i, dev->enc_work_memory[i].phys_addr, dev->enc_work_memory[i].iova, dev->enc_work_memory[i].size);
 	}
 #endif
@@ -7146,9 +7146,9 @@ static int32_t __init vpu_init_system_mem(struct platform_device *pdev,
 	//coverity[misra_c_2012_rule_8_6_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
 	//coverity[misra_c_2012_rule_10_1_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
 	//coverity[misra_c_2012_rule_10_3_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
-	VPU_DBG_DEV(&pdev->dev,
+	VPU_INFO_DEV(&pdev->dev,
 		"vpu IO memory resource: physical base addr = 0x%llx,"
-		"virtual base addr = %pK\n", dev->vpu_mem->start,
+		"virtual base addr = %px\n", dev->vpu_mem->start,
 		dev->regs_base);
 	// PRQA S 3432,4543,4403,4558,4542,1861,3344 --
 
@@ -7706,7 +7706,7 @@ static int32_t vpu_remove(struct platform_device *pdev) /* PRQA S 3673 */
 
 	ret = hb_vpu_hw_reset();
 	if (ret != 0) {
-		VPU_INFO_DEV(&pdev->dev, "Failed to reset vpu.\n");
+		VPU_ERR_DEV(&pdev->dev, "Failed to reset vpu.\n");
 	}
 
 	hb_vpu_pm_ctrl(dev, 1, 0);
@@ -7808,7 +7808,7 @@ static int32_t vpu_suspend(struct device *pdev) /* PRQA S 3673 */
 				//coverity[misra_c_2012_rule_18_4_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
 				if (VPU_READL(suc_reg) == 0U) { /* PRQA S 1006,0497,1843,1021 */
 				//coverity[misra_c_2012_rule_18_4_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
-					VPU_INFO_DEV(dev->device, "SLEEP_VPU failed [0x%x]", /* PRQA S 1021,1006,0497 */
+					VPU_ERR_DEV(dev->device, "SLEEP_VPU failed [0x%x]", /* PRQA S 1021,1006,0497 */
 						VPU_READL(fail_reg));
 					if (hb_vpu_clk_disable(dev) != 0) {
 						VPU_ERR_DEV(dev->device, "failed to disable clock.\n");
@@ -7816,7 +7816,7 @@ static int32_t vpu_suspend(struct device *pdev) /* PRQA S 3673 */
 					return -EAGAIN;
 				}
 			} else {
-				VPU_INFO_DEV(dev->device, "[VPUDRV] Unknown product id : %08x\n",
+				VPU_ERR_DEV(dev->device, "[VPUDRV] Unknown product id : %08x\n",
 					product_code);
 				if (hb_vpu_clk_disable(dev) != 0) {
 					VPU_ERR_DEV(dev->device, "failed to disable clock.\n");

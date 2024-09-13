@@ -33,11 +33,11 @@ static int32_t vpu_prio_check_and_run(hb_vpu_prio_queue_t *vpq, hb_vpu_prio_cmd_
 		osal_spin_lock(&vpq->vpu_prio_lock);
 		vpq->prio_done_flags[prio_cmd->priority][prio_cmd->inst_idx] = 1;
 		osal_spin_unlock(&vpq->vpu_prio_lock);
-		VPU_INFO_DEV(dev->device, "wakeup prio:%d, inst:%d\n",
+		VPU_DBG_DEV(dev->device, "wakeup prio:%d, inst:%d\n",
 			prio_cmd->priority, prio_cmd->inst_idx);
 		osal_wake_up(&vpq->cmd_wait_q[prio_cmd->priority]);
 	} else {
-		VPU_INFO_DEV(dev->device, "Kfifo out prio: %d command failed.\n", prio);
+		VPU_ERR_DEV(dev->device, "Kfifo out prio: %d command failed.\n", prio);
 	}
 
 	return 0;
@@ -62,10 +62,10 @@ int32_t vpu_prio_set_command_to_fw(hb_vpu_prio_queue_t *vpq)
 		if (osal_fifo_is_empty(&vpq->prio_fifo[i]) != 0) {
 			continue;
 		} else {
-			VPU_INFO_DEV(dev->device, "find prio %d.\n", i);
+			VPU_DBG_DEV(dev->device, "find prio %d.\n", i);
 			ret = vpu_prio_check_and_run(vpq, &prio_cmd, (uint32_t)i);
 			if (ret != 0) {
-				VPU_INFO_DEV(dev->device, "vpu_prio_check_and_run failed, ret=%d.\n", ret);
+				VPU_ERR_DEV(dev->device, "vpu_prio_check_and_run failed, ret=%d.\n", ret);
 			}
 			break;
 		}
@@ -106,7 +106,7 @@ int32_t vpu_prio_set_enc_dec_pic(struct file *filp, void *vpu, u_long arg)
 		prio_cmd.inst_idx = enc_cmd.inst_idx;
 		prio_cmd.priority = enc_cmd.priority;
 		vpq = dev->prio_queue;
-		VPU_INFO_DEV(dev->device, "enc_cmd.inst_idx %d, enc_cmd.priority %d.\n", enc_cmd.inst_idx, enc_cmd.priority);
+		VPU_DBG_DEV(dev->device, "enc_cmd.inst_idx %d, enc_cmd.priority %d.\n", enc_cmd.inst_idx, enc_cmd.priority);
 		if (osal_fifo_is_full(&vpq->prio_fifo[prio_cmd.priority]) != (bool)0) {
 			VPU_INFO_DEV(dev->device, "Prio command fifo is full, prio=%d, inst_idx=%d.\n",
 				prio_cmd.priority, prio_cmd.inst_idx);

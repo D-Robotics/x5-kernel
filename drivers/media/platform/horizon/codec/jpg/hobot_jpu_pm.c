@@ -26,7 +26,7 @@ int32_t hb_jpu_clk_get(hb_jpu_dev_t *dev, uint64_t freq)
 		return -1;
 	}
 	rate = clk_get_rate(dev->jpu_pclk);
-	JPU_INFO_DEV(dev->device, "%s clock is %llu\n", JPU_JPEG_PCLK_NAME, rate);
+	JPU_DBG_DEV(dev->device, "%s clock is %llu\n", JPU_JPEG_PCLK_NAME, rate);
 
 	dev->jpu_aclk = devm_clk_get(dev->device, JPU_JPEG_ACLK_NAME);
 	if ((!dev->jpu_aclk) || clk_prepare_enable(dev->jpu_aclk)) {
@@ -39,7 +39,7 @@ int32_t hb_jpu_clk_get(hb_jpu_dev_t *dev, uint64_t freq)
 	}
 
 	rate = clk_get_rate(dev->jpu_aclk);
-	JPU_INFO_DEV(dev->device, "%s clock is %llu\n", JPU_JPEG_ACLK_NAME, rate);
+	JPU_DBG_DEV(dev->device, "%s clock is %llu\n", JPU_JPEG_ACLK_NAME, rate);
 
 	dev->jpu_cclk = devm_clk_get(dev->device, JPU_JPEG_CCLK_NAME);
 	if ((!dev->jpu_cclk) || clk_prepare_enable(dev->jpu_cclk)) {
@@ -53,7 +53,7 @@ int32_t hb_jpu_clk_get(hb_jpu_dev_t *dev, uint64_t freq)
 	}
 
 	rate = clk_get_rate(dev->jpu_cclk);
-	JPU_INFO_DEV(dev->device, "%s clock is %llu\n", JPU_JPEG_CCLK_NAME, rate);
+	JPU_DBG_DEV(dev->device, "%s clock is %llu\n", JPU_JPEG_CCLK_NAME, rate);
 
 	return 0;
 }

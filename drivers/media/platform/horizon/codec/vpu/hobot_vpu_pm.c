@@ -34,7 +34,7 @@ int32_t hb_vpu_clk_get(hb_vpu_dev_t *dev, uint64_t freq)
 	}
 
 	rate = clk_get_rate(dev->vpu_pclk);
-	VPU_INFO_DEV(dev->device, "%s clock is %llu\n", VPU_PCLK_NAME, rate);
+	VPU_DBG_DEV(dev->device, "%s clock is %llu\n", VPU_PCLK_NAME, rate);
 
 	/* 2. vpu aclk */
 	dev->vpu_aclk = devm_clk_get(dev->device, VPU_ACLK_NAME);
@@ -49,7 +49,7 @@ int32_t hb_vpu_clk_get(hb_vpu_dev_t *dev, uint64_t freq)
 	}
 
 	rate = clk_get_rate(dev->vpu_aclk);
-	VPU_INFO_DEV(dev->device, "%s clock is %llu\n", VPU_ACLK_NAME, rate);
+	VPU_DBG_DEV(dev->device, "%s clock is %llu\n", VPU_ACLK_NAME, rate);
 
 	/* 3. vpu bclk */
 	dev->vpu_bclk = devm_clk_get(dev->device, VPU_VCPU_BPU_CLK_NAME);
@@ -82,7 +82,7 @@ int32_t hb_vpu_clk_get(hb_vpu_dev_t *dev, uint64_t freq)
 	}
 
 	rate = clk_get_rate(dev->vpu_bclk);
-	VPU_INFO_DEV(dev->device, "%s clock is %llu\n", VPU_VCPU_BPU_CLK_NAME, rate);
+	VPU_DBG_DEV(dev->device, "%s clock is %llu\n", VPU_VCPU_BPU_CLK_NAME, rate);
 
 	/* 4. vpu cclk */
 	dev->vpu_cclk = devm_clk_get(dev->device, VPU_VCE_CLK_NAME);
@@ -117,7 +117,7 @@ int32_t hb_vpu_clk_get(hb_vpu_dev_t *dev, uint64_t freq)
 	}
 
 	rate = clk_get_rate(dev->vpu_cclk);
-	VPU_INFO_DEV(dev->device, "%s clock is %llu\n", VPU_VCE_CLK_NAME, rate);
+	VPU_DBG_DEV(dev->device, "%s clock is %llu\n", VPU_VCE_CLK_NAME, rate);
 
 	return 0;
 }
@@ -169,7 +169,7 @@ int32_t hb_vpu_clk_enable(const hb_vpu_dev_t *dev, uint64_t freq)
 			clk_disable_unprepare(dev->vpu_aclk);
 			return -1;
 		}
-		VPU_INFO_DEV(dev->device, "%s clock is %llu\n", VPU_VCPU_BPU_CLK_NAME, round_rate);
+		VPU_DBG_DEV(dev->device, "%s clock is %llu\n", VPU_VCPU_BPU_CLK_NAME, round_rate);
 	}
 
 	ret = clk_prepare_enable(dev->vpu_bclk);
@@ -190,7 +190,7 @@ int32_t hb_vpu_clk_enable(const hb_vpu_dev_t *dev, uint64_t freq)
 			clk_disable_unprepare(dev->vpu_bclk);
 			return -1;
 		}
-		VPU_INFO_DEV(dev->device, "%s clock is %llu\n", VPU_VCE_CLK_NAME, round_rate);
+		VPU_DBG_DEV(dev->device, "%s clock is %llu\n", VPU_VCE_CLK_NAME, round_rate);
 	}
 	ret = clk_prepare_enable(dev->vpu_cclk);
 	if (ret) {
