@@ -210,6 +210,7 @@ struct guc_adc {
 	u16 *sample_buffer;
 	u32 sample_nums;
 	u32 sample_rate;
+	struct mutex adc_lock;
 };
 
 #define GUC_ADC_CHANNEL(_index, _id, _res)                                                   \
@@ -246,6 +247,23 @@ static const struct of_device_id guc_adc_match[] = {
 	{},
 };
 MODULE_DEVICE_TABLE(of, guc_adc_match);
+
+/**
+ * @brief Check if adc is busy
+ *
+ * @param[in] info: guc_adc driver struct
+ *
+ * @retval true: adc is busy
+ * @retval false: adc is idle
+ */
+static inline bool guc_adc_is_busy(struct guc_adc *info)
+{
+	bool is_busy;
+	mutex_lock(&info->adc_lock);
+	is_busy = readl_relaxed(info->regs + GUC_CTRL_NOR_CTRL2);
+	mutex_unlock(&info->adc_lock);
+	return is_busy;
+}
 
 /**
  * @brief Reset adc fifo
@@ -338,7 +356,9 @@ static inline u32 guc_adc_nor_fifo_read(struct guc_adc *info)
  */
 static inline void guc_adc_nor_start(struct guc_adc *info, bool enable)
 {
+	mutex_lock(&info->adc_lock);
 	writel_relaxed(enable ? 0x01u : 0x00u, info->regs + GUC_CTRL_NOR_CTRL2);
+	mutex_unlock(&info->adc_lock);
 }
 
 /*
@@ -789,6 +809,7 @@ static int guc_adc_probe(struct platform_device *pdev)
 		return ret;
 	}
 
+	mutex_init(&info->adc_lock);
 	dev_info(&pdev->dev, "GUC Initialize Finish\n");
 	return devm_iio_device_register(&pdev->dev, indio_dev);
 }
@@ -832,6 +853,10 @@ static int guc_adc_suspend(struct device *dev)
 {
 	struct iio_dev *indio_dev = dev_get_drvdata(dev);
 	struct guc_adc *info	  = iio_priv(indio_dev);
+
+	if (guc_adc_is_busy(info)) {
+		return -EBUSY;
+	}
 
 	clk_disable_unprepare(info->clk);
 	clk_disable_unprepare(info->pclk);
