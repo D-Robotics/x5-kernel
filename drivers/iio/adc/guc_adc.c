@@ -162,8 +162,6 @@
 #define GUC_CTRL_INJ_STS6  0x0b88
 #define GUC_CTRL_INJ_STS7  0x0b8c
 
-#define IGA_ADC_MAX_CHANNELS 8
-#define GUC_ADC_SLEEP_US     1000
 #define GUC_ADC_TIMEOUT_US   10000
 #define FIFO_HALF_FULL_DEPTH (32)
 #define GUC_ADC_FIFO_VALID_BITS (16u)
@@ -179,12 +177,6 @@
 #define IGAV04_ADC_EFUSE_NEG_FLAG BIT(5)
 #define IGAV04_ADC_EFUSE_NEG_MASK GENMASK(5, 0)
 
-struct guc_adc_data {
-	struct device *dev;
-	const struct iio_chan_spec *channels;
-	int num_channels;
-};
-
 enum convert_mode {
 	SCAN = 0,
 	SINGLE,
@@ -199,7 +191,6 @@ struct guc_adc {
 	struct regulator *vref;
 	int uv_vref;
 	int passwd;
-	const struct guc_adc_data *data;
 	u32 last_val;
 	const struct iio_chan_spec *work_chan;
 	struct notifier_block nb;
@@ -234,15 +225,9 @@ static const struct iio_chan_spec igav04a_adc_iio_channels[] = {
 	GUC_ADC_CHANNEL(6, "adc6", 10), GUC_ADC_CHANNEL(7, "adc7", 10),
 };
 
-static const struct guc_adc_data igav04a_adc_data = {
-	.channels     = igav04a_adc_iio_channels,
-	.num_channels = ARRAY_SIZE(igav04a_adc_iio_channels),
-};
-
 static const struct of_device_id guc_adc_match[] = {
 	{
 		.compatible = "guc,igav04a",
-		.data	    = &igav04a_adc_data,
 	},
 	{},
 };
