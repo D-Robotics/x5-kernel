@@ -116,6 +116,7 @@
 
 #define GUC_CTRL_NOR_STS2	   0x0a34
 #define GUC_NOR_INT		   BIT(31)
+#define GUC_NOR_INT_ALL_DISABLE (0x0u)
 #define GUC_NOR_SAMPLE_ERR_INT	   BIT(5)
 #define GUC_NOR_FIFO_OVERFLOW_INT  BIT(4)
 #define GUC_NOR_FIFO_FULL_INT	   BIT(3)
@@ -204,7 +205,6 @@ struct guc_adc {
 	struct notifier_block nb;
 	int32_t calibration_offset;
 	u32 trimming_value;
-	enum convert_mode guc_convert_mode;
 	struct reset_control *reset;
 	u32 irq;
 	u16 *sample_buffer;
@@ -247,6 +247,34 @@ static const struct of_device_id guc_adc_match[] = {
 };
 MODULE_DEVICE_TABLE(of, guc_adc_match);
 
+/**
+ * @brief Reset adc fifo
+ *
+ * @param[in] info: guc_adc driver struct
+ *
+ * @retval * void
+ */
+static void guc_adc_nor_fifo_reset(struct guc_adc *info)
+{
+	u32 val;
+
+	/* assert reset signal */
+	val = readl_relaxed(info->regs + GUC_CTRL_NOR_CTRL5);
+	val &= ~BIT(0);
+	writel_relaxed(val, info->regs + GUC_CTRL_NOR_CTRL5);
+	/* de-assert reset signal */
+	val |= BIT(0);
+	writel_relaxed(val, info->regs + GUC_CTRL_NOR_CTRL5);
+}
+
+/*
+ * ADC normal mode interrupt type enable.
+ */
+static inline void guc_adc_nor_irq_set(struct guc_adc *info, u32 mask)
+{
+	writel_relaxed(mask, info->regs + GUC_CTRL_NOR_CTRL7);
+}
+
 /*
  * Abort sample when sample error.
  */
@@ -274,18 +302,9 @@ static void guc_adc_nor_channel_enable(struct guc_adc *info, struct iio_chan_spe
 /*
  * Sample mode choose: 0:scan 1:single.
  */
-static void guc_adc_nor_mode(struct guc_adc *info)
+static inline void guc_adc_nor_mode(struct guc_adc *info, enum convert_mode mode)
 {
-	u32 flag;
-
-	flag = readl_relaxed(info->regs + GUC_CTRL_NOR_CTRL4);
-
-	if (info->guc_convert_mode == SINGLE)
-		flag |= BIT(0);
-	else
-		flag &= ~BIT(0); /* scan mode */
-
-	writel_relaxed(flag, info->regs + GUC_CTRL_NOR_CTRL4);
+	writel_relaxed(mode, info->regs + GUC_CTRL_NOR_CTRL4);
 }
 
 /*
@@ -331,6 +350,9 @@ static int guc_adc_conversion(struct guc_adc *info, struct iio_chan_spec const *
 	unsigned long tmflag;
 
 	reinit_completion(&info->completion);
+	guc_adc_nor_fifo_reset(info);
+	guc_adc_nor_irq_set(info, (u32)GUC_NOR_SAMPLE_DONE_INT_EN);
+	guc_adc_fifo_read_enable(info, true);
 	guc_adc_nor_channel_enable(info, chan, true);
 	guc_adc_nor_start(info, true);
 
@@ -339,22 +361,12 @@ static int guc_adc_conversion(struct guc_adc *info, struct iio_chan_spec const *
 		ret = -ETIMEDOUT;
 	}
 
-	guc_adc_nor_channel_enable(info, chan, false);
 	guc_adc_nor_start(info, false); /* timeout or normal, adc should be stopped */
+	guc_adc_nor_channel_enable(info, chan, false);
+	guc_adc_nor_irq_set(info, (u32)~GUC_NOR_SAMPLE_DONE_INT_EN);
+	guc_adc_fifo_read_enable(info, false);
+
 	return ret;
-}
-
-static void guc_adc_nor_fifo_reset(struct guc_adc *info)
-{
-	u32 val;
-
-	/* assert reset signal */
-	val = readl_relaxed(info->regs + GUC_CTRL_NOR_CTRL5);
-	val &= ~BIT(0);
-	writel_relaxed(val, info->regs + GUC_CTRL_NOR_CTRL5);
-	/* de-assert reset signal */
-	val |= BIT(0);
-	writel_relaxed(val, info->regs + GUC_CTRL_NOR_CTRL5);
 }
 
 /*
@@ -366,11 +378,12 @@ static int guc_adc_read_raw(struct iio_dev *indio_dev, struct iio_chan_spec cons
 	int ret = -EINVAL;
 	struct guc_adc *info = iio_priv(indio_dev);
 
+	/* read raw mode, switch adc to single mode */
+	guc_adc_nor_mode(info, SINGLE);
 	if (mask == IIO_CHAN_INFO_RAW) {
 		ret = -EBUSY;
 		if (!iio_buffer_enabled(indio_dev)) {
 			mutex_lock(&indio_dev->mlock);
-			guc_adc_nor_fifo_reset(info);
 			ret = guc_adc_conversion(info, chan);
 			if (!ret) {
 				*val = info->last_val;
@@ -389,21 +402,6 @@ static int guc_adc_read_raw(struct iio_dev *indio_dev, struct iio_chan_spec cons
 static const struct iio_info guc_adc_iio_info = {
 	.read_raw = guc_adc_read_raw,
 };
-
-/*
- * ADC normal mode interrupt type enable.
- */
-static void guc_adc_nor_irq_enable(struct guc_adc *info, bool enable)
-{
-	u32 val;
-	val = readl_relaxed(info->regs + GUC_CTRL_NOR_CTRL7);
-	if (enable) {
-		val |= (GUC_NOR_SAMPLE_DONE_INT_EN | GUC_NOR_FIFO_HALF_FULL_INT_EN);
-	} else {
-		val &= ~(GUC_NOR_SAMPLE_DONE_INT_EN |GUC_NOR_FIFO_HALF_FULL_INT_EN);
-	}
-	writel_relaxed(val, info->regs + GUC_CTRL_NOR_CTRL7);
-}
 
 /*
  * Normal mode irq handler, read sample data from FIFO.
@@ -461,8 +459,7 @@ static irqreturn_t guc_adc_thread_irq(int irq, void *dev_id)
 	u32 val;
 
 	val = readl_relaxed(info->regs + GUC_CTRL_NOR_STS2);
-	if ((info->guc_convert_mode == SCAN) &&
-		(val & GUC_NOR_FIFO_HALF_FULL_INT)) {
+	if (val & GUC_NOR_FIFO_HALF_FULL_INT) {
 		while (buffer < sample_buffer_boundary) {
 			/* burst read 8 times to reduce while times */
 			*buffer++ = guc_adc_nor_fifo_read(info);
@@ -486,11 +483,8 @@ static irqreturn_t guc_adc_thread_irq(int irq, void *dev_id)
 			iio_push_to_buffers(indio_dev, buffer);
 			buffer += push_steps;
 		}
-	} else if ((info->guc_convert_mode == SINGLE) &&
-			   (val & GUC_NOR_SAMPLE_DONE_INT)) {
-		guc_adc_fifo_read_enable(info, true);
+	} else if (val & GUC_NOR_SAMPLE_DONE_INT) {
 		info->last_val = guc_adc_nor_fifo_read(info);
-		guc_adc_fifo_read_enable(info, false);
 		complete(&info->completion);
 	}
 
@@ -540,7 +534,7 @@ static int guc_adc_hw_init(struct guc_adc *info)
 		ret = 0;
 		writel_relaxed(info->trimming_value, info->regs + GUC_CTRL_TOP_CTRL0);
 		guc_adc_error_abort(info, false);
-		guc_adc_nor_mode(info);
+		guc_adc_nor_mode(info, SINGLE);
 		/* voltage measure mode */
 		val = readl_relaxed(info->regs + GUC_TOP_ANA_CTRL1);
 		val &= ~BIT(8);
@@ -549,7 +543,6 @@ static int guc_adc_hw_init(struct guc_adc *info)
 		writel_relaxed(0x1, info->regs + GUC_CTRL_NOR_CTRL0);
 		/* initial internal circuit */
 		writel_relaxed(0x33, info->regs + GUC_TOP_ANA_CTRL1);
-		guc_adc_nor_irq_enable(info, true);
 		init_completion(&info->completion);
 		info->nb.notifier_call = guc_adc_volt_notify;
 	}
@@ -560,8 +553,12 @@ static int guc_adc_postenable(struct iio_dev *indio_dev)
 {
 	int i;
 	struct guc_adc *info = iio_priv(indio_dev);
+
+	/* use iio framework, switch adc to scan mode */
+	guc_adc_nor_mode(info, SCAN);
 	info->sample_nums = 0;
 	guc_adc_nor_fifo_reset(info);
+	guc_adc_nor_irq_set(info, (u32)GUC_NOR_FIFO_HALF_FULL_INT_EN);
 	guc_adc_fifo_read_enable(info, true);
 	for_each_set_bit (i, indio_dev->active_scan_mask, indio_dev->masklength) {
 		guc_adc_nor_channel_enable(info, &indio_dev->channels[i], true);
@@ -576,6 +573,7 @@ static int guc_adc_predisable(struct iio_dev *indio_dev)
 	struct guc_adc *info = iio_priv(indio_dev);
 	guc_adc_nor_start(info, false);
 	guc_adc_fifo_read_enable(info, false);
+	guc_adc_nor_irq_set(info, (u32)~GUC_NOR_FIFO_HALF_FULL_INT_EN);
 	for_each_set_bit (i, indio_dev->active_scan_mask, indio_dev->masklength) {
 		guc_adc_nor_channel_enable(info, &indio_dev->channels[i], false);
 	}
@@ -706,11 +704,6 @@ static int guc_adc_probe(struct platform_device *pdev)
 	}
 	info->uv_vref = ret;
 
-	if (device_property_read_bool(&pdev->dev, "guc,scan"))
-		info->guc_convert_mode = SCAN;
-	else
-		info->guc_convert_mode = SINGLE;
-
 	/* nvmem value is optional */
 	ret = adc_nvmem_cell_data(pdev, "adc-offset", &val);
 	if (ret < 0) {
@@ -811,7 +804,7 @@ static int guc_adc_remove(struct platform_device *pdev)
 	for (i = 0; i < indio_dev->num_channels; ++i) {
 		guc_adc_nor_channel_enable(info, &indio_dev->channels[i], false);
 	}
-	guc_adc_nor_irq_enable(info, false);
+	guc_adc_nor_irq_set(info, (u32)GUC_NOR_INT_ALL_DISABLE);
 	guc_adc_clk_disable(info);
 	kfree(info->sample_buffer);
 	info->sample_buffer = NULL;
