@@ -164,6 +164,9 @@
 #define IGA_ADC_MAX_CHANNELS 8
 #define GUC_ADC_SLEEP_US     1000
 #define GUC_ADC_TIMEOUT_US   10000
+#define FIFO_HALF_FULL_DEPTH (32)
+#define GUC_ADC_FIFO_VALID_BITS (16u)
+#define GUC_ADC_FIFO_VALID_BYTES (GUC_ADC_FIFO_VALID_BITS / BITS_PER_BYTE)
 
 /* adc calibration information in eFuse */
 #define IGAV04_ADC_EFUSE_BYTES	      6
@@ -218,7 +221,7 @@ struct guc_adc {
 		.scan_type  = {                                                              \
 			 .sign	      = 'u',                                                 \
 			 .realbits    = _res,                                                \
-			 .storagebits = 16,                                                  \
+			 .storagebits = GUC_ADC_FIFO_VALID_BITS,                                                  \
 			 .endianness  = IIO_CPU,                                             \
 		 },                                                                          \
 	}
@@ -302,14 +305,13 @@ static inline void guc_adc_fifo_read_enable(struct guc_adc *info, bool enable)
 	writel_relaxed(val, info->regs + GUC_CTRL_NOR_CTRL6);
 }
 
-static void guc_adc_nor_fifo_read(struct guc_adc *info)
+static inline u32 guc_adc_nor_fifo_read(struct guc_adc *info)
 {
 	u32 val;
 
-	val = readl_relaxed(info->regs + GUC_CTRL_NOR_STS1) & SAMPLE_MASK;
-
-	info->last_val = (val >> SAMPLE_OFFSET);
-	info->last_val -= info->calibration_offset;
+	val = (readl_relaxed(info->regs + GUC_CTRL_NOR_STS1) & SAMPLE_MASK);
+	val = ((val >> SAMPLE_OFFSET) - info->calibration_offset);
+	return val;
 }
 
 /*
@@ -396,9 +398,9 @@ static void guc_adc_nor_irq_enable(struct guc_adc *info, bool enable)
 	u32 val;
 	val = readl_relaxed(info->regs + GUC_CTRL_NOR_CTRL7);
 	if (enable) {
-		val |= (GUC_NOR_SAMPLE_DONE_INT_EN);
+		val |= (GUC_NOR_SAMPLE_DONE_INT_EN | GUC_NOR_FIFO_HALF_FULL_INT_EN);
 	} else {
-		val &= ~(GUC_NOR_SAMPLE_DONE_INT_EN);
+		val &= ~(GUC_NOR_SAMPLE_DONE_INT_EN |GUC_NOR_FIFO_HALF_FULL_INT_EN);
 	}
 	writel_relaxed(val, info->regs + GUC_CTRL_NOR_CTRL7);
 }
@@ -451,30 +453,47 @@ static irqreturn_t guc_adc_trigger_handler(int irq, void *p)
  */
 static irqreturn_t guc_adc_thread_irq(int irq, void *dev_id)
 {
-	u32 i, val;
 	struct iio_dev *indio_dev = dev_id;
-	struct guc_adc *info	  = iio_priv(indio_dev);
-	val = readl_relaxed(info->regs + GUC_CTRL_NOR_STS2);
-	if (val & GUC_NOR_SAMPLE_DONE_INT) {
-		if (iio_buffer_enabled(indio_dev) && indio_dev->active_scan_mask) {
-			for_each_set_bit (i, indio_dev->active_scan_mask, indio_dev->masklength) {
-				info->sample_buffer[info->sample_nums++] =
-					((readl_relaxed(info->regs + GUC_CTRL_TOP_STS2 + i * 4)) >> 2);
-			}
+	struct guc_adc *info = iio_priv(indio_dev);
+	register u16 *buffer = info->sample_buffer;
+	register u16 *sample_buffer_boundary = buffer + FIFO_HALF_FULL_DEPTH;
+	register u32 push_steps = indio_dev->scan_bytes / GUC_ADC_FIFO_VALID_BYTES;
+	u32 val;
 
-			iio_push_to_buffers(indio_dev, info->sample_buffer);
-			iio_trigger_notify_done(indio_dev->trig);
-			info->sample_nums = 0;
-		} else {
-			val = readl_relaxed(info->regs + GUC_CTRL_NOR_STS0);
-			if (!(val & 0x01u)) {
-				guc_adc_fifo_read_enable(info, true);
-				guc_adc_nor_fifo_read(info);
-				guc_adc_fifo_read_enable(info, false);
-				complete(&info->completion);
-			}
+	val = readl_relaxed(info->regs + GUC_CTRL_NOR_STS2);
+	if ((info->guc_convert_mode == SCAN) &&
+		(val & GUC_NOR_FIFO_HALF_FULL_INT)) {
+		while (buffer < sample_buffer_boundary) {
+			/* burst read 8 times to reduce while times */
+			*buffer++ = guc_adc_nor_fifo_read(info);
+			*buffer++ = guc_adc_nor_fifo_read(info);
+			*buffer++ = guc_adc_nor_fifo_read(info);
+			*buffer++ = guc_adc_nor_fifo_read(info);
+			*buffer++ = guc_adc_nor_fifo_read(info);
+			*buffer++ = guc_adc_nor_fifo_read(info);
+			*buffer++ = guc_adc_nor_fifo_read(info);
+			*buffer++ = guc_adc_nor_fifo_read(info);
 		}
+		buffer = info->sample_buffer;
+		while (buffer < sample_buffer_boundary) {
+			/* push 4 times to reduce while times */
+			iio_push_to_buffers(indio_dev, buffer);
+			buffer += push_steps;
+			iio_push_to_buffers(indio_dev, buffer);
+			buffer += push_steps;
+			iio_push_to_buffers(indio_dev, buffer);
+			buffer += push_steps;
+			iio_push_to_buffers(indio_dev, buffer);
+			buffer += push_steps;
+		}
+	} else if ((info->guc_convert_mode == SINGLE) &&
+			   (val & GUC_NOR_SAMPLE_DONE_INT)) {
+		guc_adc_fifo_read_enable(info, true);
+		info->last_val = guc_adc_nor_fifo_read(info);
+		guc_adc_fifo_read_enable(info, false);
+		complete(&info->completion);
 	}
+
 	writel_relaxed(0x01u, info->regs + GUC_CTRL_NOR_CTRL8);
 	return IRQ_HANDLED;
 }
@@ -543,6 +562,7 @@ static int guc_adc_postenable(struct iio_dev *indio_dev)
 	struct guc_adc *info = iio_priv(indio_dev);
 	info->sample_nums = 0;
 	guc_adc_nor_fifo_reset(info);
+	guc_adc_fifo_read_enable(info, true);
 	for_each_set_bit (i, indio_dev->active_scan_mask, indio_dev->masklength) {
 		guc_adc_nor_channel_enable(info, &indio_dev->channels[i], true);
 	}
@@ -555,6 +575,7 @@ static int guc_adc_predisable(struct iio_dev *indio_dev)
 	int i;
 	struct guc_adc *info = iio_priv(indio_dev);
 	guc_adc_nor_start(info, false);
+	guc_adc_fifo_read_enable(info, false);
 	for_each_set_bit (i, indio_dev->active_scan_mask, indio_dev->masklength) {
 		guc_adc_nor_channel_enable(info, &indio_dev->channels[i], false);
 	}
@@ -606,7 +627,7 @@ static int guc_adc_probe(struct platform_device *pdev)
 
 	/* setup sample buffer */
 	info->sample_nums   = 0;
-	info->sample_buffer = kmalloc(ARRAY_SIZE(igav04a_adc_iio_channels) * sizeof(u16), GFP_KERNEL);
+	info->sample_buffer = kmalloc_array(FIFO_HALF_FULL_DEPTH, GUC_ADC_FIFO_VALID_BYTES, GFP_KERNEL);
 	if (!info->sample_buffer) {
 		return -ENOMEM;
 	}
