@@ -4085,7 +4085,6 @@
 				#address-cells = <1>;
 				#size-cells = <0>;
 				guc,sample-rate=<50000>;
-				guc,scan;
 				resets = <&socrst LSIO_ADC_RESET>;
 				reset-names = "guc-adc";
 			};
