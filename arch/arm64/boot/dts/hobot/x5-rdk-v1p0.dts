@@ -365,6 +365,13 @@
 	};
 };
 
+&lpwm1 {
+	status = "okay";
+	pinctrl-names = "default";
+	/** for display backlight **/
+	pinctrl-0 = <&pinctrl_lpwm1_0 &pinctrl_lpwm1_1>;
+};
+
 &pwm0 {
 	status = "disabled";
 	pinctrl-names = "default";
@@ -574,38 +581,36 @@
 &mipi_host0 {
 	status = "okay";
 	pinctrl-names = "enable", "disable";
-	pinctrl-0 = <&pinctrl_sensor0_mclk>; //mclk0
-	pinctrl-1 = <&lsio_gpio0_24>;
-	snrclk-idx = <0>;  //mclk index
+	// in RDK X5, MCLK uses an external active crystal oscillator
 };
 
 &mipi_host1 {
 	status = "okay";
-	// in RDK X5, mipi host0 & host1 share one mclk and gpio
+	// in RDK X5, mipi host0 & host1 share one gpio
 };
 
 &mipi_host2 {
 	status = "okay";
 	pinctrl-names = "enable", "disable";
-	pinctrl-0 = <&pinctrl_sensor1_mclk>; //mclk1
-	pinctrl-1 = <&lsio_gpio0_25>;
-	snrclk-idx = <1>;  //mclk index
+	// in RDK X5, MCLK uses an external active crystal oscillator
 };
 
 &mipi_host3 {
 	status = "okay";
-	// in RDK X5, mipi host2 & host3 share one mclk and gpio
+	// in RDK X5, mipi host2 & host3 share one gpio
 };
 
 &vin_vcon0 {
 	status = "okay";
 	/* camera sensor
 	 * reset gpio:	LSIO_GPIO1_PIN6:	353
+	 * lpwm      :  LSIO_SPI3_SCLK  :   pinctrl_lpwm1_0
 	 */
 	pinctrl-names = "default";
 	pinctrl-0 = <&lsio_gpio1_6>;
 	gpio_oth = <353>;   // reset gpio
 	bus = <6>; // i2c bus
+	lpwm_chn = <4>;
 };
 
 &vin_vcon1 {
@@ -618,11 +623,13 @@
 	status = "okay";
 	/* camera sensor
 	 * reset gpio:	LSIO_GPIO1_PIN4:	351
+	 * lpwm      :  LSIO_SPI3_SSN  :    pinctrl_lpwm1_1
 	 */
 	pinctrl-names = "default";
 	pinctrl-0 = <&lsio_gpio1_4>;
 	gpio_oth = <351>;   // reset gpio
 	bus = <4>;  // i2c bus
+	lpwm_chn = <5>;
 };
 
 &vin_vcon3 {
