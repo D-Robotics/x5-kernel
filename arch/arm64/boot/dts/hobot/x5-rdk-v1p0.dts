@@ -580,7 +580,6 @@
 
 &mipi_host0 {
 	status = "okay";
-	pinctrl-names = "enable", "disable";
 	// in RDK X5, MCLK uses an external active crystal oscillator
 };
 
@@ -591,7 +590,6 @@
 
 &mipi_host2 {
 	status = "okay";
-	pinctrl-names = "enable", "disable";
 	// in RDK X5, MCLK uses an external active crystal oscillator
 };
 
