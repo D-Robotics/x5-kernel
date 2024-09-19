@@ -492,6 +492,27 @@ static int bt1120_wb_post_create(struct bt1120_wb *bt1120_wb)
 	return drm_bridge_attach(encoder, bridge, NULL, DRM_BRIDGE_ATTACH_NO_CONNECTOR);
 }
 
+static void bt1120_wb_vblank(struct vs_wb *vs_wb)
+{
+	struct drm_writeback_connector *wb_connector = &vs_wb->base;
+	const struct drm_connector *connector	     = &wb_connector->base;
+	struct drm_connector_state *state	     = connector->state;
+	struct drm_writeback_job *job		     = state->writeback_job;
+	u8 *wait_vsync_cnt;
+
+	if (job) {
+		wait_vsync_cnt = job->priv;
+
+		if (!*wait_vsync_cnt) {
+			drm_writeback_queue_job(wb_connector, state);
+			drm_writeback_signal_completion(wb_connector, 0);
+			return;
+		}
+
+		(*wait_vsync_cnt)--;
+	}
+}
+
 static const struct vs_wb_funcs vs_wb_funcs = {
 	.destroy = bt1120_wb_destroy,
 	.commit	 = bt1120_wb_commit,
@@ -886,8 +907,33 @@ static const struct component_ops bt1120_component_ops = {
 };
 
 static const struct of_device_id bt1120_driver_dt_match[] = {
-	{.compatible = "verisilicon, bt1120", .data = &g_bt1120_info}, {}};
+	{.compatible = "verisilicon,bt1120", .data = &g_bt1120_info}, {}};
 MODULE_DEVICE_TABLE(of, bt1120_driver_dt_match);
+
+static void bt1120_wb_handle_vblank(struct drm_crtc *drm_crtc)
+{
+	const struct drm_crtc_state *crtc_state = drm_crtc->state;
+	struct drm_connector *connector;
+	struct drm_writeback_connector *wb_connector;
+	struct drm_connector_list_iter conn_iter;
+	struct vs_wb *vs_wb;
+
+	drm_connector_list_iter_begin(drm_crtc->dev, &conn_iter);
+
+	drm_for_each_connector_iter (connector, &conn_iter) {
+		if (!(crtc_state->connector_mask & drm_connector_mask(connector)))
+			continue;
+
+		if (connector->connector_type != DRM_MODE_CONNECTOR_WRITEBACK)
+			continue;
+
+		wb_connector = drm_connector_to_writeback(connector);
+		vs_wb	     = to_vs_wb(wb_connector);
+		bt1120_wb_vblank(vs_wb);
+	}
+
+	drm_connector_list_iter_end(&conn_iter);
+}
 
 static irqreturn_t bt1120_isr(int irq, void *data)
 {
@@ -901,6 +947,7 @@ static irqreturn_t bt1120_isr(int irq, void *data)
 
 	if (irq_status & DMA_DONE_IRQ_STATUS_MASK) {
 		drm_crtc_handle_vblank(bt1120->drm_crtc);
+		bt1120_wb_handle_vblank(bt1120->drm_crtc);
 	}
 
 	if (irq_status & FRAME_START_IRQ_STATUS_MASK) {
