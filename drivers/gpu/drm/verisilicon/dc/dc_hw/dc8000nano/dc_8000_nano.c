@@ -734,24 +734,38 @@ static void dc_8000_nano_proc_commit(struct dc_hw_processor *processor)
 	dc_hw_enable_shadow(hw, info->id, true);
 }
 
-static void dc_8000_nano_proc_enable_vblank(struct dc_hw_processor *processor, bool enable)
+static void dc_8000_nano_proc_enable_irq(struct dc_hw_processor *processor, u32 irq_bits)
 {
 	struct dc_hw *hw = processor->hw;
 	u32 config;
 
 	config = dc_read(hw, GCREG_DISPLAY_INTR_ENABLE_Address);
-	config = VS_SET_FIELD(config, GCREG_DISPLAY_INTR_ENABLE, DISP0, enable);
+
+	config |= irq_bits;
+
+	dc_write(hw, GCREG_DISPLAY_INTR_ENABLE_Address, config);
+}
+
+static void dc_8000_nano_proc_disable_irq(struct dc_hw_processor *processor, u32 irq_bits)
+{
+	struct dc_hw *hw = processor->hw;
+	u32 config;
+
+	config = dc_read(hw, GCREG_DISPLAY_INTR_ENABLE_Address);
+
+	config &= ~irq_bits;
 
 	dc_write(hw, GCREG_DISPLAY_INTR_ENABLE_Address, config);
 }
 
 static const struct dc_hw_proc_funcs dc_8000_nano_proc_funcs = {
-	.init	    = dc_8000_nano_proc_init,
-	.disable    = dc_8000_nano_proc_disable,
-	.update	    = dc_8000_nano_proc_update,
-	.get	    = dc_8000_nano_proc_get,
-	.commit	    = dc_8000_nano_proc_commit,
-	.enable_irq = dc_8000_nano_proc_enable_vblank,
+	.init	     = dc_8000_nano_proc_init,
+	.disable     = dc_8000_nano_proc_disable,
+	.update	     = dc_8000_nano_proc_update,
+	.get	     = dc_8000_nano_proc_get,
+	.commit	     = dc_8000_nano_proc_commit,
+	.enable_irq  = dc_8000_nano_proc_enable_irq,
+	.disable_irq = dc_8000_nano_proc_disable_irq,
 };
 
 static int dc_8000_nano_init(struct dc_hw *hw)

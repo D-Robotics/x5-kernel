@@ -84,11 +84,11 @@ static int dc_bind(struct device *dev, struct device *master, void *data)
 			goto err_cleanup_crtcs;
 		}
 
-		list_add_tail(&dc_crtc->head, &dc->crtc_list);
-
 		ret = dc_crtc_init(dc_crtc, dc_crtc_info, &dc->aux_list);
 		if (ret)
 			goto err_cleanup_crtcs;
+
+		list_add_tail(&dc_crtc->head, &dc->crtc_list);
 
 		vs_crtc	     = &dc_crtc->vs_crtc;
 		vs_crtc->dev = dc->dev;
@@ -120,11 +120,11 @@ static int dc_bind(struct device *dev, struct device *master, void *data)
 			goto err_cleanup_planes;
 		}
 
-		list_add_tail(&dc_plane->head, &dc->plane_list);
-
 		ret = dc_plane_init(dc_plane, dc_plane_info, &dc->aux_list);
 		if (ret)
 			goto err_cleanup_planes;
+
+		list_add_tail(&dc_plane->head, &dc->plane_list);
 
 		vs_plane      = &dc_plane->vs_plane;
 		vs_plane->dev = dc->dev;
@@ -153,11 +153,11 @@ static int dc_bind(struct device *dev, struct device *master, void *data)
 			goto err_cleanup_wbs;
 		}
 
-		list_add_tail(&dc_wb->head, &dc->wb_list);
-
 		ret = dc_wb_init(dc_wb, dc_wb_info, &dc->aux_list);
 		if (ret)
 			goto err_cleanup_wbs;
+
+		list_add_tail(&dc_wb->head, &dc->wb_list);
 
 		vs_wb	   = &dc_wb->vs_wb;
 		vs_wb->dev = dc->dev;
@@ -220,69 +220,45 @@ static const struct of_device_id dc_driver_dt_match[] = {
 };
 MODULE_DEVICE_TABLE(of, dc_driver_dt_match);
 
-static void dc_plane_handle_vblank(struct drm_crtc *drm_crtc)
+static void dc_crtc_handle_vblank(struct vs_dc *dc, struct vs_crtc *vs_crtc, u32 irq_status)
 {
-	struct drm_crtc_state *crtc_state = drm_crtc->state;
-	struct drm_plane *drm_plane;
-	struct vs_plane *vs_plane;
+	const struct vs_crtc_info *info	  = vs_crtc->info;
+	struct drm_crtc_state *crtc_state = vs_crtc->base.state;
+	struct dc_wb *dc_wb;
+	struct dc_plane *dc_plane;
 
-	drm_for_each_plane_mask (drm_plane, drm_crtc->dev, crtc_state->plane_mask) {
-		vs_plane = to_vs_plane(drm_plane);
-		dc_plane_vblank(vs_plane);
-	}
-}
+	if (!((info->vblank_bit | info->underflow_bit) & irq_status))
+		return;
 
-__maybe_unused static void dc_wb_handle_vblank(struct drm_crtc *drm_crtc)
-{
-	struct drm_crtc_state *crtc_state = drm_crtc->state;
-	struct drm_connector *connector;
-	struct drm_writeback_connector *wb_connector;
-	struct drm_connector_list_iter conn_iter;
-	struct vs_wb *vs_wb;
-
-	drm_connector_list_iter_begin(drm_crtc->dev, &conn_iter);
-
-	drm_for_each_connector_iter (connector, &conn_iter) {
-		if (!(crtc_state->connector_mask & drm_connector_mask(connector)))
+	list_for_each_entry (dc_plane, &dc->plane_list, head) {
+		if (!(drm_plane_mask(&dc_plane->vs_plane.base) & crtc_state->plane_mask))
 			continue;
 
-		if (connector->connector_type != DRM_MODE_CONNECTOR_WRITEBACK)
-			continue;
-
-		wb_connector = drm_connector_to_writeback(connector);
-		vs_wb	     = to_vs_wb(wb_connector);
-		dc_wb_vblank(vs_wb);
+		if (info->vblank_bit & irq_status)
+			dc_plane_vblank(&dc_plane->vs_plane, irq_status);
 	}
 
-	drm_connector_list_iter_end(&conn_iter);
+	list_for_each_entry (dc_wb, &dc->wb_list, head) {
+		if (!(drm_connector_mask(&dc_wb->vs_wb.base.base) & crtc_state->connector_mask))
+			continue;
+
+		if (info->vblank_bit & irq_status)
+			dc_wb_vblank(&dc_wb->vs_wb, irq_status);
+	}
+
+	dc_crtc_vblank(vs_crtc, irq_status);
 }
 
 static irqreturn_t dc_isr(int irq, void *data)
 {
 	struct vs_dc *dc = data;
-	struct drm_crtc *drm_crtc;
-	struct vs_crtc *vs_crtc;
 	struct dc_crtc *dc_crtc;
 	u32 irq_status;
 
 	irq_status = dc_hw_get_interrupt(dc->hw);
 
-	drm_for_each_crtc (drm_crtc, dc->drm_dev) {
-		vs_crtc = to_vs_crtc(drm_crtc);
-		if (vs_crtc->dev != dc->dev)
-			continue;
-		dc_crtc = to_dc_crtc(vs_crtc);
-		if (!(BIT(dc_crtc->info->id) & irq_status))
-			continue;
-
-		dc_plane_handle_vblank(drm_crtc);
-#ifdef CONFIG_DC8000_NANO_WRITEBACK_DEBUG
-		dc_wb_handle_vblank(drm_crtc);
-#endif
-		dc_crtc_vblank(vs_crtc);
-		drm_crtc_handle_vblank(drm_crtc);
-		return IRQ_HANDLED;
-	}
+	list_for_each_entry (dc_crtc, &dc->crtc_list, head)
+		dc_crtc_handle_vblank(dc, &dc_crtc->vs_crtc, irq_status);
 
 	return IRQ_HANDLED;
 }

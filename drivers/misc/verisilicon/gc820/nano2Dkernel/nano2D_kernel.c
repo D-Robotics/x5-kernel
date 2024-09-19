@@ -69,7 +69,7 @@ static n2d_error_t do_open(n2d_kernel_t *kernel, n2d_uint32_t process)
 	gcmkASSERT(dev_core_num <= NANO2D_DEV_CORE_COUNT);
 
 	ONERROR(n2d_kernel_db_attach_process(kernel->db, process, N2D_TRUE));
-	n2d_kernel_os_print("Attach process:%d\n", process);
+	//n2d_kernel_os_print("Attach process:%d\n", process);
 
 	n2d_kernel_os_atom_inc(kernel->os, kernel->dev_ref, &dev_ref_old);
 

@@ -114,12 +114,20 @@ void dc_hw_disable(struct dc_hw_processor *processor);
 void dc_hw_commit(struct dc_hw_processor *processor);
 
 /**
- * @brief enable disable vblank interrupt
+ * @brief enable interrupt
  *
  * @param[in] processor dc hw processor pointer
- * @param[in] enable true to enable
+ * @param[in] irq_bits irq bits to enable
  */
-void dc_hw_enable_vblank(struct dc_hw_processor *processor, bool enable);
+void dc_hw_enable_irq(struct dc_hw_processor *processor, u32 irq_bits);
+
+/**
+ * @brief disable interrupt
+ *
+ * @param[in] processor dc hw processor pointer
+ * @param[in] irq_bits irq bits to disable
+ */
+void dc_hw_disable_irq(struct dc_hw_processor *processor, u32 irq_bits);
 
 /**
  * @brief get VBlank interrupt

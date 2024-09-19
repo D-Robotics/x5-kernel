@@ -65,6 +65,9 @@ struct vs_crtc_info {
 	u16 gamma_size;
 	/** gamma bit depth */
 	u8 gamma_bits;
+	/** irq bit need to process */
+	u32 vblank_bit;
+	u32 underflow_bit;
 	/** display id */
 	u8 id;
 };
@@ -85,6 +88,7 @@ struct vs_crtc_funcs {
 	void (*enable_vblank)(struct vs_crtc *vs_crtc, bool enable);
 	void (*enable_crc)(struct vs_crtc *vs_crtc, bool enable);
 	void (*commit)(struct vs_crtc *vs_crtc, struct drm_crtc_state *old_state);
+	void (*handle_vblank)(struct vs_crtc *vs_crtc, u32 irq_status);
 
 	struct drm_crtc_state *(*create_state)(struct vs_crtc *vs_crtc);
 	void (*destroy_state)(struct drm_crtc_state *state);

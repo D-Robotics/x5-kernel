@@ -439,8 +439,6 @@ static int dc_hw_proc_check_plane(struct dc_proc *dc_proc, void *_state)
 	const struct dc_hw_plane_info *plane_info = dc_proc->info->info;
 	const struct dc_plane_proc_state *hw_plane_state =
 		to_dc_plane_proc_state(get_plane_proc_state(state, dc_proc));
-	struct drm_rect *src = &state->src;
-	struct drm_rect *dst = &state->dst;
 
 	if (is_supported(&plane_info->info, DC_PLANE_RGB2RGB) &&
 	    hw_plane_state->gamut_conv == DC_GAMUT_CONV_USER && !hw_plane_state->gamut_conv_matrix)
@@ -448,16 +446,6 @@ static int dc_hw_proc_check_plane(struct dc_proc *dc_proc, void *_state)
 
 	if (!state->fb)
 		return 0;
-
-	*src = drm_plane_state_src(state);
-	*dst = drm_plane_state_dest(state);
-
-	if ((drm_rect_calc_hscale(src, dst, FRAC_16_16(1, 1), FRAC_16_16(1, 1)) !=
-		     FRAC_16_16(1, 1) ||
-	     drm_rect_calc_vscale(src, dst, FRAC_16_16(1, 1), FRAC_16_16(1, 1)) !=
-		     FRAC_16_16(1, 1)) &&
-	    !is_supported(&plane_info->info, DC_PLANE_SCALE))
-		return -EINVAL;
 
 	return 0;
 }
@@ -925,8 +913,13 @@ static void dc_hw_proc_enable_vblank(struct dc_proc *dc_proc, bool enable)
 {
 	struct dc_crtc_proc *hw_disp	= to_dc_crtc_proc(dc_proc);
 	struct dc_hw_processor *display = &hw_disp->disp;
+	struct vs_crtc *vs_crtc		= proc_to_vs_crtc(&hw_disp->base);
 
-	dc_hw_enable_vblank(display, enable);
+	if (enable)
+		dc_hw_enable_irq(display, vs_crtc->info->vblank_bit | vs_crtc->info->underflow_bit);
+	else
+		dc_hw_disable_irq(display,
+				  vs_crtc->info->vblank_bit | vs_crtc->info->underflow_bit);
 }
 
 static void dc_hw_proc_enable_crc(struct dc_proc *dc_proc, bool enable)
@@ -983,22 +976,25 @@ static void hw_display_work(struct work_struct *work)
 		get_crc(hw_disp);
 }
 
-static void dc_hw_proc_vblank(struct dc_proc *dc_proc)
+static void dc_hw_proc_vblank(struct dc_proc *dc_proc, u32 irq_status)
 {
-	struct dc_crtc_proc *hw_disp = to_dc_crtc_proc(dc_proc);
-	struct vs_crtc *vs_crtc	     = proc_to_vs_crtc(&hw_disp->base);
+	struct dc_crtc_proc *hw_disp	= to_dc_crtc_proc(dc_proc);
+	struct dc_hw_processor *display = &hw_disp->disp;
+	struct vs_crtc *vs_crtc		= proc_to_vs_crtc(&hw_disp->base);
 	struct dc_crtc_proc_state *state =
 		to_dc_crtc_proc_state(get_crtc_proc_state(vs_crtc->base.state, &hw_disp->base));
-	struct dc_hw_processor *display = &hw_disp->disp;
-	int ret;
-	bool underflow = false;
 
-	ret = dc_hw_get(display, DC_PROP_DISP_UNDERFLOW, &underflow, sizeof(underflow));
-	if (ret)
-		DRM_DEV_ERROR(vs_crtc->base.dev->dev, "failed to get underflow count\n");
-
-	if (underflow)
+	if (irq_status & vs_crtc->info->underflow_bit) {
 		state->underflow_cnt++;
+		DRM_DEV_ERROR(vs_crtc->base.dev->dev, "underflow count %d\n", state->underflow_cnt);
+		dc_hw_disable_irq(display, vs_crtc->info->underflow_bit);
+	}
+
+	if (!(irq_status & vs_crtc->info->vblank_bit))
+		return;
+
+	drm_crtc_handle_vblank(&vs_crtc->base);
+	dc_hw_enable_irq(display, vs_crtc->info->underflow_bit);
 
 	if (!hw_disp->crc_enable)
 		return;
@@ -1379,7 +1375,7 @@ const struct dc_proc_funcs dc_hw_crtc_funcs = {
 	.update		 = dc_hw_proc_update_disp,
 	.enable_vblank	 = dc_hw_proc_enable_vblank,
 	.enable_crc	 = dc_hw_proc_enable_crc,
-	.vblank		 = dc_hw_proc_vblank,
+	.vblank_status	 = dc_hw_proc_vblank,
 	.commit		 = dc_hw_proc_commit_disp,
 	.check		 = dc_hw_proc_check_disp,
 	.destroy	 = dc_hw_proc_destroy_disp,
