@@ -439,8 +439,6 @@ static int dc_hw_proc_check_plane(struct dc_proc *dc_proc, void *_state)
 	const struct dc_hw_plane_info *plane_info = dc_proc->info->info;
 	const struct dc_plane_proc_state *hw_plane_state =
 		to_dc_plane_proc_state(get_plane_proc_state(state, dc_proc));
-	struct drm_rect *src = &state->src;
-	struct drm_rect *dst = &state->dst;
 
 	if (is_supported(&plane_info->info, DC_PLANE_RGB2RGB) &&
 	    hw_plane_state->gamut_conv == DC_GAMUT_CONV_USER && !hw_plane_state->gamut_conv_matrix)
@@ -448,16 +446,6 @@ static int dc_hw_proc_check_plane(struct dc_proc *dc_proc, void *_state)
 
 	if (!state->fb)
 		return 0;
-
-	*src = drm_plane_state_src(state);
-	*dst = drm_plane_state_dest(state);
-
-	if ((drm_rect_calc_hscale(src, dst, FRAC_16_16(1, 1), FRAC_16_16(1, 1)) !=
-		     FRAC_16_16(1, 1) ||
-	     drm_rect_calc_vscale(src, dst, FRAC_16_16(1, 1), FRAC_16_16(1, 1)) !=
-		     FRAC_16_16(1, 1)) &&
-	    !is_supported(&plane_info->info, DC_PLANE_SCALE))
-		return -EINVAL;
 
 	return 0;
 }
@@ -771,6 +759,9 @@ static void dc_hw_proc_enable_disp(struct dc_proc *dc_proc)
 		pr_err("failed to prepare/enable pix_clk\n");
 		return;
 	}
+
+	/* sync to current pix clk rate */
+	state->pix_clk_rate = clk_get_rate(hw_disp->pix_clk) / 1000;
 
 	if (state->pix_clk_rate != mode->clock) {
 		clk_set_rate(hw_disp->pix_clk, (unsigned long)(mode->clock) * 1000);

@@ -43,8 +43,9 @@
 #include "nano2D.h"
 
 struct gpu_plane_context {
-	struct drm_framebuffer *in_fb;
-	struct drm_framebuffer *priv_fb;
+	struct drm_framebuffer *fb_display;
+	struct drm_framebuffer *gpu_out;
+	struct drm_framebuffer *fb_tmp;
 	int opened;
 };
 
@@ -54,6 +55,7 @@ struct gpu_plane_proc {
 	struct dc_proc base;
 	/** add gpu node structure here */
 	struct vs_n2d_aux *aux;
+	bool updating; // new framebuffer is pushed in, current fb can be recycled in next vblank
 };
 
 static inline struct gpu_plane_proc *to_gpu_plane_proc(struct dc_proc *proc)
@@ -65,7 +67,7 @@ static struct drm_framebuffer *vs_create_fb_internal(struct drm_device *dev,
 						     const struct drm_mode_fb_cmd2 *mode_cmd)
 {
 	struct vs_gem_object *objs[MAX_NUM_PLANES];
-	unsigned int height, size;
+	unsigned int height, size = 0;
 	const struct drm_format_info *info;
 	struct drm_framebuffer *fb;
 	int ret;
@@ -78,13 +80,20 @@ static struct drm_framebuffer *vs_create_fb_internal(struct drm_device *dev,
 	for (i = 0; i < info->num_planes; i++) {
 		height = drm_format_info_plane_height(info, mode_cmd->height, i);
 		size   = height * mode_cmd->pitches[i] + mode_cmd->offsets[i];
+	}
 
-		objs[i] = vs_gem_create_object(dev, size);
-		if (IS_ERR(objs[i])) {
-			dev_err(dev->dev, "Failed to create GEM object.\n");
-			ret = -ENXIO;
-			goto err;
-		}
+	objs[0] = vs_gem_create_object(dev, size);
+	if (IS_ERR(objs[0])) {
+		dev_err(dev->dev, "Failed to create GEM object.\n");
+		ret = -ENXIO;
+		return ERR_PTR(ret);
+	}
+
+	for (i = 1; i < info->num_planes; i++) {
+		drm_gem_object_get(&objs[0]->base);
+		// 2d GPU use one buffer to hold multiple color planes, but drm_framebuffer need
+		// drm_gem_object for each plane, so bind same drm_gem_object to each color planes
+		objs[i] = objs[0];
 	}
 
 	fb = vs_fb_alloc(dev, mode_cmd, objs, info->num_planes);
@@ -95,8 +104,8 @@ static struct drm_framebuffer *vs_create_fb_internal(struct drm_device *dev,
 
 	return fb;
 err:
-	for (; i > 0; i--)
-		drm_gem_object_put(&objs[i - 1]->base);
+	for (i = 0; i < info->num_planes; i++)
+		drm_gem_object_put(&objs[i]->base);
 
 	return ERR_PTR(ret);
 }
@@ -105,22 +114,25 @@ static void gpu_proc_disable_plane(struct dc_proc *dc_proc, void *old_state)
 {
 	struct gpu_plane_proc *hw_plane		= to_gpu_plane_proc(dc_proc);
 	const struct gpu_plane_info *plane_info = hw_plane->base.info->info;
-	struct vs_n2d_aux *aux		= hw_plane->aux;
-	int ret = 0;
-
-	if (plane_info->features & GPU_PLANE_OUT) {
-		drm_framebuffer_assign(&context.priv_fb, NULL);
-		context.priv_fb = NULL;
-	}
+	int error				= 0;
+	struct vs_n2d_aux *aux			= hw_plane->aux;
 
 	if (context.opened == 1) {
-		n2d_close();
-		ret = aux_close(aux);
-		if (ret < 0) {
+		error = aux_close(aux);
+		if (error < 0) {
 			dev_info(aux->dev, "%s: failed to close n2d aux.\n", __func__);
 			return;
 		}
 		context.opened = 0;
+	}
+
+	if (plane_info->features & GPU_PLANE_OUT) {
+		pr_debug("[disable]removing fb display\n");
+		drm_framebuffer_assign(&context.fb_display, NULL);
+		drm_framebuffer_assign(&context.gpu_out, NULL);
+		// crtc disable is immediately take effect, this flag shall not be cleared in vblank
+		// handler, so need reset the flag here.
+		hw_plane->updating = false;
 	}
 }
 
@@ -137,9 +149,6 @@ static n2d_buffer_format_t to_gc_format(u32 format)
 	case DRM_FORMAT_RGB565:
 		f = N2D_RGB565;
 		break;
-	// case DRM_FORMAT_RGB888:
-	//	f = N2D_RGB888;
-	//	break;
 	case DRM_FORMAT_ARGB8888:
 		f = N2D_ARGB8888;
 		break;
@@ -161,9 +170,6 @@ static n2d_buffer_format_t to_gc_format(u32 format)
 	case DRM_FORMAT_BGR565:
 		f = N2D_BGR565;
 		break;
-	// case DRM_FORMAT_BGR888:
-	//	f = N2D_BGR888;
-	//	break;
 	case DRM_FORMAT_ABGR8888:
 		f = N2D_ABGR8888;
 		break;
@@ -176,12 +182,15 @@ static n2d_buffer_format_t to_gc_format(u32 format)
 	case DRM_FORMAT_BGRA8888:
 		f = N2D_BGRA8888;
 		break;
+	case DRM_FORMAT_XRGB8888:
+		f = N2D_XRGB8888;
+		break;
+	case DRM_FORMAT_XBGR8888:
+		f = N2D_XBGR8888;
+		break;
 	case DRM_FORMAT_YUYV:
 		f = N2D_YUYV;
 		break;
-	// case DRM_FORMAT_YVYU:
-	//	f = N2D_YUYV;
-	//	break;
 	case DRM_FORMAT_NV12:
 		f = N2D_NV12;
 		break;
@@ -255,9 +264,10 @@ static void aux_rotate(struct vs_n2d_aux *aux, unsigned int rotation, n2d_rectan
 			dev_info(aux->dev, "%s: failed to open n2d aux.\n", __func__);
 			return;
 		}
-		N2D_ON_ERROR(n2d_open());
 		context.opened = 1;
 	}
+
+	N2D_ON_ERROR(n2d_open());
 	/* check size based on format/width, height */
 	memDesc.flag	 = N2D_WRAP_FROM_USERMEMORY;
 	memDesc.physical = config->in_buffer_addr[0][0]; /* assume the buffer is contiguous */
@@ -306,7 +316,7 @@ static void aux_rotate(struct vs_n2d_aux *aux, unsigned int rotation, n2d_rectan
 on_error:
 	n2d_free(&src);
 	n2d_free(&dst);
-
+	n2d_close();
 }
 
 static void aux_overlay(struct vs_n2d_aux *aux)
@@ -338,11 +348,13 @@ static void update_cfg(struct vs_n2d_aux *aux, struct drm_framebuffer *dst,
 	get_buffer_addr(dst, dma_addr);
 	cfg->out_buffer_addr[0] = dma_addr[0];
 	cfg->output_format	= to_gc_format(dst->format->format);
+	pr_debug("processing src: %d, dest %d\n", src->base.id, dst->base.id);
 	pr_debug("%s: out_format = %d.\n", __func__, cfg->output_format);
 	pr_debug("%s: out_width = %d.\n", __func__, cfg->output_width);
 	pr_debug("%s: out_height = %d.\n", __func__, cfg->output_height);
 	pr_debug("%s: out_stride = %d.\n", __func__, cfg->output_stride);
 	pr_debug("%s: out addr = 0x%llx.\n", __func__, dma_addr[0]);
+	pr_debug("%s: out addr 1 = 0x%llx.\n", __func__, dma_addr[1]);
 }
 
 static int create_fb(struct dc_proc *dc_proc)
@@ -355,19 +367,29 @@ static int create_fb(struct dc_proc *dc_proc)
 	struct drm_plane_state *plane_state	= plane->state;
 	struct drm_rect *dst			= &plane_state->dst;
 	struct drm_framebuffer *fb;
+	int i;
 	struct drm_mode_fb_cmd2 fbreq = {
 		.width	      = drm_rect_width(dst),
 		.height	      = drm_rect_height(dst),
 		.pixel_format = plane_info->fourcc,
-		.pitches      = {drm_rect_width(dst) * 4},
 	};
+	const struct drm_format_info *info = drm_get_format_info(drm_dev, &fbreq);
 
-	fbreq.pitches[0] = num_align(fbreq.pitches[0], priv->pitch_alignment);
+	WARN_ON(!info);
 
-	if (context.priv_fb) { /* if size changes, realloc the buffer */
-		if (context.priv_fb->width != fbreq.width ||
-		    context.priv_fb->height != fbreq.height)
-			drm_framebuffer_put(context.priv_fb);
+	for (i = 0; i < info->num_planes; i++) {
+		fbreq.pitches[i] = num_align(
+			drm_format_info_plane_width(info, fbreq.width, i) * info->char_per_block[i],
+			priv->pitch_alignment);
+		if (i > 0)
+			fbreq.offsets[i] = fbreq.pitches[i - 1] *
+					   drm_format_info_plane_height(info, fbreq.height, i - 1);
+	}
+
+	if (context.gpu_out) { /* if size changes, realloc the buffer */
+		if (context.gpu_out->width != fbreq.width ||
+		    context.gpu_out->height != fbreq.height)
+			drm_framebuffer_put(context.gpu_out);
 		else
 			return 0;
 	}
@@ -376,7 +398,7 @@ static int create_fb(struct dc_proc *dc_proc)
 	if (IS_ERR(fb))
 		return PTR_ERR(fb);
 
-	context.priv_fb = fb;
+	context.gpu_out = fb;
 
 	return 0;
 }
@@ -389,31 +411,31 @@ static void gpu_proc_update_plane(struct dc_proc *dc_proc, void *old_drm_plane_s
 	struct drm_plane_state *plane_state	= vs_plane->base.state;
 	struct vs_n2d_aux *aux			= hw_plane->aux;
 
-	if (plane_info->features & GPU_PLANE_IN) {
+	if (plane_info->features & GPU_PLANE_OUT) {
+		drm_framebuffer_assign(&plane_state->fb, context.fb_tmp);
+		drm_framebuffer_assign(&context.fb_tmp, NULL);
+		hw_plane->updating = true;
+		return;
+	}
+
+	if (!context.gpu_out) {
 		if (create_fb(dc_proc) != 0) {
 			return;
 		}
 	}
 
-	if (plane_info->features & GPU_PLANE_OUT) {
-		drm_framebuffer_assign(&context.priv_fb, plane_state->fb);
-		drm_framebuffer_assign(&plane_state->fb, context.in_fb);
-		if (context.in_fb) {
-			drm_framebuffer_put(context.in_fb);
-			context.in_fb = NULL;
-		}
-		return;
-	}
+	pr_debug("context.gpu_out = %d\n", context.gpu_out->base.id);
+	pr_debug("context.fb_display = %d\n", context.fb_display ? context.fb_display->base.id : 0);
 
-	update_cfg(aux, context.priv_fb, plane_state->fb);
+	update_cfg(aux, context.gpu_out, plane_state->fb);
 	if (plane_state->rotation & (DRM_MODE_ROTATE_MASK | DRM_MODE_REFLECT_MASK)) {
 		aux_rotate(aux, plane_state->rotation, NULL);
 	} else {
 		aux_overlay(aux);
 	}
 
-	drm_framebuffer_assign(&context.in_fb, plane_state->fb);
-	drm_framebuffer_assign(&plane_state->fb, context.priv_fb);
+	drm_framebuffer_assign(&context.fb_tmp, plane_state->fb);
+	drm_framebuffer_assign(&plane_state->fb, context.gpu_out);
 }
 
 static int gpu_proc_check_plane(struct dc_proc *dc_proc, void *_state)
@@ -524,6 +546,21 @@ static struct dc_proc *gpu_proc_create_plane(struct device *dev, const struct dc
 	return &hw_plane->base;
 }
 
+static void gpu_proc_vblank(struct dc_proc *dc_proc)
+{
+	struct gpu_plane_proc *hw_plane = to_gpu_plane_proc(dc_proc);
+
+	if (context.gpu_out && hw_plane->updating) {
+		hw_plane->updating = false;
+		// gpu fb not NULL, atomic commit happens before this vblank
+		// swap gpu fb and display fb
+		drm_framebuffer_assign(&context.fb_tmp, context.fb_display);
+		drm_framebuffer_assign(&context.fb_display, context.gpu_out);
+		drm_framebuffer_assign(&context.gpu_out, context.fb_tmp);
+		drm_framebuffer_assign(&context.fb_tmp, NULL);
+	}
+}
+
 const struct dc_proc_funcs gpu_plane_funcs = {
 	.create		  = gpu_proc_create_plane,
 	.update		  = gpu_proc_update_plane,
@@ -540,4 +577,5 @@ const struct dc_proc_funcs gpu_plane_funcs = {
 	.get_prop	  = gpu_proc_get_plane_prop,
 	.print_state	  = gpu_proc_plane_print_state,
 	.check_format_mod = gpu_proc_check_format_mod,
+	.vblank		  = gpu_proc_vblank,
 };
