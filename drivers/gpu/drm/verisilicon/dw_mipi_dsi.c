@@ -198,7 +198,7 @@
 
 #define DSI_PHY_IF_CFG		  0xa4
 #define PHY_STOP_WAIT_TIME(cycle) (((cycle) & 0xff) << 8)
-#define N_LANES(n)		  (((n) - 1) & 0x3)
+#define N_LANES(n)		  (((n)-1) & 0x3)
 
 #define DSI_PHY_ULPS_CTRL   0xa8
 #define DSI_PHY_TX_TRIGGERS 0xac
