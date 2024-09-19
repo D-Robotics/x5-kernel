@@ -760,6 +760,9 @@ static void dc_hw_proc_enable_disp(struct dc_proc *dc_proc)
 		return;
 	}
 
+	/* sync to current pix clk rate */
+	state->pix_clk_rate = clk_get_rate(hw_disp->pix_clk) / 1000;
+
 	if (state->pix_clk_rate != mode->clock) {
 		clk_set_rate(hw_disp->pix_clk, (unsigned long)(mode->clock) * 1000);
 		state->pix_clk_rate = mode->clock;

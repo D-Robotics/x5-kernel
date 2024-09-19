@@ -182,6 +182,12 @@ static n2d_buffer_format_t to_gc_format(u32 format)
 	case DRM_FORMAT_BGRA8888:
 		f = N2D_BGRA8888;
 		break;
+	case DRM_FORMAT_XRGB8888:
+		f = N2D_XRGB8888;
+		break;
+	case DRM_FORMAT_XBGR8888:
+		f = N2D_XBGR8888;
+		break;
 	case DRM_FORMAT_YUYV:
 		f = N2D_YUYV;
 		break;
