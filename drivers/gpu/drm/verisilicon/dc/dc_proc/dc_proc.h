@@ -282,6 +282,7 @@ static inline bool is_rgb(u32 format)
 	case DRM_FORMAT_RGB888:
 	case DRM_FORMAT_BGR888:
 	case DRM_FORMAT_XRGB8888:
+	case DRM_FORMAT_XBGR8888:
 	case DRM_FORMAT_ARGB8888:
 	case DRM_FORMAT_RGBA8888:
 	case DRM_FORMAT_ABGR8888:

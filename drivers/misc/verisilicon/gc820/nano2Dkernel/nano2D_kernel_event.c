@@ -437,7 +437,7 @@ n2d_error_t n2d_kernel_event_commit(n2d_event_center_t *event_center, n2d_user_e
 		ONERROR(N2D_INVALID_ARGUMENT);
 
 	while (next) {
-		if (is_vmalloc_addr(next)) { /* kernel logical addr */
+		if (is_vmalloc_addr(next) || virt_addr_valid(next)) { /* kernel logical addr */
 			event = next;
 		} else {
 			event = &_event;

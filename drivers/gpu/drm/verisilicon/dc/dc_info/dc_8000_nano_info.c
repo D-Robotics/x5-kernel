@@ -66,6 +66,8 @@ static const u32 primary_overlay_formats[] = {
 	DRM_FORMAT_YVYU,     //
 	DRM_FORMAT_NV12,     //
 	DRM_FORMAT_NV21,     //
+	DRM_FORMAT_XRGB8888, //
+	DRM_FORMAT_XBGR8888, //
 };
 
 static const u32 gc_overlay_formats[] = {
@@ -87,8 +89,10 @@ static const u32 gc_overlay_formats[] = {
 	DRM_FORMAT_BGRA8888, //
 	DRM_FORMAT_YUYV,     //
 	// DRM_FORMAT_YVYU,     //
-	DRM_FORMAT_NV12, //
-	DRM_FORMAT_NV21, //
+	DRM_FORMAT_NV12,     //
+	DRM_FORMAT_NV21,     //
+	DRM_FORMAT_XRGB8888, //
+	DRM_FORMAT_XBGR8888, //
 };
 
 static const u32 cursor_formats[] = {DRM_FORMAT_ARGB8888};
@@ -195,6 +199,16 @@ static const struct vs_color_format_mapping format_map[] = {
 		DC_SWIZZLE_VU,
 	},
 	{
+		DRM_FORMAT_XRGB8888,
+		DC_8000_NANO_FORMAT_A8R8G8B8,
+		DC_SWIZZLE_ARGB,
+	},
+	{
+		DRM_FORMAT_XBGR8888,
+		DC_8000_NANO_FORMAT_A8R8G8B8,
+		DC_SWIZZLE_ABGR,
+	},
+	{
 		DRM_FORMAT_TABLE_END,
 		DC_8000_NANO_FORMAT_A8R8G8B8,
 		DC_SWIZZLE_ARGB,
@@ -238,6 +252,41 @@ static struct mod_format_mapping dc_mod_format_map[] = {
 	{}};
 
 /* put dc to first element */
+#ifdef CONFIG_VERISILICON_GC_PROC_SUPPORT
+static const struct dc_proc_info dc_proc_info_gpu_0[] = {
+	{
+		.name  = GC_HW_NAME,
+		.info  = &((struct gpu_plane_info){
+			 .features = GPU_PLANE_OUT,
+			 .id	   = 0,
+		 }),
+		.funcs = &gpu_plane_funcs,
+	},
+	{
+		.name  = DC_HW_DEV_NAME,
+		.info  = &((struct dc_hw_plane_info){
+			 {
+				 .features = DC_PLANE_POSITION | DC_PLANE_BLEND | DC_PLANE_YUV2RGB,
+				 .id	   = DC_SET_ID(DC_PRIMARY_PLANE, 0),
+			 },
+			 .format	 = format_map,
+			 .modifier	 = modifier_map,
+			 .mod_format_map = dc_mod_format_map,
+			 .gamut		 = gamut_map,
+		 }),
+		.funcs = &dc_hw_plane_funcs,
+	},
+	{
+		.name  = GC_HW_NAME,
+		.info  = &((struct gpu_plane_info){
+			 .features = GPU_PLANE_IN | GPU_PLANE_SCALE | GPU_PLANE_ROTATION,
+			 .id	   = 0,
+			 .fourcc   = DRM_FORMAT_NV12,
+		 }),
+		.funcs = &gpu_plane_funcs,
+	},
+};
+#else
 static const struct dc_proc_info dc_proc_info_primary[] = {
 	{
 		.name  = DC_HW_DEV_NAME,
@@ -254,6 +303,7 @@ static const struct dc_proc_info dc_proc_info_primary[] = {
 		.funcs = &dc_hw_plane_funcs,
 	},
 };
+#endif
 
 #ifdef CONFIG_VERISILICON_GC_PROC_SUPPORT
 static const struct dc_proc_info dc_proc_info_gpu_0[] = {
@@ -306,39 +356,7 @@ static const struct dc_proc_info dc_proc_info_overlay_0[] = {
 		.funcs = &dc_hw_plane_funcs,
 	},
 };
-#ifdef CONFIG_VERISILICON_GC_PROC_SUPPORT
-static const struct dc_proc_info dc_proc_info_gpu_0[] = {
-	{
-		.name  = GC_HW_NAME,
-		.info  = &((struct gpu_plane_info){
-			 .features = GPU_PLANE_OUT,
-			 .id	   = 0,
-		 }),
-		.funcs = &gpu_plane_funcs,
-	},
-	{
-		.name  = DC_HW_DEV_NAME,
-		.info  = &((struct dc_hw_plane_info){
-			 {
-				 .features = DC_PLANE_POSITION | DC_PLANE_BLEND,
-				 .id	   = DC_SET_ID(DC_OVERLAY_PLANE, 1),
-			 },
-			 .format   = format_map,
-			 .modifier = modifier_map,
-		 }),
-		.funcs = &dc_hw_plane_funcs,
-	},
-	{
-		.name  = GC_HW_NAME,
-		.info  = &((struct gpu_plane_info){
-			 .features = GPU_PLANE_IN | GPU_PLANE_SCALE | GPU_PLANE_ROTATION,
-			 .id	   = 0,
-			 .fourcc   = DRM_FORMAT_ARGB8888,
-		 }),
-		.funcs = &gpu_plane_funcs,
-	},
-};
-#else
+
 static const struct dc_proc_info dc_proc_info_overlay_1[] = {
 	{
 		.name  = DC_HW_DEV_NAME,
@@ -353,7 +371,7 @@ static const struct dc_proc_info dc_proc_info_overlay_1[] = {
 		.funcs = &dc_hw_plane_funcs,
 	},
 };
-#endif
+
 static const struct dc_proc_info dc_proc_info_cursor[] = {
 	{
 		.name  = DC_HW_DEV_NAME,
@@ -425,25 +443,39 @@ static struct dc_plane_info dc_plane_info[] = {
 				.type	       = DRM_PLANE_TYPE_PRIMARY,
 				.modifiers     = format_modifiers,
 				.num_modifiers = NUM_MODIFIERS,
-				.num_formats   = ARRAY_SIZE(primary_overlay_formats),
-				.formats       = primary_overlay_formats,
-				.min_width     = 0,
-				.min_height    = 0,
-				.max_width     = 4096,
-				.max_height    = 4096,
-				.blend_mode    = BIT(DRM_MODE_BLEND_PIXEL_NONE) |
+#ifdef CONFIG_VERISILICON_GC_PROC_SUPPORT
+				.num_formats = ARRAY_SIZE(gc_overlay_formats),
+				.formats     = gc_overlay_formats,
+				.rotation    = DRM_MODE_ROTATE_MASK | DRM_MODE_REFLECT_MASK,
+				.min_scale   = FRAC_16_16(1, 8),
+				.max_scale   = FRAC_16_16(8, 1),
+#else
+				.num_formats = ARRAY_SIZE(primary_overlay_formats),
+				.formats     = primary_overlay_formats,
+				.min_scale   = DRM_PLANE_NO_SCALING,
+				.max_scale   = DRM_PLANE_NO_SCALING,
+#endif
+				.min_width  = 0,
+				.min_height = 0,
+				.max_width  = 4096,
+				.max_height = 4096,
+				.blend_mode = BIT(DRM_MODE_BLEND_PIXEL_NONE) |
 					      BIT(DRM_MODE_BLEND_PREMULTI) |
 					      BIT(DRM_MODE_BLEND_COVERAGE),
 				.color_encoding =
 					BIT(DRM_COLOR_YCBCR_BT601) | BIT(DRM_COLOR_YCBCR_BT709),
-				.min_scale  = DRM_PLANE_NO_SCALING,
-				.max_scale  = DRM_PLANE_NO_SCALING,
+
 				.zpos	    = {0, 2, 0},
 				.crtc_names = crtc_names,
 				.num_crtcs  = ARRAY_SIZE(crtc_names),
 			},
+#ifdef CONFIG_VERISILICON_GC_PROC_SUPPORT
+		.proc_info = dc_proc_info_gpu_0,
+		.num_proc  = ARRAY_SIZE(dc_proc_info_gpu_0),
+#else
 		.proc_info = dc_proc_info_primary,
 		.num_proc  = ARRAY_SIZE(dc_proc_info_primary),
+#endif
 	},
 	{
 		.info =
@@ -452,8 +484,6 @@ static struct dc_plane_info dc_plane_info[] = {
 				.type	       = DRM_PLANE_TYPE_OVERLAY,
 				.modifiers     = format_modifiers,
 				.num_modifiers = NUM_MODIFIERS,
-				.num_formats   = ARRAY_SIZE(primary_overlay_formats),
-				.formats       = primary_overlay_formats,
 				.min_width     = 0,
 				.min_height    = 0,
 				.max_width     = 4096,
@@ -463,11 +493,13 @@ static struct dc_plane_info dc_plane_info[] = {
 					      BIT(DRM_MODE_BLEND_COVERAGE),
 				.color_encoding =
 					BIT(DRM_COLOR_YCBCR_BT601) | BIT(DRM_COLOR_YCBCR_BT709),
-				.min_scale  = DRM_PLANE_NO_SCALING,
-				.max_scale  = DRM_PLANE_NO_SCALING,
-				.zpos	    = {0, 2, 1},
-				.crtc_names = crtc_names,
-				.num_crtcs  = ARRAY_SIZE(crtc_names),
+				.num_formats = ARRAY_SIZE(primary_overlay_formats),
+				.formats     = primary_overlay_formats,
+				.min_scale   = DRM_PLANE_NO_SCALING,
+				.max_scale   = DRM_PLANE_NO_SCALING,
+				.zpos	     = {0, 2, 1},
+				.crtc_names  = crtc_names,
+				.num_crtcs   = ARRAY_SIZE(crtc_names),
 			},
 #ifdef CONFIG_VERISILICON_GC_PROC_SUPPORT
 		.proc_info = dc_proc_info_gpu_0,
@@ -491,29 +523,17 @@ static struct dc_plane_info dc_plane_info[] = {
 				.blend_mode    = BIT(DRM_MODE_BLEND_PIXEL_NONE) |
 					      BIT(DRM_MODE_BLEND_PREMULTI) |
 					      BIT(DRM_MODE_BLEND_COVERAGE),
-#ifdef CONFIG_VERISILICON_GC_PROC_SUPPORT
-				.num_formats = ARRAY_SIZE(gc_overlay_formats),
-				.formats     = gc_overlay_formats,
-				.rotation    = DRM_MODE_ROTATE_MASK | DRM_MODE_REFLECT_MASK,
-				.min_scale   = FRAC_16_16(1, 3),
-				.max_scale   = FRAC_16_16(3, 1),
-#else
+
 				.num_formats = ARRAY_SIZE(primary_overlay_formats),
 				.formats     = primary_overlay_formats,
 				.min_scale   = DRM_PLANE_NO_SCALING,
 				.max_scale   = DRM_PLANE_NO_SCALING,
-#endif
-				.zpos	    = {0, 2, 2},
-				.crtc_names = crtc_names,
-				.num_crtcs  = ARRAY_SIZE(crtc_names),
+				.zpos	     = {0, 2, 2},
+				.crtc_names  = crtc_names,
+				.num_crtcs   = ARRAY_SIZE(crtc_names),
 			},
-#ifdef CONFIG_VERISILICON_GC_PROC_SUPPORT
-		.proc_info = dc_proc_info_gpu_0,
-		.num_proc  = ARRAY_SIZE(dc_proc_info_gpu_0),
-#else
 		.proc_info = dc_proc_info_overlay_1,
 		.num_proc  = ARRAY_SIZE(dc_proc_info_overlay_1),
-#endif
 	},
 	{
 		.info =
