@@ -54,7 +54,8 @@ struct dc_hw_proc_funcs {
 	void (*update)(struct dc_hw_processor *processor, u8 prop, void *value);
 	int (*get)(struct dc_hw_processor *processor, u8 prop, void *value, size_t size);
 	void (*commit)(struct dc_hw_processor *processor);
-	void (*enable_irq)(struct dc_hw_processor *processor, bool enable);
+	void (*enable_irq)(struct dc_hw_processor *processor, u32 irq_bits);
+	void (*disable_irq)(struct dc_hw_processor *processor, u32 irq_bits);
 };
 
 /**
