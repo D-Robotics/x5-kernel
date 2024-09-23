@@ -523,8 +523,10 @@ static struct dc_crtc_info dc_display_info[] = {
 				.color_formats =
 					DRM_COLOR_FORMAT_RGB444 | DRM_COLOR_FORMAT_YCBCR444 |
 					DRM_COLOR_FORMAT_YCBCR422 | DRM_COLOR_FORMAT_YCBCR420,
-				.gamma_size = GAMMA_SIZE,
-				.gamma_bits = 8,
+				.gamma_size    = GAMMA_SIZE,
+				.gamma_bits    = 8,
+				.vblank_bit    = BIT(0),
+				.underflow_bit = BIT(29),
 			},
 		.id	   = 0,
 		.proc_info = dc_proc_info_display,

@@ -383,7 +383,7 @@ static int __dc_proc_get_prop(struct list_head *proc_state_list, struct drm_prop
 	return -EINVAL;
 }
 
-static void __dc_proc_vblank(struct list_head *dc_proc_list)
+static void __dc_proc_vblank(struct list_head *dc_proc_list, u32 irq_status)
 {
 	struct dc_proc *dc_proc;
 	const struct dc_proc_funcs *funcs;
@@ -392,7 +392,10 @@ static void __dc_proc_vblank(struct list_head *dc_proc_list)
 	list_for_each_entry (dc_proc, dc_proc_list, head) {
 		info  = dc_proc->info;
 		funcs = info->funcs;
-		if (funcs->vblank)
+
+		if (funcs->vblank_status)
+			funcs->vblank_status(dc_proc, irq_status);
+		else if (funcs->vblank)
 			funcs->vblank(dc_proc);
 	}
 }
@@ -591,11 +594,11 @@ static void dc_plane_commit(struct vs_plane *vs_plane)
 	__dc_proc_commit(&dc_plane->list);
 }
 
-void dc_plane_vblank(struct vs_plane *vs_plane)
+void dc_plane_vblank(struct vs_plane *vs_plane, u32 status)
 {
 	struct dc_plane *dc_plane = to_dc_plane(vs_plane);
 
-	__dc_proc_vblank(&dc_plane->list);
+	__dc_proc_vblank(&dc_plane->list, status);
 }
 
 void dc_plane_suspend(struct vs_plane *vs_plane)
@@ -900,11 +903,11 @@ int dc_crtc_init(struct dc_crtc *dc_crtc, struct dc_crtc_info *dc_crtc_info,
 			      dc_crtc_info->num_proc, device_list, vs_crtc_info);
 }
 
-void dc_crtc_vblank(struct vs_crtc *vs_crtc)
+void dc_crtc_vblank(struct vs_crtc *vs_crtc, u32 irq_status)
 {
 	struct dc_crtc *dc_crtc = to_dc_crtc(vs_crtc);
 
-	__dc_proc_vblank(&dc_crtc->list);
+	__dc_proc_vblank(&dc_crtc->list, irq_status);
 }
 
 void dc_crtc_suspend(struct vs_crtc *vs_crtc)
@@ -932,11 +935,11 @@ void dc_wb_destroy(struct vs_wb *vs_wb)
 	kfree(dc_wb);
 }
 
-void dc_wb_vblank(struct vs_wb *vs_wb)
+void dc_wb_vblank(struct vs_wb *vs_wb, u32 irq_status)
 {
 	struct dc_wb *dc_wb = to_dc_wb(vs_wb);
 
-	__dc_proc_vblank(&dc_wb->list);
+	__dc_proc_vblank(&dc_wb->list, irq_status);
 }
 
 static void dc_wb_commit(struct vs_wb *vs_wb, struct drm_connector_state *state)

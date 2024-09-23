@@ -116,6 +116,7 @@ struct dc_proc_funcs {
 	void (*disable)(struct dc_proc *dc_proc, void *old_state);
 	void (*commit)(struct dc_proc *dc_proc);
 	void (*vblank)(struct dc_proc *dc_proc);
+	void (*vblank_status)(struct dc_proc *dc_proc, u32 status);
 	void (*suspend)(struct dc_proc *dc_proc);
 	void (*resume)(struct dc_proc *dc_proc);
 	// parent dc_crtc_state/dc_plane_state/dc_wb_state
@@ -424,19 +425,19 @@ int dc_plane_create_prop(struct dc_plane *dc_plane);
 int dc_plane_init(struct dc_plane *dc_plane, struct dc_plane_info *dc_plane_info,
 		  struct list_head *device_list);
 void dc_plane_destroy(struct vs_plane *vs_plane);
-void dc_plane_vblank(struct vs_plane *vs_plane);
+void dc_plane_vblank(struct vs_plane *vs_plane, u32 irq_status);
 void dc_plane_suspend(struct vs_plane *vs_plane);
 void dc_plane_resume(struct vs_plane *vs_plane);
 int dc_crtc_create_prop(struct dc_crtc *dc_crtc);
 int dc_crtc_init(struct dc_crtc *dc_crtc, struct dc_crtc_info *dc_crtc_info,
 		 struct list_head *device_list);
 void dc_crtc_destroy(struct vs_crtc *vs_crtc);
-void dc_crtc_vblank(struct vs_crtc *vs_crtc);
+void dc_crtc_vblank(struct vs_crtc *vs_crtc, u32 irq_status);
 void dc_crtc_suspend(struct vs_crtc *vs_crtc);
 void dc_crtc_resume(struct vs_crtc *vs_crtc);
 int dc_wb_create_prop(struct dc_wb *dc_wb);
 int dc_wb_init(struct dc_wb *dc_wb, struct dc_wb_info *dc_wb_info, struct list_head *device_list);
-void dc_wb_vblank(struct vs_wb *vs_wb);
+void dc_wb_vblank(struct vs_wb *vs_wb, u32 irq_status);
 void dc_wb_destroy(struct vs_wb *vs_wb);
 int dc_wb_post_create(struct dc_wb *dc_wb);
 /** @} */

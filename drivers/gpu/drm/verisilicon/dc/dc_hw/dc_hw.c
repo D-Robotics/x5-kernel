@@ -194,13 +194,22 @@ void dc_hw_commit(struct dc_hw_processor *processor)
 		processor->funcs->commit(processor);
 }
 
-void dc_hw_enable_vblank(struct dc_hw_processor *processor, bool enable)
+void dc_hw_enable_irq(struct dc_hw_processor *processor, u32 irq_bits)
 {
 	if (!processor)
 		return;
 
 	if (processor->funcs->enable_irq)
-		processor->funcs->enable_irq(processor, enable);
+		processor->funcs->enable_irq(processor, irq_bits);
+}
+
+void dc_hw_disable_irq(struct dc_hw_processor *processor, u32 irq_bits)
+{
+	if (!processor)
+		return;
+
+	if (processor->funcs->disable_irq)
+		processor->funcs->disable_irq(processor, irq_bits);
 }
 
 u32 dc_hw_get_interrupt(struct dc_hw *hw)
