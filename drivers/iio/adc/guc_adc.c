@@ -476,7 +476,10 @@ static irqreturn_t guc_adc_thread_irq(int irq, void *dev_id)
 	register u16 *sample_buffer_boundary = buffer + FIFO_HALF_FULL_DEPTH;
 	register u32 push_steps = indio_dev->scan_bytes / GUC_ADC_FIFO_VALID_BYTES;
 	u32 val;
-
+	val = readl_relaxed(info->regs + GUC_CTRL_NOR_STS0);
+	if (val & GUC_NOR_FIFO_EMPTY) {
+		goto exit;
+	}
 	val = readl_relaxed(info->regs + GUC_CTRL_NOR_STS2);
 	if (val & GUC_NOR_FIFO_HALF_FULL_INT) {
 		while (buffer < sample_buffer_boundary) {
@@ -506,7 +509,7 @@ static irqreturn_t guc_adc_thread_irq(int irq, void *dev_id)
 		info->last_val = guc_adc_nor_fifo_read(info);
 		complete(&info->completion);
 	}
-
+exit:
 	writel_relaxed(0x01u, info->regs + GUC_CTRL_NOR_CTRL8);
 	return IRQ_HANDLED;
 }
