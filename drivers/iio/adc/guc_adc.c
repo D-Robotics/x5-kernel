@@ -270,6 +270,19 @@ static void guc_adc_nor_fifo_reset(struct guc_adc *info)
 	writel_relaxed(val, info->regs + GUC_CTRL_NOR_CTRL5);
 }
 
+/**
+ * @brief Reset adc controller
+ *
+ * @param[in] info: guc_adc driver struct
+ *
+ * @retval * void
+ */
+static void guc_adc_controller_reset(struct guc_adc *info)
+{
+	writel_relaxed(0x00, info->regs + GUC_CTRL_TOP_CTRL17);
+	udelay(10);
+	writel_relaxed(0x01, info->regs + GUC_CTRL_TOP_CTRL17);
+}
 /*
  * ADC normal mode interrupt type enable.
  */
@@ -355,6 +368,7 @@ static int guc_adc_conversion(struct guc_adc *info, struct iio_chan_spec const *
 	unsigned long tmflag;
 
 	reinit_completion(&info->completion);
+	guc_adc_controller_reset(info);
 	guc_adc_nor_fifo_reset(info);
 	guc_adc_nor_irq_set(info, (u32)GUC_NOR_SAMPLE_DONE_INT_EN);
 	guc_adc_fifo_read_enable(info, true);
@@ -558,6 +572,7 @@ static int guc_adc_postenable(struct iio_dev *indio_dev)
 	struct guc_adc *info = iio_priv(indio_dev);
 
 	/* use iio framework, switch adc to scan mode */
+	guc_adc_controller_reset(info);
 	guc_adc_nor_mode(info, SCAN);
 	info->sample_nums = 0;
 	guc_adc_nor_fifo_reset(info);
