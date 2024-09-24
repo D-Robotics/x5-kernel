@@ -52,9 +52,9 @@
  * default size carveout size from
  * cma heap if no carveout set in dts
  */
-#define DFT_CMA_CARVEOUT_SIZE	(512 * 0x100000)	/**< carveout heap default size from cma heap if no carveout set in dts*/
+#define DFT_CMA_CARVEOUT_SIZE	(512UL * 0x100000UL)	/**< carveout heap default size from cma heap if no carveout set in dts*/
 
-#define DFT_CMA_SIZE	(256 * 0x100000)		/**< cma heap defualt size if not set in dts*/
+#define DFT_CMA_SIZE	(256UL * 0x100000UL)		/**< cma heap defualt size if not set in dts*/
 
 #define DFT_LEAST_CMA_SIZE	(128UL * 0x100000UL)	/**< the least cma heap size*/
 
@@ -151,6 +151,8 @@ static struct hobot_ion *hb_ion;
 /**
  * ion device for other driver use hobot ion device in kernel
  */
+//coverity[misra_c_2012_rule_8_4_violation:SUPPRESS], ## violation reason SYSSW_V_8.4_01
+//coverity[misra_c_2012_rule_8_7_violation:SUPPRESS], ## violation reason SYSSW_V_8.7_01
 struct ion_device *hb_ion_dev;
 //coverity[misra_c_2012_rule_20_7_violation:SUPPRESS], ## violation reason SYSSW_V_20.7_01
 EXPORT_SYMBOL(hb_ion_dev);
@@ -357,6 +359,7 @@ static void ion_dma_chan_release(struct dma_chan *chan)
  * @callergraph
  * @design
  */
+//coverity[HIS_VOCF:SUPPRESS], ## violation reason SYSSW_V_VOCF_01
 static int32_t hobot_ion_dma_transfer(dma_addr_t dst,
 		dma_addr_t src, size_t len)
 {
@@ -384,6 +387,7 @@ static int32_t hobot_ion_dma_transfer(dma_addr_t dst,
 
 	tx = dma_dev->device_prep_dma_memcpy(dma_ch, dst, src, len, 0);
 	if (tx == NULL) {
+		ion_dma_chan_release(dma_ch);
 		mutex_unlock(&hb_ion->dma_lock);
 		(void)pr_err("ION DMA transfer device_prep_dma_memcpy failed!!\n");
 		return -EIO;
@@ -396,6 +400,8 @@ static int32_t hobot_ion_dma_transfer(dma_addr_t dst,
 	cookie = dmaengine_submit(tx);
 	ret = dma_submit_error(cookie);
 	if (ret) {
+		(void)dmaengine_terminate_all(dma_ch);
+		ion_dma_chan_release(dma_ch);
 		mutex_unlock(&hb_ion->dma_lock);
 		(void)pr_err("ION DMA transfer dma_submit_error %d\n", cookie);
 		return -EIO;
@@ -403,8 +409,8 @@ static int32_t hobot_ion_dma_transfer(dma_addr_t dst,
 
 	dma_async_issue_pending(dma_ch);
 
-	ret = wait_for_completion_interruptible_timeout(&hb_ion->dma_completion,
-			(unsigned long)msecs_to_jiffies(DMA_TRANSFER_TIMEOUT_MS));
+	ret = (int32_t)wait_for_completion_interruptible_timeout(&hb_ion->dma_completion,
+			msecs_to_jiffies(DMA_TRANSFER_TIMEOUT_MS));
 	if (ret == 0) {
 		(void)pr_err("%s:%d, pid: %d, dma copy timeout\n", __func__, __LINE__, current->pid);
 		(void)dmaengine_terminate_all(dma_ch);
@@ -460,6 +466,7 @@ static int32_t hobot_ion_dma_copy_sg2contig(struct ion_buffer *src_buffer, struc
 	return ret;
 }
 
+//coverity[HIS_VOCF:SUPPRESS], ## violation reason SYSSW_V_VOCF_01
 static int32_t hobot_ion_dma_copy_contig2sg(struct ion_buffer *src_buffer, struct ion_buffer *dst_buffer,
 		dma_addr_t dst, dma_addr_t src, size_t len)
 {
@@ -497,6 +504,7 @@ static int32_t hobot_ion_dma_copy_contig2sg(struct ion_buffer *src_buffer, struc
 	return ret;
 }
 
+//coverity[HIS_VOCF:SUPPRESS], ## violation reason SYSSW_V_VOCF_01
 static int32_t hobot_ion_dma_copy(struct ion_client *client, int32_t dst_handle_id, int32_t src_handle_id,
 		dma_addr_t dst, dma_addr_t src, size_t len)
 {
@@ -853,7 +861,7 @@ static ssize_t ion_sram_limit_size_store(struct device *dev,
 	//coverity[misra_c_2012_rule_20_7_violation:SUPPRESS], ## violation reason SYSSW_V_20.7_01
 	//coverity[misra_c_2012_rule_18_4_violation:SUPPRESS], ## violation reason SYSSW_V_18.4_03
 	//coverity[misra_c_2012_rule_11_5_violation:SUPPRESS], ## violation reason SYSSW_V_11.5_01
-	plist_for_each_entry(heap, &hb_ion->ion_dev->heaps, node) {
+	plist_for_each_entry(heap, &hb_ion->ion_dev->heaps, hb_node) {
 		/* if the caller didn't specify this heap id */
 		if ((((uint32_t)1U << (uint32_t)heap->type) & (uint32_t)ION_HEAP_TYPE_SRAM_LIMIT_MASK) != 0U) {
 			break;
@@ -984,6 +992,7 @@ static long hobot_ion_ioctl(struct ion_client *client,
 	struct ion_phy_data phy_data;
 	int32_t ret = 0;
 
+	//coverity[misra_c_2012_rule_11_6_violation:SUPPRESS], ## violation reason SYSSW_V_11.6_01
 	if (copy_from_user(&phy_data,
 				(void __user *)arg, sizeof(struct ion_phy_data))) {
 		(void)pr_err("ION cmd[%d]:copy from user failed!!\n", cmd);
@@ -995,6 +1004,7 @@ static long hobot_ion_ioctl(struct ion_client *client,
 			//coverity[misra_c_2012_rule_10_3_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
 			ret = ion_phys(client, (long)phy_data.handle,
 					&phy_data.paddr, &phy_data.len);
+			//coverity[misra_c_2012_rule_11_6_violation:SUPPRESS], ## violation reason SYSSW_V_11.6_01
 			if (copy_to_user((void __user *)arg,
 						&phy_data, sizeof(struct ion_phy_data))) {
 				(void)pr_err("ION get phy addr[0x%llx] copy to user failed!!\n",
@@ -1063,7 +1073,13 @@ int32_t ion_get_all_heaps_range(struct ion_heap_range *heap_range, int num)
 	size_t ion_cma_size = 0, ion_cma_extra_size = 0;
 	int idx = 0;
 
-	if (num < 5) {
+	if (heap_range == NULL) {
+		(void)pr_err("Invalid heap range!!\n");
+		return -EINVAL;
+	}
+
+	if (num < (int32_t)ION_HEAP_TYPE_MAX) {
+		(void)pr_err("Invalid heap num:%d!!\n", num);
 		return -EINVAL;
 	}
 
@@ -1120,7 +1136,7 @@ int32_t ion_get_heap_range(phys_addr_t *base_addr, size_t *total_size)
 {
 	int32_t ret = 0;
 	if (!base_addr || !total_size) {
-		pr_info("Invalid argument!!\n");
+		(void)pr_err("Invalid argument!!\n");
 		return -EINVAL;
 	}
 	phys_addr_t min_addr = 0, ion_cma_base = 0;
@@ -1176,6 +1192,11 @@ int32_t ion_get_all_heap_range(struct ion_heap_range_data_pac *heap_range)
 {
 	static phys_addr_t ion_cma_base = 0, ion_cma_extra_base = 0;
 	static size_t ion_cma_size = 0, ion_cma_extra_size = 0;
+
+	if (!heap_range) {
+		(void)pr_err("Invalid argument!!\n");
+		return -EINVAL;
+	}
 
 	//ion_cma_get_info(hb_ion->ion_dev, &ion_cma_base, &ion_cma_size, ION_HEAP_TYPE_DMA);
 	ion_cma_base = hobot_heaps[ION_HEAP_TYPE_DMA].base;
@@ -1324,6 +1345,7 @@ EXPORT_SYMBOL_GPL(ion_function_custom_operation);
  * @design
  */
 //coverity[misra_c_2012_rule_8_7_violation:SUPPRESS], ## violation reason SYSSW_V_8.7_01
+//coverity[HIS_CCM:SUPPRESS], ## violation reason SYSSW_V_CCM_01
 int32_t ion_check_in_heap_carveout(phys_addr_t start, size_t size)
 {
 	struct ion_platform_heap *cvt = &hobot_heaps[ION_HEAP_TYPE_CARVEOUT];
@@ -1456,6 +1478,49 @@ static int32_t hobot_check_heap_valid(phys_addr_t heap_base, phys_addr_t heap_en
 	return -EINVAL;
 }
 
+//coverity[HIS_LEVEL:SUPPRESS], ## violation reason SYSSW_V_LEVEL_01
+static int32_t hobot_ion_get_heap_info(struct device_node *rnode, char *heap_name, int32_t heap_id,
+				size_t default_size)
+{
+	struct device_node *hb_node;
+	struct resource ion_pool_reserved;
+	const char *status;
+	int32_t ret = 0;
+
+	hb_node = of_find_compatible_node(rnode, NULL, heap_name);
+	if (hb_node != NULL) {
+		//coverity[misra_c_2012_rule_11_5_violation:SUPPRESS], ## violation reason SYSSW_V_11.5_01
+		status = of_get_property(hb_node, "status", NULL);
+		if ((status == NULL) || (strcmp(status, "okay") == 0)
+				|| (strcmp(status, "ok") == 0)) {
+			if (of_address_to_resource(hb_node, 0, &ion_pool_reserved) == 0) {
+				hobot_heaps[heap_id].base
+					= ion_pool_reserved.start;
+				hobot_heaps[heap_id].size
+					= resource_size(&ion_pool_reserved);
+				(void)pr_info("Reserverd %s MEM start 0x%llx, size 0x%lx\n",
+						heap_name,
+						hobot_heaps[heap_id].base,
+						hobot_heaps[heap_id].size);
+				ret = hobot_check_heap_valid(hobot_heaps[heap_id].base,
+						hobot_heaps[heap_id].base + hobot_heaps[heap_id].size);
+				if (ret < 0) {
+					(void)pr_info("Hobot ion-pool not in memory range\n");
+					of_node_put(hb_node);
+					return -EINVAL;
+				}
+			}
+		} else {
+			hobot_heaps[heap_id].size = default_size;
+		}
+		of_node_put(hb_node);
+	} else {
+		(void)of_node_get(rnode);
+	}
+
+	return ret;
+}
+
 /**
  * @NO{S21E04C01U}
  * @ASIL{B}
@@ -1475,10 +1540,8 @@ static int32_t hobot_check_heap_valid(phys_addr_t heap_base, phys_addr_t heap_en
  */
 static int32_t hobot_heaps_prepare(struct hobot_ion *hb_ion_data)
 {
-	struct resource ion_pool_reserved, ion_sram_reserved;
-	struct device_node *hb_node, *rnode;
-	const char *status;
-	int32_t err = 0, ret = 0;
+	struct device_node *rnode;
+	int32_t ret = 0;
 
 	if (hb_ion_data == NULL) {
 		return -EINVAL;
@@ -1501,191 +1564,53 @@ static int32_t hobot_heaps_prepare(struct hobot_ion *hb_ion_data)
 		return 0;
 	}
 
-	hb_node = of_find_compatible_node(rnode, NULL, "ion-pool");
-	if (hb_node != NULL) {
-		//coverity[misra_c_2012_rule_11_5_violation:SUPPRESS], ## violation reason SYSSW_V_11.5_01
-		status = of_get_property(hb_node, "status", NULL);
-		if ((status == NULL) || (strcmp(status, "okay") == 0)
-				|| (strcmp(status, "ok") == 0)) {
-			if (of_address_to_resource(hb_node, 0, &ion_pool_reserved) == 0) {
-				hobot_heaps[ION_HEAP_TYPE_CARVEOUT].base
-					= ion_pool_reserved.start;
-				hobot_heaps[ION_HEAP_TYPE_CARVEOUT].size
-					= resource_size(&ion_pool_reserved);
-				(void)pr_info("Reserved ION Carveout(ion-pool) MEM start 0x%llx, size 0x%lx\n",
-						hobot_heaps[ION_HEAP_TYPE_CARVEOUT].base,
-						hobot_heaps[ION_HEAP_TYPE_CARVEOUT].size);
-				ret = hobot_check_heap_valid(hobot_heaps[ION_HEAP_TYPE_CARVEOUT].base,
-						hobot_heaps[ION_HEAP_TYPE_CARVEOUT].base + hobot_heaps[ION_HEAP_TYPE_CARVEOUT].size);
-				if (ret < 0) {
-					(void)pr_info("Hobot ion-pool not in memory range\n");
-					of_node_put(hb_node);
-					return -EINVAL;
-				}
-			}
-		} else {
-			hobot_heaps[ION_HEAP_TYPE_CARVEOUT].size = DFT_CMA_CARVEOUT_SIZE;
-		}
-		of_node_put(hb_node);
-	} else {
-		(void)of_node_get(rnode);
+	ret = hobot_ion_get_heap_info(rnode, "ion-pool", (int32_t)ION_HEAP_TYPE_CARVEOUT,
+							(size_t)DFT_CMA_CARVEOUT_SIZE);
+	if (ret < 0) {
+		(void)pr_info("Hobot ion-pool memory range get failed\n");
+		return ret;
 	}
 
-	hb_node = of_find_compatible_node(rnode, NULL, "ion-carveout");
-	if (hb_node != NULL) {
-		//coverity[misra_c_2012_rule_11_5_violation:SUPPRESS], ## violation reason SYSSW_V_11.5_01
-		status = of_get_property(hb_node, "status", NULL);
-		if ((status == NULL) || (strcmp(status, "okay") == 0)
-				|| (strcmp(status, "ok") == 0)) {
-			if (of_address_to_resource(hb_node, 0, &ion_pool_reserved) == 0) {
-				hobot_heaps[ION_HEAP_TYPE_CMA_RESERVED].base
-					= ion_pool_reserved.start;
-				hobot_heaps[ION_HEAP_TYPE_CMA_RESERVED].size
-					= resource_size(&ion_pool_reserved);
-				(void)pr_info("Reserved ION cma(ion-carveout) reserved MEM start 0x%llx, size 0x%lx\n",
-						hobot_heaps[ION_HEAP_TYPE_CMA_RESERVED].base,
-						hobot_heaps[ION_HEAP_TYPE_CMA_RESERVED].size);
-				ret = hobot_check_heap_valid(hobot_heaps[ION_HEAP_TYPE_CMA_RESERVED].base,
-						hobot_heaps[ION_HEAP_TYPE_CMA_RESERVED].base + hobot_heaps[ION_HEAP_TYPE_CMA_RESERVED].size);
-				if (ret < 0) {
-					(void)pr_info("Hobot ion-carveout not in memory range\n");
-					of_node_put(hb_node);
-					return -EINVAL;
-				}
-			}
-		} else {
-			hobot_heaps[ION_HEAP_TYPE_CARVEOUT].size = DFT_CMA_CARVEOUT_SIZE;
-		}
-		of_node_put(hb_node);
-	} else {
-		(void)of_node_get(rnode);
+	ret = hobot_ion_get_heap_info(rnode, "ion-carveout", (int32_t)ION_HEAP_TYPE_CMA_RESERVED,
+							(size_t)DFT_CMA_CARVEOUT_SIZE);
+	if (ret < 0) {
+		(void)pr_info("Hobot ion-carveout memory range get failed\n");
+		return ret;
 	}
 
-	hb_node = of_find_compatible_node(rnode, NULL, "shared-dma-pool");
-	if (hb_node != NULL) {
-		err = of_property_read_u64(hb_node, "reserved-size", &hb_ion_data->cma_reserved_size);
-		if (err != 0) {
-			hb_ion_data->cma_reserved_size = 0;
-		}
-		err = of_property_read_u64(hb_node, "default-size", &hb_ion_data->cma_default_size);
-		if (err != 0) {
-			hb_ion_data->cma_default_size = DFT_CMA_SIZE;
-		}
-		of_node_put(hb_node);
-	} else {
-		(void)of_node_get(rnode);
+	ret = hobot_ion_get_heap_info(rnode, "shared-dma-pool", (int32_t)ION_HEAP_TYPE_CUSTOM,
+							(size_t)0UL);
+	if (ret < 0) {
+		(void)pr_info("Hobot shared-dma-pool memory range get failed\n");
+		return ret;
 	}
 
-	hb_node = of_find_compatible_node(rnode, NULL, "ion-sram");
-	if (hb_node != NULL) {
-		//coverity[misra_c_2012_rule_11_5_violation:SUPPRESS], ## violation reason SYSSW_V_11.5_01
-		status = of_get_property(hb_node, "status", NULL);
-		if ((status == NULL) || (strcmp(status, "okay") == 0)
-				|| (strcmp(status, "ok") == 0)) {
-			if (of_address_to_resource(hb_node, 0, &ion_sram_reserved) == 0) {
-				hobot_heaps[ION_HEAP_TYPE_CUSTOM].base
-					= ion_sram_reserved.start;
-				hobot_heaps[ION_HEAP_TYPE_CUSTOM].size
-					= resource_size(&ion_sram_reserved);
-				(void)pr_info("ION Custom MEM start 0x%llx, size 0x%lx\n",
-						hobot_heaps[ION_HEAP_TYPE_CUSTOM].base,
-						hobot_heaps[ION_HEAP_TYPE_CUSTOM].size);
-				ret = hobot_check_heap_valid(hobot_heaps[ION_HEAP_TYPE_CUSTOM].base,
-						hobot_heaps[ION_HEAP_TYPE_CUSTOM].base + hobot_heaps[ION_HEAP_TYPE_CUSTOM].size);
-				if (ret < 0) {
-					(void)pr_info("Hobot ion-sram not in memory range\n");
-					of_node_put(hb_node);
-					return -EINVAL;
-				}
-			}
-		}
-		of_node_put(hb_node);
-	} else {
-		(void)of_node_get(rnode);
+	ret = hobot_ion_get_heap_info(rnode, "ion-sram", (int32_t)ION_HEAP_TYPE_CUSTOM,
+							(size_t)0UL);
+	if (ret < 0) {
+		(void)pr_info("Hobot ion-sram memory range get failed\n");
+		return ret;
 	}
 
-	hb_node = of_find_compatible_node(rnode, NULL, "ion-sram-limit");
-	if (hb_node != NULL) {
-		//coverity[misra_c_2012_rule_11_5_violation:SUPPRESS], ## violation reason SYSSW_V_11.5_01
-		status = of_get_property(hb_node, "status", NULL);
-		if ((status == NULL) || (strcmp(status, "okay") == 0)
-				|| (strcmp(status, "ok") == 0)) {
-			if (of_address_to_resource(hb_node, 0, &ion_sram_reserved) == 0) {
-				hobot_heaps[ION_HEAP_TYPE_SRAM_LIMIT].base
-					= ion_sram_reserved.start;
-				hobot_heaps[ION_HEAP_TYPE_SRAM_LIMIT].size
-					= resource_size(&ion_sram_reserved);
-				(void)pr_info("ION Custom limit MEM start 0x%llx, size 0x%lx\n",
-						hobot_heaps[ION_HEAP_TYPE_SRAM_LIMIT].base,
-						hobot_heaps[ION_HEAP_TYPE_SRAM_LIMIT].size);
-				ret = hobot_check_heap_valid(hobot_heaps[ION_HEAP_TYPE_SRAM_LIMIT].base,
-						hobot_heaps[ION_HEAP_TYPE_SRAM_LIMIT].base + hobot_heaps[ION_HEAP_TYPE_SRAM_LIMIT].size);
-				if (ret < 0) {
-					(void)pr_info("Hobot ion-sram-limit not in memory range\n");
-					of_node_put(hb_node);
-					return -EINVAL;
-				}
-			}
-		}
-		of_node_put(hb_node);
-	} else {
-		(void)of_node_get(rnode);
+	ret = hobot_ion_get_heap_info(rnode, "ion-sram-limit", (int32_t)ION_HEAP_TYPE_SRAM_LIMIT,
+							(size_t)0UL);
+	if (ret < 0) {
+		(void)pr_info("Hobot ion-sram-limit memory range get failed\n");
+		return ret;
 	}
 
-	hb_node = of_find_compatible_node(rnode, NULL, "ion-inline-ecc");
-	if (hb_node != NULL) {
-		//coverity[misra_c_2012_rule_11_5_violation:SUPPRESS], ## violation reason SYSSW_V_11.5_01
-		status = of_get_property(hb_node, "status", NULL);
-		if ((status == NULL) || (strcmp(status, "okay") == 0)
-				|| (strcmp(status, "ok") == 0)) {
-			if (of_address_to_resource(hb_node, 0, &ion_pool_reserved) == 0) {
-				hobot_heaps[ION_HEAP_TYPE_INLINE_ECC].base
-					= ion_pool_reserved.start;
-				hobot_heaps[ION_HEAP_TYPE_INLINE_ECC].size
-					= resource_size(&ion_pool_reserved);
-				(void)pr_info("Reserved ION cma(ion-inline-ecc) reserved MEM start 0x%llx, size 0x%lx\n",
-						hobot_heaps[ION_HEAP_TYPE_INLINE_ECC].base,
-						hobot_heaps[ION_HEAP_TYPE_INLINE_ECC].size);
-				ret = hobot_check_heap_valid(hobot_heaps[ION_HEAP_TYPE_INLINE_ECC].base,
-						hobot_heaps[ION_HEAP_TYPE_INLINE_ECC].base + hobot_heaps[ION_HEAP_TYPE_INLINE_ECC].size);
-				if (ret < 0) {
-					(void)pr_info("Hobot ion-inline-ecc not in memory range\n");
-					of_node_put(hb_node);
-					return -EINVAL;
-				}
-			}
-		}
-		of_node_put(hb_node);
-	} else {
-		(void)of_node_get(rnode);
+	ret = hobot_ion_get_heap_info(rnode, "ion-inline-ecc", (int32_t)ION_HEAP_TYPE_INLINE_ECC,
+							(size_t)0UL);
+	if (ret < 0) {
+		(void)pr_info("Hobot ion-inline-ecc memory range get failed\n");
+		return ret;
 	}
 
-	hb_node = of_find_compatible_node(rnode, NULL, "ion-cma");
-	if (hb_node != NULL) {
-		//coverity[misra_c_2012_rule_11_5_violation:SUPPRESS], ## violation reason SYSSW_V_11.5_01
-		status = of_get_property(hb_node, "status", NULL);
-		if ((status == NULL) || (strcmp(status, "okay") == 0)
-				|| (strcmp(status, "ok") == 0)) {
-			if (of_address_to_resource(hb_node, 0, &ion_pool_reserved) == 0) {
-				hobot_heaps[ION_HEAP_TYPE_DMA].base
-					= ion_pool_reserved.start;
-				hobot_heaps[ION_HEAP_TYPE_DMA].size
-					= resource_size(&ion_pool_reserved);
-				(void)pr_info("Reserved ION cma(ion-cma) reserved MEM start 0x%llx, size 0x%lx\n",
-						hobot_heaps[ION_HEAP_TYPE_DMA].base,
-						hobot_heaps[ION_HEAP_TYPE_DMA].size);
-				ret = hobot_check_heap_valid(hobot_heaps[ION_HEAP_TYPE_DMA].base,
-						hobot_heaps[ION_HEAP_TYPE_DMA].base + hobot_heaps[ION_HEAP_TYPE_DMA].size);
-				if (ret < 0) {
-					(void)pr_info("Hobot ion-cma not in memory range\n");
-					of_node_put(hb_node);
-					return -EINVAL;
-				}
-			}
-		}
-		of_node_put(hb_node);
-	} else {
-		(void)of_node_get(rnode);
+	ret = hobot_ion_get_heap_info(rnode, "ion-cma", (int32_t)ION_HEAP_TYPE_DMA,
+							(size_t)0UL);
+	if (ret < 0) {
+		(void)pr_info("Hobot ion-cma memory range get failed\n");
+		return ret;
 	}
 
 	return 0;
@@ -1733,6 +1658,8 @@ static void hobot_heaps_unprepare(struct hobot_ion *hb_ion_data)
  * @design
  */
 //coverity[HIS_VOCF:SUPPRESS], ## violation reason SYSSW_V_VOCF_01
+//coverity[HIS_CCM:SUPPRESS], ## violation reason SYSSW_V_CCM_01
+//coverity[HIS_LEVEL:SUPPRESS], ## violation reason SYSSW_V_LEVEL_01
 static void hobot_ion_cma_carveout_prepare(struct hobot_ion *hb_ion_data)
 {
 	int32_t ret;
@@ -1859,6 +1786,7 @@ static void hobot_ion_cma_carveout_unprepare(struct hobot_ion *hb_ion_data)
  * @design
  */
 //coverity[HIS_VOCF:SUPPRESS], ## violation reason SYSSW_V_VOCF_01
+//coverity[HIS_CCM:SUPPRESS], ## violation reason SYSSW_V_CCM_01
 static int32_t __init hobot_ion_init(void)
 {
 	struct ion_platform_heap *heap_data;

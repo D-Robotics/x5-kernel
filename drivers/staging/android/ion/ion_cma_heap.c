@@ -37,6 +37,7 @@ struct ion_cma_heap {
 #define to_cma_heap(x) container_of(x, struct ion_cma_heap, heap)
 
 /* ION CMA heap operations functions */
+//coverity[HIS_LEVEL:SUPPRESS], ## violation reason SYSSW_V_LEVEL_01
 static int ion_cma_allocate(struct ion_heap *heap, struct ion_buffer *buffer,
 		unsigned long len, unsigned long start_align,
 		unsigned long flags)
@@ -62,7 +63,7 @@ static int ion_cma_allocate(struct ion_heap *heap, struct ion_buffer *buffer,
 		align = CONFIG_CMA_ALIGNMENT;
 #endif
 
-	pages = cma_alloc(cma_heap->sys_cma, nr_pages, align, GFP_KERNEL);
+	pages = cma_alloc(cma_heap->sys_cma, nr_pages, (uint32_t)align, false);
 	if (pages == NULL)
 		return -ENOMEM;
 
@@ -111,7 +112,7 @@ static int ion_cma_allocate(struct ion_heap *heap, struct ion_buffer *buffer,
 	sg_set_page(table->sgl, pages, (uint32_t)size, 0);
 
 	buffer->priv_virt = pages;
-	buffer->sg_table = table;
+	buffer->hb_sg_table = table;
 
 	return 0;
 
@@ -136,15 +137,15 @@ static void ion_cma_free(struct ion_buffer *buffer)
 	/* release memory */
 	(void)cma_release(cma_heap->sys_cma, pages, nr_pages);
 	/* release sg table */
-	sg_free_table(buffer->sg_table);
-	kfree(buffer->sg_table);
+	sg_free_table(buffer->hb_sg_table);
+	kfree(buffer->hb_sg_table);
 }
 
 static int ion_cma_heap_phys(struct ion_heap *heap,
 				  struct ion_buffer *buffer,
 				  phys_addr_t *addr, size_t *len)
 {
-	struct sg_table *table = buffer->sg_table;
+	struct sg_table *table = buffer->hb_sg_table;
 	struct page *heap_page = sg_page(table->sgl);
 	//coverity[misra_c_2012_rule_18_4_violation:SUPPRESS], ## violation reason SYSSW_V_18.4_03
 	//coverity[misra_c_2012_rule_10_4_violation:SUPPRESS], ## violation reason SYSSW_V_10.4_01
@@ -159,7 +160,7 @@ static int ion_cma_heap_phys(struct ion_heap *heap,
 static struct sg_table *ion_cma_heap_map_dma(struct ion_heap *heap,
 					     struct ion_buffer *buffer)
 {
-	return buffer->sg_table;
+	return buffer->hb_sg_table;
 }
 
 static void ion_cma_heap_unmap_dma(struct ion_heap *heap,
@@ -224,7 +225,7 @@ int ion_cma_get_info(struct ion_device *dev, phys_addr_t *base, size_t *size,
 	//coverity[misra_c_2012_rule_20_7_violation:SUPPRESS], ## violation reason SYSSW_V_20.7_01
 	//coverity[misra_c_2012_rule_18_4_violation:SUPPRESS], ## violation reason SYSSW_V_18.4_03
 	//coverity[misra_c_2012_rule_11_5_violation:SUPPRESS], ## violation reason SYSSW_V_11.5_01
-	plist_for_each_entry(heap, &dev->heaps, node) {
+	plist_for_each_entry(heap, &dev->heaps, hb_node) {
 		if (heap->type != type)
 			continue;
 
@@ -288,7 +289,7 @@ static int __ion_del_cma_heaps(struct cma *sys_cma, void *data)
 	//coverity[misra_c_2012_rule_20_7_violation:SUPPRESS], ## violation reason SYSSW_V_20.7_01
 	//coverity[misra_c_2012_rule_18_4_violation:SUPPRESS], ## violation reason SYSSW_V_18.4_03
 	//coverity[misra_c_2012_rule_11_5_violation:SUPPRESS], ## violation reason SYSSW_V_11.5_01
-	plist_for_each_entry(heap, &cma_ion_dev->heaps, node) {
+	plist_for_each_entry(heap, &cma_ion_dev->heaps, hb_node) {
 		if (((heap->type == ION_HEAP_TYPE_DMA) || (heap->type == ION_HEAP_TYPE_DMA_EX)) &&
 			(strcmp(name, heap->name) != 0)) {
 			plist_del((struct plist_node *)heap, &cma_ion_dev->heaps);

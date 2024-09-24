@@ -195,9 +195,11 @@ static char *_vio_data_type[] = {
 	"other",
 	};
 
+//coverity[misra_c_2012_rule_8_6_violation:SUPPRESS], ## violation reason SYSSW_V_8.6_01
 static int32_t ion_share_pool_notify(struct ion_device *dev,
 	int32_t share_id, int32_t import_cnt, int32_t timeout, int32_t retry);
 
+//coverity[misra_c_2012_rule_8_6_violation:SUPPRESS], ## violation reason SYSSW_V_8.6_01
 int hb_expand_files(struct files_struct *files, unsigned int nr);
 
 bool ion_buffer_cached(struct ion_buffer *buffer)
@@ -218,7 +220,7 @@ static void ion_buffer_add(struct ion_device *dev,
 		//coverity[misra_c_2012_rule_20_7_violation:SUPPRESS], ## violation reason SYSSW_V_20.7_01
 		//coverity[misra_c_2012_rule_18_4_violation:SUPPRESS], ## violation reason SYSSW_V_18.4_03
 		//coverity[misra_c_2012_rule_11_5_violation:SUPPRESS], ## violation reason SYSSW_V_11.5_01
-		entry = rb_entry(parent, struct ion_buffer, node);
+		entry = rb_entry(parent, struct ion_buffer, hb_node);
 
 		//coverity[misra_c_2012_rule_11_4_violation:SUPPRESS], ## violation reason SYSSW_V_11.4_01
 		if ((uint64_t)buffer < (uint64_t)entry) {
@@ -232,8 +234,8 @@ static void ion_buffer_add(struct ion_device *dev,
 		}
 	}
 
-	rb_link_node(&buffer->node, parent, p);
-	rb_insert_color(&buffer->node, &dev->buffers);
+	rb_link_node(&buffer->hb_node, parent, p);
+	rb_insert_color(&buffer->hb_node, &dev->buffers);
 }
 
 /* this function should only be called while dev->lock is held */
@@ -259,6 +261,7 @@ static void ion_buffer_add(struct ion_device *dev,
  * @design
  */
 //coverity[HIS_VOCF:SUPPRESS], ## violation reason SYSSW_V_VOCF_01
+//coverity[HIS_LEVEL:SUPPRESS], ## violation reason SYSSW_V_LEVEL_01
 static struct ion_buffer *ion_buffer_create(struct ion_heap *heap,
 				     struct ion_device *dev,
 				     unsigned long len,
@@ -300,7 +303,7 @@ static struct ion_buffer *ion_buffer_create(struct ion_heap *heap,
 		}
 	}
 
-	if (buffer->sg_table == NULL) {
+	if (buffer->hb_sg_table == NULL) {
 		WARN_ONCE(1, "This heap needs to set the sgtable");
 		ret = -EINVAL;
 		//coverity[misra_c_2012_rule_15_1_violation:SUPPRESS], ## violation reason SYSSW_V_15.1_01
@@ -328,6 +331,7 @@ err2:
 	return (struct ion_buffer *)ERR_PTR(ret);
 }
 
+//coverity[HIS_VOCF:SUPPRESS], ## violation reason SYSSW_V_VOCF_01
 void ion_buffer_destroy(struct ion_buffer *buffer)
 {
 #if IS_ENABLED(CONFIG_HOBOT_IOMMU)
@@ -355,6 +359,7 @@ void ion_buffer_destroy(struct ion_buffer *buffer)
 	kfree(buffer);
 }
 
+//coverity[HIS_VOCF:SUPPRESS], ## violation reason SYSSW_V_VOCF_01
 static void _ion_buffer_destroy(struct kref *hb_kref)
 {
 	//coverity[misra_c_2012_rule_20_7_violation:SUPPRESS], ## violation reason SYSSW_V_20.7_01
@@ -371,7 +376,7 @@ static void _ion_buffer_destroy(struct kref *hb_kref)
 		(void)pr_info("ready to free buffer2, the size is %lx, the heap type is %d, the heap name is %s\n",
 					buffer2->size, buffer2->heap->type, buffer2->heap->name);
 		mutex_lock(&dev->buffer_lock);
-		rb_erase(&buffer2->node, &dev->buffers);
+		rb_erase(&buffer2->hb_node, &dev->buffers);
 		mutex_unlock(&dev->buffer_lock);
 		buffer->size = buffer->size - buffer2->size;
 
@@ -382,7 +387,7 @@ static void _ion_buffer_destroy(struct kref *hb_kref)
 	}
 
 	mutex_lock(&dev->buffer_lock);
-	rb_erase(&buffer->node, &dev->buffers);
+	rb_erase(&buffer->hb_node, &dev->buffers);
 	mutex_unlock(&dev->buffer_lock);
 
 	if (heap->flags & ION_HEAP_FLAG_DEFER_FREE)
@@ -640,6 +645,7 @@ static struct ion_group_data *ion_group_data_create(struct ion_client *client, i
 	return group_data;
 }
 
+//coverity[HIS_LEVEL:SUPPRESS], ## violation reason SYSSW_V_LEVEL_01
 static int32_t ion_group_data_add(struct ion_client *client, struct ion_group_data *group_data)
 {
 	struct rb_node *parent = NULL;
@@ -778,6 +784,7 @@ static void ion_share_handle_group_destroy(struct kref *hb_kref)
 	kfree(share_group_hd);
 }
 
+//coverity[HIS_LEVEL:SUPPRESS], ## violation reason SYSSW_V_LEVEL_01
 static int32_t ion_share_handle_group_add(struct ion_device *dev, struct ion_share_group_handle *share_group_hd)
 {
 	struct rb_node *parent = NULL;
@@ -1241,6 +1248,7 @@ static bool ion_handle_validate(struct ion_client *client,
 	return idr_find(&client->handle_idr, (unsigned long)handle->id) == handle;
 }
 
+//coverity[HIS_LEVEL:SUPPRESS], ## violation reason SYSSW_V_LEVEL_01
 static int ion_handle_add(struct ion_client *client, struct ion_handle *handle)
 {
 	int id;
@@ -1298,6 +1306,7 @@ static int ion_handle_add(struct ion_client *client, struct ion_handle *handle)
  * @callergraph
  * @design
  */
+//coverity[HIS_LEVEL:SUPPRESS], ## violation reason SYSSW_V_LEVEL_01
 static int ion_share_handle_add(struct ion_device *dev, struct ion_share_handle * share_hd,
 				struct ion_handle *handle)
 {
@@ -1465,6 +1474,7 @@ struct ion_handle *ion_import_dma_buf_with_shareid(struct ion_client *client, in
 	if (ret) {
 		(void)ion_handle_put(handle);
 		//coverity[misra_c_2012_rule_11_5_violation:SUPPRESS], ## violation reason SYSSW_V_11.5_02
+		//coverity[misra_c_2012_directive_4_7_violation], ## violation reason SYSSW_V_4.7_01
 		handle = (struct ion_handle *)ERR_PTR(ret);
 		(void)ion_share_handle_put(share_hd);
 		(void)ion_buffer_put(buffer);
@@ -1564,6 +1574,7 @@ static struct ion_handle *ion_share_handle_import_dma_buf(struct ion_client *cli
 	if (ret) {
 		(void)ion_handle_put(handle);
 		//coverity[misra_c_2012_rule_11_5_violation:SUPPRESS], ## violation reason SYSSW_V_11.5_02
+		//coverity[misra_c_2012_directive_4_7_violation], ## violation reason SYSSW_V_4.7_01
 		handle = (struct ion_handle *)ERR_PTR(ret);
 		(void)ion_share_handle_put(share_hd);
 		(void)ion_buffer_put(buffer);
@@ -1596,6 +1607,7 @@ static struct ion_handle *ion_share_handle_import_dma_buf(struct ion_client *cli
  * @callergraph
  * @design
  */
+//coverity[HIS_VOCF:SUPPRESS], ## violation reason SYSSW_V_VOCF_01
 static struct ion_buffer *ion_sg_buffer_create(struct ion_heap *heap,
 				     struct ion_device *dev,
 				     unsigned long len,
@@ -1621,7 +1633,8 @@ static struct ion_buffer *ion_sg_buffer_create(struct ion_heap *heap,
 
 	buffer[ION_SRAM_SG_FIR] = ion_buffer_create(heap, dev, max_contigous, align, flags);
 	if (IS_ERR_OR_NULL(buffer[ION_SRAM_SG_FIR])) {
-		(void)pr_err("%s: ion alloc memory from sram for scatterlist failed [%p]\n", __func__, buffer[ION_SRAM_SG_FIR]);
+		(void)pr_err("%s: ion alloc memory from sram for scatterlist failed [%pK]\n", __func__, buffer[ION_SRAM_SG_FIR]);
+		//coverity[misra_c_2012_rule_11_5_violation:SUPPRESS], ## violation reason SYSSW_V_11.5_02
 		return (struct ion_buffer *)ERR_PTR(-ENOMEM);
 	}
 
@@ -1632,7 +1645,7 @@ static struct ion_buffer *ion_sg_buffer_create(struct ion_heap *heap,
 		//coverity[misra_c_2012_rule_20_7_violation:SUPPRESS], ## violation reason SYSSW_V_20.7_01
 		//coverity[misra_c_2012_rule_18_4_violation:SUPPRESS], ## violation reason SYSSW_V_18.4_03
 		//coverity[misra_c_2012_rule_11_5_violation:SUPPRESS], ## violation reason SYSSW_V_11.5_01
-		plist_for_each_entry(heap, &dev->heaps, node) {
+		plist_for_each_entry(heap, &dev->heaps, hb_node) {
 			if ((((uint32_t)1U << (uint32_t)heap->type) & heap_id_mask) == 0U)
 				continue;
 			buffer[ION_SRAM_SG_SEC] = ion_buffer_create(heap, dev, res_mem, align, flags);
@@ -1640,7 +1653,7 @@ static struct ion_buffer *ion_sg_buffer_create(struct ion_heap *heap,
 				break;
 		}
 		if (IS_ERR_OR_NULL(buffer[ION_SRAM_SG_SEC])) {
-			(void)pr_err("%s: ion alloc memory from other heap failed [%p]\n", __func__, buffer[ION_SRAM_SG_SEC]);
+			(void)pr_err("%s: ion alloc memory from other heap failed [%pK]\n", __func__, buffer[ION_SRAM_SG_SEC]);
 			(void)ion_buffer_put(buffer[ION_SRAM_SG_FIR]);
 			//coverity[misra_c_2012_rule_11_5_violation:SUPPRESS], ## violation reason SYSSW_V_11.5_02
 			return (struct ion_buffer *)ERR_PTR(-ENOMEM);
@@ -1650,11 +1663,11 @@ static struct ion_buffer *ion_sg_buffer_create(struct ion_heap *heap,
 	}
 
 	for (i = 0; i < ION_SRAM_SG_NUM; i++) {
-		hb_page[i] = sg_page(buffer[i]->sg_table->sgl);
+		hb_page[i] = sg_page(buffer[i]->hb_sg_table->sgl);
 		size[i] = buffer[i]->size;
 	}
 
-	sg_free_table(buffer[ION_SRAM_SG_FIR]->sg_table);
+	sg_free_table(buffer[ION_SRAM_SG_FIR]->hb_sg_table);
 
 	//coverity[misra_c_2012_directive_4_12_violation], ## violation reason SYSSW_V_4.12_02
 	//coverity[misra_c_2012_rule_11_5_violation:SUPPRESS], ## violation reason SYSSW_V_11.5_02
@@ -1683,7 +1696,7 @@ static struct ion_buffer *ion_sg_buffer_create(struct ion_heap *heap,
 	}
 
 	buffer[ION_SRAM_SG_FIR]->priv_virt = table;
-	buffer[ION_SRAM_SG_FIR]->sg_table = table;
+	buffer[ION_SRAM_SG_FIR]->hb_sg_table = table;
 	buffer[ION_SRAM_SG_FIR]->priv_buffer = (void *)buffer[ION_SRAM_SG_SEC];
 	buffer[ION_SRAM_SG_FIR]->size = ((uint64_t)size[ION_SRAM_SG_FIR] + (uint64_t)size[ION_SRAM_SG_SEC]);
 
@@ -1691,7 +1704,7 @@ static struct ion_buffer *ion_sg_buffer_create(struct ion_heap *heap,
 	ion_buffer_add_to_handle(buffer[ION_SRAM_SG_SEC]);
 
 	//coverity[misra_c_2012_rule_20_7_violation:SUPPRESS], ## violation reason SYSSW_V_20.7_01
-	for_each_sg(buffer[ION_SRAM_SG_FIR]->sg_table->sgl, sg, table->nents, j) {
+	for_each_sg(buffer[ION_SRAM_SG_FIR]->hb_sg_table->sgl, sg, table->nents, j) {
 		(void)pr_info("%d:the alloc size is %x\n", j, sg->length);
 	}
 
@@ -1721,6 +1734,9 @@ static struct ion_buffer *ion_sg_buffer_create(struct ion_heap *heap,
  * @callergraph
  * @design
  */
+//coverity[HIS_CCM:SUPPRESS], ## violation reason SYSSW_V_CCM_01
+//coverity[HIS_STMT:SUPPRESS], ## violation reason SYSSW_V_STMT_01
+//coverity[HIS_VOCF:SUPPRESS], ## violation reason SYSSW_V_VOCF_01
 struct ion_handle *ion_alloc(struct ion_client *client, size_t len,
 			     size_t align, unsigned int heap_id_mask,
 			     unsigned int flags)
@@ -1768,7 +1784,7 @@ struct ion_handle *ion_alloc(struct ion_client *client, size_t len,
 		//coverity[misra_c_2012_rule_20_7_violation:SUPPRESS], ## violation reason SYSSW_V_20.7_01
 		//coverity[misra_c_2012_rule_18_4_violation:SUPPRESS], ## violation reason SYSSW_V_18.4_03
 		//coverity[misra_c_2012_rule_11_5_violation:SUPPRESS], ## violation reason SYSSW_V_11.5_01
-		plist_for_each_entry(heap, &dev->heaps, node) {
+		plist_for_each_entry(heap, &dev->heaps, hb_node) {
 			/* if the caller didn't specify this heap id */
 			if ((((uint32_t)1U << (uint32_t)heap->type) & heap_id_mask) != 0U) {
 				heap_march = 1;
@@ -1783,7 +1799,7 @@ struct ion_handle *ion_alloc(struct ion_client *client, size_t len,
 		//coverity[misra_c_2012_rule_20_7_violation:SUPPRESS], ## violation reason SYSSW_V_20.7_01
 		//coverity[misra_c_2012_rule_18_4_violation:SUPPRESS], ## violation reason SYSSW_V_18.4_03
 		//coverity[misra_c_2012_rule_11_5_violation:SUPPRESS], ## violation reason SYSSW_V_11.5_01
-		plist_for_each_entry(heap, &dev->heaps, node) {
+		plist_for_each_entry(heap, &dev->heaps, hb_node) {
 			/* if the caller didn't specify this heap id */
 			if ((((uint32_t)1U << (uint32_t)heap->type) & heap_id_mask) != 0U) {
 				heap_march = 1;
@@ -1797,7 +1813,7 @@ struct ion_handle *ion_alloc(struct ion_client *client, size_t len,
 	//coverity[misra_c_2012_rule_20_7_violation:SUPPRESS], ## violation reason SYSSW_V_20.7_01
 	//coverity[misra_c_2012_rule_18_4_violation:SUPPRESS], ## violation reason SYSSW_V_18.4_03
 	//coverity[misra_c_2012_rule_11_5_violation:SUPPRESS], ## violation reason SYSSW_V_11.5_01
-	plist_for_each_entry(heap, &dev->heaps, node) {
+	plist_for_each_entry(heap, &dev->heaps, hb_node) {
 		/* if the caller didn't specify this heap id */
 		if ((((uint32_t)1U << (uint32_t)heap->type) & heap_id_mask) == 0U)
 			continue;
@@ -1818,7 +1834,8 @@ struct ion_handle *ion_alloc(struct ion_client *client, size_t len,
 		if (IS_ERR(buffer)) {
 			pr_err("%s: buffer create failed\n", __func__);
 			up_read(&dev->lock);
-			return ERR_PTR(-ENOMEM);
+			//coverity[misra_c_2012_rule_11_5_violation:SUPPRESS], ## violation reason SYSSW_V_11.5_02
+			return (struct ion_handle *)ERR_PTR(-ENOMEM);
 		}
 		//initial the child buffer paramters
 		//coverity[misra_c_2012_rule_11_5_violation:SUPPRESS], ## violation reason SYSSW_V_11.5_02
@@ -1856,7 +1873,7 @@ struct ion_handle *ion_alloc(struct ion_client *client, size_t len,
 		//coverity[misra_c_2012_rule_20_7_violation:SUPPRESS], ## violation reason SYSSW_V_20.7_01
 		//coverity[misra_c_2012_rule_18_4_violation:SUPPRESS], ## violation reason SYSSW_V_18.4_03
 		//coverity[misra_c_2012_rule_11_5_violation:SUPPRESS], ## violation reason SYSSW_V_11.5_01
-		plist_for_each_entry(heap, &dev->heaps, node) {
+		plist_for_each_entry(heap, &dev->heaps, hb_node) {
 			/* if the caller didn't specify this heap id */
 			if ((((uint32_t)1U << (uint32_t)heap->type) & heap_id_mask) == 0U)
 				continue;
@@ -1889,7 +1906,7 @@ struct ion_handle *ion_alloc(struct ion_client *client, size_t len,
 		//coverity[misra_c_2012_rule_20_7_violation:SUPPRESS], ## violation reason SYSSW_V_20.7_01
 		//coverity[misra_c_2012_rule_18_4_violation:SUPPRESS], ## violation reason SYSSW_V_18.4_03
 		//coverity[misra_c_2012_rule_11_5_violation:SUPPRESS], ## violation reason SYSSW_V_11.5_01
-		plist_for_each_entry(heap, &dev->heaps, node) {
+		plist_for_each_entry(heap, &dev->heaps, hb_node) {
 			/* if the caller didn't specify this heap id */
 			if ((((uint32_t)1U << (uint32_t)heap->type) & heap_id_mask) == 0U)
 				continue;
@@ -1950,6 +1967,7 @@ struct ion_handle *ion_alloc(struct ion_client *client, size_t len,
 		(void)ion_share_handle_put(share_hd);
 		(void)ion_handle_put(handle);
 		//coverity[misra_c_2012_rule_11_5_violation:SUPPRESS], ## violation reason SYSSW_V_11.5_02
+		//coverity[misra_c_2012_directive_4_7_violation], ## violation reason SYSSW_V_4.7_01
 		handle = (struct ion_handle *)ERR_PTR(ret);
 		return handle;
 	}
@@ -2261,6 +2279,9 @@ static int32_t share_pool_sync_idx(struct ion_share_handle *share_hd)
  * @callergraph
  * @design
  */
+//coverity[HIS_CCM:SUPPRESS], ## violation reason SYSSW_V_CCM_01
+//coverity[HIS_LEVEL:SUPPRESS], ## violation reason SYSSW_V_LEVEL_01
+//coverity[HIS_VOCF:SUPPRESS], ## violation reason SYSSW_V_VOCF_01
 static int32_t ion_share_pool_notify(struct ion_device *dev,
 	int32_t share_id, int32_t import_cnt, int32_t timeout, int32_t retry)
 {
@@ -2546,6 +2567,7 @@ int ion_phys(struct ion_client *client, int handle_id,
 //coverity[misra_c_2012_rule_20_7_violation:SUPPRESS], ## violation reason SYSSW_V_20.7_01
 EXPORT_SYMBOL(ion_phys);
 
+//coverity[HIS_LEVEL:SUPPRESS], ## violation reason SYSSW_V_LEVEL_01
 static void *ion_buffer_kmap_get(struct ion_buffer *buffer)
 {
 	void *vaddr;
@@ -2716,61 +2738,11 @@ void ion_unmap_kernel(struct ion_client *client, struct ion_handle *handle)
 //coverity[misra_c_2012_rule_20_7_violation:SUPPRESS], ## violation reason SYSSW_V_20.7_01
 EXPORT_SYMBOL(ion_unmap_kernel);
 
-/**
- * @NO{S21E04C02U}
- * @ASIL{B}
- * @brief get the ion flag by hbmem flag
- *
- * @param[in] flags: the hbmem alloc flag
- * @param[out] heap_id_mask: the alloc heap id mask
- * @param[out] port: the alloc port
- *
- * @retval alloc_flags: succeed
- *
- * @data_read None
- * @data_updated None
- *
- * @callgraph
- * @callergraph
- * @design
- */
-//coverity[misra_c_2012_rule_8_7_violation:SUPPRESS], ## violation reason SYSSW_V_8.7_01
-uint32_t hbmem_flag_to_ion_flag(int64_t flags, uint32_t *heap_id_mask, int32_t *port)
+//coverity[HIS_CCM:SUPPRESS], ## violation reason SYSSW_V_CCM_01
+static uint32_t hobot_ion_get_alloc_flags(uint64_t user_flags, int64_t flags)
 {
 	uint32_t alloc_flags = 0;
-	uint64_t user_flags = ((uint64_t)flags & (uint64_t)HB_MEM_USAGE_TRIVIAL_MASK);
-	uint32_t heap_mask;
-	uint64_t heap_flags = (uint64_t)flags & (uint64_t)HB_MEM_USAGE_PRIV_MASK;
-	int32_t map_prot = PROT_NONE;
-	uint64_t port_flags = ((uint64_t)flags & (uint64_t)HB_MEM_USAGE_CPU_READ_MASK) |
-		((uint64_t)flags & (uint64_t)HB_MEM_USAGE_CPU_WRITE_MASK);
 
-	if (((uint64_t)user_flags & (uint64_t)HB_MEM_USAGE_CACHED) != 0UL) {
-		alloc_flags |= ((uint32_t)ION_FLAG_CACHED | (uint32_t)ION_FLAG_CACHED_NEEDS_SYNC);
-	}
-
-	if (((uint64_t)user_flags & (uint64_t)HB_MEM_USAGE_MAP_INITIALIZED) != 0UL) {
-		alloc_flags |= (uint32_t)ION_FLAG_INITIALIZED;
-	} else if (((uint64_t)user_flags & (uint64_t)HB_MEM_USAGE_MAP_UNINITIALIZED) != 0UL) {
-		alloc_flags |= (uint32_t)ION_FLAG_UNINITIALIZED;
-	} else {
-		//coverity[misra_c_2012_rule_8_6_violation:SUPPRESS], ## violation reason SYSSW_V_8.6_01
-		pr_debug("%s:%d Use uninitialized default\n", __func__, __LINE__);
-	}
-
-/* 	if (((uint64_t)user_flags & (uint64_t)HB_MEM_USAGE_MEM_POOL) != 0) {
-		alloc_flags |= (uint32_t)ION_FLAG_USE_POOL;
-	} */
-
-	// alloc flag's high 16 bit meaning:
-	// xxxx (vpu/jpu type id)xxxx xx(vpu/jpu instance id)xx xxxx(vpu/jpu memory
-	// type)
-	//alloc_flags |= (ionType << 12 | instIndex << 6 | memoryType) << 16;
-
-	// now we can only set the module type to bpu to make the heap mask work
-	// we should fix this
-	//get the ion alloc flags
-	user_flags = ((uint64_t)flags & (uint64_t)HB_MEM_USAGE_HW_MASK);
 	switch (user_flags) {
 		case (uint64_t)HB_MEM_USAGE_HW_CIM:
 			alloc_flags |= ((uint32_t)ION_MODULE_TYPE_INTERNAL << ION_MODULE_TYPE_BIT_SHIFT) |
@@ -2842,31 +2814,102 @@ uint32_t hbmem_flag_to_ion_flag(int64_t flags, uint32_t *heap_id_mask, int32_t *
 			break;
 	}
 
-	//get the heap id mask
+	return alloc_flags;
+}
+
+//coverity[HIS_LEVEL:SUPPRESS], ## violation reason SYSSW_V_LEVEL_01
+static uint32_t hobot_ion_get_heap_id_mask(uint64_t heap_flags)
+{
+	uint32_t heap_id_mask;
+
 	if ((uint64_t)heap_flags == (uint64_t)HB_MEM_USAGE_PRIV_HEAP_DMA) {/* PRQA S 2995,2991 */
-		heap_mask = (uint32_t)ION_HEAP_TYPE_DMA_MASK;
+		heap_id_mask = (uint32_t)ION_HEAP_TYPE_DMA_MASK;
 	} else if (((uint64_t)heap_flags & (uint64_t)HB_MEM_USAGE_PRIV_HEAP_RESERVED) != 0UL) {
-		heap_mask = (uint32_t)ION_HEAP_CARVEOUT_MASK;
+		heap_id_mask = (uint32_t)ION_HEAP_CARVEOUT_MASK;
 	} else if (((uint64_t)heap_flags & (uint64_t)HB_MEM_USAGE_PRIV_HEAP_SRAM) != 0UL) {
-		heap_mask = (uint32_t)ION_HEAP_TYPE_CUSTOM_MASK;
+		heap_id_mask = (uint32_t)ION_HEAP_TYPE_CUSTOM_MASK;
 	} else if (((uint64_t)heap_flags & (uint64_t)HB_MEM_USAGE_PRIV_HEAP_2_RESERVED) != 0UL) {
-		heap_mask = (uint32_t)ION_HEAP_TYPE_CMA_RESERVED_MASK;
+		heap_id_mask = (uint32_t)ION_HEAP_TYPE_CMA_RESERVED_MASK;
 	} else if (((uint64_t)heap_flags & (uint64_t)HB_MEM_USAGE_PRIV_HEAP_SRAM_LIMIT) != 0UL) {
-		heap_mask = (uint32_t)ION_HEAP_TYPE_SRAM_LIMIT_MASK;
+		heap_id_mask = (uint32_t)ION_HEAP_TYPE_SRAM_LIMIT_MASK;
 	} else if (((uint64_t)heap_flags & (uint64_t)HB_MEM_USAGE_PRIV_HEAP_INLINE_ECC) != 0UL) {
-		heap_mask = (uint32_t)ION_HEAP_TYPE_INLINE_ECC_MASK;
+		heap_id_mask = (uint32_t)ION_HEAP_TYPE_INLINE_ECC_MASK;
 	} else {
-		heap_mask = (uint32_t)ION_HEAP_TYPE_DMA_MASK;
+		heap_id_mask = (uint32_t)ION_HEAP_TYPE_DMA_MASK;
 	}
 
+	return heap_id_mask;
+}
+
+/**
+ * @NO{S21E04C02U}
+ * @ASIL{B}
+ * @brief get the ion flag by hbmem flag
+ *
+ * @param[in] flags: the hbmem alloc flag
+ * @param[out] heap_id_mask: the alloc heap id mask
+ * @param[out] port: the alloc port
+ *
+ * @retval alloc_flags: succeed
+ *
+ * @data_read None
+ * @data_updated None
+ *
+ * @callgraph
+ * @callergraph
+ * @design
+ */
+//coverity[misra_c_2012_rule_8_7_violation:SUPPRESS], ## violation reason SYSSW_V_8.7_01
+uint32_t hbmem_flag_to_ion_flag(int64_t flags, uint32_t *heap_id_mask, int32_t *port)
+{
+	uint32_t alloc_flags = 0;
+	uint64_t user_flags = ((uint64_t)flags & (uint64_t)HB_MEM_USAGE_TRIVIAL_MASK);
+	uint32_t heap_mask;
+	uint64_t heap_flags = (uint64_t)flags & (uint64_t)HB_MEM_USAGE_PRIV_MASK;
+	int32_t map_prot = PROT_NONE;
+	uint64_t port_flags = ((uint64_t)flags & (uint64_t)HB_MEM_USAGE_CPU_READ_MASK) |
+		((uint64_t)flags & (uint64_t)HB_MEM_USAGE_CPU_WRITE_MASK);
+
+	if (((uint64_t)user_flags & (uint64_t)HB_MEM_USAGE_CACHED) != 0UL) {
+		alloc_flags |= ((uint32_t)ION_FLAG_CACHED | (uint32_t)ION_FLAG_CACHED_NEEDS_SYNC);
+	}
+
+	if (((uint64_t)user_flags & (uint64_t)HB_MEM_USAGE_MAP_INITIALIZED) != 0UL) {
+		alloc_flags |= (uint32_t)ION_FLAG_INITIALIZED;
+	} else if (((uint64_t)user_flags & (uint64_t)HB_MEM_USAGE_MAP_UNINITIALIZED) != 0UL) {
+		alloc_flags |= (uint32_t)ION_FLAG_UNINITIALIZED;
+	} else {
+		//coverity[misra_c_2012_rule_8_6_violation:SUPPRESS], ## violation reason SYSSW_V_8.6_01
+		pr_debug("%s:%d Use uninitialized default\n", __func__, __LINE__);
+	}
+
+/* 	if (((uint64_t)user_flags & (uint64_t)HB_MEM_USAGE_MEM_POOL) != 0) {
+		alloc_flags |= (uint32_t)ION_FLAG_USE_POOL;
+	} */
+
+	// alloc flag's high 16 bit meaning:
+	// xxxx (vpu/jpu type id)xxxx xx(vpu/jpu instance id)xx xxxx(vpu/jpu memory
+	// type)
+	//alloc_flags |= (ionType << 12 | instIndex << 6 | memoryType) << 16;
+
+	// now we can only set the module type to bpu to make the heap mask work
+	// we should fix this
+	//get the ion alloc flags
+	user_flags = ((uint64_t)flags & (uint64_t)HB_MEM_USAGE_HW_MASK);
+	alloc_flags |= hobot_ion_get_alloc_flags(user_flags, flags);
+
+	//get the heap id mask
+	heap_mask = hobot_ion_get_heap_id_mask(heap_flags);
 	*heap_id_mask = heap_mask;
 
 	//get the port for alloc buffer
 	if (((port_flags & (uint64_t)HB_MEM_USAGE_CPU_READ_OFTEN) != 0UL)) {
-		map_prot = (uint32_t)map_prot | (uint32_t)PROT_READ;
+		//coverity[misra_c_2012_rule_10_8_violation:SUPPRESS], ## violation reason SYSSW_V_10.8_01
+		map_prot = (int32_t)((uint32_t)map_prot | (uint32_t)PROT_READ);
 	}
 	if ((port_flags & (uint64_t)HB_MEM_USAGE_CPU_WRITE_OFTEN) != 0UL) {
-		map_prot = (uint32_t)map_prot | (uint32_t)PROT_WRITE;
+		//coverity[misra_c_2012_rule_10_8_violation:SUPPRESS], ## violation reason SYSSW_V_10.8_01
+		map_prot = (int32_t)((uint32_t)map_prot | (uint32_t)PROT_WRITE);
 	}
 
 	*port = map_prot;
@@ -2876,6 +2919,140 @@ uint32_t hbmem_flag_to_ion_flag(int64_t flags, uint32_t *heap_id_mask, int32_t *
 //coverity[misra_c_2012_rule_8_6_violation:SUPPRESS], ## violation reason SYSSW_V_8.6_01
 //coverity[misra_c_2012_rule_20_7_violation:SUPPRESS], ## violation reason SYSSW_V_20.7_01
 EXPORT_SYMBOL(hbmem_flag_to_ion_flag);
+
+//coverity[HIS_CCM:SUPPRESS], ## violation reason SYSSW_V_CCM_01
+static uint64_t hobot_ion_get_module_flag(uint32_t type)
+{
+	uint64_t module_flag = 0;
+
+	switch(type) {
+		case (uint32_t)ION_MEM_TYPE_CIM:
+		{
+			module_flag = module_flag | (uint64_t)HB_MEM_USAGE_HW_CIM;
+			break;
+		}
+		case (uint32_t)ION_MEM_TYPE_PYRAMID:
+		{
+			module_flag = module_flag | (uint64_t)HB_MEM_USAGE_HW_PYRAMID;
+			break;
+		}
+		case (uint32_t)ION_MEM_TYPE_GDC_OUT:
+		{
+			module_flag = module_flag | (uint64_t)HB_MEM_USAGE_HW_GDC_OUT;
+			break;
+		}
+		case (uint32_t)ION_MEM_TYPE_GDC:
+		{
+			module_flag = module_flag | (uint64_t)HB_MEM_USAGE_HW_GDC;
+			break;
+		}
+		case (uint32_t)ION_MEM_TYPE_STITCH:
+		{
+			module_flag = module_flag | (uint64_t)HB_MEM_USAGE_HW_STITCH;
+			break;
+		}
+		case (uint32_t)ION_MEM_TYPE_OPTICAL_FLOW:
+		{
+			module_flag = module_flag | (uint64_t)HB_MEM_USAGE_HW_OPTICAL_FLOW;
+			break;
+		}
+		case (uint32_t)ION_MEM_TYPE_BPU:
+		{
+			module_flag = module_flag | (uint64_t)HB_MEM_USAGE_HW_BPU;
+			break;
+		}
+		case (uint32_t)ION_MEM_TYPE_ISP:
+		{
+			module_flag = module_flag | (uint64_t)HB_MEM_USAGE_HW_ISP;
+			break;
+		}
+		case (uint32_t)ION_MEM_TYPE_DISPLAY:
+		{
+			module_flag = module_flag | (uint64_t)HB_MEM_USAGE_HW_DISPLAY;
+			break;
+		}
+		case (uint32_t)ION_MEM_TYPE_VIDEO_CODEC:
+		{
+			module_flag = module_flag | (uint64_t)HB_MEM_USAGE_HW_VIDEO_CODEC;
+			break;
+		}
+		case (uint32_t)ION_MEM_TYPE_JPEG_CODEC:
+		{
+			module_flag = module_flag | (uint64_t)HB_MEM_USAGE_HW_JPEG_CODEC;
+			break;
+		}
+		case (uint32_t)ION_MEM_TYPE_VDSP:
+		{
+			module_flag = module_flag | (uint64_t)HB_MEM_USAGE_HW_VDSP;
+			break;
+		}
+		case (uint32_t)ION_MEM_TYPE_IPC:
+		{
+			module_flag = module_flag | (uint64_t)HB_MEM_USAGE_HW_IPC;
+			break;
+		}
+		case (uint32_t)ION_MEM_TYPE_PCIE:
+		{
+			module_flag = module_flag | (uint64_t)HB_MEM_USAGE_HW_PCIE;
+			break;
+		}
+		case (uint32_t)ION_MEM_TYPE_YNR:
+		{
+			module_flag = module_flag | (uint64_t)HB_MEM_USAGE_HW_YNR;
+			break;
+		}
+		default:
+			//coverity[misra_c_2012_rule_8_6_violation:SUPPRESS], ## violation reason SYSSW_V_8.6_01
+			pr_debug("%s:%d default use other\n", __func__, __LINE__);
+			break;
+	}
+
+	return module_flag;
+}
+
+static uint64_t hobot_ion_get_heap_mask(uint32_t heap_id_mask)
+{
+	uint64_t heap_mask = 0;
+
+	switch(heap_id_mask) {
+		case (uint32_t)ION_HEAP_CARVEOUT_MASK:
+		{
+			heap_mask = heap_mask | (uint64_t)HB_MEM_USAGE_PRIV_HEAP_RESERVED;
+			break;
+		}
+		case (uint32_t)ION_HEAP_TYPE_CUSTOM_MASK:
+		{
+			heap_mask = heap_mask | (uint64_t)HB_MEM_USAGE_PRIV_HEAP_SRAM;
+			break;
+		}
+		case (uint32_t)ION_HEAP_TYPE_CMA_RESERVED_MASK:
+		{
+			heap_mask = heap_mask | (uint64_t)HB_MEM_USAGE_PRIV_HEAP_2_RESERVED;
+			break;
+		}
+		case (uint32_t)ION_HEAP_TYPE_DMA_MASK:
+		{
+			heap_mask = heap_mask | (uint64_t)HB_MEM_USAGE_PRIV_HEAP_DMA;
+			break;
+		}
+		case (uint32_t)ION_HEAP_TYPE_SRAM_LIMIT_MASK:
+		{
+			heap_mask = heap_mask | (uint64_t)HB_MEM_USAGE_PRIV_HEAP_SRAM_LIMIT;
+			break;
+		}
+		case (uint32_t)ION_HEAP_TYPE_INLINE_ECC_MASK:
+		{
+			heap_mask = heap_mask | (uint64_t)HB_MEM_USAGE_PRIV_HEAP_INLINE_ECC;
+			break;
+		}
+		default:
+			//coverity[misra_c_2012_rule_8_6_violation:SUPPRESS], ## violation reason SYSSW_V_8.6_01
+			pr_debug("%s:%d default use cma heap\n", __func__, __LINE__);
+			break;
+	}
+
+	return heap_mask;
+}
 
 /**
  * @NO{S21E04C01I}
@@ -2899,7 +3076,7 @@ EXPORT_SYMBOL(hbmem_flag_to_ion_flag);
 //coverity[misra_c_2012_rule_8_7_violation:SUPPRESS], ## violation reason SYSSW_V_8.7_01
 int64_t ion_flag_to_hbmem_flag(uint32_t ion_flag, uint32_t heap_id_mask, int64_t pool_flag, int64_t prot)
 {
-	uint64_t flags = 0;
+	uint64_t flags = 0, module_flag = 0, heap_mask = 0;
 	uint32_t type = 0;
 	//ion_flag<-->ion_flag in driver
 		//get cache
@@ -2917,124 +3094,13 @@ int64_t ion_flag_to_hbmem_flag(uint32_t ion_flag, uint32_t heap_id_mask, int64_t
 	}
 		//get module type
 	type = (ion_flag >> ION_MEM_TYPE_BIT_SHIFT) & (uint32_t)ION_MEM_TYPE_MASK;
-	switch(type) {
-		case (uint32_t)ION_MEM_TYPE_CIM:
-		{
-			flags = flags | (uint64_t)HB_MEM_USAGE_HW_CIM;
-			break;
-		}
-		case (uint32_t)ION_MEM_TYPE_PYRAMID:
-		{
-			flags = flags | (uint64_t)HB_MEM_USAGE_HW_PYRAMID;
-			break;
-		}
-		case (uint32_t)ION_MEM_TYPE_GDC_OUT:
-		{
-			flags = flags | (uint64_t)HB_MEM_USAGE_HW_GDC_OUT;
-			break;
-		}
-		case (uint32_t)ION_MEM_TYPE_GDC:
-		{
-			flags = flags | (uint64_t)HB_MEM_USAGE_HW_GDC;
-			break;
-		}
-		case (uint32_t)ION_MEM_TYPE_STITCH:
-		{
-			flags = flags | (uint64_t)HB_MEM_USAGE_HW_STITCH;
-			break;
-		}
-		case (uint32_t)ION_MEM_TYPE_OPTICAL_FLOW:
-		{
-			flags = flags | (uint64_t)HB_MEM_USAGE_HW_OPTICAL_FLOW;
-			break;
-		}
-		case (uint32_t)ION_MEM_TYPE_BPU:
-		{
-			flags = flags | (uint64_t)HB_MEM_USAGE_HW_BPU;
-			break;
-		}
-		case (uint32_t)ION_MEM_TYPE_ISP:
-		{
-			flags = flags | (uint64_t)HB_MEM_USAGE_HW_ISP;
-			break;
-		}
-		case (uint32_t)ION_MEM_TYPE_DISPLAY:
-		{
-			flags = flags | (uint64_t)HB_MEM_USAGE_HW_DISPLAY;
-			break;
-		}
-		case (uint32_t)ION_MEM_TYPE_VIDEO_CODEC:
-		{
-			flags = flags | (uint64_t)HB_MEM_USAGE_HW_VIDEO_CODEC;
-			break;
-		}
-		case (uint32_t)ION_MEM_TYPE_JPEG_CODEC:
-		{
-			flags = flags | (uint64_t)HB_MEM_USAGE_HW_JPEG_CODEC;
-			break;
-		}
-		case (uint32_t)ION_MEM_TYPE_VDSP:
-		{
-			flags = flags | (uint64_t)HB_MEM_USAGE_HW_VDSP;
-			break;
-		}
-		case (uint32_t)ION_MEM_TYPE_IPC:
-		{
-			flags = flags | (uint64_t)HB_MEM_USAGE_HW_IPC;
-			break;
-		}
-		case (uint32_t)ION_MEM_TYPE_PCIE:
-		{
-			flags = flags | (uint64_t)HB_MEM_USAGE_HW_PCIE;
-			break;
-		}
-		case (uint32_t)ION_MEM_TYPE_YNR:
-		{
-			flags = flags | (uint64_t)HB_MEM_USAGE_HW_YNR;
-			break;
-		}
-		default:
-			//coverity[misra_c_2012_rule_8_6_violation:SUPPRESS], ## violation reason SYSSW_V_8.6_01
-			pr_debug("%s:%d default use other\n", __func__, __LINE__);
-			break;
-	}
+	module_flag = hobot_ion_get_module_flag(type);
+	flags = flags | module_flag;
+
 	//heap_id_mask
-	switch(heap_id_mask) {
-		case (uint32_t)ION_HEAP_CARVEOUT_MASK:
-		{
-			flags = flags | (uint64_t)HB_MEM_USAGE_PRIV_HEAP_RESERVED;
-			break;
-		}
-		case (uint32_t)ION_HEAP_TYPE_CUSTOM_MASK:
-		{
-			flags = flags | (uint64_t)HB_MEM_USAGE_PRIV_HEAP_SRAM;
-			break;
-		}
-		case (uint32_t)ION_HEAP_TYPE_CMA_RESERVED_MASK:
-		{
-			flags = flags | (uint64_t)HB_MEM_USAGE_PRIV_HEAP_2_RESERVED;
-			break;
-		}
-		case (uint32_t)ION_HEAP_TYPE_DMA_MASK:
-		{
-			flags = flags | (uint64_t)HB_MEM_USAGE_PRIV_HEAP_DMA;
-			break;
-		}
-		case (uint32_t)ION_HEAP_TYPE_SRAM_LIMIT_MASK:
-		{
-			flags = flags | (uint64_t)HB_MEM_USAGE_PRIV_HEAP_SRAM_LIMIT;
-			break;
-		}
-		case (uint32_t)ION_HEAP_TYPE_INLINE_ECC_MASK:
-		{
-			flags = flags | (uint64_t)HB_MEM_USAGE_PRIV_HEAP_INLINE_ECC;
-			break;
-		}
-		default:
-			//coverity[misra_c_2012_rule_8_6_violation:SUPPRESS], ## violation reason SYSSW_V_8.6_01
-			pr_debug("%s:%d default use cma heap\n", __func__, __LINE__);
-			break;
-	}
+	heap_mask = hobot_ion_get_heap_mask(heap_id_mask);
+	flags = flags | heap_mask;
+
 	//pool_flag is from @mem_usage_t, whether use memory pool
 	//prot if from @mem_usage_t，read and write flag
 	if (0UL != ((uint64_t)prot & (uint64_t)PROT_READ)) {
@@ -3070,6 +3136,7 @@ EXPORT_SYMBOL(ion_flag_to_hbmem_flag);
  * @callergraph
  * @design
  */
+//coverity[HIS_VOCF:SUPPRESS], ## violation reason SYSSW_V_VOCF_01
 static int ion_debug_client_show(struct seq_file *s, void *unused)
 {
 	//coverity[misra_c_2012_rule_11_5_violation:SUPPRESS], ## violation reason SYSSW_V_11.5_02
@@ -3216,6 +3283,7 @@ static int ion_get_client_serial(const struct rb_root *root,
  * @design
  */
 //coverity[HIS_VOCF:SUPPRESS], ## violation reason SYSSW_V_VOCF_01
+//coverity[HIS_LEVEL:SUPPRESS], ## violation reason SYSSW_V_LEVEL_01
 struct ion_client *ion_client_create(struct ion_device *dev,
 				     const char *name)
 {
@@ -3427,7 +3495,9 @@ void ion_client_destroy(struct ion_client *client)
 	mutex_unlock(&client->lock);
 
 	ion_group_data_unregister_all(client);
+	mutex_lock(&dev->share_lock);
 	share_pool_unregister_all(client);
+	mutex_unlock(&dev->share_lock);
 	//coverity[misra_c_2012_rule_20_7_violation:SUPPRESS], ## violation reason SYSSW_V_20.7_01
 	kfifo_free(&client->hb_fifo);
 
@@ -3477,7 +3547,7 @@ struct sg_table *ion_sg_table(struct ion_client *client,
 		return (struct sg_table *)ERR_PTR(-EINVAL);
 	}
 	buffer = handle->buffer;
-	table = buffer->sg_table;
+	table = buffer->hb_sg_table;
 	mutex_unlock(&client->lock);
 	return table;
 }
@@ -3542,7 +3612,7 @@ static int ion_dma_buf_attach(struct dma_buf *dmabuf,
 	if (a == NULL)
 		return -ENOMEM;
 
-	table = dup_sg_table(buffer->sg_table);
+	table = dup_sg_table(buffer->hb_sg_table);
 	if (IS_ERR(table)) {
 		kfree(a);
 		return -ENOMEM;
@@ -3633,6 +3703,36 @@ int ion_mmap(struct ion_buffer *buffer, struct vm_area_struct *vma)
 	return ret;
 }
 EXPORT_SYMBOL(ion_mmap);
+
+static int ion_mmap_mem(struct file *hb_file, struct vm_area_struct *vma)
+{
+	int32_t ret = 0;
+	size_t size = vma->vm_end - vma->vm_start;
+	phys_addr_t offset = (phys_addr_t)vma->vm_pgoff << PAGE_SHIFT;
+
+	ret = ion_check_in_heap_carveout(offset, size);
+	if (ret != 0) {
+		pr_err("Invalid paddr:%#llx, size = %#lx, not in ion heap range\n", offset, size);
+		return -EPERM;
+	}
+
+	/* It's illegal to wrap around the end of the physical address space. */
+	if (offset + (phys_addr_t)size - 1U < offset) {
+		pr_err("Invalid paddr:%#llx, size = %#lx, address winding\n", offset, size);
+		return -EINVAL;
+	}
+
+	//coverity[misra_c_2012_rule_10_8_violation:SUPPRESS], ## violation reason SYSSW_V_10.8_01
+	if (hb_file->f_flags & (uint32_t)O_SYNC)
+		vma->vm_page_prot = pgprot_writecombine(vma->vm_page_prot);
+
+	/* Remap-pfn-range will mark the range VM_IO */
+	if (remap_pfn_range(vma,
+		vma->vm_start, vma->vm_pgoff, size, vma->vm_page_prot))
+		return -EAGAIN;
+
+	return 0;
+}
 
 static int ion_dma_buf_mmap(struct dma_buf *dmabuf, struct vm_area_struct *vma)
 {
@@ -3820,7 +3920,7 @@ EXPORT_SYMBOL(ion_share_dma_buf_fd);
  * @design
  */
 //coverity[misra_c_2012_rule_8_7_violation:SUPPRESS], ## violation reason SYSSW_V_8.7_01
-struct ion_handle *ion_import_dma_buf(struct ion_client *client, int fd)
+struct ion_handle *ion_import_dma_buf(struct ion_client *client, int hb_fd)
 {
 	struct dma_buf *dmabuf;
 	struct ion_buffer *buffer;
@@ -3837,7 +3937,7 @@ struct ion_handle *ion_import_dma_buf(struct ion_client *client, int fd)
 	}
 
 	dev = client->dev;
-	dmabuf = dma_buf_get(fd);
+	dmabuf = dma_buf_get(hb_fd);
 	if (IS_ERR(dmabuf)) {
 		//coverity[misra_c_2012_rule_11_5_violation:SUPPRESS], ## violation reason SYSSW_V_11.5_02
 		return (struct ion_handle *)ERR_CAST(dmabuf);
@@ -3902,6 +4002,7 @@ struct ion_handle *ion_import_dma_buf(struct ion_client *client, int fd)
 	if (ret) {
 		(void)ion_handle_put(handle);
 		//coverity[misra_c_2012_rule_11_5_violation:SUPPRESS], ## violation reason SYSSW_V_11.5_02
+		//coverity[misra_c_2012_directive_4_7_violation], ## violation reason SYSSW_V_4.7_01
 		handle = ERR_PTR(ret);
 		(void)ion_share_handle_put(share_hd);
 	}
@@ -3935,8 +4036,8 @@ static int ion_sync_for_device(struct ion_client *client, int hb_fd)
 	buffer = (struct ion_buffer *)dmabuf->priv;
 
 	// here we do nothing;
-	//dma_sync_sg_for_device(NULL, buffer->sg_table->sgl,
-	//		       buffer->sg_table->nents, DMA_BIDIRECTIONAL);
+	//dma_sync_sg_for_device(NULL, buffer->hb_sg_table->sgl,
+	//		       buffer->hb_sg_table->nents, DMA_BIDIRECTIONAL);
 	dma_buf_put(dmabuf);
 	return 0;
 }
@@ -4264,7 +4365,7 @@ static int32_t ion_share_pool_monitor_ref_cnt(struct ion_client *client,
 		struct ion_share_pool_data *data)
 {
 	int32_t ret;
-	int32_t buf[SPBUFNUM];
+	int32_t buf[SPBUFNUM] = {0, };
 
 	//coverity[misra_c_2012_rule_20_7_violation:SUPPRESS], ## violation reason SYSSW_V_20.7_01
 	ret = kfifo_out_spinlocked(
@@ -4381,6 +4482,7 @@ static int32_t ion_get_buffer_process_info(struct ion_device *dev,
 	return 0;
 }
 
+//coverity[HIS_VOCF:SUPPRESS], ## violation reason SYSSW_V_VOCF_01
 static int32_t ion_buf_group_register(struct ion_client *client, struct ion_register_buf_group_data *register_buf_data)
 {
 	int32_t ret = 0, group_id;
@@ -4493,6 +4595,7 @@ static int32_t ion_buf_group_unregister(struct ion_client *client,
 	return ret;
 }
 
+//coverity[HIS_LEVEL:SUPPRESS], ## violation reason SYSSW_V_LEVEL_01
 static int32_t ion_check_import_group_phys(struct ion_client *client,
 					   struct ion_import_buf_group_data *import_buf_data)
 {
@@ -4502,7 +4605,7 @@ static int32_t ion_check_import_group_phys(struct ion_client *client,
 
 	dev = client->dev;
 	bitmap = import_buf_data->bitmap;
-	for (i = 0; i < ION_MAX_SUB_BUFFER_NUM; i++) {
+	for (i = 0; i < ION_MAX_SUB_BUFFER_NUM * ION_MAX_BUFFER_NUM; i++) {
 		if ((bitmap & ((uint32_t)(1u) << ((uint32_t)i / (uint32_t)ION_MAX_SUB_BUFFER_NUM))) != 0U) {
 			struct ion_buffer *buffer;
 			struct ion_share_handle *share_hd;
@@ -4670,6 +4773,11 @@ static int32_t ion_buf_group_import(struct ion_client *client, struct ion_import
  * @callergraph
  * @design
  */
+//coverity[HIS_VOCF:SUPPRESS], ## violation reason SYSSW_V_VOCF_01
+//coverity[HIS_CALLS:SUPPRESS], ## violation reason SYSSW_V_CALLS_01
+//coverity[HIS_LEVEL:SUPPRESS], ## violation reason SYSSW_V_LEVEL_01
+//coverity[HIS_STMT:SUPPRESS], ## violation reason SYSSW_V_STMT_01
+//coverity[HIS_CCM:SUPPRESS], ## violation reason SYSSW_V_CCM_01
 static long ion_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 {
 	//coverity[misra_c_2012_rule_11_5_violation:SUPPRESS], ## violation reason SYSSW_V_11.5_02
@@ -4698,14 +4806,16 @@ static long ion_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 
 	dir = ion_ioctl_dir(cmd);
 
+	//coverity[misra_c_2012_rule_10_1_violation:SUPPRESS], ## violation reason SYSSW_V_10.1_01
 	//coverity[misra_c_2012_rule_10_4_violation:SUPPRESS], ## violation reason SYSSW_V_10.4_01
-	//coverity[misra_c_2012_rule_10_4_violation:SUPPRESS], ## violation reason SYSSW_V_10.4_01
+	//coverity[misra_c_2012_rule_10_8_violation:SUPPRESS], ## violation reason SYSSW_V_10.8_01
 	if ((uint64_t)_IOC_SIZE(cmd) > sizeof(data))
 		return -EINVAL;
 
 	if (dir & _IOC_WRITE) {
 		//coverity[misra_c_2012_rule_10_4_violation:SUPPRESS], ## violation reason SYSSW_V_10.4_01
-		//coverity[misra_c_2012_rule_10_4_violation:SUPPRESS], ## violation reason SYSSW_V_10.4_01
+		//coverity[misra_c_2012_rule_11_6_violation:SUPPRESS], ## violation reason SYSSW_V_11.6_01
+		//coverity[misra_c_2012_rule_10_8_violation:SUPPRESS], ## violation reason SYSSW_V_10.8_01
 		if (copy_from_user(&data, (void __user *)arg, (uint64_t)_IOC_SIZE(cmd)))
 			return -EFAULT;
 	}
@@ -4763,10 +4873,10 @@ static long ion_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 					__func__, PTR_ERR(handle));
 			return PTR_ERR(handle);
 		}
-		data.ion_fd.fd = ion_share_dma_buf_fd(client, handle);
+		data.ion_fd.hb_fd = ion_share_dma_buf_fd(client, handle);
 		(void)ion_handle_put(handle);
-		if (data.ion_fd.fd < 0)
-			ret = data.ion_fd.fd;
+		if (data.ion_fd.hb_fd < 0)
+			ret = data.ion_fd.hb_fd;
 		break;
 	}
 	//coverity[misra_c_2012_rule_10_1_violation:SUPPRESS], ## violation reason SYSSW_V_10.1_01
@@ -4775,7 +4885,7 @@ static long ion_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 	{
 		struct ion_handle *handle;
 
-		handle = ion_import_dma_buf(client, data.ion_fd.fd);
+		handle = ion_import_dma_buf(client, data.ion_fd.hb_fd);
 		if (IS_ERR(handle))
 			ret = (int)PTR_ERR(handle);
 		else
@@ -4786,7 +4896,7 @@ static long ion_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 	//coverity[misra_c_2012_rule_10_4_violation:SUPPRESS], ## violation reason SYSSW_V_10.4_01
 	case ION_IOC_SYNC:
 	{
-		ret = ion_sync_for_device(client, data.ion_fd.fd);
+		ret = ion_sync_for_device(client, data.ion_fd.hb_fd);
 		break;
 	}
 	//coverity[misra_c_2012_rule_10_1_violation:SUPPRESS], ## violation reason SYSSW_V_10.1_01
@@ -4837,7 +4947,7 @@ static long ion_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		if ((handle->share_id != 0) && (handle->sh_hd != NULL)) {
 			data.share_info.cur_client_cnt = ion_share_handle_get_share_info(handle->sh_hd);
 		} else {
-			(void)pr_err("%s:%d invalid handle with share id %d and ptr %p.",
+			(void)pr_err("%s:%d invalid handle with share id %d and ptr %pK.",
 					__func__, __LINE__, handle->share_id, handle->sh_hd);
 			ret = -EINVAL;
 		}
@@ -4862,7 +4972,7 @@ static long ion_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		}
 		if ((handle->share_id == 0) || (handle->sh_hd == NULL)) {
 			mutex_unlock(&client->lock);
-			(void)pr_err("%s:%d invalid handle with share id %d and ptr %p.",
+			(void)pr_err("%s:%d invalid handle with share id %d and ptr %pK.",
 					__func__, __LINE__, handle->share_id, handle->sh_hd);
 			return -EINVAL;
 		}
@@ -5010,7 +5120,7 @@ static long ion_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		if ((handle->share_id != 0) && (handle->sh_hd != NULL)) {
 			data.consume_info.cur_consume_cnt = ion_share_handle_get_consume_info(handle->sh_hd);
 		} else {
-			(void)pr_err("%s:%d invalid handle with share id %d and ptr %p.",
+			(void)pr_err("%s:%d invalid handle with share id %d and ptr %pK.",
 					__func__, __LINE__, handle->share_id, handle->sh_hd);
 			ret = -EINVAL;
 		}
@@ -5035,7 +5145,7 @@ static long ion_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		}
 		if ((handle->share_id == 0) || (handle->sh_hd == NULL)) {
 			mutex_unlock(&client->lock);
-			(void)pr_err("%s:%d invalid handle with share id %d and ptr %p.",
+			(void)pr_err("%s:%d invalid handle with share id %d and ptr %pK.",
 					__func__, __LINE__, handle->share_id, handle->sh_hd);
 			return -EINVAL;
 		}
@@ -5115,6 +5225,8 @@ static long ion_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 	if (dir & _IOC_READ) {
 		//coverity[misra_c_2012_rule_10_4_violation:SUPPRESS], ## violation reason SYSSW_V_10.4_01
 		//coverity[misra_c_2012_rule_10_1_violation:SUPPRESS], ## violation reason SYSSW_V_10.1_01
+		//coverity[misra_c_2012_rule_11_6_violation:SUPPRESS], ## violation reason SYSSW_V_11.6_01
+		//coverity[misra_c_2012_rule_10_8_violation:SUPPRESS], ## violation reason SYSSW_V_10.8_01
 		if (copy_to_user((void __user *)arg, &data, (uint64_t)_IOC_SIZE(cmd))) {
 			if (cleanup_handle != NULL)
 				ion_free(client, cleanup_handle);
@@ -5198,6 +5310,7 @@ static const struct file_operations ion_fops = {
 	.owner          = THIS_MODULE,
 	.open			= ion_open,
 	.release		= ion_release,
+	.mmap			= ion_mmap_mem,
 	.unlocked_ioctl = ion_ioctl,
 #ifdef CONFIG_COMPAT
 	.compat_ioctl	= ion_ioctl,
@@ -5340,7 +5453,7 @@ int32_t ion_function_operation(struct ion_data_pac *ion_rev_data)
 		if ((handle->share_id != 0) && (handle->sh_hd != NULL)) {
 			ion_rev_data->data.share_info.cur_client_cnt = ion_share_handle_get_share_info(handle->sh_hd);
 		} else {
-			pr_err("%s:%d invalid handle with share id %d and ptr %p.",
+			pr_err("%s:%d invalid handle with share id %d and ptr %pK.",
 					__func__, __LINE__, handle->share_id, handle->sh_hd);
 			ret = -EINVAL;
 		}
@@ -5364,7 +5477,7 @@ int32_t ion_function_operation(struct ion_data_pac *ion_rev_data)
 		}
 		if ((handle->share_id == 0) || (handle->sh_hd == NULL)) {
 			mutex_unlock(&client->lock);
-			pr_err("%s:%d invalid handle with share id %d and ptr %p.",
+			pr_err("%s:%d invalid handle with share id %d and ptr %pK.",
 					__func__, __LINE__, handle->share_id, handle->sh_hd);
 			return -EINVAL;
 		}
@@ -5461,7 +5574,7 @@ int32_t ion_function_operation(struct ion_data_pac *ion_rev_data)
 		if ((handle->share_id != 0) && (handle->sh_hd != NULL)) {
 			ion_rev_data->data.consume_info.cur_consume_cnt = ion_share_handle_get_consume_info(handle->sh_hd);
 		} else {
-			pr_err("%s:%d invalid handle with share id %d and ptr %p.",
+			pr_err("%s:%d invalid handle with share id %d and ptr %pK.",
 					__func__, __LINE__, handle->share_id, handle->sh_hd);
 			ret = -EINVAL;
 		}
@@ -5485,7 +5598,7 @@ int32_t ion_function_operation(struct ion_data_pac *ion_rev_data)
 		}
 		if ((handle->share_id == 0) || (handle->sh_hd == NULL)) {
 			mutex_unlock(&client->lock);
-			pr_err("%s:%d invalid handle with share id %d and ptr %p.",
+			pr_err("%s:%d invalid handle with share id %d and ptr %pK.",
 					__func__, __LINE__, handle->share_id, handle->sh_hd);
 			return -EINVAL;
 		}
@@ -5551,6 +5664,8 @@ static size_t ion_debug_heap_total(struct ion_client *client,
 	return size;
 }
 
+//coverity[HIS_CCM:SUPPRESS], ## violation reason SYSSW_V_CCM_01
+//coverity[HIS_VOCF:SUPPRESS], ## violation reason SYSSW_V_VOCF_01
 static int ion_heap_show(struct ion_heap *heap, struct seq_file *s,
 				      void *unused)
 {
@@ -5610,7 +5725,7 @@ static int ion_heap_show(struct ion_heap *heap, struct seq_file *s,
 		//coverity[misra_c_2012_rule_18_4_violation:SUPPRESS], ## violation reason SYSSW_V_18.4_03
 		//coverity[misra_c_2012_rule_11_5_violation:SUPPRESS], ## violation reason SYSSW_V_11.5_01
 		struct ion_buffer *buffer = rb_entry(n, struct ion_buffer,
-							node);
+							hb_node);
 		//the second scatterlist buffer, NULL is no matter
 		//coverity[misra_c_2012_rule_11_5_violation:SUPPRESS], ## violation reason SYSSW_V_11.5_02
 		struct ion_buffer *priv_buffer = (struct ion_buffer *)buffer->priv_buffer;
@@ -5695,6 +5810,7 @@ static ssize_t ion_debug_config_write(struct file *filp, const char __user *buf,
 {
 	char value[32];
 
+	//coverity[misra_c_2012_rule_11_6_violation:SUPPRESS], ## violation reason SYSSW_V_11.6_01
 	if(copy_from_user(value, buf, len)) {
 		(void)printk("read data from user failed\n");
 		return -EFAULT;
@@ -5724,7 +5840,7 @@ static int ion_debug_all_heap_show(struct seq_file *s, void *unused)
 	//coverity[misra_c_2012_rule_20_7_violation:SUPPRESS], ## violation reason SYSSW_V_20.7_01
 	//coverity[misra_c_2012_rule_18_4_violation:SUPPRESS], ## violation reason SYSSW_V_18.4_03
 	//coverity[misra_c_2012_rule_11_5_violation:SUPPRESS], ## violation reason SYSSW_V_11.5_01
-	plist_for_each_entry(heap, &dev->heaps, node) {
+	plist_for_each_entry(heap, &dev->heaps, hb_node) {
 		ret = ion_heap_show(heap, s, unused);
 	}
 
@@ -5807,8 +5923,8 @@ void ion_device_add_heap(struct ion_device *dev, struct ion_heap *heap)
 	 * use negative heap->id to reverse the priority -- when traversing
 	 * the list later attempt higher id numbers first
 	 */
-	plist_node_init(&heap->node, -(int32_t)heap->id);
-	plist_add(&heap->node, &dev->heaps);
+	plist_node_init(&heap->hb_node, -(int32_t)heap->id);
+	plist_add(&heap->hb_node, &dev->heaps);
 	debug_file = debugfs_create_file(heap->name, 0664,
 					dev->heaps_debug_root, heap,
 					&debug_heap_fops);
@@ -5853,7 +5969,7 @@ void ion_device_del_heap(struct ion_device *dev, struct ion_heap *heap)
 		debugfs_remove(debug_file);
 	}
 
-	plist_del(&heap->node, &dev->heaps);
+	plist_del(&heap->hb_node, &dev->heaps);
 }
 //coverity[misra_c_2012_rule_8_6_violation:SUPPRESS], ## violation reason SYSSW_V_8.6_01
 //coverity[misra_c_2012_rule_20_7_violation:SUPPRESS], ## violation reason SYSSW_V_20.7_01
@@ -6007,7 +6123,7 @@ struct ion_device *ion_device_create(long (*custom_ioctl)
 	}
 
 	idev->ion_buf_debug_file = debugfs_create_file("ion_buf",
-						0666, idev->debug_root, idev, &ion_buf_fops);
+						0644, idev->debug_root, idev, &ion_buf_fops);
 
 debugfs_done:
 

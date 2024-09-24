@@ -199,7 +199,7 @@ struct ion_heap_query {
  */
 struct ion_fd_data {
 	ion_user_handle_t handle;	/**< a handle */
-	int fd;						/**< a file descriptor representing that handle */
+	int hb_fd;						/**< a file descriptor representing that handle */
 };
 
 /**

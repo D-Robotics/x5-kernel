@@ -307,7 +307,7 @@ struct ion_client {
 struct ion_buffer {
 	struct kref ref;			/**< refernce count */
 	union {
-		struct rb_node node;	/**< node in the ion_device buffers tree */
+		struct rb_node hb_node;	/**< node in the ion_device buffers tree */
 		struct list_head list;	/**< list of ion_device buffers */
 	};
 	struct ion_device *dev;		/**< back pointer to the ion_device */
@@ -323,7 +323,7 @@ struct ion_buffer {
 	int kmap_cnt;				/**< number of times the buffer is mapped to the kernel */
 	void *vaddr;				/**< the kernel mapping if kmap_cnt is not zero */
 	int dmap_cnt;				/**< number of times the buffer is mapped for dma */
-	struct sg_table *sg_table;	/**< the sg table for the buffer if dmap_cnt is not zero */
+	struct sg_table *hb_sg_table;	/**< the sg table for the buffer if dmap_cnt is not zero */
 	struct list_head attachments;	/**< list of this buffer dma buf attachments*/
 	struct page **pages;		/**< flat array of pages in the buffer */
 	struct list_head vmas;		/**< list of vma's mapping this buffer */
@@ -456,7 +456,7 @@ struct ion_heap_ops {
  * @NO{S21E04C01I}
  */
 struct ion_heap {
-	struct plist_node node;		/**< rb node to put the heap on the device's tree of heaps */
+	struct plist_node hb_node;		/**< rb node to put the heap on the device's tree of heaps */
 	struct ion_device *dev;		/**< back pointer to the ion_device */
 	enum ion_heap_type type;	/**< type of heap */
 	struct ion_heap_ops *ops;	/**< ops struct as above */
@@ -693,7 +693,7 @@ struct ion_page_pool {
 	bool cached;	/**< it's cached pool or not */
 	struct list_head high_items;	/**< list of highmem items */
 	struct list_head low_items;		/**< list of lowmem items */
-	struct mutex mutex;		/**< lock protecting this struct and especially the count item list */
+	struct mutex pool_mutex;		/**< lock protecting this struct and especially the count item list */
 	gfp_t gfp_mask;			/**< gfp_mask to use from alloc */
 	unsigned int order;		/**< order of pages in the pool */
 	struct plist_node list;	/**< plist node for list of pools*/
@@ -703,7 +703,7 @@ struct ion_page_pool *ion_page_pool_create(gfp_t gfp_mask, unsigned int order,
 					   bool cached);
 void ion_page_pool_destroy(struct ion_page_pool *pool);
 struct page *ion_page_pool_alloc(struct ion_page_pool *pool);
-void ion_page_pool_free(struct ion_page_pool *pool, struct page *page);
+void ion_page_pool_free(struct ion_page_pool *pool, struct page *hb_page);
 
 /** ion_page_pool_shrink - shrinks the size of the memory cached in the pool
  * @pool:		the pool
@@ -922,7 +922,7 @@ int ion_share_dma_buf_fd(struct ion_client *client, struct ion_handle *handle);
  * @client:    the client
  * @fd:        the fd
  */
-struct ion_handle *ion_import_dma_buf(struct ion_client *client, int fd);
+struct ion_handle *ion_import_dma_buf(struct ion_client *client, int hb_fd);
 
 /**
  * @NO{S21E04C02I}

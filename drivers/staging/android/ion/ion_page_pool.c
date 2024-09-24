@@ -44,7 +44,7 @@ static int ion_page_pool_add(struct ion_page_pool *pool, struct page *heap_page)
 {
 	struct mutex *pool_mutex;
 
-	pool_mutex = &pool->mutex;
+	pool_mutex = &pool->pool_mutex;
 	mutex_lock(pool_mutex);
 	if (PageHighMem(heap_page)) {
 		list_add_tail(&heap_page->lru, &pool->high_items);
@@ -87,14 +87,14 @@ struct page *ion_page_pool_alloc(struct ion_page_pool *pool)
 
 	BUG_ON(pool == NULL);
 
-	mutex_lock(&pool->mutex);
+	mutex_lock(&pool->pool_mutex);
 	if (pool->high_count)
 		heap_page = ion_page_pool_remove(pool, TRUE);
 	else if (pool->low_count)
 		heap_page = ion_page_pool_remove(pool, FALSE);
 	else
 		;
-	mutex_unlock(&pool->mutex);
+	mutex_unlock(&pool->pool_mutex);
 
 	if (heap_page == NULL)
 		heap_page = ion_page_pool_alloc_pages(pool);
@@ -102,11 +102,11 @@ struct page *ion_page_pool_alloc(struct ion_page_pool *pool)
 	return heap_page;
 }
 
-void ion_page_pool_free(struct ion_page_pool *pool, struct page *page)
+void ion_page_pool_free(struct ion_page_pool *pool, struct page *hb_page)
 {
-	BUG_ON(pool->order != compound_order(page));
+	BUG_ON(pool->order != compound_order(hb_page));
 
-	(void)ion_page_pool_add(pool, page);
+	(void)ion_page_pool_add(pool, hb_page);
 }
 
 static int ion_page_pool_total(struct ion_page_pool *pool, bool high)
@@ -126,6 +126,7 @@ int ion_page_pool_shrink(struct ion_page_pool *pool, gfp_t gfp_mask,
 			 int nr_to_scan)
 {
 	int freed = 0;
+	uint32_t u_freed = 0U;
 	bool high;
 
 	if (current_is_kswapd())
@@ -139,18 +140,19 @@ int ion_page_pool_shrink(struct ion_page_pool *pool, gfp_t gfp_mask,
 	while (freed < nr_to_scan) {
 		struct page *heap_page;
 
-		mutex_lock(&pool->mutex);
+		mutex_lock(&pool->pool_mutex);
 		if (pool->low_count) {
 			heap_page = ion_page_pool_remove(pool, FALSE);
 		} else if (high && (pool->high_count != 0)) {
 			heap_page = ion_page_pool_remove(pool, TRUE);
 		} else {
-			mutex_unlock(&pool->mutex);
+			mutex_unlock(&pool->pool_mutex);
 			break;
 		}
-		mutex_unlock(&pool->mutex);
+		mutex_unlock(&pool->pool_mutex);
 		ion_page_pool_free_pages(pool, heap_page);
-		freed += (1 << pool->order);
+		u_freed = ((uint32_t)1U << pool->order);
+		freed += (int32_t)u_freed;
 	}
 
 	return freed;
@@ -171,7 +173,7 @@ struct ion_page_pool *ion_page_pool_create(gfp_t gfp_mask, unsigned int order,
 	INIT_LIST_HEAD(&pool->high_items);
 	pool->gfp_mask = gfp_mask | __GFP_COMP;
 	pool->order = order;
-	mutex_init(&pool->mutex);
+	mutex_init(&pool->pool_mutex);
 	plist_node_init(&pool->list, (int)order);
 	if (cached)
 		pool->cached = TRUE;

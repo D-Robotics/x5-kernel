@@ -131,7 +131,7 @@ static int ion_system_heap_allocate(struct ion_heap *heap,
 	if (align > PAGE_SIZE)
 		return -EINVAL;
 
-	if (size / PAGE_SIZE > totalram_pages() / 2)
+	if (size / PAGE_SIZE > totalram_pages() / 2U)
 		return -ENOMEM;
 
 	INIT_LIST_HEAD(&pages);
@@ -140,7 +140,7 @@ static int ion_system_heap_allocate(struct ion_heap *heap,
 						max_order);
 		if (heap_page == NULL) {
 			//coverity[misra_c_2012_rule_15_1_violation:SUPPRESS], ## violation reason SYSSW_V_15.1_01
-			goto free_pages;
+			goto free_pages_err;
 		}
 		list_add_tail(&heap_page->lru, &pages);
 		size_remaining -= page_size(heap_page);
@@ -165,10 +165,10 @@ static int ion_system_heap_allocate(struct ion_heap *heap,
 	table = kmalloc(sizeof(*table), GFP_KERNEL);
 	if (table == NULL) {
 		//coverity[misra_c_2012_rule_15_1_violation:SUPPRESS], ## violation reason SYSSW_V_15.1_01
-		goto free_pages;
+		goto free_pages_err;
 	}
 
-	if (sg_alloc_table(table, i, GFP_KERNEL)) {
+	if (sg_alloc_table(table, (uint32_t)i, GFP_KERNEL)) {
 		//coverity[misra_c_2012_rule_15_1_violation:SUPPRESS], ## violation reason SYSSW_V_15.1_01
 		goto free_table;
 	}
@@ -184,12 +184,12 @@ static int ion_system_heap_allocate(struct ion_heap *heap,
 	}
 
 	buffer->priv_virt = table;
-	buffer->sg_table = table;
+	buffer->hb_sg_table = table;
 	return 0;
 
 free_table:
 	kfree(table);
-free_pages:
+free_pages_err:
 	//coverity[misra_c_2012_rule_20_7_violation:SUPPRESS], ## violation reason SYSSW_V_20.7_01
 	//coverity[misra_c_2012_rule_18_4_violation:SUPPRESS], ## violation reason SYSSW_V_18.4_03
 	//coverity[misra_c_2012_rule_11_5_violation:SUPPRESS], ## violation reason SYSSW_V_11.5_01
@@ -206,7 +206,7 @@ static void ion_system_heap_free(struct ion_buffer *buffer)
 	struct ion_system_heap *sys_heap = container_of(buffer->heap,
 							struct ion_system_heap,
 							heap);
-	struct sg_table *table = buffer->sg_table;
+	struct sg_table *table = buffer->hb_sg_table;
 	struct scatterlist *sg;
 	uint32_t i;
 
@@ -299,10 +299,10 @@ static int ion_system_heap_debug_show(struct ion_heap *heap, struct seq_file *s,
 
 		seq_printf(s, "%d order %u highmem pages in pool = %lu total\n",
 			   pool->high_count, pool->order,
-			   (PAGE_SIZE << pool->order) * pool->high_count);
+			   (PAGE_SIZE << pool->order) * (uint32_t)pool->high_count);
 		seq_printf(s, "%d order %u lowmem pages in pool = %lu total\n",
 			   pool->low_count, pool->order,
-			   (PAGE_SIZE << pool->order) * pool->low_count);
+			   (PAGE_SIZE << pool->order) * (uint32_t)pool->low_count);
 	}
 	return 0;
 }
@@ -381,7 +381,7 @@ static int ion_system_contig_heap_allocate(struct ion_heap *heap,
 	if (align > (PAGE_SIZE << (uint32_t)order))
 		return -EINVAL;
 
-	heap_page = alloc_pages(low_order_gfp_flags | __GFP_NOWARN, order);
+	heap_page = alloc_pages(low_order_gfp_flags | __GFP_NOWARN, (uint32_t)order);
 	if (heap_page == NULL)
 		return -ENOMEM;
 
@@ -400,7 +400,7 @@ static int ion_system_contig_heap_allocate(struct ion_heap *heap,
 	if (table == NULL) {
 		ret = -ENOMEM;
 		//coverity[misra_c_2012_rule_15_1_violation:SUPPRESS], ## violation reason SYSSW_V_15.1_01
-		goto free_pages;
+		goto free_pages_err;
 	}
 
 	ret = sg_alloc_table(table, 1, GFP_KERNEL);
@@ -412,7 +412,7 @@ static int ion_system_contig_heap_allocate(struct ion_heap *heap,
 	sg_set_page(table->sgl, heap_page, (uint32_t)len, 0);
 
 	buffer->priv_virt = table;
-	buffer->sg_table = table;
+	buffer->hb_sg_table = table;
 
 	/* the page may used for instruction or data which still cached */
 	//coverity[misra_c_2012_rule_11_6_violation:SUPPRESS], ## violation reason SYSSW_V_11.6_02
@@ -429,7 +429,7 @@ static int ion_system_contig_heap_allocate(struct ion_heap *heap,
 
 free_table:
 	kfree(table);
-free_pages:
+free_pages_err:
 	for (i = 0; i < len >> PAGE_SHIFT; i++) {
 		//coverity[misra_c_2012_rule_18_4_violation:SUPPRESS], ## violation reason SYSSW_V_18.4_03
 		__free_page(heap_page + i);
@@ -440,7 +440,7 @@ free_pages:
 
 static void ion_system_contig_heap_free(struct ion_buffer *buffer)
 {
-	struct sg_table *table = buffer->sg_table;
+	struct sg_table *table = buffer->hb_sg_table;
 	struct page *heap_page = sg_page(table->sgl);
 	//coverity[misra_c_2012_rule_10_4_violation:SUPPRESS], ## violation reason SYSSW_V_10.4_01
 	unsigned long pages = PAGE_ALIGN(buffer->size) >> PAGE_SHIFT;

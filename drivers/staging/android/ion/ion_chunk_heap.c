@@ -33,6 +33,7 @@ struct ion_chunk_heap {
 };
 
 //coverity[HIS_VOCF:SUPPRESS], ## violation reason SYSSW_V_VOCF_01
+//coverity[HIS_CCM:SUPPRESS], ## violation reason SYSSW_V_CCM_01
 static int ion_chunk_heap_allocate(struct ion_heap *heap,
 				      struct ion_buffer *buffer,
 				      unsigned long size, unsigned long align,
@@ -64,7 +65,7 @@ static int ion_chunk_heap_allocate(struct ion_heap *heap,
 	table = kmalloc(sizeof(struct sg_table), GFP_KERNEL);
 	if (table == NULL)
 		return -ENOMEM;
-	ret = sg_alloc_table(table, num_chunks, GFP_KERNEL);
+	ret = sg_alloc_table(table, (uint32_t)num_chunks, GFP_KERNEL);
 	if (ret) {
 		kfree(table);
 		return ret;
@@ -87,7 +88,7 @@ static int ion_chunk_heap_allocate(struct ion_heap *heap,
 	}
 
 	buffer->priv_virt = table;
-	buffer->sg_table = table;
+	buffer->hb_sg_table = table;
 	chunk_heap->allocated += allocated_size;
 	return 0;
 err:
@@ -192,6 +193,7 @@ struct ion_heap *ion_chunk_heap_create(struct ion_platform_heap *heap_data)
 		return ERR_PTR(-ENOMEM);
 	}
 
+	//coverity[misra_c_2012_rule_11_6_violation:SUPPRESS], ## violation reason SYSSW_V_11.6_01
 	chunk_heap->chunk_size = (unsigned long)heap_data->priv;
 	chunk_heap->pool = gen_pool_create(get_order(chunk_heap->chunk_size) +
 					   PAGE_SHIFT, -1);

@@ -28,6 +28,7 @@
 
 #define HOBOT_ION_MAX_BLOCK		2
 
+//coverity[HIS_VOCF:SUPPRESS], ## violation reason SYSSW_V_VOCF_01
 void *ion_heap_map_kernel(struct ion_heap *heap,
 			  struct ion_buffer *buffer)
 {
@@ -36,11 +37,11 @@ void *ion_heap_map_kernel(struct ion_heap *heap,
 	uint32_t i;
 	void *vaddr;
 	pgprot_t pgprot;
-	struct sg_table *table = buffer->sg_table;
+	struct sg_table *table = buffer->hb_sg_table;
 	int npages = PAGE_ALIGN(buffer->size) / PAGE_SIZE;
 	//coverity[misra_c_2012_directive_4_12_violation], ## violation reason SYSSW_V_4.12_02
 	//coverity[misra_c_2012_rule_11_5_violation:SUPPRESS], ## violation reason SYSSW_V_11.5_02
-	struct page **pages = vmalloc(sizeof(struct page *) * npages);
+	struct page **pages = vmalloc(sizeof(struct page *) * (size_t)npages);
 	struct page **tmp = pages;
 
 	if (pages == NULL)
@@ -53,7 +54,8 @@ void *ion_heap_map_kernel(struct ion_heap *heap,
 
 	//coverity[misra_c_2012_rule_20_7_violation:SUPPRESS], ## violation reason SYSSW_V_20.7_01
 	for_each_sg(table->sgl, sg, table->nents, i) {
-		int npages_this_entry = (uint64_t)PAGE_ALIGN(sg->length) / PAGE_SIZE;
+		//coverity[misra_c_2012_rule_10_8_violation:SUPPRESS], ## violation reason SYSSW_V_10.8_01
+		int npages_this_entry = (int)((uint64_t)PAGE_ALIGN(sg->length) / PAGE_SIZE);
 		struct page *heap_page = sg_page(sg);
 
 		BUG_ON(i >= (uint32_t)npages);
@@ -78,7 +80,7 @@ void ion_heap_unmap_kernel(struct ion_heap *heap,
 int ion_heap_map_user(struct ion_heap *heap, struct ion_buffer *buffer,
 		      struct vm_area_struct *vma)
 {
-	struct sg_table *table = buffer->sg_table;
+	struct sg_table *table = buffer->hb_sg_table;
 	unsigned long addr = vma->vm_start;
 	unsigned long offset = vma->vm_pgoff * PAGE_SIZE;
 	struct scatterlist *sg;
@@ -107,6 +109,7 @@ int ion_heap_map_user(struct ion_heap *heap, struct ion_buffer *buffer,
 
 		//coverity[misra_c_2012_rule_18_4_violation:SUPPRESS], ## violation reason SYSSW_V_18.4_03
 		//coverity[misra_c_2012_rule_10_1_violation:SUPPRESS], ## violation reason SYSSW_V_10.1_01
+		//coverity[misra_c_2012_rule_10_3_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_01
 		ret = remap_pfn_range(vma, addr, page_to_pfn(heap_page), len,
 				      vma->vm_page_prot);
 
@@ -190,6 +193,7 @@ static int ion_heap_sglist_zero(struct scatterlist *sgl, unsigned int nents,
 	return ret;
 }
 
+//coverity[HIS_VOCF:SUPPRESS], ## violation reason SYSSW_V_VOCF_01
 int ion_heap_buffer_zero_ex(struct sg_table * table, unsigned long flags)
 {
 	pgprot_t pgprot;
@@ -234,7 +238,7 @@ int ion_heap_buffer_zero_ex(struct sg_table * table, unsigned long flags)
 //coverity[HIS_VOCF:SUPPRESS], ## violation reason SYSSW_V_VOCF_01
 int ion_heap_buffer_zero(struct ion_buffer *buffer)
 {
-	struct sg_table *table = buffer->sg_table;
+	struct sg_table *table = buffer->hb_sg_table;
 	pgprot_t pgprot;
 
 	if ((buffer->flags & (uint64_t)ION_FLAG_CACHED) != 0UL) {
@@ -250,12 +254,13 @@ int ion_heap_buffer_zero(struct ion_buffer *buffer)
 	return ion_heap_sglist_zero(table->sgl, table->nents, pgprot);
 }
 
+//coverity[HIS_VOCF:SUPPRESS], ## violation reason SYSSW_V_VOCF_01
 int ion_heap_pages_zero(struct page *heap_page, size_t size, pgprot_t pgprot)
 {
 	struct scatterlist sg[HOBOT_ION_MAX_BLOCK];
 	struct scatterlist *tmp_sg, *init_sg;
 	unsigned long size_remaining = size;
-	int32_t i = 1;
+	uint32_t i = 1U;
 	phys_addr_t paddr = PFN_PHYS(page_to_pfn(heap_page));
 
 	while (size_remaining >= SZ_4G) {
@@ -372,6 +377,7 @@ static int ion_heap_deferred_free(void *data)
 		ion_buffer_destroy(buffer);
 	}
 
+	//coverity[misra_c_2012_rule_2_1_violation:SUPPRESS], ## violation reason SYSSW_V_2.1_01
 	return 0;
 }
 
@@ -401,7 +407,8 @@ static unsigned long ion_heap_shrink_count(struct shrinker *hb_shrinker,
 					     hb_shrinker);
 	int total = 0;
 
-	total = ion_heap_freelist_size(heap) / PAGE_SIZE;
+	//coverity[misra_c_2012_rule_10_8_violation:SUPPRESS], ## violation reason SYSSW_V_10.8_01
+	total = (int32_t)(ion_heap_freelist_size(heap) / PAGE_SIZE);
 
 	if (heap->ops->shrink != NULL)
 		total += heap->ops->shrink(heap, sc->gfp_mask, 0);
@@ -429,17 +436,18 @@ static unsigned long ion_heap_shrink_scan(struct shrinker *hb_shrinker,
 	 */
 	if (heap->flags & ION_HEAP_FLAG_DEFER_FREE) {
 		//coverity[misra_c_2012_rule_10_4_violation:SUPPRESS], ## violation reason SYSSW_V_10.4_01
-		freed = ion_heap_freelist_shrink(heap, to_scan * PAGE_SIZE) /
-				PAGE_SIZE;
+		//coverity[misra_c_2012_rule_10_8_violation:SUPPRESS], ## violation reason SYSSW_V_10.8_01
+		freed = (int32_t)(ion_heap_freelist_shrink(heap, to_scan * PAGE_SIZE) /
+				PAGE_SIZE);
 	}
 
 	to_scan -= freed;
 	if (to_scan <= 0)
-		return freed;
+		return (unsigned long)freed;
 
 	if (heap->ops->shrink != NULL)
 		freed += heap->ops->shrink(heap, sc->gfp_mask, to_scan);
-	return freed;
+	return (unsigned long)freed;
 }
 
 void ion_heap_init_shrinker(struct ion_heap *heap)

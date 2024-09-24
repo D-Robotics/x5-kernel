@@ -37,6 +37,7 @@ struct ion_carveout_heap {
 
 //get the avail size and max_contigous
 //coverity[HIS_VOCF:SUPPRESS], ## violation reason SYSSW_V_VOCF_01
+//coverity[HIS_LEVEL:SUPPRESS], ## violation reason SYSSW_V_LEVEL_01
 int32_t get_carveout_info(struct ion_heap *heap, uint64_t *avail, uint64_t *max_contigous)
 {
 	//coverity[misra_c_2012_rule_20_7_violation:SUPPRESS], ## violation reason SYSSW_V_20.7_01
@@ -132,6 +133,7 @@ static int ion_carveout_heap_phys(struct ion_heap *heap,
 	return 0;
 }
 
+//coverity[HIS_CCM:SUPPRESS], ## violation reason SYSSW_V_CCM_01
 static int ion_carveout_heap_allocate(struct ion_heap *heap,
 				      struct ion_buffer *buffer,
 				      unsigned long size, unsigned long align,
@@ -141,7 +143,8 @@ static int ion_carveout_heap_allocate(struct ion_heap *heap,
 	struct scatterlist *sg, *tmp_sg;
 	unsigned long size_remaining = size;
 	phys_addr_t paddr;
-	int ret, i = 1;
+	int ret;
+	uint32_t i = 1U;
 
 	if (align > PAGE_SIZE) {
 		(void)pr_err("%s: align should <= page size\n", __func__);
@@ -187,7 +190,7 @@ static int ion_carveout_heap_allocate(struct ion_heap *heap,
 	}
 	sg_set_page(sg, pfn_to_page(PFN_DOWN(paddr)), size_remaining, 0U);
 	buffer->priv_virt = table;
-	buffer->sg_table = table;
+	buffer->hb_sg_table = table;
 
 	if ((buffer->flags & (uint64_t)ION_FLAG_INITIALIZED) != 0U) {
 		(void)ion_heap_buffer_zero_ex(table, buffer->flags);
