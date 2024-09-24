@@ -59,7 +59,7 @@ static int vs_gem_alloc_buf(struct vs_gem_object *vs_obj)
 		DRM_DEV_DEBUG_KMS(dev->dev, "vs ion alloc failed!\n");
 		return ret;
 	}
-	vs_obj->sgt = vs_obj->handle->buffer->sg_table;
+	vs_obj->sgt = vs_obj->handle->buffer->hb_sg_table;
 
 	ion_phys(priv->client, vs_obj->handle->id, &vs_obj->dma_addr, &len);
 
