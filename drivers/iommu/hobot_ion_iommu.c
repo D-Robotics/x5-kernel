@@ -885,7 +885,7 @@ int32_t ion_iommu_map_ion_fd(struct device *dev,
 		return PTR_ERR(dma->ion_handle);
 	}
 
-	dma->sg_table = dma->ion_handle->buffer->sg_table;
+	dma->sg_table = dma->ion_handle->buffer->hb_sg_table;
 
 	ret = ion_phys(client, dma->ion_handle->id, &phys, &len);
 	if (ret) {
@@ -929,7 +929,7 @@ int32_t ion_iommu_map_ion_handle(struct device *dev,
 		return -EINVAL;
 	}
 	dma->ion_handle = handle;
-	dma->sg_table = handle->buffer->sg_table;
+	dma->sg_table = handle->buffer->hb_sg_table;
 
 	ret = ion_phys(client, handle->id, &phys, &len);
 	if (ret) {
