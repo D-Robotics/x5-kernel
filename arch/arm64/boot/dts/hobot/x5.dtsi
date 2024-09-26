@@ -763,20 +763,19 @@
 
 		/* Sunrise5 soc information*/
 		socinfo: socinfo{
-			compatible = "hobot,x5-socinfo";
-			board_name = "0";
-			board_id = "00000000";
-			origin_board_id = "00000000";
-			ddr_vender = "0";
+			compatible = "hobot,boardinfo";
+			soc_gen = "x5";
+			soc_name = "x5m";
+			hw_name = "00000000";
+			board_version = "00000000";
+			board_name = "000000000000";
+			bootdevice_name = "00000000";
+			soc_uid = "00000000000000000000000000000000";
+			ddr_vendor = "0";
 			ddr_type = "0";
 			ddr_freq = "0";
 			ddr_size = "0";
-			ddr_part_num = "0";
-			som_name = "0";
-			base_board_name = "00000000000000000000000000000000";
-			boot_mode = "0";
-			socuid = "00000000000000000000000000000000";
-			chip_id = "00000000";
+			board_id = "00000000";
 			bak_slot_reg = <0x31021000 4 8 0x0000ff00>;
 			boot_count_reg = <0x31021000 4 0 0x000000ff>;
 			reg = <0x31021008 0x4>;   /* ddr info reg */
