@@ -977,7 +977,7 @@
 				status = "okay";
 			};
 
-			isp_mp_qos: isp_mp_qos@20510280 {
+			isp_axi5_hdr_qos: isp_axi5_hdr_qos@20510280 {
 				compatible = "d-robotics,noc_qos";
 				reg = <0x20510280 0x80>;
 				power-domains = <&power X5_ISP>;
@@ -990,7 +990,7 @@
 				ports-off = <0x0008>;
 			};
 
-			isp_sp2_qos: isp_sp2_qos@20510300 {
+			isp_axi4_mcm_qos: isp_axi4_mcm_qos@20510300 {
 				compatible = "d-robotics,noc_qos";
 				reg = <0x20510300 0x80>;
 				power-domains = <&power X5_ISP>;
@@ -1003,7 +1003,7 @@
 				ports-off = <0x0008>;
 			};
 
-			isp_mcm_qos: isp_mcm_qos@20510380 {
+			isp_axi3_sp2_qos: isp_axi3_sp2_qos@20510380 {
 				compatible = "d-robotics,noc_qos";
 				reg = <0x20510380 0x80>;
 				power-domains = <&power X5_ISP>;
@@ -1016,7 +1016,7 @@
 				ports-off = <0x0008>;
 			};
 
-			isp_hdr_qos: isp_hdr_qos@20510480 {
+			isp_axi1_mp_qos: isp_axi1_mp_qos@20510480 {
 				compatible = "d-robotics,noc_qos";
 				reg = <0x20510480 0x80>;
 				power-domains = <&power X5_ISP>;
@@ -2668,13 +2668,22 @@
 			};
 		};
 
-		cpu_qos: cpu_qos@20500000 {
+		cpu_ace_qos: cpu_ace_qos@20500000 {
 			compatible = "d-robotics,noc_qos";
-			reg = <0x20500000 0x200>;
+			reg = <0x20500000 0x100>;
 			clocks-num = <0>;
 			status = "okay";
-			ports-num = <3>;
-			ports-off = <0x0008 0x0088 0x0108>;
+			ports-num = <2>;
+			ports-off = <0x0008 0x0088>;
+		};
+
+		cpu_perif_qos: cpu_perif_qos@20500100 {
+			compatible = "d-robotics,noc_qos";
+			reg = <0x20500100 0x80>;
+			clocks-num = <0>;
+			status = "okay";
+			ports-num = <1>;
+			ports-off = <0x0008>;
 		};
 
 		bt1120_qos: bt1120_qos@20510000 {
