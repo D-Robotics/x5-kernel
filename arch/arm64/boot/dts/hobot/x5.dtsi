@@ -977,17 +977,56 @@
 				status = "okay";
 			};
 
-			isp_qos: isp_qos@20510280 {
+			isp_mp_qos: isp_mp_qos@20510280 {
 				compatible = "d-robotics,noc_qos";
-				reg = <0x20510280 0x280>;
+				reg = <0x20510280 0x80>;
 				power-domains = <&power X5_ISP>;
 				consumer-dev = <&isp>;
 
 				clocks-num = <0>;
 
 				status = "okay";
-				ports-num = <4>;
-				ports-off = <0x0008 0x0088 0x108 0x208>;
+				ports-num = <1>;
+				ports-off = <0x0008>;
+			};
+
+			isp_sp2_qos: isp_sp2_qos@20510300 {
+				compatible = "d-robotics,noc_qos";
+				reg = <0x20510300 0x80>;
+				power-domains = <&power X5_ISP>;
+				consumer-dev = <&isp>;
+
+				clocks-num = <0>;
+
+				status = "okay";
+				ports-num = <1>;
+				ports-off = <0x0008>;
+			};
+
+			isp_mcm_qos: isp_mcm_qos@20510380 {
+				compatible = "d-robotics,noc_qos";
+				reg = <0x20510380 0x80>;
+				power-domains = <&power X5_ISP>;
+				consumer-dev = <&isp>;
+
+				clocks-num = <0>;
+
+				status = "okay";
+				ports-num = <1>;
+				ports-off = <0x0008>;
+			};
+
+			isp_hdr_qos: isp_hdr_qos@20510480 {
+				compatible = "d-robotics,noc_qos";
+				reg = <0x20510480 0x80>;
+				power-domains = <&power X5_ISP>;
+				consumer-dev = <&isp>;
+
+				clocks-num = <0>;
+
+				status = "okay";
+				ports-num = <1>;
+				ports-off = <0x0008>;
 			};
 
 			isp: isp@3d000000 {
@@ -2660,26 +2699,81 @@
 			ports-off = <0x0008>;
 		};
 
-		dw230_qos: dw230_qos@20510100 {
+		dw230_gdc_qos: dw230_gdc_qos@20510100 {
 			compatible = "d-robotics,noc_qos";
-			reg = <0x20510100 0x180>;
+			reg = <0x20510100 0x80>;
 			clocks-num = <1>;
 			clocks =<&hpsclks X5_CAM_VSE_CORE_CLK>;
 			clock-names ="vse_core";
 			status = "okay";
-			ports-num = <3>;
-			ports-off = <0x0008 0x0088 0x0108>;
+			ports-num = <1>;
+			ports-off = <0x0008>;
 		};
 
-		sif_qos: sif_qos@20510500 {
+		dw230_scalar2_qos: dw230_scalar2_qos@20510180 {
 			compatible = "d-robotics,noc_qos";
-			reg = <0x20510500 0x200>;
+			reg = <0x20510180 0x80>;
+			clocks-num = <1>;
+			clocks =<&hpsclks X5_CAM_VSE_CORE_CLK>;
+			clock-names ="vse_core";
+			status = "okay";
+			ports-num = <1>;
+			ports-off = <0x0008>;
+		};
+
+		dw230_scalar3_qos: dw230_scalar3_qos@0x20510200{
+			compatible = "d-robotics,noc_qos";
+			reg = <0x20510200 0x80>;
+			clocks-num = <1>;
+			clocks =<&hpsclks X5_CAM_VSE_CORE_CLK>;
+			clock-names ="vse_core";
+			status = "okay";
+			ports-num = <1>;
+			ports-off = <0x0008>;
+		};
+
+		sif0_qos: sif0_qos@20510500 {
+			compatible = "d-robotics,noc_qos";
+			reg = <0x20510500 0x80>;
 			clocks-num = <1>;
 			clocks = <&hpsclks X5_CAM_SIF_AXI_CLK>;
 			clock-names = "axi_clk";
 			status = "okay";
-			ports-num = <4>;
-			ports-off = <0x0008 0x0088 0x0108 0x0188>;
+			ports-num = <1>;
+			ports-off = <0x0008>;
+		};
+
+		sif1_qos: sif1_qos@20510580 {
+			compatible = "d-robotics,noc_qos";
+			reg = <0x20510580 0x80>;
+			clocks-num = <1>;
+			clocks = <&hpsclks X5_CAM_SIF_AXI_CLK>;
+			clock-names = "axi_clk";
+			status = "okay";
+			ports-num = <1>;
+			ports-off = <0x0008>;
+		};
+
+		sif2_qos: sif2_qos@20510600 {
+			compatible = "d-robotics,noc_qos";
+			reg = <0x20510600 0x80>;
+			clocks-num = <1>;
+			clocks = <&hpsclks X5_CAM_SIF_AXI_CLK>;
+			clock-names = "axi_clk";
+			status = "okay";
+			ports-num = <1>;
+			ports-off = <0x0008>;
+		};
+
+		sif3_qos: sif3_qos@20510680 {
+			compatible = "d-robotics,noc_qos";
+			reg = <0x20510680 0x80>;
+			clocks-num = <1>;
+			clocks = <&hpsclks X5_CAM_SIF_AXI_CLK>;
+			clock-names = "axi_clk";
+			status = "okay";
+			ports-num = <1>;
+			ports-off = <0x0008>;
 		};
 
 		sif_disp_qos: sif_disp_qos@20510700 {
