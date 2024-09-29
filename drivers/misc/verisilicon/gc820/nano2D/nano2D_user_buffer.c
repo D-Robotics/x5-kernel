@@ -300,7 +300,7 @@ static n2d_error_t gcGetCmdBuf(
     if (N2D_NULL != cmd_buf)
     {
         /* Test if command cmd_buf is available. */
-        error = n2d_user_os_signal_wait(hardware, cmd_buf->stall_signal, 0);
+        error = n2d_user_os_signal_wait(hardware, cmd_buf->stall_signal, N2D_INFINITE);
     }
 
     /* Not available? */
@@ -593,7 +593,6 @@ n2d_error_t gcCommitCmdBuf(
     if (cmd_buf != N2D_NULL)
     {
         n2d_user_subcommit_t    subcommit = {0};
-        n2d_user_event_t            event = {0};
 
         subcommit.cmd_buf.address = cmd_buf->address;
         subcommit.cmd_buf.logical = (n2d_pointer)(cmd_buf->logical);
@@ -604,15 +603,6 @@ n2d_error_t gcCommitCmdBuf(
         /* When the current cmdbuf size is 0, the commit buf phase will be skipped, only commit event. */
         if(subcommit.cmd_buf.size != 0)
             N2D_ON_ERROR(gcSubcommitCmd(hardware, &subcommit));
-
-        /*commit eventid*/
-        event.iface.command = N2D_KERNEL_COMMAND_SIGNAL;
-        event.iface.core    = hardware->coreIndex;
-        event.iface.u.command_signal.handle         = (n2d_uintptr_t)hardware->buffer.command_buffer_tail->stall_signal;
-        event.iface.u.command_signal.from_kernel    = N2D_FALSE;
-        event.iface.u.command_signal.process        = 0;
-        event.next = 0;
-        N2D_ON_ERROR(gcCommitEvent(hardware, gcmPTR_TO_UINT64(&event)));
 
         /* update to new offset location*/
         cmd_buf->start_offset = cmd_buf->offset;
