@@ -39,6 +39,18 @@
 		power-source = <HORIZON_IO_PAD_VOLTAGE_3V3>;
 		drive-strength = <2>;
 	};
+	
+	pconf_bias_disabled_ds3_3v3: pconf-bias-disabled-ds3-3v3 {
+		bias-disable;
+		power-source = <HORIZON_IO_PAD_VOLTAGE_3V3>;
+		drive-strength = <3>;
+	};
+
+	pconf_bias_disabled_ds6_3v3: pconf-bias-disabled-ds6-3v3 {
+		bias-disable;
+		power-source = <HORIZON_IO_PAD_VOLTAGE_3V3>;
+		drive-strength = <6>;
+	};
 
 	pconf_bias_disabled_ds7_3v3: pconf-bias-disabled-ds7-3v3 {
 		bias-disable;
@@ -199,6 +211,12 @@
 	pconf_sd_sdio_pu_ds3_ipctrl: pconf-sd-sdio-pu-ds3-ipctrl {
 		bias-pull-up;
 		drive-strength = <3>;
+		power-source = <HORIZON_IO_PAD_VOLTAGE_IP_CTRL>;
+	};
+
+		pconf_sd_sdio_pu_ds4_ipctrl: pconf-sd-sdio-pu-ds4-ipctrl {
+		bias-pull-up;
+		drive-strength = <4>;
 		power-source = <HORIZON_IO_PAD_VOLTAGE_IP_CTRL>;
 	};
 
@@ -602,12 +620,12 @@
 		horizon,pins = <
 			HSIO_ENET_MDC           HSIO_PINMUX_1   BIT_OFFSET30    MUX_ALT0        &pconf_bias_disabled_ds2_3v3
 			HSIO_ENET_MDIO          HSIO_PINMUX_1   BIT_OFFSET28    MUX_ALT0        &pconf_bias_disabled_ds2_3v3
-			HSIO_ENET_TXD_0         HSIO_PINMUX_1   BIT_OFFSET26    MUX_ALT0        &pconf_bias_disabled_ds8_3v3
-			HSIO_ENET_TXD_1         HSIO_PINMUX_1   BIT_OFFSET24    MUX_ALT0        &pconf_bias_disabled_ds9_3v3
-			HSIO_ENET_TXD_2         HSIO_PINMUX_1   BIT_OFFSET22    MUX_ALT0        &pconf_bias_disabled_ds10_3v3
-			HSIO_ENET_TXD_3         HSIO_PINMUX_1   BIT_OFFSET20    MUX_ALT0        &pconf_bias_disabled_ds9_3v3
+			HSIO_ENET_TXD_0         HSIO_PINMUX_1   BIT_OFFSET26    MUX_ALT0        &pconf_bias_disabled_ds3_3v3
+			HSIO_ENET_TXD_1         HSIO_PINMUX_1   BIT_OFFSET24    MUX_ALT0        &pconf_bias_disabled_ds3_3v3
+			HSIO_ENET_TXD_2         HSIO_PINMUX_1   BIT_OFFSET22    MUX_ALT0        &pconf_bias_disabled_ds3_3v3
+			HSIO_ENET_TXD_3         HSIO_PINMUX_1   BIT_OFFSET20    MUX_ALT0        &pconf_bias_disabled_ds3_3v3
 			HSIO_ENET_TXEN          HSIO_PINMUX_1   BIT_OFFSET18    MUX_ALT0        &pconf_bias_disabled_ds2_3v3
-			HSIO_ENET_TX_CLK        HSIO_PINMUX_1   BIT_OFFSET16    MUX_ALT1        &pconf_bias_disabled_ds7_3v3
+			HSIO_ENET_TX_CLK        HSIO_PINMUX_1   BIT_OFFSET16    MUX_ALT1        &pconf_bias_disabled_ds6_3v3
 			HSIO_ENET_RX_CLK        HSIO_PINMUX_1   BIT_OFFSET14    MUX_ALT0        &pconf_bias_disabled_ds2_3v3
 			HSIO_ENET_RXD_0         HSIO_PINMUX_1   BIT_OFFSET12    MUX_ALT0        &pconf_bias_disabled_ds2_3v3
 			HSIO_ENET_RXD_1         HSIO_PINMUX_1   BIT_OFFSET10    MUX_ALT0        &pconf_bias_disabled_ds2_3v3
@@ -621,7 +639,7 @@
 	pinctrl_sd: sdgrp {
 		horizon,pins = <
 			HSIO_SD_WP		HSIO_PINMUX_2	BIT_OFFSET24	MUX_ALT0	&pconf_sd_sdio_pu_ds3_ipctrl
-			HSIO_SD_CLK		HSIO_PINMUX_2	BIT_OFFSET22	MUX_ALT0	&pconf_sd_sdio_pu_ds5_ipctrl
+			HSIO_SD_CLK		HSIO_PINMUX_2	BIT_OFFSET22	MUX_ALT0	&pconf_sd_sdio_pu_ds4_ipctrl
 			HSIO_SD_CMD		HSIO_PINMUX_2	BIT_OFFSET20	MUX_ALT0	&pconf_sd_sdio_pu_ds3_ipctrl
 			HSIO_SD_CDN		HSIO_PINMUX_2	BIT_OFFSET18	MUX_ALT0	&pconf_sd_sdio_pu_ds3_ipctrl
 			HSIO_SD_DATA0	HSIO_PINMUX_2	BIT_OFFSET16	MUX_ALT0	&pconf_sd_sdio_pu_ds3_ipctrl
