@@ -850,6 +850,10 @@ gcCommitEvent(
     );
 
 n2d_error_t
+gcCommitSignal(
+    IN n2d_user_hardware_t* Hardware);
+
+n2d_error_t
 gcWaitSignal(
     IN n2d_user_hardware_t  *Hardware,
     IN n2d_pointer          Stall_signal,

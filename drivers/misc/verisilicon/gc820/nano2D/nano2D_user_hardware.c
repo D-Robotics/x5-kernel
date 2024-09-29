@@ -1541,6 +1541,26 @@ on_error:
     return error;
 }
 
+n2d_error_t gcCommitSignal(
+    IN n2d_user_hardware_t* Hardware)
+{
+    n2d_user_event_t event = { 0 };
+    n2d_error_t error = N2D_SUCCESS;
+
+    /*commit eventid*/
+    event.iface.command = N2D_KERNEL_COMMAND_SIGNAL;
+    event.iface.core = Hardware->coreIndex;
+    event.iface.u.command_signal.handle = (n2d_uintptr_t)Hardware->buffer.command_buffer_tail->stall_signal;
+    event.iface.u.command_signal.from_kernel = N2D_FALSE;
+    event.iface.u.command_signal.process = 0;
+    event.next = 0;
+
+    N2D_ON_ERROR(gcCommitEvent(Hardware, gcmPTR_TO_UINT64(&event)));
+
+on_error:
+    return error;
+}
+
 n2d_error_t gcWaitSignal(
     IN n2d_user_hardware_t  *Hardware,
     IN n2d_pointer          Stall_signal,
