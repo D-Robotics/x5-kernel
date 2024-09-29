@@ -1027,7 +1027,7 @@ check_bss:
 		#endif
 
 		#if defined(CPTCFG_VERSION) || LINUX_VERSION_CODE >= KERNEL_VERSION(4, 12, 0)
-		#if defined(CONFIG_MLD_KERNEL_PATCH)
+		#if defined(CONFIG_MLD_KERNEL_PATCH)  || defined(CONFIG_PLATFORM_ARM_HOBOT)
 		/* ToDo CONFIG_RTW_MLD */
 		roam_info.links[0].bssid = cur_network->network.MacAddress;
 		#else
@@ -1809,7 +1809,7 @@ exit:
 }
 
 static int cfg80211_rtw_add_key(struct wiphy *wiphy, struct net_device *ndev
-#ifdef CONFIG_MLD_KERNEL_PATCH
+#if defined(CONFIG_MLD_KERNEL_PATCH) || defined(CONFIG_PLATFORM_ARM_HOBOT)
 	, int link_id
 #endif
 	, u8 key_index
@@ -1974,7 +1974,7 @@ addkey_end:
 }
 
 static int cfg80211_rtw_get_key(struct wiphy *wiphy, struct net_device *ndev
-#ifdef CONFIG_MLD_KERNEL_PATCH
+#if defined(CONFIG_MLD_KERNEL_PATCH) || defined(CONFIG_PLATFORM_ARM_HOBOT)
 	, int link_id
 #endif
 	, u8 keyid
@@ -2170,7 +2170,7 @@ exit:
 }
 
 static int cfg80211_rtw_del_key(struct wiphy *wiphy, struct net_device *ndev
-#ifdef CONFIG_MLD_KERNEL_PATCH
+#if defined(CONFIG_MLD_KERNEL_PATCH) || defined(CONFIG_PLATFORM_ARM_HOBOT)
 	, int link_id
 #endif
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 37)) || defined(COMPAT_KERNEL_RELEASE)
@@ -2193,7 +2193,7 @@ static int cfg80211_rtw_del_key(struct wiphy *wiphy, struct net_device *ndev
 }
 
 static int cfg80211_rtw_set_default_key(struct wiphy *wiphy, struct net_device *ndev
-#ifdef CONFIG_MLD_KERNEL_PATCH
+#if defined(CONFIG_MLD_KERNEL_PATCH) || defined(CONFIG_PLATFORM_ARM_HOBOT)
 	, int link_id
 #endif
 	, u8 key_index
@@ -2245,7 +2245,7 @@ static int cfg80211_rtw_set_default_key(struct wiphy *wiphy, struct net_device *
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 30))
 int cfg80211_rtw_set_default_mgmt_key(struct wiphy *wiphy, struct net_device *ndev
-#ifdef CONFIG_MLD_KERNEL_PATCH
+#if defined(CONFIG_MLD_KERNEL_PATCH) || defined(CONFIG_PLATFORM_ARM_HOBOT)
 	, int link_id
 #endif
 	, u8 key_index)

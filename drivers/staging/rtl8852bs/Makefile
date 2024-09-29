@@ -137,7 +137,7 @@ EXTRA_CFLAGS += -DCONFIG_RTW_ANDROID=$(CONFIG_RTW_ANDROID)
 endif
 
 ########################## Debug ###########################
-CONFIG_RTW_DEBUG = y
+CONFIG_RTW_DEBUG = n
 # default log level is _DRV_INFO_ = 4,
 # please refer to "How_to_set_driver_debug_log_level.doc" to set the available level.
 CONFIG_RTW_LOG_LEVEL = 4
@@ -195,7 +195,7 @@ CONFIG_LAYER2_ROAMING = y
 CONFIG_ROAMING_FLAG = 0x3
 
 ###################### Platform Related #######################
-CONFIG_PLATFORM_I386_PC = y
+CONFIG_PLATFORM_I386_PC = n
 CONFIG_PLATFORM_RTL8198D = n
 CONFIG_PLATFORM_ANDROID_X86 = n
 CONFIG_PLATFORM_ANDROID_INTEL_X86 = n
@@ -208,7 +208,7 @@ CONFIG_PLATFORM_AML_S905 = n
 CONFIG_PLATFORM_AML_S905_L3A = n
 CONFIG_PLATFORM_HUANGLONG = n
 CONFIG_PLATFORM_ARM_ROCKCHIP = n
-
+CONFIG_PLATFORM_ARM_HOBOT = y
 ########### CUSTOMER ################################
 
 CONFIG_DRVEXT_MODULE = n
@@ -240,6 +240,8 @@ endif
 
 ifeq ($(CONFIG_PLATFORM_RTL8198D), y)
 DRV_PATH = $(src)
+else ifeq ($(CONFIG_PLATFORM_ARM_HOBOT), y)
+DRV_PATH = $(srctree)/$(src)
 else
 DRV_PATH = $(TopDIR)
 endif
@@ -326,6 +328,7 @@ $(shell cp $(DRV_PATH)/autoconf_$(IC_NAME)_$(HCI_NAME)_linux.h $(DRV_PATH)/inclu
 endif
 
 ########### END OF PATH  #################################
+
 ifeq ($(CONFIG_MP_INCLUDED), y)
 #MODULE_NAME := $(MODULE_NAME)_mp
 EXTRA_CFLAGS += -DCONFIG_MP_INCLUDED

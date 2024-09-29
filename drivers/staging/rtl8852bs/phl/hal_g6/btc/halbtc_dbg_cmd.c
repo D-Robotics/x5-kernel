@@ -3641,6 +3641,9 @@ void halbtc_cmd_parser(struct btc_t *btc, char input[][MAX_ARGV],
 		CLI_PRT("command not supported !!\n");
 
 	/* fall through */
+#ifdef CONFIG_PLATFORM_ARM_HOBOT
+		fallthrough;
+#endif
 	case HALBTC_HELP:
 		CLI_PRT("BTC cmd ==>\n");
 
