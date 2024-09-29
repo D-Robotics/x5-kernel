@@ -3640,10 +3640,7 @@ void halbtc_cmd_parser(struct btc_t *btc, char input[][MAX_ARGV],
 	default:
 		CLI_PRT("command not supported !!\n");
 
-		/* fall through */
-#ifdef CONFIG_PLATFORM_ARM_HORIZON
-		fallthrough;
-#endif
+	/* fall through */
 	case HALBTC_HELP:
 		CLI_PRT("BTC cmd ==>\n");
 
@@ -3680,3 +3677,4 @@ s32 halbtc_cmd(struct btc_t *btc, char *input, char *output, u32 out_len)
 }
 
 #endif
+

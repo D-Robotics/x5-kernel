@@ -1372,17 +1372,11 @@ u32 halbb_ch_bw_upd(struct bb_info *bb, struct rtw_ch_bw_notif *cfg){
 						 central_ch, cbw,
 						 CHANNEL_WIDTH_80);
 		/* fall through */
-#ifdef CONFIG_PLATFORM_ARM_HORIZON
-		fallthrough;
-#endif
 	case CHANNEL_WIDTH_80:
 		txsc_40 = halbb_get_txsc(bb, pri_ch,
 						 central_ch, cbw,
 						 CHANNEL_WIDTH_40);
 		/* fall through */
-#ifdef CONFIG_PLATFORM_ARM_HORIZON
-		fallthrough;
-#endif
 	case CHANNEL_WIDTH_40:
 		txsc_20 = halbb_get_txsc(bb, pri_ch,
 						 central_ch, cbw,

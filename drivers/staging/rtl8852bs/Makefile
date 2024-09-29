@@ -53,7 +53,6 @@ CONFIG_PCI_HCI = n
 CONFIG_SDIO_HCI = y
 CONFIG_GSPI_HCI = n
 ########################## Features ###########################
-CONFIG_FPGA_INCLUDED = n
 CONFIG_MP_INCLUDED = y
 CONFIG_CONCURRENT_MODE = n
 CONFIG_POWER_SAVE = y
@@ -138,7 +137,7 @@ EXTRA_CFLAGS += -DCONFIG_RTW_ANDROID=$(CONFIG_RTW_ANDROID)
 endif
 
 ########################## Debug ###########################
-CONFIG_RTW_DEBUG = n
+CONFIG_RTW_DEBUG = y
 # default log level is _DRV_INFO_ = 4,
 # please refer to "How_to_set_driver_debug_log_level.doc" to set the available level.
 CONFIG_RTW_LOG_LEVEL = 4
@@ -173,7 +172,7 @@ CONFIG_WAKEUP_TYPE = 0x0f
 CONFIG_SUSPEND_TYPE = 0
 CONFIG_WOW_STA_MIX = n
 CONFIG_GPIO_WAKEUP = n
-# Please contact with RTK support team first. After getting the agreement from RTK support team,
+# Please contact with RTK support team first. After getting the agreement from RTK support team, 
 # you are just able to modify the CONFIG_WAKEUP_GPIO_IDX with customized requirement.
 CONFIG_WAKEUP_GPIO_IDX = default
 CONFIG_HIGH_ACTIVE_DEV2HST = n
@@ -196,7 +195,7 @@ CONFIG_LAYER2_ROAMING = y
 CONFIG_ROAMING_FLAG = 0x3
 
 ###################### Platform Related #######################
-CONFIG_PLATFORM_I386_PC = n
+CONFIG_PLATFORM_I386_PC = y
 CONFIG_PLATFORM_RTL8198D = n
 CONFIG_PLATFORM_ANDROID_X86 = n
 CONFIG_PLATFORM_ANDROID_INTEL_X86 = n
@@ -209,7 +208,7 @@ CONFIG_PLATFORM_AML_S905 = n
 CONFIG_PLATFORM_AML_S905_L3A = n
 CONFIG_PLATFORM_HUANGLONG = n
 CONFIG_PLATFORM_ARM_ROCKCHIP = n
-CONFIG_PLATFORM_ARM_HORIZON = y
+
 ########### CUSTOMER ################################
 
 CONFIG_DRVEXT_MODULE = n
@@ -241,8 +240,6 @@ endif
 
 ifeq ($(CONFIG_PLATFORM_RTL8198D), y)
 DRV_PATH = $(src)
-else ifeq ($(CONFIG_PLATFORM_ARM_HORIZON), y)
-DRV_PATH = $(srctree)/$(src)
 else
 DRV_PATH = $(TopDIR)
 endif
@@ -329,11 +326,6 @@ $(shell cp $(DRV_PATH)/autoconf_$(IC_NAME)_$(HCI_NAME)_linux.h $(DRV_PATH)/inclu
 endif
 
 ########### END OF PATH  #################################
-ifeq ($(CONFIG_FPGA_INCLUDED), y)
-EXTRA_CFLAGS += -DCONFIG_FPGA_INCLUDED
-CONFIG_PHL_TEST_SUITE = y
-endif
-
 ifeq ($(CONFIG_MP_INCLUDED), y)
 #MODULE_NAME := $(MODULE_NAME)_mp
 EXTRA_CFLAGS += -DCONFIG_MP_INCLUDED

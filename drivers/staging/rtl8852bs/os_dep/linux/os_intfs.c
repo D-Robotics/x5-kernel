@@ -304,11 +304,7 @@ int rtw_ndev_init(struct net_device *dev)
 	rtw_adapter_proc_init(dev);
 
 #ifdef CONFIG_RTW_NAPI
-#if LINUX_VERSION_CODE <= KERNEL_VERSION(5, 18, 00)
 	netif_napi_add(dev, &adapter->napi, rtw_recv_napi_poll, RTL_NAPI_WEIGHT);
-#else
-	netif_napi_add_weight(dev, &adapter->napi, rtw_recv_napi_poll, RTL_NAPI_WEIGHT);
-#endif
 #endif /* CONFIG_RTW_NAPI */
 
 	return 0;
@@ -498,12 +494,6 @@ void rtw_os_ndev_free(_adapter *adapter)
 #if defined(CONFIG_IOCTL_CFG80211)
 	rtw_cfg80211_ndev_res_free(adapter);
 #endif
-
-	/* free the old_pnetdev */
-	if (adapter->rereg_nd_name_priv.old_pnetdev) {
-		rtw_free_netdev(adapter->rereg_nd_name_priv.old_pnetdev);
-		adapter->rereg_nd_name_priv.old_pnetdev = NULL;
-	}
 
 	if (adapter->pnetdev) {
 		rtw_free_netdev(adapter->pnetdev);
@@ -3307,6 +3297,11 @@ int rtw_resume_process_wow(_adapter *padapter)
 			rtw_roaming(padapter, NULL);
 		}
 	}
+
+#ifdef CONFIG_RTW_LPS_DEFAULT_OFF
+	/* Set LPS off after WOW resume, it can be turn on by proc cmd */
+	rtw_phl_ps_set_rt_cap(GET_PHL_INFO(dvobj), HW_BAND_0, _FALSE, PS_RT_DEBUG);
+#endif
 
 	if (pwrpriv->wowlan_mode == _TRUE) {
 #ifdef CONFIG_CMD_GENERAL

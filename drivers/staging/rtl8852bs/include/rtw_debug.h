@@ -41,8 +41,6 @@ enum {
 #define _RTW_DBG(x,...) do {} while (0)
 #define _RTW_PRINT_SEL(x,...) do {} while (0)
 
-#define RTW_WARN_LMT(x,...) do {} while (0)
-
 #define RTW_INFO_DUMP(_TitleString, _HexData, _HexDataLen) do {} while (0)
 #define RTW_DBG_DUMP(_TitleString, _HexData, _HexDataLen) do {} while (0)
 #define RTW_PRINT_DUMP(_TitleString, _HexData, _HexDataLen) do {} while (0)
@@ -517,6 +515,8 @@ ssize_t proc_set_tx_amsdu(struct file *file, const char __user *buffer, size_t c
 int proc_get_tx_amsdu_rate(struct seq_file *m, void *v);
 ssize_t proc_set_tx_amsdu_rate(struct file *file, const char __user *buffer, size_t count, loff_t *pos, void *data);
 #endif
+int proc_get_tx_max_agg_time(struct seq_file *m, void *v);
+ssize_t proc_set_tx_max_agg_time(struct file *file, const char __user *buffer, size_t count, loff_t *pos, void *data);
 #endif /* CONFIG_80211N_HT */
 
 #ifdef CONFIG_80211AC_VHT
