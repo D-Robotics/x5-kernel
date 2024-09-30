@@ -8,3 +8,5 @@ obj-y                                   += socinfo/
 obj-y                                   += reboot_reason/
 obj-y                                   += ddr_monitor/
 obj-y                                   += firewall/
+obj-y                                   += camera_power/
+

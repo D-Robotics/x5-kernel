@@ -1,0 +1,7 @@
+# SPDX-License-Identifier: GPL-2.0-only
+
+config DROBOT_CAMERA_REGULATOR
+	tristate "D-robot camera regualtor"
+	default y
+	help
+	  This driver is used for drobot camera power management

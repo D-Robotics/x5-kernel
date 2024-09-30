@@ -805,6 +805,18 @@
 			};
 		};
 
+		camera_power0: camera_power0 {
+			compatible = "d-robotics,camera-power";
+			status = "disabled";
+			power-supply = <&camera0_pd_dc_1v8>;
+			id = <0>;
+		};
+		camera_power1: camera_power1 {
+			compatible = "d-robotics,camera-power";
+			status = "disabled";
+			power-supply = <&camera1_pd_dc_1v8>;
+			id = <1>;
+		};
 		/* Sunrise5 codecs subsystem */
 		vpu_iommu: vpu_iommu@3b020004 {
 			compatible = "d-robotics,lite_mmu";
@@ -4062,6 +4074,31 @@
 				regulator-name = "adc_1v8";
 				regulator-min-microvolt = <1800000>;
 				regulator-max-microvolt = <1800000>;
+			};
+
+			camera0_pd_dc_1v8: camera0_pd_dc_1v8 {
+				status = "disabled";
+				compatible = "regulator-gpio";
+				regulator-name = "VCC_CAM0";
+				regulator-min-microvolt = <1800000>;
+				regulator-max-microvolt = <1800000>;
+				states = <1800000 0>;
+				regulator-enable-ramp-delay = <3000>;
+				regulator-ramp-delay = <2000>;
+				startup-delay-us = <3000>;
+				enable-active-high;
+			};
+			camera1_pd_dc_1v8: camera1_pd_dc_1v8 {
+				status = "disabled";
+				compatible = "regulator-gpio";
+				regulator-name = "VCC_CAM1";
+				regulator-min-microvolt = <1800000>;
+				regulator-max-microvolt = <1800000>;
+				states = <1800000 0>;
+				regulator-enable-ramp-delay = <3000>;
+				regulator-ramp-delay = <2000>;
+				startup-delay-us = <3000>;
+				enable-active-high;
 			};
 
 			adc: adc@34190000 {

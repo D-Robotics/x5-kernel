@@ -508,3 +508,17 @@
 	pinctrl-names = "default";
 	pinctrl-0 = <&aon_gpio_7>;
 };
+
+&camera0_pd_dc_1v8 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&lsio_gpio0_7>;
+	enable-gpio = <&ls_gpio0_porta 7 GPIO_ACTIVE_HIGH>;
+	status = "okay";
+};
+
+&camera1_pd_dc_1v8 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&lsio_gpio0_8>;
+	enable-gpio = <&ls_gpio0_porta 8 GPIO_ACTIVE_HIGH>;
+	status = "okay";
+};
