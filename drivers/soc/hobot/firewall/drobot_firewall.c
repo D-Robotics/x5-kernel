@@ -31,6 +31,27 @@
 
 static const uint32_t mpu_addr[] = {HORIZON_DDR_MPU_0, HORIZON_DDR_MPU_1, HORIZON_DDR_MPU_2,
                                     HORIZON_DDR_MPU_3, HORIZON_DDR_MPU_4};
+static uint16_t firewall_en_bitmap = (1 << 0) | (1 << 8);
+static struct mpu_region debug_mpu_region = {0};
+uint64_t default_addr = 0;
+uint32_t summary_all = 0;
+
+static int32_t drobot_find_mpu_region_num(void)
+{
+        int index = 0;
+        uint64_t num = firewall_en_bitmap;
+        if (num == 0xffff)
+                return -1;
+        while (1) {
+                if ((num & 1) == 0) {
+                        break;
+                }
+                num >>= 1;
+                index++;
+        }
+        return index;
+}
+
 // #define DUMP_MPU_INFO
 static irqreturn_t mpu_protection_isr(int this_irq, void *data)
 {
@@ -40,7 +61,10 @@ static irqreturn_t mpu_protection_isr(int this_irq, void *data)
         int i = 0;
         uint32_t value = 0;
         uint32_t reg_value = 0;
+        uint32_t value31_0 = 0;
+        uint32_t value63_32 = 0;
         uint32_t mpu_int_sta = 0;
+        uint64_t tmp_value = 0;
 
         mpu_prt = (struct mpu_protection *)data;
 
@@ -71,24 +95,25 @@ static irqreturn_t mpu_protection_isr(int this_irq, void *data)
                                 pr_err("read violation master id:%d\n", reg_value & 0xff) ;
 
                                 reg = MPU_VIO_READ_ADDR_31_0 + i * 0x100000;
-                                ret = regmap_read(mpu_prt->map, reg, &reg_value);
+                                ret = regmap_read(mpu_prt->map, reg, &value31_0);
                                 if (ret) {
                                         pr_err("%d: read MPU 0x%x failed\n", __LINE__, reg);
                                         reg = MPU_MISSIONINTSTATUS0 + i * 0x100000;
                                         regmap_write(mpu_prt->map, reg, mpu_int_sta);
                                         break;
                                 }
-                                pr_err("read violation address 31_0:0x%x\n", reg_value + 0x80000000);
 
                                 reg = MPU_VIO_READ_ADDR_63_32 + i * 0x100000;
-                                ret = regmap_read(mpu_prt->map, reg, &reg_value);
+                                ret = regmap_read(mpu_prt->map, reg, &value63_32);
                                 if (ret) {
                                         pr_err("%d: read MPU 0x%x failed\n", __LINE__, reg);
                                         reg = MPU_MISSIONINTSTATUS0 + i * 0x100000;
                                         regmap_write(mpu_prt->map, reg, mpu_int_sta);
                                         break;
                                 }
-                                pr_err("read violation address 63_32:0x%x\n", reg_value);
+                                tmp_value =  (((uint64_t)(value63_32) << 32) | value31_0) + 0x80000000;
+                                pr_err("read violation address 31_0:0x%08llx\n", tmp_value & 0xffffffff);
+                                pr_err("read violation address 63_32:0x%08llx\n", (tmp_value >> 32) & 0xffffffff);
                         }
 
                         reg = MPU_VIO_WRITE_MASTERID + i * 0x100000;
@@ -102,24 +127,25 @@ static irqreturn_t mpu_protection_isr(int this_irq, void *data)
                         if (reg_value & MPU_VIO_FLAG) {
                                 pr_err("write violation master id:%d\n", reg_value & 0xff);
                                 reg = MPU_VIO_WRITE_ADDR_31_0 + i * 0x100000;
-                                ret = regmap_read(mpu_prt->map, reg, &reg_value);
+                                ret = regmap_read(mpu_prt->map, reg, &value31_0);
                                 if (ret) {
                                         pr_err("%d: read MPU 0x%x failed\n", __LINE__, reg);
                                         reg = MPU_MISSIONINTSTATUS0 + i * 0x100000;
                                         regmap_write(mpu_prt->map, reg, mpu_int_sta);
                                         break;
                                 }
-                                pr_err("write violation address 31_0:0x%x\n", reg_value + 0x80000000);
 
                                 reg = MPU_VIO_WRITE_ADDR_63_32 + i * 0x100000;
-                                ret = regmap_read(mpu_prt->map, reg, &reg_value);
+                                ret = regmap_read(mpu_prt->map, reg, &value63_32);
                                 if (ret) {
                                         pr_err("%d: read MPU 0x%x failed\n", __LINE__, reg);
                                         reg = MPU_MISSIONINTSTATUS0 + i * 0x100000;
                                         regmap_write(mpu_prt->map, reg, mpu_int_sta);
                                         break;
                                 }
-                                pr_err("write violation address 63_32:0x%x\n", reg_value);
+                                tmp_value =  (((uint64_t)(value63_32) << 32) | value31_0) + 0x80000000;
+                                pr_err("write violation address 31_0:0x%08llx\n", tmp_value & 0xffffffff);
+                                pr_err("write violation address 63_32:0x%08llx\n", (tmp_value >> 32) & 0xffffffff);
 
                         }
                         pr_err("##########################################\n");
@@ -134,47 +160,67 @@ static irqreturn_t mpu_protection_isr(int this_irq, void *data)
         return IRQ_HANDLED;
 }
 
-#ifdef DUMP_MPU_INFO
 void mpu_region_reg_dump(struct regmap *map, uint32_t region_reg_base)
 {
         uint32_t value = 0;
-        pr_info("\n");
-        pr_info(" dump mpu region reg: 0x%x ==============\n", region_reg_base + HORIZON_DDR_MPU_0);
+        uint32_t s_value31_0 = 0;
+        uint32_t s_value63_32 = 0;
+        uint32_t e_value31_0 = 0;
+        uint32_t e_value63_32 = 0;
+        uint64_t r_tmp_value = 0;
+        uint64_t w_tmp_value = 0;
 
-        regmap_read(map, region_reg_base + MPU_START_ADDR_31_0, &value);
-        pr_info("dump [MPU_START_ADDR_31_0:0x%x]:0x%08x\n", HORIZON_DDR_MPU_0 + region_reg_base + MPU_START_ADDR_31_0, value);
+        regmap_read(map, region_reg_base + MPU_START_ADDR_31_0, &s_value31_0);
+        regmap_read(map, region_reg_base + MPU_START_ADDR_63_32, &s_value63_32);
+        regmap_read(map, region_reg_base + MPU_END_ADDR_31_0, &e_value31_0);
+        regmap_read(map, region_reg_base + MPU_END_ADDR_63_32, &e_value63_32);
 
-        regmap_read(map, region_reg_base + MPU_START_ADDR_63_32, &value);
-        pr_info("dump [MPU_START_ADDR_63_32:0x%x]:0x%08x\n", HORIZON_DDR_MPU_0 + region_reg_base + MPU_START_ADDR_63_32, value);
+        if (s_value31_0 != 0 || s_value63_32 != 0 || e_value31_0 != 0 || e_value63_32 != 0) {
+                r_tmp_value =  (((uint64_t)(s_value63_32) << 32) | s_value31_0) + 0x80000000;
+                s_value31_0 = r_tmp_value & 0xffffffff;
+                s_value63_32 = (r_tmp_value  >> 32) & 0xffffffff;
 
-        regmap_read(map, region_reg_base + MPU_END_ADDR_31_0, &value);
-        pr_info("dump [MPU_END_ADDR_31_0:0x%x]:0x%08x\n", HORIZON_DDR_MPU_0 + region_reg_base + MPU_END_ADDR_31_0, value);
+                w_tmp_value =  (((uint64_t)(e_value63_32) << 32) | e_value31_0) + 0x80000000;
+                e_value31_0 = w_tmp_value & 0xffffffff;
+                e_value63_32 = (w_tmp_value  >> 32) & 0xffffffff;
+        }
 
-        regmap_read(map, region_reg_base + MPU_END_ADDR_63_32, &value);
-        pr_info("dump [MPU_END_ADDR_63_32:0x%x]:0x%08x\n", HORIZON_DDR_MPU_0 + region_reg_base + MPU_END_ADDR_63_32, value);
+        pr_err("dump [MPU_START_ADDR_31_0:0x%x]:0x%08x\n", HORIZON_DDR_MPU_0 + region_reg_base + MPU_START_ADDR_31_0, s_value31_0);
+        pr_err("dump [MPU_START_ADDR_63_32:0x%x]:0x%08x\n", HORIZON_DDR_MPU_0 + region_reg_base + MPU_START_ADDR_63_32, s_value63_32);
+        pr_err("dump [MPU_END_ADDR_31_0:0x%x]:0x%08x\n", HORIZON_DDR_MPU_0 + region_reg_base + MPU_END_ADDR_31_0, e_value31_0);
+        pr_err("dump [MPU_END_ADDR_63_32:0x%x]:0x%08x\n", HORIZON_DDR_MPU_0 + region_reg_base + MPU_END_ADDR_63_32, e_value63_32);
 
-        for (int i = 0; i < 8; i++) {
+        /*
+        * although read and write id is 256bit, but
+        * in x5, 32bit is enough
+        */
+        for (int i = 0; i < 1; i++) {
                 regmap_read(map, region_reg_base + MPU_RD_DISABLE_31_0 + 4 * i, &value);
-                pr_info("dump [MPU_RD_DISABLE_31_0:0x%x]:0x%08x\n",
+                pr_err("dump [MPU_RD_DISABLE_31_0:0x%x]:0x%08x\n",
                         HORIZON_DDR_MPU_0 + region_reg_base + MPU_RD_DISABLE_31_0 + 4 * i, value);
+                regmap_read(map, region_reg_base + MPU_RD_DISABLE_63_32 + 4 * i, &value);
+                pr_err("dump [MPU_RD_DISABLE_63_33:0x%x]:0x%08x\n",
+                        HORIZON_DDR_MPU_0 + region_reg_base + MPU_RD_DISABLE_63_32 + 4 * i, value);
         }
 
 
-        for (int i = 0; i < 8; i++) {
+        for (int i = 0; i < 1; i++) {
                 regmap_read(map, region_reg_base + MPU_WR_DISABLE_31_0 + 4 * i, &value);
-                pr_info("dump [MPU_WR_DISABLE_31_0:0x%x]:0x%08x\n",
+                pr_err("dump [MPU_WR_DISABLE_31_0:0x%x]:0x%08x\n",
                         HORIZON_DDR_MPU_0 + region_reg_base + MPU_WR_DISABLE_31_0 + 4 * i, value);
+                regmap_read(map, region_reg_base + MPU_WR_DISABLE_63_32 + 4 * i, &value);
+                pr_err("dump [MPU_WR_DISABLE_31_0:0x%x]:0x%08x\n",
+                        HORIZON_DDR_MPU_0 + region_reg_base + MPU_WR_DISABLE_63_32 + 4 * i, value);
         }
 
         regmap_read(map, region_reg_base + MPU_NS_DISABLE, &value);
-        pr_info("dump [MPU_NS_DISABLE: 0x%x]:0x%08x\n", HORIZON_DDR_MPU_0 + region_reg_base + MPU_NS_DISABLE, value);
+        pr_err("dump [MPU_NS_DISABLE: 0x%x]:0x%08x\n", HORIZON_DDR_MPU_0 + region_reg_base + MPU_NS_DISABLE, value);
         regmap_read(map, region_reg_base + MPU_CFG_REG_LOCK, &value);
-        pr_info("dump [MPU_CFG_REG_LOCK: 0x%x]:0x%08x\n", HORIZON_DDR_MPU_0 + region_reg_base + MPU_CFG_REG_LOCK, value);
-
-        pr_info("===================================\n");
-        pr_info("\n");
+        pr_err("dump [MPU_CFG_REG_LOCK: 0x%x]:0x%08x\n", HORIZON_DDR_MPU_0 + region_reg_base + MPU_CFG_REG_LOCK, value);
+        pr_err("\n");
 }
 
+#ifdef DUMP_MPU_INFO
 void dump_mpu_config(struct mpu_region *mpu)
 {
         pr_info("region_start_31_0:0x%x\n", mpu->region_start_31_0);
@@ -239,6 +285,7 @@ void mpu_config(struct mpu_protection *mpu_prt, uint32_t regmap_base, struct mpu
 #ifdef DUMP_MPU_INFO
         mpu_region_reg_dump(map, region_reg_base);
 #endif
+        firewall_en_bitmap |= (1UL << region->region_number);
 }
 
 /*
@@ -357,6 +404,7 @@ static int drobot_parse_dts(struct platform_device *pdev, struct device_node *np
         }
 
         region->default_addr = resource.start;
+        default_addr = resource.start;
         return 0;
 }
 
@@ -409,6 +457,203 @@ static int is_match_regmap_version(void)
         return match;
 
 }
+static ssize_t firewall_summary_show(struct device *dev, struct device_attribute *attr, char *buf)
+{
+        struct mpu_protection *mpu_prt = (struct mpu_protection *)dev_get_drvdata(dev);
+        uint32_t i = 0;
+        uint32_t j = 0;
+        uint32_t region_reg_base = 0;
+        uint32_t value31_0 = 0;
+        uint32_t value63_32 = 0;
+        uint64_t tmp_value = 0;
+
+        pr_err("firewall_en_bitmap:0x%x\n", firewall_en_bitmap);
+        for (i = 0; i < sizeof(firewall_en_bitmap) * 8; i++) {
+                if (((1UL << i) & firewall_en_bitmap) || summary_all) {
+                        region_reg_base = MPU_REGION_STEP * i;
+                        pr_err("-------------dump firewall_%d-----------------\n", i);
+                        mpu_region_reg_dump(mpu_prt->map, region_reg_base);
+                }
+        }
+        if (summary_all) {
+                /* dump all (5) firewall infromation */
+                for (j = 1; j < ARRAY_SIZE(mpu_addr); j++) {
+                        for (i = 0; i < sizeof(firewall_en_bitmap) * 8; i++) {
+                                pr_err("-------------dump firewall_%d %d-----------------\n", j, i);
+                                region_reg_base = mpu_addr[j] - HORIZON_DDR_MPU_0;
+                                region_reg_base += MPU_REGION_STEP * i;
+                                mpu_region_reg_dump(mpu_prt->map, region_reg_base);
+                        }
+                }
+
+        }
+        pr_err("-------------dump firewall_default address----------\n");
+        regmap_read(mpu_prt->map, MPU_READ_DEFAULT_ADDR_31_0, &value31_0);
+        regmap_read(mpu_prt->map, MPU_READ_DEFAULT_ADDR_63_32, &value63_32);
+        if (value31_0 != 0 || value63_32 != 0)
+                tmp_value =  (((uint64_t)(value63_32) << 32) | value31_0) + 0x80000000;
+
+        pr_err("read default address low:0x%08llx\n", tmp_value & 0xffffffff);
+        pr_err("read default address high:0x%08llx\n", (tmp_value >> 32) & 0xffffffff);
+
+        regmap_read(mpu_prt->map, MPU_WRITE_DEFAULT_ADDR_31_0, &value31_0);
+        regmap_read(mpu_prt->map, MPU_WRITE_DEFAULT_ADDR_63_32, &value63_32);
+        if (value31_0 != 0 || value63_32 != 0)
+                tmp_value =  (((uint64_t)(value63_32) << 32) | value31_0) + 0x80000000;
+
+        pr_err("write default address low:0x%08llx\n", tmp_value & 0xffffffff);
+        pr_err("write default address high:0x%08llx\n", (tmp_value >> 32) & 0xffffffff);
+	return 0;
+}
+
+static ssize_t firewall_summary_store(struct device *dev, struct device_attribute *attr,
+				  const char *buf, size_t len)
+{
+        int32_t ret;
+        uint32_t tmp_val;
+        ret = sscanf(buf, "%d", &tmp_val);
+        if (ret < 0) {
+                dev_err(dev, "get firewall summary mode failed\n");
+                return 0;
+        }
+        summary_all = tmp_val;
+        return (ssize_t)len;
+}
+
+static ssize_t firewall_addr_start(struct device *dev, struct device_attribute *attr,
+				  const char *buf, size_t len)
+{
+        int32_t ret;
+        uint64_t tmp_val;
+
+        ret = sscanf(buf, "%llx", &tmp_val);
+        if (ret < 0) {
+                dev_err(dev, "get firewall disable_ns failed\n");
+                return 0;
+        }
+        if (tmp_val < 0x80000000) {
+                dev_err(dev, "valid firewall end ddr address, x5 ddr start is 0x80000000\n");
+                return 0;
+        }
+        debug_mpu_region.region_start_63_32 = (tmp_val - 0x80000000) >> 32;
+        debug_mpu_region.region_start_31_0 = (tmp_val - 0x80000000) & 0xffffffff;
+        return (ssize_t)len;
+}
+
+static ssize_t firewall_addr_end(struct device *dev, struct device_attribute *attr,
+				  const char *buf, size_t len)
+{
+        int32_t ret;
+        uint64_t tmp_val;
+
+        ret = sscanf(buf, "%llx", &tmp_val);
+        if (ret < 0) {
+                dev_err(dev, "get firewall disable_ns failed\n");
+                return 0;
+        }
+        if (tmp_val < 0x80000000) {
+                dev_err(dev, "valid firewall end ddr address, x5 ddr start is 0x80000000\n");
+                return 0;
+        }
+        debug_mpu_region.region_end_63_32 = (tmp_val - 0x80000000) >> 32;
+        debug_mpu_region.region_end_31_0 = (tmp_val - 0x80000000) & 0xffffffff;
+        return (ssize_t)len;
+}
+
+static ssize_t firewall_disable_rd_id_store(struct device *dev, struct device_attribute *attr,
+				  const char *buf, size_t len)
+{
+        int32_t ret;
+        uint64_t tmp_val = 0;
+        ret = sscanf(buf, "%llx", &tmp_val);
+        if (ret < 0) {
+                dev_err(dev, "get firewall disable_ns failed\n");
+                return 0;
+        }
+        debug_mpu_region.disable_rd_userid_31_0 = tmp_val & 0xffffffff;
+        debug_mpu_region.disable_rd_userid_63_32 = (tmp_val >> 32) & 0xffffffff;
+        return (ssize_t)len;
+}
+
+static ssize_t firewall_disable_wr_id_store(struct device *dev, struct device_attribute *attr,
+				  const char *buf, size_t len)
+{
+        int32_t ret;
+        uint64_t tmp_val = 0;
+        ret = sscanf(buf, "%llx", &tmp_val);
+        if (ret < 0) {
+                dev_err(dev, "get firewall disable_ns failed\n");
+                return 0;
+        }
+        debug_mpu_region.disable_wr_userid_31_0 = tmp_val & 0xffffffff;
+        debug_mpu_region.disable_wr_userid_63_32 = (tmp_val >> 32) & 0xffffffff;
+        return (ssize_t)len;
+}
+
+static ssize_t firewall_disable_ns_store(struct device *dev, struct device_attribute *attr,
+				  const char *buf, size_t len)
+{
+        int32_t ret;
+        uint32_t tmp_val;
+        ret = sscanf(buf, "%xu", &tmp_val);
+        if (ret < 0) {
+                dev_err(dev, "get firewall disable_ns failed\n");
+                return 0;
+        }
+        debug_mpu_region.disable_ns = tmp_val;
+        return (ssize_t)len;
+}
+
+static ssize_t firewall_enable_store(struct device *dev, struct device_attribute *attr,
+				  const char *buf, size_t len)
+{
+        struct mpu_protection *mpu_prt = (struct mpu_protection *)dev_get_drvdata(dev);
+        int32_t ret;
+
+        debug_mpu_region.base = HORIZON_DDR_MPU_0;
+        debug_mpu_region.name = "sys_debug";
+        debug_mpu_region.default_addr = default_addr;
+        ret = drobot_find_mpu_region_num();
+        if (ret == -1) {
+                dev_err(dev, "can not find avilable firewall\n");
+                return -1;
+        }
+        debug_mpu_region.region_number = ret;
+        ddr_mpu_protect(mpu_prt, &debug_mpu_region);
+        memset((void *)&debug_mpu_region, 0 , sizeof(debug_mpu_region));
+
+	return (ssize_t)len;
+}
+
+static DEVICE_ATTR(summary, S_IRUGO | S_IWUSR, firewall_summary_show, firewall_summary_store);
+
+static DEVICE_ATTR(addr_start, S_IWUSR, NULL, firewall_addr_start);
+
+static DEVICE_ATTR(addr_end, S_IWUSR, NULL, firewall_addr_end);
+
+static DEVICE_ATTR(disable_rd_id, S_IWUSR, NULL, firewall_disable_rd_id_store);
+
+static DEVICE_ATTR(disable_wr_id, S_IWUSR, NULL, firewall_disable_wr_id_store);
+
+static DEVICE_ATTR(disable_ns, S_IWUSR, NULL, firewall_disable_ns_store);
+
+static DEVICE_ATTR(enable, S_IWUSR, NULL, firewall_enable_store);
+
+static struct attribute *firewall_attrs[] = {
+        &dev_attr_summary.attr,
+        &dev_attr_addr_start.attr,
+        &dev_attr_addr_end.attr,
+        &dev_attr_disable_rd_id.attr,
+        &dev_attr_disable_wr_id.attr,
+        &dev_attr_disable_ns.attr,
+        &dev_attr_enable.attr,
+        NULL,
+};
+
+static struct attribute_group firewall_attr_group = {
+        .name = "debug",
+        .attrs = firewall_attrs,
+};
 
 static int drobot_firewall_probe(struct platform_device *pdev)
 {
@@ -466,7 +711,12 @@ static int drobot_firewall_probe(struct platform_device *pdev)
                                 mpu_prt->irq);
                 return -ENODEV;
         }
-
+        dev_set_drvdata(&pdev->dev, mpu_prt);
+        ret = device_add_group(&pdev->dev, &firewall_attr_group);
+        if (ret < 0) {
+                dev_err(&pdev->dev, "Create firewall debug group failed\n");
+                return ret;
+        }
         return 0;
 }
 
