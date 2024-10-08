@@ -534,7 +534,8 @@ static int axi_mon_parse_of(struct platform_device *pdev, struct axi_monitor *ax
 		dev_info(dev, "Got new axi-port:%s, idx:%d\n", port->name, port->idx);
 		/* Enable R/W bandwidth stat by default */
 		axi_mon_writel(axi_mon, PORT_EVENT_EN(i),
-					   (RD_BW_EN | WR_BW_EN));
+					   (RD_BW_EN | RD_CMD_CNT_EN | RD_LATENCY_EN | RD_TOTAL_CYCLE_EN | RD_THROTTLE_EN | 
+					   WR_BW_EN | WR_CMD_CNT_EN | WR_LATENCY_EN | WR_TOTAL_CYCLE_EN | WR_THROTTLE_EN));
 	}
 
 	return 0;
