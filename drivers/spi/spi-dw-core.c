@@ -135,7 +135,36 @@ static inline u32 dw_spi_rx_max(struct dw_spi *dws)
 	return min_t(u32, dws->rx_len, dw_readl(dws, DW_SPI_RXFLR));
 }
 
-static void dw_writer(struct dw_spi *dws)
+static void dw_writer_u8(struct dw_spi *dws)
+{
+	u32 max = dw_spi_tx_max(dws);
+	u8 txw = 0;
+
+	dws->tx_len -= max;
+	while (max--) {
+		if (dws->tx) {
+			txw = (*(u8 *)(dws->tx) & (0xFFFFFFFF >> (32 - (dws->n_bytes * 8))));
+			dws->tx += dws->n_bytes;
+		}
+		dw_write_io_reg(dws, DW_SPI_DR, txw);
+	}
+}
+
+static void dw_writer_u16(struct dw_spi *dws)
+{
+	u32 max = dw_spi_tx_max(dws);
+	u16 txw = 0;
+
+	dws->tx_len -= max;
+	while (max--) {
+		if (dws->tx) {
+			txw = (*(u16 *)(dws->tx) & (0xFFFFFFFF >> (32 - (dws->n_bytes * 8))));
+			dws->tx += dws->n_bytes;
+		}
+		dw_write_io_reg(dws, DW_SPI_DR, txw);
+	}
+}
+static void dw_writer_u32(struct dw_spi *dws)
 {
 	u32 max = dw_spi_tx_max(dws);
 	u32 txw = 0;
@@ -150,7 +179,37 @@ static void dw_writer(struct dw_spi *dws)
 	}
 }
 
-static void dw_reader(struct dw_spi *dws)
+static void dw_reader_u8(struct dw_spi *dws)
+{
+	u32 max = dw_spi_rx_max(dws);
+	u8 rxw;
+
+	dws->rx_len -= max;
+	while (max--) {
+		rxw = dw_read_io_reg(dws, DW_SPI_DR);
+		if (dws->rx) {
+			*(u8 *)dws->rx = rxw;
+			dws->rx += dws->n_bytes;
+		}
+	}
+}
+
+static void dw_reader_u16(struct dw_spi *dws)
+{
+	u32 max = dw_spi_rx_max(dws);
+	u16 rxw;
+
+	dws->rx_len -= max;
+	while (max--) {
+		rxw = dw_read_io_reg(dws, DW_SPI_DR);
+		if (dws->rx) {
+			*(u16 *)dws->rx = rxw;
+			dws->rx += dws->n_bytes;
+		}
+	}
+}
+
+static void dw_reader_u32(struct dw_spi *dws)
 {
 	u32 max = dw_spi_rx_max(dws);
 	u32 rxw;
@@ -217,7 +276,7 @@ static irqreturn_t dw_spi_transfer_handler(struct dw_spi *dws)
 	 * final stage of the transfer. By doing so we'll get the next IRQ
 	 * right when the leftover incoming data is received.
 	 */
-	dw_reader(dws);
+	dws->reader(dws);
 	if (!dws->rx_len) {
 		dw_spi_mask_intr(dws, 0xff);
 		spi_finalize_current_transfer(dws->master);
@@ -231,7 +290,7 @@ static irqreturn_t dw_spi_transfer_handler(struct dw_spi *dws)
 	 * have the TXE IRQ flood at the final stage of the transfer.
 	 */
 	if (irq_status & DW_SPI_INT_TXEI) {
-		dw_writer(dws);
+		dws->writer(dws);
 		if (!dws->tx_len)
 			dw_spi_mask_intr(dws, DW_SPI_INT_TXEI);
 	}
@@ -453,12 +512,12 @@ static int dw_spi_poll_transfer(struct dw_spi *dws,
 	nbits = dws->n_bytes * BITS_PER_BYTE;
 
 	do {
-		dw_writer(dws);
+		dws->writer(dws);
 
 		delay.value = nbits * (dws->rx_len - dws->tx_len);
 		spi_delay_exec(&delay, transfer);
 
-		dw_reader(dws);
+		dws->reader(dws);
 
 		ret = dw_spi_check_status(dws, true);
 		if (ret)
@@ -485,6 +544,21 @@ static int dw_spi_transfer_one(struct spi_controller *master,
 	dws->n_bytes =
 		roundup_pow_of_two(DIV_ROUND_UP(transfer->bits_per_word,
 						BITS_PER_BYTE));
+	switch (dws->n_bytes) {
+		case 1:
+			dws->reader = dw_reader_u8;
+			dws->writer = dw_writer_u8;
+			break;
+		case 2:
+			dws->reader = dw_reader_u16;
+			dws->writer = dw_writer_u16;
+			break;
+		default:
+		case 4:
+			dws->reader = dw_reader_u32;
+			dws->writer = dw_writer_u32;
+			break;
+	}
 
 	dws->tx = (void *)transfer->tx_buf;
 	dws->tx_len = transfer->len / dws->n_bytes;

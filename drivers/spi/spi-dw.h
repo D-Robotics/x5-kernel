@@ -247,6 +247,8 @@ struct dw_spi {
 	struct dentry *debugfs;
 	struct debugfs_regset32 regset;
 #endif
+	void (*reader)(struct dw_spi *dws);
+	void (*writer)(struct dw_spi *dws);
 };
 
 static inline u32 dw_readl(struct dw_spi *dws, u32 offset)
