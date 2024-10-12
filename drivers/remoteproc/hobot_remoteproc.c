@@ -1584,41 +1584,48 @@ static int32_t hobot_remoteproc_suspend(struct device *dev)
 	struct hobot_rproc_pdata *pdata = (struct hobot_rproc_pdata *)platform_get_drvdata(pdev);
 	int32_t ret;
 	uint32_t mode;
+
+	ret = 0;
 	mode = hb_get_sleep_mode(pdata);
 	if (adsp_boot_flag == 0u)
-		return 0;
+		return ret;
 
-	if (mode == HOBOT_LITE_SLEEP && pdata->wakeup_status != HOBOT_AUDIO_WAKEUP_FAILED) {
-		device_wakeup_enable(dev);
-		ret = hb_send_power_cmd(pdata, AUDIO_POWER_TO_LOW_POWER);
-		if (ret < 0) {
-			dev_err(dev, "send power cmd error\n");
-			goto err;
-		}
-		ret = gua_pcm_hw_params(pdata);
-		if (ret < 0) {
-			dev_err(dev, "gua_pcm_hw_params error\n");
-			goto err;
-		}
-
-		ret = sync_pipeline_state(HIFI5_LOW_POWER_DEV, SNDRV_PCM_STREAM_CAPTURE, PCM_RX_OPEN);
-		if (ret < 0) {
-			dev_err(dev, "ssf sync_pipeline_state error\n");
-			goto err;
-		}
-
-		ret = sync_pipeline_state(HIFI5_LOW_POWER_DEV, SNDRV_PCM_STREAM_CAPTURE, PCM_RX_START);
-		if (ret < 0) {
-			dev_err(dev, "ssf sync_pipeline_state error\n");
-			goto err;
-		}
-	} else if (mode == HOBOT_DEEP_SLEEP) {
+	if (mode == HOBOT_DEEP_SLEEP) {
 		clk_disable_unprepare(pdata->clk);
+	} else if (mode == HOBOT_LITE_SLEEP) {
+		if (pdata->wakeup_status != HOBOT_AUDIO_WAKEUP_FAILED) {
+			device_wakeup_enable(dev);
+			ret = hb_send_power_cmd(pdata, AUDIO_POWER_TO_LOW_POWER);
+			if (ret < 0) {
+				dev_err(dev, "send power cmd error\n");
+				goto err;
+			}
+			ret = gua_pcm_hw_params(pdata);
+			if (ret < 0) {
+				dev_err(dev, "gua_pcm_hw_params error\n");
+				goto err;
+			}
+
+			ret = sync_pipeline_state(HIFI5_LOW_POWER_DEV, SNDRV_PCM_STREAM_CAPTURE, PCM_RX_OPEN);
+			if (ret < 0) {
+				dev_err(dev, "ssf sync_pipeline_state error\n");
+				goto err;
+			}
+
+			ret = sync_pipeline_state(HIFI5_LOW_POWER_DEV, SNDRV_PCM_STREAM_CAPTURE, PCM_RX_START);
+			if (ret < 0) {
+				dev_err(dev, "ssf sync_pipeline_state error\n");
+				goto err;
+			}
+		}
+	} else {
+		dev_err(dev, "Unsupported sleep mode(%d) found!\n", mode);
+		ret = -EINVAL;
 	}
 
 	dev_info(dev, "Exit %s\n", __func__);
 	pdata->sleep_mode = mode;
-	return 0;
+	return ret;
 err:
 	pdata->sleep_mode = mode;
 	return -EBUSY;
@@ -1658,25 +1665,36 @@ static int32_t hobot_remoteproc_resume(struct device *dev)
 	struct platform_device *pdev = to_platform_device(dev);
 	struct hobot_rproc_pdata *pdata = (struct hobot_rproc_pdata *)platform_get_drvdata(pdev);
 	uint32_t reason, mode;
+
+	ret = 0;
 	mode = hb_get_sleep_mode(pdata);
 	reason = hb_get_wakeup_reason(pdata);
 	pdata->sleep_mode = mode;
 	if (adsp_boot_flag == 0u)
-		return 0;
+		goto out;
 
-	if (reason == HOBOT_GPIO_WAKEUP && mode == HOBOT_LITE_SLEEP) {
-		ret = hobot_remoteproc_close_adsp_power_dev(dev);
-		if (ret < 0) {
-			dev_err(dev, "ssf sync_pipeline_state PCM_RX_STOP error\n");
-			return -EBUSY;
-		}
-	} else if (reason != HOBOT_AUDIO_WAKEUP && mode == HOBOT_DEEP_SLEEP) {
+	if (mode == HOBOT_DEEP_SLEEP) {
 		clk_prepare_enable(pdata->clk);
-	} else if (reason == HOBOT_AUDIO_WAKEUP && mode == HOBOT_LITE_SLEEP) {
-		device_wakeup_disable(dev);
+	} else if (mode == HOBOT_LITE_SLEEP) {
+		if (reason == HOBOT_GPIO_WAKEUP) {
+			ret = hobot_remoteproc_close_adsp_power_dev(dev);
+			if (ret < 0) {
+				dev_err(dev, "ssf sync_pipeline_state PCM_RX_STOP error\n");
+				ret = -EBUSY;
+			}
+		} else if (reason == HOBOT_AUDIO_WAKEUP) {
+			device_wakeup_disable(dev);
+		} else {
+			dev_err(dev, "Unsupported wakeup reason(%d) found!\n", reason);
+			ret = -EINVAL;
+		}
+	} else {
+		dev_err(dev, "Unsupported sleep mode(%d) found!\n", mode);
+		ret = -EINVAL;
 	}
 
-	return 0;
+out:
+	return ret;
 }
 
 static ssize_t hb_store_remoteproc_suspend(struct device *dev,/*PRQA S ALL*/
