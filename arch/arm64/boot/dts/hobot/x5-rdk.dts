@@ -239,15 +239,6 @@
 	status = "okay";
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_i2c3>;
-
-	ft5406@38 {
-		compatible = "ft5406";
-		reg = <0x38>;
-	};
-	hbx3_bl@45 {
-		compatible = "hobot_bl_controller";
-		reg = <0x45>;
-	};
 };
 
 &i2c4 {
@@ -633,34 +624,6 @@
 
 &bpu {
 	cnn-supply = <&vdd08_bpu_1_reg>;
-};
-
-/**display sub-system start**/
-
-&mipi_dsi0 {
-	status = "okay";
-
-	ports {
-		port@1 {
-			reg = <1>;
-			mipi_dsi_out: endpoint {
-				remote-endpoint = <&panel_in>;
-			};
-		};
-	};
-
-	dsi_panel0@0 {
-		compatible = "wh-cm480";
-		reg = <0>;
-
-		port {
-			panel_in: endpoint {
-				remote-endpoint =
-					<&mipi_dsi_out>;
-			};
-		};
-	};
-
 };
 
 /* For boards that do not need display module,
