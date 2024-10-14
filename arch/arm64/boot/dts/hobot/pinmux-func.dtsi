@@ -214,7 +214,7 @@
 		power-source = <HORIZON_IO_PAD_VOLTAGE_IP_CTRL>;
 	};
 
-		pconf_sd_sdio_pu_ds4_ipctrl: pconf-sd-sdio-pu-ds4-ipctrl {
+	pconf_sd_sdio_pu_ds4_ipctrl: pconf-sd-sdio-pu-ds4-ipctrl {
 		bias-pull-up;
 		drive-strength = <4>;
 		power-source = <HORIZON_IO_PAD_VOLTAGE_IP_CTRL>;

@@ -753,4 +753,15 @@ config DRM_PANEL_WH_CM480
 	  Say Y here if you want to enable support for the CM480
 	  panel with 480x800 resolution. This panel support
 	  MIPI DSI interface.
+
+config DRM_PANEL_WAVESHARE_TOUCHSCREEN
+	tristate "Waveshare touchscreen panels"
+	depends on OF
+	depends on DRM_MIPI_DSI
+	depends on BACKLIGHT_CLASS_DEVICE
+	help
+	  Say Y here if you want to enable support for the Waveshare
+	  DSI Touchscreens.  To compile this driver as a module,
+	  choose M here.
+	  
 endmenu
