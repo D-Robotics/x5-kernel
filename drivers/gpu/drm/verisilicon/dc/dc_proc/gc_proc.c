@@ -410,6 +410,12 @@ static void gpu_proc_update_plane(struct dc_proc *dc_proc, void *old_drm_plane_s
 	const struct gpu_plane_info *plane_info = hw_plane->base.info->info;
 	struct drm_plane_state *plane_state	= vs_plane->base.state;
 	struct vs_n2d_aux *aux			= hw_plane->aux;
+	struct drm_rect *dst			= &plane_state->dst;
+	struct drm_mode_fb_cmd2 fbreq		= {
+			  .width	= drm_rect_width(dst),
+			  .height	= drm_rect_height(dst),
+			  .pixel_format = plane_info->fourcc,
+	  };
 
 	if (plane_info->features & GPU_PLANE_OUT) {
 		drm_framebuffer_assign(&plane_state->fb, context.fb_tmp);
@@ -419,6 +425,11 @@ static void gpu_proc_update_plane(struct dc_proc *dc_proc, void *old_drm_plane_s
 	}
 
 	if (!context.gpu_out) {
+		if (create_fb(dc_proc) != 0) {
+			return;
+		}
+	} else if (context.gpu_out->width != fbreq.width ||
+		   context.gpu_out->height != fbreq.height) {
 		if (create_fb(dc_proc) != 0) {
 			return;
 		}
