@@ -61,24 +61,24 @@
 static n2d_error_t do_open(n2d_kernel_t *kernel, n2d_uint32_t process)
 {
 	n2d_error_t error = N2D_SUCCESS;
-	n2d_uint32_t i = 0, j = 0;
-	n2d_uint32_t dev_num	  = kernel->dev_num;
-	n2d_uint32_t dev_core_num = kernel->dev_core_num;
-	n2d_int32_t dev_ref_old	  = -1;
+	// n2d_uint32_t i = 0, j = 0;
+	// n2d_uint32_t dev_num	  = kernel->dev_num;
+	// n2d_uint32_t dev_core_num = kernel->dev_core_num;
+	// n2d_int32_t dev_ref_old	  = -1;
 
-	gcmkASSERT(dev_core_num <= NANO2D_DEV_CORE_COUNT);
+	// gcmkASSERT(dev_core_num <= NANO2D_DEV_CORE_COUNT);
 
 	ONERROR(n2d_kernel_db_attach_process(kernel->db, process, N2D_TRUE));
 	//n2d_kernel_os_print("Attach process:%d\n", process);
 
-	n2d_kernel_os_atom_inc(kernel->os, kernel->dev_ref, &dev_ref_old);
+	// n2d_kernel_os_atom_inc(kernel->os, kernel->dev_ref, &dev_ref_old);
 
-	if (dev_ref_old == 0) {
-		for (i = 0; i < dev_num; i++) {
-			for (j = 0; j < dev_core_num; j++)
-				ONERROR(n2d_kernel_hardware_start(kernel->sub_dev[i]->hardware[j]));
-		}
-	}
+	// if (dev_ref_old == 0) {
+	// 	for (i = 0; i < dev_num; i++) {
+	// 		for (j = 0; j < dev_core_num; j++)
+	// 			ONERROR(n2d_kernel_hardware_start(kernel->sub_dev[i]->hardware[j]));
+	// 	}
+	// }
 
 on_error:
 	return error;
@@ -87,21 +87,21 @@ on_error:
 static n2d_error_t do_close(n2d_kernel_t *kernel, n2d_uint32_t process)
 {
 	n2d_error_t error = N2D_SUCCESS;
-	n2d_uint32_t i = 0, j = 0;
-	n2d_uint32_t dev_num	  = kernel->dev_num;
-	n2d_uint32_t dev_core_num = kernel->dev_core_num;
-	n2d_int32_t dev_ref_old	  = -1;
+	// n2d_uint32_t i = 0, j = 0;
+	// n2d_uint32_t dev_num	  = kernel->dev_num;
+	// n2d_uint32_t dev_core_num = kernel->dev_core_num;
+	// n2d_int32_t dev_ref_old	  = -1;
 
-	gcmkASSERT(dev_core_num <= NANO2D_DEV_CORE_COUNT);
+	// gcmkASSERT(dev_core_num <= NANO2D_DEV_CORE_COUNT);
 
-	n2d_kernel_os_atom_dec(kernel->os, kernel->dev_ref, &dev_ref_old);
+	// n2d_kernel_os_atom_dec(kernel->os, kernel->dev_ref, &dev_ref_old);
 
-	if (dev_ref_old == 1) {
-		for (i = 0; i < dev_num; i++) {
-			for (j = 0; j < dev_core_num; j++)
-				ONERROR(n2d_kernel_hardware_stop(kernel->sub_dev[i]->hardware[j]));
-		}
-	}
+	// if (dev_ref_old == 1) {
+	// 	for (i = 0; i < dev_num; i++) {
+	// 		for (j = 0; j < dev_core_num; j++)
+	// 			ONERROR(n2d_kernel_hardware_stop(kernel->sub_dev[i]->hardware[j]));
+	// 	}
+	// }
 
 	ONERROR(n2d_kernel_db_attach_process(kernel->db, process, N2D_FALSE));
 	// n2d_kernel_os_print("Detach process:%d\n", process);
@@ -541,6 +541,8 @@ n2d_error_t n2d_kernel_construct(n2d_device_t *device, n2d_kernel_t **kernel)
 
 	ONERROR(n2d_kernel_os_atom_construct(_kernel->os, &_kernel->dev_ref));
 	ONERROR(n2d_kernel_os_atom_set(_kernel->os, _kernel->dev_ref, 0));
+	ONERROR(n2d_kernel_os_atom_construct(_kernel->os, &_kernel->power_ref));
+	ONERROR(n2d_kernel_os_atom_set(_kernel->os, _kernel->power_ref, 0));
 
 	ONERROR(n2d_kernel_db_construct(_kernel, &_kernel->db));
 	if (!_kernel->db)
@@ -591,6 +593,8 @@ n2d_error_t n2d_kernel_destroy(n2d_kernel_t *kernel)
 
 	if (kernel->db)
 		ONERROR(n2d_kernel_db_destroy(kernel, kernel->db));
+	if (kernel->power_ref)
+		n2d_kernel_os_atom_destroy(kernel->os, kernel->power_ref);
 	if (kernel->dev_ref)
 		n2d_kernel_os_atom_destroy(kernel->os, kernel->dev_ref);
 	if (kernel)
