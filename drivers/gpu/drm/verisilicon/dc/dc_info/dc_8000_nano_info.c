@@ -89,8 +89,10 @@ static const u32 gc_overlay_formats[] = {
 	DRM_FORMAT_BGRA8888, //
 	DRM_FORMAT_YUYV,     //
 	// DRM_FORMAT_YVYU,     //
-	DRM_FORMAT_NV12, //
-	DRM_FORMAT_NV21, //
+	DRM_FORMAT_NV12,     //
+	DRM_FORMAT_NV21,     //
+	DRM_FORMAT_XRGB8888, //
+	DRM_FORMAT_XBGR8888, //
 };
 
 static const u32 cursor_formats[] = {DRM_FORMAT_ARGB8888};
