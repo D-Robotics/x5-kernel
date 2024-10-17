@@ -2375,8 +2375,10 @@ n2d_error_t n2d_commit_ex(
 
     N2D_ON_ERROR(gcCommitCmdBuf(hardware));
 
-    if (stall)
+    if (stall) {
+        N2D_ON_ERROR(gcCommitSignal(hardware));
         N2D_ON_ERROR(gcWaitSignal(hardware, hardware->buffer.command_buffer_tail->stall_signal, N2D_INFINITE));
+    }
 
     N2D_PERF_TIME_STAMP_PRINT(__FUNCTION__, "END");
 
@@ -2387,6 +2389,7 @@ on_error:
     return error;
 
 }
+EXPORT_SYMBOL(n2d_commit_ex);
 
 /*******************************************************************************
 **

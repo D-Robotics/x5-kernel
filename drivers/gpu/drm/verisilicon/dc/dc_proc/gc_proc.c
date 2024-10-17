@@ -310,7 +310,7 @@ static void aux_rotate(struct vs_n2d_aux *aux, unsigned int rotation, n2d_rectan
 	dst.tiling = N2D_LINEAR;
 
 	N2D_ON_ERROR(n2d_blit(&dst, rect, &src, N2D_NULL, N2D_BLEND_NONE));
-	N2D_ON_ERROR(n2d_commit());
+	N2D_ON_ERROR(n2d_commit_ex(N2D_FALSE));
 
 // cppcheck-suppress unusedLabel
 on_error:
