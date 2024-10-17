@@ -3550,13 +3550,8 @@
 				clock-names = "sclk", "i2s_pclk", "i2s_mux_clk", "i2s_external", "i2s_mclk";
 				pinctrl-names = "default";
 				pinctrl-0 = <&pinctrl_dsp_i2s1>;
-#if DW_I2S_PIO_MODE
 				interrupt-parent = <&gic>;
 				interrupts = <GIC_SPI 143 IRQ_TYPE_LEVEL_HIGH>;
-#else
-				dmas = <&dsp_axi_dma 25>, <&dsp_axi_dma 24>;
-				dma-names = "tx", "rx";
-#endif
 				#sound-dai-cells = <0>;
 				dwc-master = <0>;
 				status = "disabled";
