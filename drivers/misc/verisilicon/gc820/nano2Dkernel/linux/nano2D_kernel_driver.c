@@ -858,10 +858,29 @@ static int release_contiguous_memory(struct memory_heap *heap)
 	return N2D_SUCCESS;
 }
 
+static void gpu_poweron(void) {
+       n2d_int32_t power_ref_old = -1;
+
+       n2d_kernel_os_atom_inc(global_device->kernel->os, global_device->kernel->power_ref, &power_ref_old);
+       if (power_ref_old == 0) {
+               gpu_resume(N2D_NULL);
+       }
+}
+
+static void gpu_poweroff(void) {
+       n2d_int32_t power_ref_old = -1;
+       pm_message_t state = {0};
+
+       n2d_kernel_os_atom_dec(global_device->kernel->os, global_device->kernel->power_ref, &power_ref_old);
+       if (power_ref_old == 1) {
+               gpu_suspend(N2D_NULL, state);
+       }
+}
+
 static int drv_open(struct inode *inode, struct file *file)
 {
 	n2d_error_t error = N2D_SUCCESS;
-	gpu_resume(N2D_NULL);
+	gpu_poweron();
 	ONERROR(n2d_kernel_dispatch(global_device->kernel, N2D_KERNEL_COMMAND_OPEN, 0, 0,
 				    N2D_NULL));
 
@@ -872,14 +891,13 @@ on_error:
 static int drv_release(struct inode *inode, struct file *file)
 {
 	int allocate_count = 0;
-	pm_message_t state = {0};
 
 	n2d_kernel_dispatch(global_device->kernel, N2D_KERNEL_COMMAND_CLOSE, 0, 0, N2D_NULL);
 	n2d_check_allocate_count(&allocate_count);
 	if (allocate_count)
 		pr_err("Allocated %d memory\n", allocate_count);
 
-	gpu_suspend(N2D_NULL, state);
+	gpu_poweroff();
 
 	return 0;
 }
@@ -972,7 +990,7 @@ int aux_open(struct vs_n2d_aux *aux)
 
 	gcmkASSERT(dev == global_device->dev);
 
-	gpu_resume(N2D_NULL);
+	gpu_poweron();
 
 	return error;
 }
@@ -982,7 +1000,6 @@ int aux_close(struct vs_n2d_aux *aux)
 {
 	struct device *dev = aux->dev;
 	int allocate_count = 0;
-	pm_message_t state = {0};
 
 	gcmkASSERT(dev == global_device->dev);
 
@@ -990,7 +1007,7 @@ int aux_close(struct vs_n2d_aux *aux)
 	if (allocate_count)
 		pr_debug("Allocated %d memory\n", allocate_count);
 
-	gpu_suspend(N2D_NULL, state);
+	gpu_poweroff();
 
 	return 0;
 }
@@ -1005,7 +1022,7 @@ static int n2d_vnode_open(struct vio_video_ctx *vctx)
 	n2d_error_t error = N2D_SUCCESS;
 
 	gcmkASSERT(g_device == global_device);
-	gpu_resume(N2D_NULL);
+	gpu_poweron();
 
 	return error;
 }
@@ -1016,7 +1033,6 @@ static int n2d_vnode_close(struct vio_video_ctx *vctx)
 	struct horizon_n2d_dev *n2d     = vpf->ip_dev;
 	struct n2d_gl_device *g_device = n2d->galcore;
 	int allocate_count = 0;
-	pm_message_t state = {0};
 
 	gcmkASSERT(g_device == global_device);
 
@@ -1024,7 +1040,7 @@ static int n2d_vnode_close(struct vio_video_ctx *vctx)
 	if (allocate_count)
 		pr_debug("Allocated %d memory\n", allocate_count);
 
-	gpu_suspend(N2D_NULL, state);
+	gpu_poweroff();
 
 	return 0;
 }
@@ -2120,6 +2136,7 @@ static int gpu_resume(struct platform_device *dev)
 			ONERROR(n2d_kernel_hardware_set_power(
 				global_device->kernel->sub_dev[i]->hardware[j], N2D_POWER_ON));
 	}
+
 
 on_error:
 	return error;
