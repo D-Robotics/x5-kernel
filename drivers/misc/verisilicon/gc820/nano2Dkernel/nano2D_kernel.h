@@ -73,6 +73,7 @@ struct n2d_kernel {
 	n2d_uint32_t dev_num;
 	n2d_uint32_t dev_core_num;
 	n2d_pointer dev_ref;
+	n2d_pointer power_ref;
 
 	n2d_os_t *os;
 	n2d_device_t *device;
