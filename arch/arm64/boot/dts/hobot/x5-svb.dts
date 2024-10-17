@@ -211,6 +211,8 @@
 				remote-endpoint = <&ov5640_to_mipi_csi0>;
 				clock-lanes = <0>;
 				data-lanes = <1 2>;
+				lane-rate = <400>;
+				vc_id = <0>;
 			};
 		};
 	};
@@ -225,6 +227,8 @@
 				remote-endpoint = <&ov5640_to_mipi_csi1>;
 				clock-lanes = <0>;
 				data-lanes = <1 2>;
+				lane-rate = <400>;
+				vc_id = <0>;
 			};
 		};
 	};
@@ -239,6 +243,8 @@
 				remote-endpoint = <&ov5640_to_mipi_csi2>;
 				clock-lanes = <0>;
 				data-lanes = <1 2>;
+				lane-rate = <400>;
+				vc_id = <0>;
 			};
 		};
 	};
@@ -253,6 +259,8 @@
 				remote-endpoint = <&ov5640_to_mipi_csi3>;
 				clock-lanes = <0>;
 				data-lanes = <1 2>;
+				lane-rate = <400>;
+				vc_id = <0>;
 			};
 		};
 	};
