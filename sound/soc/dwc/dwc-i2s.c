@@ -896,15 +896,6 @@ static int dw_i2s_probe(struct platform_device *pdev)
 		if (IS_ERR(dev->sclk))
 			return PTR_ERR(dev->sclk);
 
-		dev->pclk = devm_clk_get(&pdev->dev, pclk);
-		if (IS_ERR(dev->pclk))
-			return PTR_ERR(dev->pclk);
-
-		ret = clk_prepare_enable(dev->pclk);
-		if (ret) {
-			return ret;
-		}
-
 		ret = clk_prepare_enable(dev->mclk);
 		if (ret) {
 			return ret;
@@ -933,6 +924,15 @@ static int dw_i2s_probe(struct platform_device *pdev)
 			dev_err(&pdev->dev, "Error: failed to set slave clock parent\n");
 			return ret;
 		}
+	}
+	
+	dev->pclk = devm_clk_get(&pdev->dev, pclk);
+	if (IS_ERR(dev->pclk))
+		return PTR_ERR(dev->pclk);
+
+	ret = clk_prepare_enable(dev->pclk);
+	if (ret) {
+		return ret;
 	}
 
 	if (pdata) {
