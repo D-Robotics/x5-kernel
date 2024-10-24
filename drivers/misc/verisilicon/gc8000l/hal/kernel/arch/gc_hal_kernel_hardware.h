@@ -194,10 +194,10 @@ struct _gckHARDWARE {
 	gctPOINTER powerStateTimer;
 #endif
 
-#if gcdENABLE_FSCALE_VAL_ADJUST
 	gctUINT32 powerOnFscaleVal;
 	gctUINT32 powerOnShaderFscaleVal;
-#endif
+	gctBOOL supportUpdateShaderClock;
+
 	gctPOINTER pageTableDirty[gcvENGINE_GPU_ENGINE_COUNT];
 
 #if gcdLINK_QUEUE_SIZE

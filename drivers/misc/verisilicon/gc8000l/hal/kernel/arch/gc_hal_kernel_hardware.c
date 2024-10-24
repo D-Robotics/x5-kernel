@@ -2317,10 +2317,10 @@ gceSTATUS gckHARDWARE_Construct(gckOS Os, gckKERNEL Kernel, gckHARDWARE *Hardwar
 	hardware->lastWaitLink	  = ~0U;
 	hardware->lastEnd	  = ~0U;
 	hardware->globalSemaphore = gcvNULL;
-#if gcdENABLE_FSCALE_VAL_ADJUST
 	hardware->powerOnFscaleVal	 = 64;
 	hardware->powerOnShaderFscaleVal = 64;
-#endif
+	hardware->supportUpdateShaderClock = (hardware->identity.chipModel < gcv8000) ?
+                                          gcvTRUE : gcvFALSE;
 #if gcdPOWEROFF_TIMEOUT
 	hardware->powerOffTimeout = gcdPOWEROFF_TIMEOUT;
 #endif
@@ -9319,7 +9319,8 @@ static gceSTATUS _PmClockControl(gckHARDWARE Hardware, gceCHIPPOWERSTATE State)
 								       1)))))))
 			  << (0 ? 8 : 2)));
 
-		if (Hardware->powerOnShaderFscaleVal != ~0U &&
+		if (Hardware->supportUpdateShaderClock == gcvTRUE &&
+			Hardware->powerOnShaderFscaleVal != ~0U &&
 		    Hardware->powerOnShaderFscaleVal > 0 &&
 		    Hardware->powerOnShaderFscaleVal <= 64) {
 			needUpdateShaderClock = gcvTRUE;
@@ -9420,6 +9421,7 @@ static gceSTATUS _PmClockControl(gckHARDWARE Hardware, gceCHIPPOWERSTATE State)
 		/* Done loading the frequency scaler. */
 		gcmkONERROR(gckOS_WriteRegisterEx(Hardware->os, Hardware->kernel, 0x00000, clock));
 		if (needUpdateShaderClock) {
+			/* Scale the shader clock separately. */
 			gcmkONERROR(gckOS_WriteRegisterEx(Hardware->os, Hardware->kernel, 0x0010C,
 							  shaderClock));
 
@@ -10595,7 +10597,12 @@ gceSTATUS gckHARDWARE_SetFscaleValue(gckHARDWARE Hardware, gctUINT32 FscaleValue
 
 	Hardware->powerOnFscaleVal = FscaleValue;
 
+	if (Hardware->supportUpdateShaderClock == gcvFALSE) {
+		/* Scale the shader clock along with the core clock. */
+		Hardware->powerOnShaderFscaleVal = Hardware->powerOnFscaleVal;
+	}
 	if (ShaderFscaleValue != ~0U && ShaderFscaleValue > 0 && ShaderFscaleValue <= 64) {
+		/* Scale the shader clock separately. */
 		Hardware->powerOnShaderFscaleVal = ShaderFscaleValue;
 	}
 	if (Hardware->chipPowerState == gcvPOWER_ON) {
@@ -10839,7 +10846,8 @@ gceSTATUS gckHARDWARE_SetFscaleValue(gckHARDWARE Hardware, gctUINT32 FscaleValue
 			  << (0 ? 9 : 9)))));
 
 		/* A option to support shader clock scaling. */
-		if (ShaderFscaleValue != ~0U && ShaderFscaleValue > 0 && ShaderFscaleValue <= 64) {
+		if (Hardware->supportUpdateShaderClock == gcvTRUE &&
+			ShaderFscaleValue != ~0U && ShaderFscaleValue > 0 && ShaderFscaleValue <= 64) {
 			/* Scale the shader clock. */
 			clock = ((((gctUINT32)(0)) &
 				  ~(((gctUINT32)(((
@@ -19843,10 +19851,16 @@ OnError:
 							  org));
 
 			Hardware->powerOnFscaleVal = mcScale;
+
+			if (Hardware->supportUpdateShaderClock == gcvFALSE) {
+				/* Scale the shader clock along with the core clock. */
+				Hardware->powerOnShaderFscaleVal = Hardware->powerOnFscaleVal;
+			}
 		}
 
 		/* set SH clock */
-		if (shScale > 0 && shScale <= 64) {
+		if (Hardware->supportUpdateShaderClock == gcvTRUE &&
+			shScale > 0 && shScale <= 64) {
 			gcmkONERROR(gckOS_ReadRegisterEx(Hardware->os, Hardware->kernel, 0x0010C,
 							 &org));
 
