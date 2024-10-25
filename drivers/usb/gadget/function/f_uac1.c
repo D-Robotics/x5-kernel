@@ -71,6 +71,17 @@ static inline struct f_uac1_opts *g_audio_to_uac1_opts(struct g_audio *audio)
  * ALSA_Playback -> IT_3 -> OT_4 -> USB-IN
  */
 
+static struct usb_interface_assoc_descriptor uac_iad = {
+	.bLength = sizeof(uac_iad),
+	.bDescriptorType = USB_DT_INTERFACE_ASSOCIATION,
+
+	.bFirstInterface = 0,
+	.bInterfaceCount = 3,
+	.bFunctionClass = USB_CLASS_AUDIO,
+	.bFunctionSubClass = 0,
+	.bFunctionProtocol = UAC_VERSION_1,
+};
+
 /* B.3.1  Standard AC Interface Descriptor */
 static struct usb_interface_descriptor ac_interface_desc = {
 	.bLength =		USB_DT_INTERFACE_SIZE,
@@ -259,6 +270,7 @@ static struct uac_iso_endpoint_descriptor as_iso_in_desc = {
 };
 
 static struct usb_descriptor_header *f_audio_desc[] = {
+	(struct usb_descriptor_header *)&uac_iad,
 	(struct usb_descriptor_header *)&ac_interface_desc,
 	(struct usb_descriptor_header *)&ac_header_desc,
 
@@ -293,6 +305,7 @@ static struct usb_descriptor_header *f_audio_desc[] = {
 };
 
 enum {
+	STR_ASSOC,
 	STR_AC_IF,
 	STR_USB_OUT_IT,
 	STR_USB_OUT_IT_CH_NAMES,
@@ -310,6 +323,7 @@ enum {
 
 static struct usb_string strings_uac1[] = {
 	/* [STR_AC_IF].s = DYNAMIC, */
+	[STR_ASSOC].s = "Source/Sink",
 	[STR_USB_OUT_IT].s = "Playback Input terminal",
 	[STR_USB_OUT_IT_CH_NAMES].s = "Playback Channels",
 	[STR_IO_OUT_OT].s = "Playback Output terminal",
@@ -1079,7 +1093,7 @@ static void setup_descriptor(struct f_uac1_opts *opts)
 		ac_header_desc->wTotalLength = cpu_to_le16(len);
 	}
 
-	i = 0;
+	i = 1;
 	f_audio_desc[i++] = USBDHDR(&ac_interface_desc);
 	f_audio_desc[i++] = USBDHDR(ac_header_desc);
 
@@ -1217,6 +1231,7 @@ static int f_audio_bind(struct usb_configuration *c, struct usb_function *f)
 		}
 	}
 
+	uac_iad.iFunction = us[STR_AC_IF].id;
 	ac_interface_desc.iInterface = us[STR_AC_IF].id;
 	usb_out_it_desc.iTerminal = us[STR_USB_OUT_IT].id;
 	usb_out_it_desc.iChannelNames = us[STR_USB_OUT_IT_CH_NAMES].id;
@@ -1302,6 +1317,7 @@ static int f_audio_bind(struct usb_configuration *c, struct usb_function *f)
 	status = usb_interface_id(c, f);
 	if (status < 0)
 		goto err_free_fu;
+	uac_iad.bFirstInterface = status;
 	ac_interface_desc.bInterfaceNumber = status;
 	uac1->ac_intf = status;
 	uac1->ac_alt = 0;
