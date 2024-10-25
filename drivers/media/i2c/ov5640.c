@@ -2777,7 +2777,7 @@ static int ov5640_try_frame_interval(struct ov5640_dev *sensor,
 
 find_mode:
 	mode = ov5640_find_mode(sensor, width, height, false);
-	return mode ? rate : -EINVAL;
+	return mode ? (rate > mode->max_fps? -EINVAL : rate) : -EINVAL;
 }
 
 static int ov5640_get_fmt(struct v4l2_subdev *sd,
