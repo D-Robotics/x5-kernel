@@ -463,6 +463,11 @@
 	remoteproc-ipc = <&ipc_instance1>;
 };
 
+&ipc_hal {
+	status = "okay";
+	ipc-hal = <&ipc_instance2>;
+};
+
 &hpsclks {
 	status = "okay";
 };

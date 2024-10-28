@@ -4481,4 +4481,14 @@
 		status = "disabled";
 		false_trigger_detect;
 	};
+
+	dsp0: dsp0 {
+		status = "okay";
+		compatible = "hobot,dsp0";
+	};
+
+	ipc_hal: ipc_hal {
+		status = "disabled";
+		compatible = "hobot,hobot-ipc-hal";
+	};
 };
