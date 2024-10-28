@@ -26,7 +26,7 @@ static struct hobot_vdsp_dev_data *dev_to_hobot_vdsp_dev_data(struct device *dev
 static int32_t vdsp_send_msg_byrpmsg(struct hobot_vdsp_dev_data *pdata, char *rpmsgmsg, size_t msgsize)
 {
 	int ret = 0;
-	struct rpmsg_handle *localphandle = hb_get_rpmsg_handle(pdata->dsp_id);
+	struct rpmsg_handle *localphandle = NULL;
 
 	if (NULL == localphandle) {
 		dev_err(pdata->dev, "vdsp%d rpmsg handler is NULL.\n", pdata->dsp_id);
@@ -48,7 +48,7 @@ static int32_t vdsp_send_msg_byrpmsg(struct hobot_vdsp_dev_data *pdata, char *rp
 static int32_t vdsp_recv_msg_byrpmsg(struct hobot_vdsp_dev_data *pdata, char *rpmsgmsg, size_t msgsize)
 {
 	int32_t ret = 0;
-	struct rpmsg_handle *localphandle = hb_get_rpmsg_handle(pdata->dsp_id);
+	struct rpmsg_handle *localphandle = NULL;
 
 	if (NULL == localphandle) {
 		dev_err(pdata->dev, "rpmsg handler is NULL\n");
@@ -238,7 +238,6 @@ static ssize_t vdsp_ctrl_wwdt_enable_show(struct device *dev,
 static ssize_t vdsp_ctrl_wwdt_enable_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t count)
 {
-	int32_t ret = 0;
 	uint32_t value = 0;
 	//coverity[misra_c_2012_rule_11_5_violation:SUPPRESS], ## violation reason SYSSW_V_11.5_02
 	struct hobot_vdsp_dev_data *pdata = (struct hobot_vdsp_dev_data *)dev_get_drvdata(dev);
@@ -256,13 +255,6 @@ static ssize_t vdsp_ctrl_wwdt_enable_store(struct device *dev,
 	if ((WWDT_DISABLE != value)) {
 		dev_err(pdata->dev, "%s invalid param\n", __func__);
 		return -EINVAL;
-	}
-
-	dev_info(pdata->dev, "%s dsp%d wwdt %s.\n", __func__, pdata->dsp_id, (WWDT_ENABLE == value)? DSP_WWDT_ON : DSP_WWDT_OFF);
-	ret = hobot_remoteproc_wwdt_enable(pdata->dsp_id, value);
-	if (ret < 0) {
-		dev_err(pdata->dev, "wwdt %s failed=%d.\n", (WWDT_ENABLE == value)? DSP_WWDT_ON : DSP_WWDT_OFF, ret);
-		return -EFAULT;
 	}
 
 	//coverity[misra_c_2012_rule_10_3_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_02

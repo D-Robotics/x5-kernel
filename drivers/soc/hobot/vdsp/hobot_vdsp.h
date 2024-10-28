@@ -24,8 +24,10 @@
 #include <ion.h>
 #include <hobot_ion_iommu.h>
 #include <hobot_remoteproc.h>
+#ifdef CONFIG_HOBOT_VDSP_STL
 #include <linux/hobot_diag.h>
 #include <linux/hobot_diag_id.h>
+#endif
 #include "hobot_vdsp_ioctl.h"
 
 #define VDSP_DRIVER_API_VERSION_MAJOR			(1)

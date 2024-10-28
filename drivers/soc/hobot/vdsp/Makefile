@@ -2,19 +2,28 @@
 #
 # Hobot VDSP Acore Drivers
 #
-ccflags-y += -I$(srctree)/../hobot-drivers/remoteproc
-subdir-ccflags-y += -I$(srctree)/../hobot-drivers/ion/
-subdir-ccflags-y += -I$(srctree)/../hobot-drivers/smmu/
-subdir-ccflags-y += -I$(srctree)/../hobot-drivers/rpmsg
-
 ccflags-y += -I${srctree}/drivers/remoteproc
 ccflags-y += -I${srctree}/drivers/staging/android/ion
 ccflags-y += -I${srctree}/drivers/iommu
-subdir-ccflags-y += -I$(srctree)/drivers/rpmsg
+
+HBIPC_PATH = ${srctree}/drivers/mailbox/hobot/ipc/
+HBMOX_PATH = ${srctree}/drivers/mailbox/hobot/mbox/
+
+ccflags-y += -I${srctree}/include/
+ccflags-y += -I${srctree}/drivers/mailbox
+
+ccflags-y += -I${HBIPC_PATH}/common/
+ccflags-y += -I${HBIPC_PATH}/os/kernel/
+ccflags-y += -I${HBIPC_PATH}/platform/cpusys/
+ccflags-y += -I${HBMBOX_PATH}/platform/cpusys/
+ccflags-y += -I${HBMOX_PATH}/common/
+ccflags-y += -I${HBMOX_PATH}/os/kernel/
+ccflags-y += -I${HBMOX_PATH}/platform/cpusys/
+
+ccflags-y += -I${srctree}/sound/soc/gua/
 
 obj-$(CONFIG_HOBOT_VDSP) += hobot_vdsp.o
 hobot_vdsp-objs += hobot_vdsp_dev.o
-hobot_vdsp-objs += hobot_vdsp_sys.o
 
 all: FORCE
 	make -C ${OUTPUT_BUILD_DIR}/kernel M=$(PWD) modules

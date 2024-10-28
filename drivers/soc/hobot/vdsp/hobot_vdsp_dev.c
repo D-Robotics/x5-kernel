@@ -946,7 +946,7 @@ static unsigned int vdsp_char_poll(struct file *filp, poll_table *wait)
 
 	poll_wait(filp, &vdev->poll_wait, wait);
 
-	ret = hobot_vdsp_char_async_boot_work_done(vdev->dsp_id);
+	//ret = hobot_vdsp_char_async_boot_work_done(vdev->dsp_id); //TODO
 	//coverity[misra_c_2012_rule_10_1_violation:SUPPRESS], ## violation reason SYSSW_V_10.1_01
 	dev_dbg(vdev->dev, "vdsp%d get async boot work done=%d\n", vdev->dsp_id, ret);
 	if (1 == ret) {
@@ -996,7 +996,7 @@ static void vdsp_char_wake_up_poll(struct work_struct *work)
 	}
 
 	//wait vdsp boot async work here
-	(void)hobot_vdsp_char_wait_async_boot_work(vdev->dsp_id);
+	//(void)hobot_vdsp_char_wait_async_boot_work(vdev->dsp_id); //TODO:
 	//coverity[misra_c_2012_rule_10_1_violation:SUPPRESS], ## violation reason SYSSW_V_10.1_01
 	dev_dbg(vdev->dev, "vdsp%d wait async boot work return = %d\n", vdev->dsp_id, ret);
 
@@ -1091,21 +1091,8 @@ static long vdsp_char_ioctl(struct file *filp, unsigned int cmd,
 			queue_work(vdev->wq_poll, &(vdev->work_poll));
 		}
 
-		ret = hobot_remoteproc_boot_vdsp(data.ctl_info.dsp_id,
+		ret = hobot_remoteproc_boot_hifi5(data.ctl_info.dsp_id,
 			data.ctl_info.timeout, vdev->vpathname);
-		break;
-	}
-	//coverity[misra_c_2012_rule_10_1_violation:SUPPRESS], ## violation reason SYSSW_V_10.1_01
-	//coverity[misra_c_2012_rule_10_3_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_02
-	//coverity[misra_c_2012_rule_10_4_violation:SUPPRESS], ## violation reason SYSSW_V_10.4_01
-	case VDSP_IOCTL_SET_FIRMWARE_PATH:
-	{
-		(void)memset(vdev->vpathname, 0x00, VDSP_PATHNAME_BUF_SIZE);
-		if (copy_from_user(vdev->vpathname, (void __user *)data.ctl_info.pathname, (uint32_t)data.ctl_info.pathnamelen)) {
-			dev_err(vdev->dev, "%s: vdsp%d copy_from_user failed", __func__, vdev->dsp_id);
-			return -EFAULT;
-		}
-		ret = hb_rproc_set_vdsp_fwpath(data.ctl_info.dsp_id, vdev->vpathname);
 		break;
 	}
 	//coverity[misra_c_2012_rule_10_1_violation:SUPPRESS], ## violation reason SYSSW_V_10.1_01
@@ -1118,7 +1105,7 @@ static long vdsp_char_ioctl(struct file *filp, unsigned int cmd,
 			dev_err(vdev->dev, "%s: vdsp%d copy_from_user failed", __func__, vdev->dsp_id);
 			return -EFAULT;
 		}
-		ret = hb_rproc_set_vdsp_fwname(data.ctl_info.dsp_id, vdev->vpathname);
+		ret = hobot_remoteproc_set_dsp_firmware_name(vdev->vpathname);
 		break;
 	}
 	//coverity[misra_c_2012_rule_10_1_violation:SUPPRESS], ## violation reason SYSSW_V_10.1_01
@@ -1126,7 +1113,7 @@ static long vdsp_char_ioctl(struct file *filp, unsigned int cmd,
 	//coverity[misra_c_2012_rule_10_4_violation:SUPPRESS], ## violation reason SYSSW_V_10.4_01
 	case VDSP_IOCTL_GET_VDSP_STATUS:
 	{
-		ret = hobot_remoteproc_get_vdsp_status(data.ctl_info.dsp_id,
+		ret = hobot_remoteproc_get_dsp_status(data.ctl_info.dsp_id,
 			&data.ctl_info.status);
 		if (0 == ret) {
 			//coverity[misra_c_2012_rule_10_1_violation:SUPPRESS], ## violation reason SYSSW_V_10.1_01
@@ -1147,7 +1134,7 @@ static long vdsp_char_ioctl(struct file *filp, unsigned int cmd,
 	case VDSP_IOCTL_STOP_VDSP:
 	{
 		cancel_work(&(vdev->work_poll));
-		ret = hobot_remoteproc_shutdown_vdsp(data.ctl_info.dsp_id);
+		ret = hobot_remoteproc_shutdown_hifi5(data.ctl_info.dsp_id);
 		break;
 	}
 	//coverity[misra_c_2012_rule_10_1_violation:SUPPRESS], ## violation reason SYSSW_V_10.1_01
@@ -1156,7 +1143,7 @@ static long vdsp_char_ioctl(struct file *filp, unsigned int cmd,
 	case VDSP_IOCTL_RESET_VDSP:
 	{
 		cancel_work(&(vdev->work_poll));
-		ret = hobot_remoteproc_reset_vdsp(data.ctl_info.dsp_id);
+		ret = hobot_remoteproc_reset_hifi5(data.ctl_info.dsp_id);
 		break;
 	}
 #ifdef CONFIG_HOBOT_VDSP_STL
@@ -1276,15 +1263,6 @@ static struct file_operations vdsp_fops = {
 	.compat_ioctl = vdsp_char_ioctl
 };
 
-/* sysfs attr groups */
-extern const struct attribute_group vdsp_ctrl_attr_group;
-
-//coverity[misra_c_2012_rule_8_9_violation:SUPPRESS], ## violation reason SYSSW_V_8.9_02
-static const struct attribute_group *vdsp_attr_groups[] = {
-	&vdsp_ctrl_attr_group,
-	NULL,
-};
-
 /**
  * @NO{S05E05C01U}
  * @ASIL{B}
@@ -1316,7 +1294,6 @@ static int32_t vdsp_state_init(struct hobot_vdsp_dev_data *vdev)
 
 static const struct of_device_id hobot_vdsp_dt_ids[] = {
 	{ .compatible = "hobot,vdsp0", },
-	{ .compatible = "hobot,vdsp1", },
 	{ /* sentinel */ }
 };
 
@@ -1386,7 +1363,7 @@ static int32_t hobot_vdsp_probe(struct platform_device *pdev)
 	platform_set_drvdata(pdev, pdata);
 	pdata->dev = &pdev->dev;
 
-	ret = vdsp_smmu_init(pdata);
+	ret = vdsp_smmu_init(pdata); //TODO:
 	if (ret < 0) {
 		dev_err(&pdev->dev, "%s vdsp%d vdsp_smmu_init failed\n", __func__, pdata->dsp_id);
 		kfree(pdata->vpathname);
@@ -1403,7 +1380,6 @@ static int32_t hobot_vdsp_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "invalid dsp_id:%d\n", pdata->dsp_id);
 	}
 	pdata->miscdev.fops	= &vdsp_fops;
-	pdata->miscdev.groups = vdsp_attr_groups;
 
 	ret = misc_register(&pdata->miscdev);
 	if (ret != 0) {
