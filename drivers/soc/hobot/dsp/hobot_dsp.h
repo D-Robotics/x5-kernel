@@ -4,7 +4,7 @@
  *                    All rights reserved.
  *************************************************************************/
 /**
- * @file hobot_vdsp.h
+ * @file hobot_dsp.h
  *
  * @NO{S05E05C01}
  * @ASIL{B}
@@ -28,7 +28,7 @@
 #include <linux/hobot_diag.h>
 #include <linux/hobot_diag_id.h>
 #endif
-#include "hobot_vdsp_ioctl.h"
+#include "hobot_dsp_ioctl.h"
 
 #define VDSP_DRIVER_API_VERSION_MAJOR			(1)
 #define VDSP_DRIVER_API_VERSION_MINOR			(0)
@@ -48,9 +48,9 @@
 								VDSP_DRIVER_API_VERSION_PATCH)
 
 
-#define VDSP_DEV_NAME					"vdsp"
-#define VDSP0_DEV_NAME					"vdsp0"
-#define VDSP1_DEV_NAME					"vdsp1"
+#define VDSP_DEV_NAME					"dsp"
+#define VDSP0_DEV_NAME					"dsp0"
+#define VDSP1_DEV_NAME					"dsp1"
 
 #define VDSP0_IDX					(0)
 #define VDSP1_IDX					(1)
@@ -78,11 +78,11 @@
 #define DBG_TYPE_LEVEL					(3u)
 
 /**
- * @struct hobot_vdsp_state
- * Define the descriptor of vdsp state.
+ * @struct hobot_dsp_state
+ * Define the descriptor of dsp state.
  * @NO{S05E05C01I}
  */
-struct hobot_vdsp_state
+struct hobot_dsp_state
 {
 	uint32_t is_wwdt_enable;			/* wwdt state*/
 	uint32_t loglevel;				/* log level*/
@@ -91,47 +91,47 @@ struct hobot_vdsp_state
 };
 
 /**
- * @struct hobot_vdsp_dev_data
- * Define the descriptor of vdsp device info data.
+ * @struct hobot_dsp_dev_data
+ * Define the descriptor of dsp device info data.
  * @NO{S05E05C01I}
  */
-struct hobot_vdsp_dev_data
+struct hobot_dsp_dev_data
 {
 	int32_t dsp_id;					/**< dsp id */
-	char *vpathname;				/* vdsp firmware path & name */
+	char *vpathname;				/* dsp firmware path & name */
 	struct device *dev;				/**< device */
 	struct miscdevice miscdev;			/**< miscdevice*/
 	wait_queue_head_t poll_wait;			/**< poll wait*/
-	struct mutex vdsp_smmu_lock;			/**< smmu mutex lock */
-	struct rb_root vdsp_filp_root;			/**< filp rbtree.*/
-	struct ion_client *vdsp_ion_client;		/**< ion client*/
+	struct mutex dsp_smmu_lock;			/**< smmu mutex lock */
+	struct rb_root dsp_filp_root;			/**< filp rbtree.*/
+	struct ion_client *dsp_ion_client;		/**< ion client*/
 	struct work_struct work_poll;			/*poll work*/
 	struct workqueue_struct *wq_poll;		/*poll singlethread workqueue*/
-	struct hobot_vdsp_state vdsp_state;		/*vdsp state*/
+	struct hobot_dsp_state dsp_state;		/*dsp state*/
 };
 
 /**
- * @struct vdsp_filp_info
- * Define the descriptor of vdsp filp info.
+ * @struct dsp_filp_info
+ * Define the descriptor of dsp filp info.
  * @NO{S05E05C01I}
  */
-struct vdsp_filp_info {
+struct dsp_filp_info {
 	struct kref ref;				/**< the reference count.*/
-	struct hobot_vdsp_dev_data *vdev;		/**< the device*/
-	struct rb_node filpnode;				/**< vdsp filp rbtree node.*/
+	struct hobot_dsp_dev_data *vdev;		/**< the device*/
+	struct rb_node filpnode;				/**< dsp filp rbtree node.*/
 	struct file *filp;				/**< the filp*/
-	struct rb_root vdsp_smmu_root;			/**< smmu rbtree.*/
+	struct rb_root dsp_smmu_root;			/**< smmu rbtree.*/
 };
 
 /**
- * @struct vdsp_smmu_info
- * Define the descriptor of vdsp smmu info.
+ * @struct dsp_smmu_info
+ * Define the descriptor of dsp smmu info.
  * @NO{S05E05C01I}
  */
-struct vdsp_smmu_info {
+struct dsp_smmu_info {
 	struct kref ref;				/**< the reference count.*/
-	struct vdsp_filp_info *filpinfo;		/**< the device*/
-	struct rb_node smmunode;				/**< vdsp smmu rbtree node.*/
+	struct dsp_filp_info *filpinfo;		/**< the device*/
+	struct rb_node smmunode;				/**< dsp smmu rbtree node.*/
 	int32_t mem_fd;					/**< fd of the mem.*/
 	uint64_t mem_va;				/**< virtual address of the mem.*/
 	uint64_t mem_size;				/**< map size of the mem.*/

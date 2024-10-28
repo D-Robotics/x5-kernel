@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: GPL-2.0-only
+#
+# Hobot VDSP Acore Drivers
+#
+
+comment "Hobot DSP Acore Drivers"
+
+config HOBOT_DSP
+	tristate "dsp acore driver on HOBOT SoCs"
+	depends on HOBOT_REMOTEPROC
+	help
+		This driver supports the horizon robotics dsp acore driver

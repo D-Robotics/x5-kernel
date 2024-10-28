@@ -22,8 +22,8 @@ ccflags-y += -I${HBMOX_PATH}/platform/cpusys/
 
 ccflags-y += -I${srctree}/sound/soc/gua/
 
-obj-$(CONFIG_HOBOT_VDSP) += hobot_vdsp.o
-hobot_vdsp-objs += hobot_vdsp_dev.o
+obj-$(CONFIG_HOBOT_DSP) += hobot_dsp.o
+hobot_dsp-objs += hobot_dsp_dev.o
 
 all: FORCE
 	make -C ${OUTPUT_BUILD_DIR}/kernel M=$(PWD) modules
