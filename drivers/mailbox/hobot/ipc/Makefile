@@ -24,4 +24,4 @@ $(HAL_MODULE_NAME)-y := os/kernel/ipc_hal.o
 obj-$(CONFIG_HB_IPC_SHM) += $(MODULE_NAME).o
 obj-$(CONFIG_HB_IPC_SHM) += ipc_test.o
 #obj-$(CONFIG_HB_IPC_SHM) += $(UIO_MODULE_NAME).o
-#obj-$(CONFIG_HB_IPC_SHM) += $(HAL_MODULE_NAME).o
+obj-$(CONFIG_HB_IPC_SHM) += $(HAL_MODULE_NAME).o

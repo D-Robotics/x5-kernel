@@ -34,6 +34,10 @@
 #include <linux/debugfs.h>
 #include <linux/sched.h>
 #include <linux/ioctl.h>
+#include <linux/of.h>
+#include <linux/platform_device.h>
+#include <linux/of_platform.h>
+#include <linux/mod_devicetable.h>
 
 #include "ipc_hal.h"
 
@@ -92,6 +96,8 @@ struct ipc_shm_data_t {
 	int32_t rdump, wdump;
 	int32_t tsdump;
 	uint32_t dumplen;
+
+	struct ipc_instance_cfg *ipc_cfg;
 };
 
 static struct ipc_shm_data_t ipc_shm_data;
@@ -535,17 +541,14 @@ static void ipcf_dump_data(char *str, uint8_t *buf, int32_t len)
 
 static int32_t hal_ipc_shm_init(struct ipc_shm_data_t *_ipc_shm_data)
 {
-	int32_t retval = 0;
-	ipchal_usercfg.info.custom_cfg = customcfg[0];
-	retval = hb_ipc_open_instance(IPCF_INSTANCES_ID0, &ipchal_usercfg);
-	if (!retval) {
-		shm_dbg("ipc_shm_init success, num instance %d num channel %d\n",
-			 IPCF_INSTANCES_NUM, IPCF_HAL_CHANNEL_NUM_MAX);
-	} else {
-		shm_err("ipc_shm_init failed, ret %d!\n", retval);
+	//int32_t retval = 0;
 
-		return retval;
-	}
+	ipchal_usercfg.info.custom_cfg = customcfg[0];
+	ipchal_usercfg.info.custom_cfg.local_shm_addr =  _ipc_shm_data->ipc_cfg->info.custom_cfg.local_shm_addr;
+	ipchal_usercfg.info.custom_cfg.remote_shm_addr =  _ipc_shm_data->ipc_cfg->info.custom_cfg.remote_shm_addr;
+
+	shm_dbg("local_shm_addr 0x%llx remote_shm_addr 0x%llx\n", ipchal_usercfg.info.custom_cfg.local_shm_addr,
+			ipchal_usercfg.info.custom_cfg.remote_shm_addr);
 
 	return 0;
 }
@@ -587,6 +590,7 @@ static int32_t hal_channel_manage_init(struct ipc_shm_data_t *_ipc_shm_data,
 {
 	struct task_struct *task = current;
 	unsigned long spinlock_flags;
+	int32_t retval = 0;
 
 	if (channel_id >= IPCF_HAL_CHANNEL_NUM_MAX) {
 		shm_err("%s(%d) %s invalid param channel id, must be loss than %d.\n",
@@ -605,7 +609,7 @@ static int32_t hal_channel_manage_init(struct ipc_shm_data_t *_ipc_shm_data,
 	if (!fifo_size)
 		fifo_size = DATA_FIFO_SIZE;
 	spin_lock_irqsave(&_ipc_shm_data->channel[channel_id].rxfifo_lock, spinlock_flags);
-	if (kfifo_alloc(&_ipc_shm_data->channel[channel_id].rxfifo_data, fifo_size, GFP_KERNEL)) {
+	if (kfifo_alloc(&_ipc_shm_data->channel[channel_id].rxfifo_data, fifo_size, GFP_ATOMIC)) {
 		shm_err("[Ins %d channel %d] %s(%d) rx fifo alloc failed.\n",
 				_ipc_shm_data->instance, _ipc_shm_data->channel[channel_id].channel_id, 
 				_ipc_shm_data->channel[channel_id].task_comm, _ipc_shm_data->channel[channel_id].pid);
@@ -618,6 +622,16 @@ static int32_t hal_channel_manage_init(struct ipc_shm_data_t *_ipc_shm_data,
 	INIT_KFIFO(_ipc_shm_data->channel[channel_id].rxfifo_len);
 	spin_unlock_irqrestore(&_ipc_shm_data->channel[channel_id].rxfifo_lock, spinlock_flags);
 	write_unlock(&_ipc_shm_data->channel[channel_id].channel_lock);
+
+	retval = hb_ipc_open_instance(IPCF_INSTANCES_ID0, &ipchal_usercfg);
+	if (!retval) {
+		shm_dbg("ipc_shm_init success, num instance %d num channel %d\n",
+			 IPCF_INSTANCES_NUM, IPCF_HAL_CHANNEL_NUM_MAX);
+	} else {
+		shm_err("ipc_shm_init failed, ret %d!\n", retval);
+
+		return retval;
+	}
 
 	atomic_set(&_ipc_shm_data->channel[channel_id].state, 1); /* enable channel */
 
@@ -639,6 +653,8 @@ static int32_t hal_channel_manage_free(struct ipc_shm_data_t *_ipc_shm_data,
 
 		return -EINVAL;
 	}
+
+	hb_ipc_close_instance(IPCF_INSTANCES_ID0);
 
 	atomic_set(&_ipc_shm_data->channel[channel_id].state, 0); /* disable channel */
 
@@ -918,9 +934,9 @@ static ssize_t hal_ipc_shm_read(struct file *file, char __user *buf,
 		return -EMSGSIZE;
 	}
 
+	read_unlock(&ipc_shm_data.channel[data.channel_id].channel_lock);
 	retval = kfifo_to_user(&ipc_shm_data.channel[data.channel_id].rxfifo_data,
 							(char __user *)data.buffer, frame_len, &copied);
-	read_unlock(&ipc_shm_data.channel[data.channel_id].channel_lock);
 
 	return retval < 0 ? retval : copied;
 }
@@ -1050,10 +1066,26 @@ static struct file_operations hal_ipc_shm_flops = {
 	.llseek = no_llseek,
 };
 
-
-static int32_t __init hal_ipc_shm_drv_init(void)
-{
+static int32_t ipc_hal_probe(struct platform_device *pdev) {
 	int32_t ret;
+	struct device_node *ipc_np;
+	struct platform_device *ipc_pdev;
+	struct ipc_dev_instance *ipc_dev;
+
+	ipc_np = of_parse_phandle(pdev->dev.of_node, "ipc-hal", 0);
+	if (!ipc_np) {
+		shm_err("get ipc-hal error\n");
+		return -1;
+	}
+
+	ipc_pdev = of_find_device_by_node(ipc_np);
+	if (!ipc_pdev) {
+		shm_err("find ipc-hal error\n");
+		return -1;
+	}
+
+	ipc_dev = (struct ipc_dev_instance *)platform_get_drvdata(ipc_pdev);
+	ipc_shm_data.ipc_cfg = &ipc_dev->ipc_info;
 
 	shm_dbg("IPCF device start initializ...\n");
 	ret = register_chrdev(DEVICE_MAJOR, DEVICE_NAME, &hal_ipc_shm_flops);
@@ -1086,22 +1118,48 @@ static int32_t __init hal_ipc_shm_drv_init(void)
 	shm_info("IPCF device init success.\n");
 
 	return 0;
-}
+	}
 
-static void __exit hal_ipc_shm_drv_exit(void)
-{
+static int32_t ipc_hal_remove(struct platform_device *pdev) {
 	shm_info("IPCF device remove....\n");
 	/* channel free */
 	hal_ipc_shm_channel_free(&ipc_shm_data);
 
 	/* ipc free */
-	hb_ipc_close_instance(IPCF_INSTANCES_ID0);
+	//hb_ipc_close_instance(IPCF_INSTANCES_ID0);
 	dev_debugfs_remove(&ipc_shm_data);
 	device_unregister(hal_ipc_shm_device);
 	class_destroy(hal_ipc_shm_class);
 	unregister_chrdev(DEVICE_MAJOR, DEVICE_NAME);
 
 	shm_info("IPCF device removed.\n");
+
+	return 0;
+}
+
+static const struct of_device_id ipc_hal_of_match[] = {
+	{ .compatible = "hobot,hobot-ipc-hal", },
+	{}
+};
+MODULE_DEVICE_TABLE(of, ipc_hal_of_match);
+
+static struct platform_driver ipc_hal_driver = {
+	.driver = {
+		.name = "hobot-ipc-hal",
+		.of_match_table = ipc_hal_of_match,
+	},
+	.probe = ipc_hal_probe,
+	.remove = ipc_hal_remove,
+};
+
+static int32_t __init hal_ipc_shm_drv_init(void)
+{
+	return platform_driver_register(&ipc_hal_driver);
+}
+
+static void __exit hal_ipc_shm_drv_exit(void)
+{
+	platform_driver_unregister(&ipc_hal_driver);
 }
 
 module_init(hal_ipc_shm_drv_init);
