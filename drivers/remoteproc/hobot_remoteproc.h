@@ -246,6 +246,10 @@ struct hobot_rproc_pdata {
 
 	void *dspthread_info_addr_va;
 	void *dspthread_status_reg_va;
+
+	struct mutex mutex_boot;
+	int32_t wait_timeout;
+	struct completion completion_boot;
 };
 
 static inline void *log_memcpy(void *dest, void *src, unsigned int num)
@@ -266,5 +270,11 @@ static inline void *log_memcpy(void *dest, void *src, unsigned int num)
         }
         return (void *)dest;
 }
+
+int32_t hobot_remoteproc_boot_hifi5(uint32_t dsp_id, int32_t timeout, const char *total_path);
+int32_t hobot_remoteproc_shutdown_hifi5(uint32_t dsp_id);
+int32_t hobot_remoteproc_set_dsp_firmware_name(const char *name);
+int32_t hobot_remoteproc_get_dsp_status(uint32_t dsp_id, uint32_t *status);
+int32_t hobot_remoteproc_reset_hifi5(uint32_t dsp_id);
 
 #endif /*HOBOT_VDSP_REMOTEPROC_H*/

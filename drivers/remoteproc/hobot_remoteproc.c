@@ -54,6 +54,10 @@ typedef struct _control {
 	u8 payload[0];
 } control_msg_s_t;
 
+static struct hobot_rproc_pdata *g_dsp_pdata = NULL;
+
+#define ADSP_PATH_NAME_SIZE (256)
+
 #define CONFIG_HOBOT_ADSP_CTRL 1
 
 /* the data segment used by BSP for interaction between acore and DSP, such as logs and shared data. */
@@ -103,6 +107,8 @@ static char *ramdump_name[] = {"ddr", "iram0", "dram0", "dram1"};
 extern int32_t sync_pipeline_state(uint16_t pcm_device, uint8_t stream, uint8_t state);
 static int32_t hobot_dsp_ipc_close_instance(void);
 static void hobot_log_handler(uint8_t *userdata, int32_t instance, int32_t chan_id,
+	uint8_t *buf, uint64_t size);
+static void hobot_boot_handler(uint8_t *userdata, int32_t instance, int32_t chan_id,
 	uint8_t *buf, uint64_t size);
 
 #ifdef CONFIG_HOBOT_REMOTEPROC_PM
@@ -494,10 +500,13 @@ static int32_t hobot_dsp_log_open_instance(struct hobot_rproc_pdata *pdata) {
 	} else {
 		for (int i = 0; i < ipc_cfg->info.custom_cfg.num_chans; i++) {
 			chan = ipc_cfg->info.custom_cfg.chans + i;
-			chan->recv_callback = hobot_log_handler;
 			chan->userdata = (uint8_t *)pdata;
+			if (i == 1) {
+				chan->recv_callback = hobot_boot_handler;
+			} else {
+				chan->recv_callback = hobot_log_handler;
+			}
 		}
-
 	}
 
 	ret = hb_ipc_open_instance(instance, ipc_cfg);
@@ -1230,20 +1239,202 @@ return 0;
 #endif
 int32_t hobot_remoteproc_shutdown_hifi5(uint32_t id)
 {
-	if(g_hifi5_res.rproc->state != (uint32_t)RPROC_RUNNING)
+	int32_t ret = 0;
+	struct hobot_rproc_pdata *pdata = NULL;
+
+	pdata = g_dsp_pdata;
+	if (!pdata) {
+		pr_err("%s:%d pdata is NULL\n", __func__, __LINE__);
 		return -EINVAL;
+	}
+
+	ret = mutex_lock_interruptible(&(pdata->mutex_boot));
+	if (ret) {
+		dev_err(&pdata->rproc->dev, "%s mutex_lock_interruptible mutex_boot failed\n", __func__);
+		return -EINVAL;
+	}
+
+	if(g_hifi5_res.rproc->state != (uint32_t)RPROC_RUNNING) {
+		mutex_unlock(&(pdata->mutex_boot));
+		dev_err(&pdata->rproc->dev, "%s dsp state is not running\n", __func__);
+		return -EINVAL;
+	}
+
 	rproc_shutdown(g_hifi5_res.rproc);
+
+	mutex_unlock(&(pdata->mutex_boot));
+
 	return 0;
 }
 EXPORT_SYMBOL(hobot_remoteproc_shutdown_hifi5);/*PRQA S 0307*//*kernel macro*/
 
+static int32_t parse_dsp_name(const char *total_path, char* firmware_name,
+	char* firmware_path)
+{
+	int32_t ret = -1;
+	char *last_slash = NULL;
+	int32_t pathlen = 0;
+	int32_t namelen = 0;
 
-int32_t hobot_remoteproc_boot_hifi5(uint32_t id)
+	last_slash = strrchr(total_path, '/');
+	if (NULL != last_slash) {
+		pathlen = last_slash - total_path;
+		if (pathlen >= ADSP_PATH_NAME_SIZE) {
+			pr_err("%s: fw path length-%d overflow %d\n", __func__, pathlen, ADSP_PATH_NAME_SIZE);
+			return -E2BIG;
+		}
+		if (pathlen < 1) {
+			pr_err("%s: total_path-%s is only path\n", __func__, total_path);
+			return -EINVAL;
+		}
+
+		namelen = strlen(total_path) - pathlen - 1;
+		if (namelen >= ADSP_PATH_NAME_SIZE) {
+			pr_err("%s: fw name length-%d overflow %d\n", __func__, namelen, ADSP_PATH_NAME_SIZE);
+			return -E2BIG;
+		}
+
+		strncpy(firmware_path, total_path, pathlen);
+		firmware_path[pathlen] = '\0';
+
+		if (namelen > 0) {
+			strncpy(firmware_name, last_slash+1, strlen(last_slash+1) + 1);
+		}
+
+		ret = 0;
+	}
+
+	return ret;
+}
+
+int32_t hobot_remoteproc_set_dsp_firmware_name(const char *name)
+{
+	int32_t ret = 0;
+	int32_t len = 0;
+	char *p;
+	struct hobot_rproc_pdata *pdata = NULL;
+
+	pdata = g_dsp_pdata;
+	if (NULL == pdata) {
+		pr_err("%s , pdata is NULL\n", __func__);
+		return -EINVAL;
+	}
+
+	len = strcspn(name, "\n");
+	if (!len) {
+		dev_err(&pdata->rproc->dev, "%s,  name a NULL\n", __func__);
+		return -EINVAL;
+	}
+
+	p = kstrndup(name, len, GFP_KERNEL);
+	if (!p) {
+		dev_err(&pdata->rproc->dev, "%s, can't kstrndup\n", __func__);
+		return -EINVAL;
+	}
+
+	ret = mutex_lock_interruptible(&(pdata->mutex_boot));
+	if (ret) {
+		dev_err(&pdata->rproc->dev, "%s mutex_lock_interruptible failed\n", __func__);
+		return -EINVAL;
+	}
+
+	kfree(pdata->rproc->firmware);
+	pdata->rproc->firmware = p;
+
+	mutex_unlock(&(pdata->mutex_boot));
+
+	return ret;
+}
+EXPORT_SYMBOL(hobot_remoteproc_set_dsp_firmware_name);
+
+int32_t hobot_remoteproc_get_dsp_status(uint32_t id, uint32_t* status)
+{
+	struct hobot_rproc_pdata *pdata = g_dsp_pdata;
+
+	if (NULL == pdata) {
+		pr_err("%s ,dsp pdata is NULL\n", __func__);
+		return -EINVAL;
+	}
+
+	if (NULL == status) {
+		dev_err(&pdata->rproc->dev, "rproc or status is NULL\n");
+		return -EINVAL;
+	}
+
+	*status = pdata->rproc->state;
+
+	return 0;
+}
+EXPORT_SYMBOL(hobot_remoteproc_get_dsp_status);
+
+int32_t wait_dsp_connect(struct rproc *rproc) {
+	int32_t ret = 0;
+	struct hobot_rproc_pdata *pdata = rproc->priv;
+	uint64_t jiffies_timeout = msecs_to_jiffies(pdata->wait_timeout);
+
+	if (pdata->wait_timeout <= 0)
+		jiffies_timeout = msecs_to_jiffies(3000);
+
+	ret = wait_for_completion_interruptible_timeout(&pdata->completion_boot, jiffies_timeout);
+	if (ret < 0) {
+		dev_err(&rproc->dev, "wait for boot error\n");
+	} else if (ret == 0) {
+		dev_err(&rproc->dev, "wait for boot timeout\n");
+	}
+
+	return ret;
+}
+
+int32_t hobot_remoteproc_boot_hifi5(uint32_t id, int32_t timeout, const char * total_path)
 {
 	int32_t ret;
-	if(g_hifi5_res.rproc->state == (uint32_t)RPROC_RUNNING)
-		return -EBUSY;
+	char firmware_name[ADSP_PATH_NAME_SIZE] = {0};
+	char firmware_path[ADSP_PATH_NAME_SIZE] = {0};
+	struct hobot_rproc_pdata *pdata = g_dsp_pdata;
+	if (!total_path) {
+		pr_err("%s remoteproc path is NULL\n", __func__);
+		return -EINVAL;
+	}
+
+	if (!pdata) {
+		pr_err("%s pdata is NULL\n", __func__);
+		return -EINVAL;
+	}
+
+	if (total_path) {
+		ret = parse_dsp_name(total_path, firmware_name, firmware_path);
+		if (ret == 0) {
+			if (strlen(firmware_name) > 0) {
+				rproc_set_firmware(pdata->rproc, firmware_name);
+			}
+		}
+	}
+
+	ret = mutex_lock_interruptible(&(pdata->mutex_boot));
+	if (ret < 0) {
+		dev_err(&pdata->rproc->dev, "%s:%d lock failed, ret %d\n", __func__, __LINE__, ret);
+		return ret;
+	}
+
+	if(g_hifi5_res.rproc->state == (uint32_t)RPROC_RUNNING) {
+		mutex_unlock(&(pdata->mutex_boot));
+		dev_err(&pdata->rproc->dev, "boot is already running\n");
+                return -EBUSY;
+	}
+
 	ret = rproc_boot(g_hifi5_res.rproc);
+	if (ret < 0) {
+		mutex_unlock(&(pdata->mutex_boot));
+		dev_err(&pdata->rproc->dev, "boot failed\n");
+		return ret;
+	}
+
+	ret = wait_dsp_connect(pdata->rproc);
+	if (ret < 0) {
+		dev_err(&pdata->rproc->dev, "wait dsp connect failed\n");
+	}
+
+	mutex_unlock(&(pdata->mutex_boot));
 	return ret;
 }
 EXPORT_SYMBOL(hobot_remoteproc_boot_hifi5);/*PRQA S 0307*//*kernel macro*/
@@ -1287,6 +1478,26 @@ static int timesync_init(struct platform_device *pdev) {
 		pdata->bsp.pa, timesync_sec_offset, timesync_sec_diff_offset,
 		timesync_nanosec_offset);
 	return 0;
+}
+
+static void hobot_boot_handler(uint8_t *userdata, int32_t instance, int32_t chan_id,
+		uint8_t *buf, uint64_t size) {
+	struct hobot_rproc_pdata *pdata;
+	if (userdata == NULL) {
+		return;
+	}
+	if (buf == NULL || size <= 0) {
+		return;
+	}
+
+	if (hb_ipc_is_remote_ready(instance)) {
+		pr_err("ipc instance[%d] chan[%d] not ready\n", instance, chan_id);
+		return;
+	}
+
+	pdata = (struct hobot_rproc_pdata *)userdata;
+	(void)hb_ipc_release_buf(instance, chan_id, buf);
+	complete(&pdata->completion_boot);
 }
 
 static void hobot_log_handler(uint8_t *userdata, int32_t instance, int32_t chan_id,
@@ -2336,6 +2547,8 @@ static int32_t hobot_remoteproc_probe(struct platform_device *pdev)
 		goto deinit_irq_out;
 	}
 
+	init_completion(&pdata->completion_boot);
+
 	pdata->rst = devm_reset_control_get(&pdev->dev, NULL);
 	if (IS_ERR(pdata->rst)) {
 		dev_err(&pdev->dev, "Missing reset controller\n");
@@ -2412,6 +2625,8 @@ static int32_t hobot_remoteproc_probe(struct platform_device *pdev)
 	}
 #endif
 
+	g_dsp_pdata = pdata;
+
 	device_init_wakeup(&pdev->dev, true);
 	pr_info("hobot_remoteproc_probe end\n");
 
@@ -2457,6 +2672,8 @@ static int32_t hobot_remoteproc_remove(struct platform_device *pdev) {
 	device_remove_file(&pdev->dev, &dev_attr_dspthread);
 	device_remove_file(&pdev->dev, &dev_attr_loglevel);
 	device_remove_file(&pdev->dev, &dev_attr_thread_info);
+
+	complete(&pdata->completion_boot);
 
 #ifdef CONFIG_HOBOT_ADSP_CTRL
 	iounmap(timesync_acore_to_adsp);

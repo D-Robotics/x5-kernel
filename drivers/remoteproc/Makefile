@@ -53,7 +53,6 @@ ccflags-y += -I${HBMBOX_PATH}/platform/cpusys/
 ccflags-y += -I${HBMOX_PATH}/common/
 ccflags-y += -I${HBMOX_PATH}/os/kernel/
 ccflags-y += -I${HBMOX_PATH}/platform/cpusys/
-#subdir-ccflags-y += -I$(srctree)/drivers/hobot/rpmsg
 subdir-ccflags-y += -I$(srctree)/drivers/mailbox/hobot/mbox/platform/cpusys/
 
 ccflags-y += -I${srctree}/sound/soc/gua/
