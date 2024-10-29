@@ -1078,7 +1078,7 @@
 					<&hpsclks X5_CAM_DEWARP_CORE_CLK>,
 					<&hpsclks X5_CAM_DEWARP_HCLK>;
 				clock-names = "core", "ups", "axi", "gdc_core", "gdc_hclk";
-				instances = <7>;
+				instances = <8>;
 				cam-ctrl = <&cam_ctrl>;
 				dw-crc = <&dw_crc>;
 				iommus = <&vse_iommu>;
@@ -1426,7 +1426,7 @@
 					<&hpsclks X5_CAM_VSE_UPSCALE_CLK>;
 				clock-names = "core", "axi", "hclk", "vse_core", "vse_ups";
 				id = <0>;
-				instances = <2>;
+				instances = <6>;
 				cam-ctrl = <&cam_ctrl>;
 				dw-crc = <&dw_crc>;
 				iommus = <&gdc_iommu>;
