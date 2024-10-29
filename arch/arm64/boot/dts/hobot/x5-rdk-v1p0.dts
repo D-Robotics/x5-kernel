@@ -91,6 +91,17 @@
 		enable-active-high;
 	};
 
+	leds {
+		status = "okay";
+		compatible = "gpio-leds";
+
+		act_led: led-act {
+			label = "ACT";
+			gpios = <&dsp_gpio_porta 14 GPIO_ACTIVE_LOW>;
+			linux,default-trigger = "heartbeat";
+		};
+	};
+
 };
 
 &cpu_0 {
@@ -146,7 +157,6 @@
 	pinctrl-names = "default";
 	pinctrl-0 = < &dsp_gpio0_17
 				  &dsp_gpio0_18
-				  &dsp_gpio0_14 //LED_SYS_STATUS
 				>;
 };
 
