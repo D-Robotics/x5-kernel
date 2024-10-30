@@ -7083,9 +7083,18 @@ static int32_t __init vpu_init_system_mem(struct platform_device *pdev,
 	dma_alloc_coherent(&pdev->dev, dev->codec_mem_reserved2.size, &dev->codec_mem_reserved2.base,
 			GFP_KERNEL);
 	dev->codec_mem_reserved2.phys_addr = dev->codec_mem_reserved2.base;
-	dma_alloc_coherent(&pdev->dev, dev->codec_mem_reserved2.size, &dev->codec_mem_reserved2.iova,
-			GFP_KERNEL);
+
+	/* re-use ion_iommu_map_on_phys function to do iova & phys_addr mapping */
+	ret = ion_iommu_map_ion_phys(&pdev->dev, dev->codec_mem_reserved2.phys_addr, dev->codec_mem_reserved2.size,
+			&dev->codec_mem_reserved2.iova, IOMMU_READ | IOMMU_WRITE);
+	if (ret < 0) {
+			VPU_ERR_DEV(&pdev->dev, "Failed to map ion phys, ret = %d.\n", ret);
+			vpu_destroy_resource(dev);
+			vpu_send_diag_error_event((u16)EventIdVPUDevIonMapErr, (u8)ERR_SEQ_0, 0, __LINE__);
+			return ret;
+	}
 	dev->codec_mem_reserved2.vaddr = vpu_vmap_work_buffer_memory(&dev->codec_mem_reserved2);
+
 
 	for (i = 0; i < MAX_NUM_VPU_INSTANCE; i++) {
 		tmp_offset = i * WAVE521DEC_WORKBUF_SIZE;
@@ -7127,7 +7136,7 @@ static int32_t __init vpu_init_system_mem(struct platform_device *pdev,
 		if (ret < 0) {
 			VPU_ERR_DEV(&pdev->dev, "Failed to map ion phys, ret = %d.\n", ret);
 			vpu_destroy_resource(dev);
-			vpu_send_diag_error_event((u16)EventIdVPUDevIonMapErr, (u8)ERR_SEQ_0, 0, __LINE__);
+			vpu_send_diag_error_event((u16)EventIdVPUDevIonMapErr, (u8)ERR_SEQ_1, 0, __LINE__);
 			return ret;
 		}
 
