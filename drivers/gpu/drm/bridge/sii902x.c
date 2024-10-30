@@ -331,6 +331,9 @@ static enum drm_mode_status sii902x_mode_valid(struct drm_connector *connector,
 {
 	/* TODO: check mode */
 
+	if(mode->clock > 165000)
+		return MODE_BAD;
+
 	return MODE_OK;
 }
 
