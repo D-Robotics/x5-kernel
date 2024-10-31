@@ -419,6 +419,7 @@ static void dw_axi_dma_set_byte_halfword(struct axi_dma_chan *chan, bool set)
 static void axi_chan_block_xfer_start(struct axi_dma_chan *chan,
 				      struct axi_dma_desc *first)
 {
+	struct dma_private_flag *private_flag;
 	u32 priority = chan->chip->dw->hdata->priority[chan->id];
 	struct axi_dma_chan_config config = {};
 	u32 irq_mask;
@@ -433,6 +434,7 @@ static void axi_chan_block_xfer_start(struct axi_dma_chan *chan,
 
 	axi_dma_enable(chan->chip);
 
+	private_flag = chan->private;
 	config.dst_multblk_type = DWAXIDMAC_MBLK_TYPE_LL;
 	config.src_multblk_type = DWAXIDMAC_MBLK_TYPE_LL;
 	config.tt_fc = DWAXIDMAC_TT_FC_MEM_TO_MEM_DMAC;
@@ -467,6 +469,8 @@ static void axi_chan_block_xfer_start(struct axi_dma_chan *chan,
 	write_chan_llp(chan, first->hw_desc[0].llp | lms);
 
 	irq_mask = DWAXIDMAC_IRQ_DMA_TRF | DWAXIDMAC_IRQ_ALL_ERR;
+	if(private_flag != NULL && private_flag->is_block_tfr)
+		irq_mask |= DWAXIDMAC_IRQ_BLOCK_TRF;
 	axi_chan_irq_sig_set(chan, irq_mask);
 
 	/* Generate 'suspend' status but don't generate interrupt */
@@ -674,6 +678,7 @@ static int dw_axi_dma_set_hw_desc(struct axi_dma_chan *chan,
 				  struct axi_dma_hw_desc *hw_desc,
 				  dma_addr_t mem_addr, size_t len)
 {
+	struct dma_private_flag *private_flag;
 	unsigned int data_width = BIT(chan->chip->dw->hdata->m_data_width);
 	unsigned int reg_width;
 	unsigned int mem_width;
@@ -685,6 +690,7 @@ static int dw_axi_dma_set_hw_desc(struct axi_dma_chan *chan,
 
 	axi_block_ts = chan->chip->dw->hdata->block_size[chan->id];
 
+	private_flag = chan->private;
 	mem_width = __ffs(data_width | mem_addr | len);
 	if (mem_width > DWAXIDMAC_TRANS_WIDTH_32)
 		mem_width = DWAXIDMAC_TRANS_WIDTH_32;
@@ -733,6 +739,10 @@ static int dw_axi_dma_set_hw_desc(struct axi_dma_chan *chan,
 			 burst_len << CH_CTL_H_AWLEN_POS;
 	}
 
+	if(private_flag != NULL && private_flag->is_block_tfr) {
+		// enable block tfr done irq
+		ctlhi |= CH_CTL_H_IOC_BLKTFR;
+	}
 	hw_desc->lli->ctl_hi = cpu_to_le32(ctlhi);
 
 	if (chan->direction == DMA_MEM_TO_DEV) {
@@ -801,6 +811,7 @@ dw_axi_dma_chan_prep_cyclic(struct dma_chan *dchan, dma_addr_t dma_addr,
 	struct axi_dma_chan *chan = dchan_to_axi_dma_chan(dchan);
 	struct axi_dma_hw_desc *hw_desc = NULL;
 	struct axi_dma_desc *desc = NULL;
+	struct dma_private_flag *private_flag = NULL;
 	dma_addr_t src_addr = dma_addr;
 	u32 num_periods, num_segments;
 	size_t axi_block_len;
@@ -811,7 +822,9 @@ dw_axi_dma_chan_prep_cyclic(struct dma_chan *dchan, dma_addr_t dma_addr,
 	u64 llp = 0;
 	u8 lms = 0; /* Select AXI0 master for LLI fetching */
 
+	chan->private = dchan->private;
 	num_periods = buf_len / period_len;
+	private_flag = chan->private;
 
 	axi_block_len = calculate_block_len(chan, dma_addr, buf_len, direction);
 	if (axi_block_len == 0)
@@ -844,7 +857,8 @@ dw_axi_dma_chan_prep_cyclic(struct dma_chan *dchan, dma_addr_t dma_addr,
 		/* Set end-of-link to the linked descriptor, so that cyclic
 		 * callback function can be triggered during interrupt.
 		 */
-		set_desc_last(hw_desc);
+		if (private_flag == NULL || !private_flag->is_block_tfr)
+			set_desc_last(hw_desc);
 
 		src_addr += segment_len;
 	}
@@ -1128,6 +1142,29 @@ out:
 	spin_unlock_irqrestore(&chan->vc.lock, flags);
 }
 
+static void axi_chan_block_tfr_complete(struct axi_dma_chan *chan)
+{
+	struct virt_dma_desc *vd;
+	unsigned long flags;
+
+	spin_lock_irqsave(&chan->vc.lock, flags);
+
+	/* The completed descriptor currently is in the head of vc list */
+	vd = vchan_next_desc(&chan->vc);
+	if (!vd) {
+		dev_err(chan2dev(chan), "BUG: %s, IRQ with no descriptors\n",
+			axi_chan_name(chan));
+		goto out;
+	}
+
+	if (chan->cyclic) {
+		vchan_cyclic_callback(vd);
+	}
+
+out:
+	spin_unlock_irqrestore(&chan->vc.lock, flags);
+}
+
 static void axi_chan_block_xfer_complete(struct axi_dma_chan *chan)
 {
 	int count = atomic_read(&chan->descs_allocated);
@@ -1190,6 +1227,7 @@ static irqreturn_t dw_axi_dma_interrupt(int irq, void *dev_id)
 	struct axi_dma_chip *chip = dev_id;
 	struct dw_axi_dma *dw = chip->dw;
 	struct axi_dma_chan *chan;
+	struct dma_private_flag *private_flag;
 
 	u32 status, i;
 
@@ -1199,6 +1237,7 @@ static irqreturn_t dw_axi_dma_interrupt(int irq, void *dev_id)
 	/* Poll, clear and process every channel interrupt status */
 	for (i = 0; i < dw->hdata->nr_channels; i++) {
 		chan = &dw->chan[i];
+		private_flag = chan->private;
 		status = axi_chan_irq_read(chan);
 		axi_chan_irq_clear(chan, status);
 
@@ -1209,6 +1248,10 @@ static irqreturn_t dw_axi_dma_interrupt(int irq, void *dev_id)
 			axi_chan_handle_err(chan, status);
 		else if (status & DWAXIDMAC_IRQ_DMA_TRF)
 			axi_chan_block_xfer_complete(chan);
+		else if (status & DWAXIDMAC_IRQ_BLOCK_TRF) {
+			if (private_flag != NULL && private_flag->is_block_tfr)
+				axi_chan_block_tfr_complete(chan);
+		}
 	}
 
 	/* Re-enable interrupts */
@@ -1244,6 +1287,8 @@ static int dma_chan_terminate_all(struct dma_chan *dchan)
 	vchan_get_all_descriptors(&chan->vc, &head);
 
 	chan->cyclic = false;
+	chan->private = NULL;
+	dchan->private = NULL;
 	spin_unlock_irqrestore(&chan->vc.lock, flags);
 
 	vchan_dma_desc_free_list(&chan->vc, &head);

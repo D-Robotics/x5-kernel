@@ -53,6 +53,7 @@ struct axi_dma_chan {
 	bool				cyclic;
 	/* these other elements are all protected by vc.lock */
 	bool				is_paused;
+	void *private;
 };
 
 struct dw_axi_dma {
@@ -236,6 +237,7 @@ static inline struct axi_dma_chan *dchan_to_axi_dma_chan(struct dma_chan *dchan)
 #define CH_CTL_H_ARLEN_POS		7
 #define CH_CTL_H_AWLEN_EN		BIT(15)
 #define CH_CTL_H_AWLEN_POS		16
+#define CH_CTL_H_IOC_BLKTFR		BIT(26)
 
 enum {
 	DWAXIDMAC_ARWLEN_1		= 0,

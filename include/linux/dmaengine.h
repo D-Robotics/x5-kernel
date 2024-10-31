@@ -452,6 +452,14 @@ struct dma_slave_config {
 };
 
 /**
+ * struct dma_private_flag - dma private flag to limit dma action
+* @is_block_tfr: whether the DMA shall care about block_tfr or not
+*/
+struct dma_private_flag {
+	bool is_block_tfr;
+};
+
+/**
  * enum dma_residue_granularity - Granularity of the reported transfer residue
  * @DMA_RESIDUE_GRANULARITY_DESCRIPTOR: Residue reporting is not support. The
  *  DMA channel is only able to tell whether a descriptor has been completed or

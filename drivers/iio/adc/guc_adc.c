@@ -22,6 +22,8 @@
 #include <linux/iio/trigger_consumer.h>
 #include <linux/iio/triggered_buffer.h>
 #include <linux/nvmem-consumer.h>
+#include <linux/dma-mapping.h>
+#include <linux/dmaengine.h>
 
 /* IP Top Registers */
 #define GUC_TOP_PWD_CTRL    0x0000
@@ -113,6 +115,8 @@
 #define GUC_NOR_FIFO_NOT_EMPTY_INT_EN BIT(1)
 #define GUC_NOR_SAMPLE_DONE_INT_EN    BIT(0)
 #define GUC_NOR_INT_MASK	      GENMASK(5, 0)
+#define GUC_NOR_DMA_MASK	      GENMASK(3, 0)
+#define GUC_FIFO_HALF_FULL_DMA_EN BIT(2)
 
 #define GUC_CTRL_NOR_STS2	   0x0a34
 #define GUC_NOR_INT		   BIT(31)
@@ -177,6 +181,12 @@
 #define IGAV04_ADC_EFUSE_NEG_FLAG BIT(5)
 #define IGAV04_ADC_EFUSE_NEG_MASK GENMASK(5, 0)
 
+#define GUC_FULL_FIFO_DEPTH   (64)
+#define GUC_FIFO_WIDTH_OFFSET (1)
+#define GUC_FIFO_SIZE	      ((GUC_FULL_FIFO_DEPTH << GUC_FIFO_WIDTH_OFFSET))
+#define GUC_HALF_FIFO_SIZE    (((GUC_FIFO_SIZE) >> 1))
+#define GUC_DMA_BUFFER_SIZE   (((GUC_FIFO_SIZE) << 1))
+
 enum convert_mode {
 	SCAN = 0,
 	SINGLE,
@@ -192,11 +202,20 @@ struct guc_adc {
 	int uv_vref;
 	int passwd;
 	u32 last_val;
+	unsigned int bufi;
+	struct dma_chan *dma_chan;
+	phys_addr_t phys_addr;
+	u8 *rx_buf;
+	dma_addr_t rx_dma_buf;
+	unsigned int rx_buf_sz;
+	unsigned int rx_block_sz;
 	const struct iio_chan_spec *work_chan;
 	struct notifier_block nb;
 	int32_t calibration_offset;
 	u32 trimming_value;
 	struct reset_control *reset;
+	u32 skip_data_sz;
+	struct dma_private_flag dma_flag;
 	u32 irq;
 	u16 *sample_buffer;
 	u32 sample_nums;
@@ -360,6 +379,21 @@ static inline void guc_adc_nor_start(struct guc_adc *info, bool enable)
 }
 
 /*
+ * Enable normal ADC DMA interrupt.
+ */
+static void guc_adc_dma_irq_enable(struct guc_adc *info, bool enable)
+{
+	int enable_irq;
+
+	enable_irq = readl_relaxed(info->regs + GUC_CTRL_NOR_CTRL9);
+	if (enable)
+		enable_irq |= (GUC_NOR_FIFO_FULL_DMA_REQ);
+	else
+		enable_irq &= ~(GUC_NOR_DMA_MASK);
+	writel_relaxed(enable_irq, info->regs + GUC_CTRL_NOR_CTRL9);
+}
+
+/*
  * Trigger conversion.
  */
 static int guc_adc_conversion(struct guc_adc *info, struct iio_chan_spec const *chan)
@@ -480,6 +514,7 @@ static irqreturn_t guc_adc_thread_irq(int irq, void *dev_id)
 	if (val & GUC_NOR_FIFO_EMPTY) {
 		goto exit;
 	}
+
 	val = readl_relaxed(info->regs + GUC_CTRL_NOR_STS2);
 	if (val & GUC_NOR_FIFO_HALF_FULL_INT) {
 		while (buffer < sample_buffer_boundary) {
@@ -569,18 +604,159 @@ static int guc_adc_hw_init(struct guc_adc *info)
 	return ret;
 }
 
+static int guc_adc_dma_request(struct device *dev, struct iio_dev *indio_dev)
+{
+	struct guc_adc *info = iio_priv(indio_dev);
+	struct dma_slave_config config;
+	int ret;
+
+	info->dma_chan = dma_request_chan(dev, "rx");
+	if (IS_ERR(info->dma_chan)) {
+		ret = PTR_ERR(info->dma_chan);
+		if (ret != -ENODEV)
+			return dev_err_probe(dev, ret, "DMA channel request failed with\n");
+
+		/* DMA is optional: fall back to IRQ mode */
+		info->dma_chan = NULL;
+		return 0;
+	}
+
+	info->rx_buf = dma_alloc_coherent(info->dma_chan->device->dev, GUC_DMA_BUFFER_SIZE,
+					  &info->rx_dma_buf, GFP_KERNEL);
+	if (!info->rx_buf) {
+		ret = -ENOMEM;
+		goto err_release;
+	}
+
+	/* Configure DMA channel to read data register */
+	memset(&config, 0, sizeof(config));
+	config.src_addr = (dma_addr_t)info->phys_addr;
+	config.src_addr += GUC_CTRL_NOR_STS1;
+	config.src_addr_width = DMA_SLAVE_BUSWIDTH_2_BYTES;
+	config.dst_addr_width = DMA_SLAVE_BUSWIDTH_2_BYTES;
+	config.src_msize = 64;
+	config.dst_msize = 64;
+
+	ret = dmaengine_slave_config(info->dma_chan, &config);
+	if (ret)
+		goto err_free;
+
+	return 0;
+
+err_free:
+	dma_free_coherent(info->dma_chan->device->dev, GUC_DMA_BUFFER_SIZE, info->rx_buf,
+			  info->rx_dma_buf);
+err_release:
+	dma_release_channel(info->dma_chan);
+	return ret;
+}
+
+static void guc_adc_dma_buffer_done(void *data)
+{
+	struct iio_dev *indio_dev = data;
+	struct guc_adc *info	  = iio_priv(indio_dev);
+	u16 *buf;
+	u16 buffer[32];
+	u32 i;
+	u32 offset;
+
+	// drop first fifo data
+	if (info->skip_data_sz < GUC_FIFO_SIZE) {
+		info->skip_data_sz += info->rx_block_sz;
+		goto exit;
+	}
+
+	buf    = (u16 *)&info->rx_buf[info->bufi];
+	offset = indio_dev->scan_bytes >> 1;
+	memcpy(buffer, buf, info->rx_block_sz);
+
+	for (i = 0; i < info->rx_block_sz >> 1; i++) {
+		buffer[i] = (buffer[i] >> SAMPLE_OFFSET) - info->calibration_offset;
+	}
+	for (i = 0; i < info->rx_block_sz / indio_dev->scan_bytes; i++) {
+		iio_push_to_buffers(indio_dev, &buffer[i * offset]);
+	}
+exit:
+	info->bufi += info->rx_block_sz;
+	if (info->bufi >= info->rx_buf_sz) {
+		info->bufi = 0;
+	}
+}
+
+static int guc_adc_dma_start(struct iio_dev *indio_dev)
+{
+	struct guc_adc *info = iio_priv(indio_dev);
+	struct dma_async_tx_descriptor *desc;
+	dma_cookie_t cookie;
+	int ret, period_len;
+
+	if (!info->dma_chan)
+		return 0;
+
+	info->dma_chan->private = (void *)(&info->dma_flag);
+
+	info->rx_block_sz = indio_dev->scan_bytes * (GUC_HALF_FIFO_SIZE / indio_dev->scan_bytes);
+	info->rx_buf_sz	  = info->rx_block_sz * (GUC_DMA_BUFFER_SIZE / info->rx_block_sz);
+	dev_dbg(&indio_dev->dev, "%s size=%d watermark=%d\n", __func__, info->rx_buf_sz,
+		info->rx_buf_sz / 2);
+
+	period_len		    = info->rx_block_sz;
+	info->dma_flag.is_block_tfr = true;
+	/* Prepare a DMA cyclic transaction */
+	desc = dmaengine_prep_dma_cyclic(info->dma_chan, info->rx_dma_buf, info->rx_buf_sz,
+					 period_len, DMA_DEV_TO_MEM, DMA_PREP_INTERRUPT);
+	if (!desc)
+		return -EBUSY;
+
+	desc->callback	     = guc_adc_dma_buffer_done;
+	desc->callback_param = indio_dev;
+
+	cookie = dmaengine_submit(desc);
+	ret    = dma_submit_error(cookie);
+	if (ret) {
+		dmaengine_terminate_sync(info->dma_chan);
+		return ret;
+	}
+
+	/* Issue pending DMA requests */
+	dma_async_issue_pending(info->dma_chan);
+
+	return 0;
+}
+
 static int guc_adc_postenable(struct iio_dev *indio_dev)
 {
-	int i;
+	int ret, i;
 	struct guc_adc *info = iio_priv(indio_dev);
-
+	unsigned long chan_num = 0;
+	info->bufi	   = 0;
+	info->skip_data_sz = 0;
+	chan_num = *indio_dev->active_scan_mask;
 	/* use iio framework, switch adc to scan mode */
 	guc_adc_controller_reset(info);
 	guc_adc_nor_mode(info, SCAN);
 	info->sample_nums = 0;
 	guc_adc_nor_fifo_reset(info);
-	guc_adc_nor_irq_set(info, (u32)GUC_NOR_FIFO_HALF_FULL_INT_EN);
+
+	if (info->dma_chan) {
+		if (chan_num & (chan_num - 1)) {
+			dev_err(&indio_dev->dev, "dma mode only supports one channel\n");
+			return -EBUSY;
+		}
+		ret = guc_adc_dma_start(indio_dev);
+		if (ret) {
+			dev_err(&indio_dev->dev, "Can't start dma\n");
+			return ret;
+		}
+	}
+
+	if (info->dma_chan) {
+		guc_adc_dma_irq_enable(info, true);
+	} else {
+		guc_adc_nor_irq_set(info, (u32)GUC_NOR_FIFO_HALF_FULL_INT_EN);
+	}
 	guc_adc_fifo_read_enable(info, true);
+
 	for_each_set_bit (i, indio_dev->active_scan_mask, indio_dev->masklength) {
 		guc_adc_nor_channel_enable(info, &indio_dev->channels[i], true);
 	}
@@ -592,9 +768,16 @@ static int guc_adc_predisable(struct iio_dev *indio_dev)
 {
 	int i;
 	struct guc_adc *info = iio_priv(indio_dev);
+	if (info->dma_chan) {
+		dmaengine_terminate_sync(info->dma_chan);
+	}
 	guc_adc_nor_start(info, false);
 	guc_adc_fifo_read_enable(info, false);
-	guc_adc_nor_irq_set(info, (u32)~GUC_NOR_FIFO_HALF_FULL_INT_EN);
+	if (info->dma_chan) {
+		guc_adc_dma_irq_enable(info, false);
+	} else {
+		guc_adc_nor_irq_set(info, (u32)~GUC_NOR_FIFO_HALF_FULL_INT_EN);
+	}
 	for_each_set_bit (i, indio_dev->active_scan_mask, indio_dev->masklength) {
 		guc_adc_nor_channel_enable(info, &indio_dev->channels[i], false);
 	}
@@ -635,6 +818,7 @@ static int guc_adc_probe(struct platform_device *pdev)
 	struct guc_adc *info;
 	struct iio_dev *indio_dev;
 	struct resource *res;
+	struct resource *res_adc;
 
 	indio_dev = devm_iio_device_alloc(&pdev->dev, sizeof(*info));
 	if (!indio_dev) {
@@ -655,10 +839,16 @@ static int guc_adc_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "invalid or missing value for guc,passwd\n");
 		return ret;
 	}
-	info->regs = devm_platform_ioremap_resource(pdev, 0);
+	info->regs = devm_platform_get_and_ioremap_resource(pdev, 0, &res_adc);
 	if (IS_ERR(info->regs)) {
 		return PTR_ERR(info->regs);
 	}
+	/* if we plan to use DMA, we need the physical address of the regs */
+	info->phys_addr = res_adc->start;
+	ret = guc_adc_dma_request(&pdev->dev, indio_dev);
+	if (ret < 0)
+ 		return ret;
+
 	res		 = platform_get_resource(pdev, IORESOURCE_MEM, 1);
 	info->passwd_reg = ioremap(res->start, resource_size(res));
 	if (!info->passwd_reg) {
@@ -675,6 +865,9 @@ static int guc_adc_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "invalid or missing value for guc,sample_rate\n");
 		return ret;
 	}
+	if (info->dma_chan)
+		info->sample_rate *= 6;
+
 	ret = clk_set_rate(info->clk, info->sample_rate << 4);
 	if (ret) {
 		dev_err(&pdev->dev, "failed to set sample rate\n");
