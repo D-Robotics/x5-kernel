@@ -57,24 +57,65 @@
 			ecc-size = <0x0>;
 		};
 
-		ion_reserved: ion_reserved@A4100000 {
+		/* UBoot will enable corresponding node when ddr size is confirmed */
+		ion_reserved_1g: ion_reserved_1g@A4100000 {
 			compatible = "ion-pool";
-			reg = <0x0 0xA4100000 0x0 0x20000000>; /* 512MB */
-			status = "okay";
+			reg = <0x0 0xA4100000 0x0 0x07000000>; /* 112MiB */
+			status = "disabled";
 		};
 
-		ion_carveout: ion_carveout@C4100000 {
+		ion_carveout_1g: ion_carveout_1g@AB100000 {
 			compatible = "ion-carveout";
-			reg = <0x0 0xC4100000 0x0 0x20000000>; /* 512MB */
-			status = "okay";
+			reg = <0x0 0xAB100000 0x0 0x07000000>; /* 112MiB */
+			status = "disabled";
 		};
 
-		ion_cma: ion_cma {
+		ion_cma_1g: ion_cma_1g@B2100000 {
 			compatible = "ion-cma";
 			alignment = <0x0 0x2000>;
 			reusable;
-			reg = <0x0 0xE4100000 0x0 0x0B800000>; /* 184MB */
-			status = "okay";
+			reg = <0x0 0xB2100000 0x0 0x00400000>; /* 64MiB */
+			status = "disabled";
+		};
+
+		ion_reserved_2g: ion_reserved_2g@A4100000 {
+			compatible = "ion-pool";
+			reg = <0x0 0xA4100000 0x0 0x20000000>; /* 512MiB */
+			status = "disabled";
+		};
+
+		ion_carveout_2g: ion_carveout_2g@C4100000 {
+			compatible = "ion-carveout";
+			reg = <0x0 0xC4100000 0x0 0x20000000>; /* 512MiB */
+			status = "disabled";
+		};
+
+		ion_cma_2g: ion_cma_2g@E4100000 {
+			compatible = "ion-cma";
+			alignment = <0x0 0x2000>;
+			reusable;
+			reg = <0x0 0xE4100000 0x0 0x0C000000>; /* 192MiB */
+			status = "disabled";
+		};
+
+		ion_reserved_ge4g: ion_reserved_ge4g@A4100000 {
+			compatible = "ion-pool";
+			reg = <0x0 0xA4100000 0x0 0x40000000>; /* 1GiB */
+			status = "disabled";
+		};
+
+		ion_carveout_ge4g: ion_carveout_ge4g@E4100000 {
+			compatible = "ion-carveout";
+			reg = <0x0 0xE4100000 0x0 0x40000000>; /* 1GiB */
+			status = "disabled";
+		};
+
+		ion_cma_ge4g: ion_cma_ge4g@124100000 {
+			compatible = "ion-cma";
+			alignment = <0x0 0x2000>;
+			reusable;
+			reg = <0x1 0x24100000 0x0 0x20000000>; /* 512MiB */
+			status = "disabled";
 		};
 		/* The remaining memory is used as kernel heaps,
 		 * please reserve with CAUTION!
