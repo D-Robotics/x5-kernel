@@ -1564,14 +1564,14 @@ static int32_t hobot_heaps_prepare(struct hobot_ion *hb_ion_data)
 		return 0;
 	}
 
-	ret = hobot_ion_get_heap_info(rnode, "ion-pool", (int32_t)ION_HEAP_TYPE_CARVEOUT,
+	ret = hobot_ion_get_heap_info(rnode, "ion-pool", (int32_t)ION_HEAP_TYPE_CMA_RESERVED,
 							(size_t)DFT_CMA_CARVEOUT_SIZE);
 	if (ret < 0) {
 		(void)pr_info("Hobot ion-pool memory range get failed\n");
 		return ret;
 	}
 
-	ret = hobot_ion_get_heap_info(rnode, "ion-carveout", (int32_t)ION_HEAP_TYPE_CMA_RESERVED,
+	ret = hobot_ion_get_heap_info(rnode, "ion-carveout", (int32_t)ION_HEAP_TYPE_CARVEOUT,
 							(size_t)DFT_CMA_CARVEOUT_SIZE);
 	if (ret < 0) {
 		(void)pr_info("Hobot ion-carveout memory range get failed\n");
