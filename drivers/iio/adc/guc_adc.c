@@ -416,7 +416,7 @@ static int guc_adc_conversion(struct guc_adc *info, struct iio_chan_spec const *
 
 	guc_adc_nor_start(info, false); /* timeout or normal, adc should be stopped */
 	guc_adc_nor_channel_enable(info, chan, false);
-	guc_adc_nor_irq_set(info, (u32)~GUC_NOR_SAMPLE_DONE_INT_EN);
+	guc_adc_nor_irq_set(info, (u32)~(GUC_NOR_INT_MASK));
 	guc_adc_fifo_read_enable(info, false);
 
 	return ret;
@@ -776,7 +776,7 @@ static int guc_adc_predisable(struct iio_dev *indio_dev)
 	if (info->dma_chan) {
 		guc_adc_dma_irq_enable(info, false);
 	} else {
-		guc_adc_nor_irq_set(info, (u32)~GUC_NOR_FIFO_HALF_FULL_INT_EN);
+		guc_adc_nor_irq_set(info, (u32)~(GUC_NOR_INT_MASK));
 	}
 	for_each_set_bit (i, indio_dev->active_scan_mask, indio_dev->masklength) {
 		guc_adc_nor_channel_enable(info, &indio_dev->channels[i], false);
