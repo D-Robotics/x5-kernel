@@ -1486,14 +1486,22 @@ static int32_t hobot_ion_get_heap_info(struct device_node *rnode, char *heap_nam
 	struct resource ion_pool_reserved;
 	const char *status;
 	int32_t ret = 0;
+	bool need_rnode_get = true, heap_disabled = true;
 
 	hb_node = of_find_compatible_node(rnode, NULL, heap_name);
-	if (hb_node != NULL) {
+	while (hb_node != NULL) {
+		need_rnode_get = false;
 		//coverity[misra_c_2012_rule_11_5_violation:SUPPRESS], ## violation reason SYSSW_V_11.5_01
 		status = of_get_property(hb_node, "status", NULL);
+		pr_debug("%s: %s(%s) status:%s\n", __func__, hb_node->full_name, heap_name, status);
 		if ((status == NULL) || (strcmp(status, "okay") == 0)
 				|| (strcmp(status, "ok") == 0)) {
+			heap_disabled = false;
 			if (of_address_to_resource(hb_node, 0, &ion_pool_reserved) == 0) {
+				if (hobot_heaps[heap_id].base != 0) {
+					pr_alert_once("Multiple %s enabled! The last one will take effect!\n",
+									hobot_heaps[heap_id].name);
+				}
 				hobot_heaps[heap_id].base
 					= ion_pool_reserved.start;
 				hobot_heaps[heap_id].size
@@ -1510,11 +1518,16 @@ static int32_t hobot_ion_get_heap_info(struct device_node *rnode, char *heap_nam
 					return -EINVAL;
 				}
 			}
-		} else {
-			hobot_heaps[heap_id].size = default_size;
 		}
 		of_node_put(hb_node);
-	} else {
+		hb_node = of_find_compatible_node(hb_node, NULL, heap_name);
+	}
+
+	if (heap_disabled) {
+		hobot_heaps[heap_id].size = default_size;
+	}
+
+	if (need_rnode_get) {
 		(void)of_node_get(rnode);
 	}
 
