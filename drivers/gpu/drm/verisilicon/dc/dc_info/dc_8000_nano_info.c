@@ -305,41 +305,6 @@ static const struct dc_proc_info dc_proc_info_primary[] = {
 };
 #endif
 
-#ifdef CONFIG_VERISILICON_GC_PROC_SUPPORT
-static const struct dc_proc_info dc_proc_info_gpu_0[] = {
-	{
-		.name  = GC_HW_NAME,
-		.info  = &((struct gpu_plane_info){
-			 .features = GPU_PLANE_OUT,
-			 .id	   = 0,
-		 }),
-		.funcs = &gpu_plane_funcs,
-	},
-	{
-		.name  = DC_HW_DEV_NAME,
-		.info  = &((struct dc_hw_plane_info){
-			 {
-				 .features = DC_PLANE_POSITION | DC_PLANE_BLEND | DC_PLANE_YUV2RGB,
-				 .id	   = DC_SET_ID(DC_OVERLAY_PLANE, 0),
-			 },
-			 .format	 = format_map,
-			 .modifier	 = modifier_map,
-			 .mod_format_map = dc_mod_format_map,
-			 .gamut		 = gamut_map,
-		 }),
-		.funcs = &dc_hw_plane_funcs,
-	},
-	{
-		.name  = GC_HW_NAME,
-		.info  = &((struct gpu_plane_info){
-			 .features = GPU_PLANE_IN | GPU_PLANE_SCALE | GPU_PLANE_ROTATION,
-			 .id	   = 0,
-			 .fourcc   = DRM_FORMAT_NV12,
-		 }),
-		.funcs = &gpu_plane_funcs,
-	},
-};
-#else
 static const struct dc_proc_info dc_proc_info_overlay_0[] = {
 	{
 		.name  = DC_HW_DEV_NAME,
@@ -501,13 +466,8 @@ static struct dc_plane_info dc_plane_info[] = {
 				.crtc_names  = crtc_names,
 				.num_crtcs   = ARRAY_SIZE(crtc_names),
 			},
-#ifdef CONFIG_VERISILICON_GC_PROC_SUPPORT
-		.proc_info = dc_proc_info_gpu_0,
-		.num_proc  = ARRAY_SIZE(dc_proc_info_gpu_0),
-#else
 		.proc_info = dc_proc_info_overlay_0,
 		.num_proc  = ARRAY_SIZE(dc_proc_info_overlay_0),
-#endif
 	},
 	{
 		.info =
