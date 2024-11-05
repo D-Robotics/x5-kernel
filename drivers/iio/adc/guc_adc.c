@@ -507,9 +507,9 @@ static irqreturn_t guc_adc_thread_irq(int irq, void *dev_id)
 	struct iio_dev *indio_dev = dev_id;
 	struct guc_adc *info = iio_priv(indio_dev);
 	register u16 *buffer = info->sample_buffer;
-	register u16 *sample_buffer_boundary = buffer + FIFO_HALF_FULL_DEPTH;
 	register u32 push_steps = indio_dev->scan_bytes / GUC_ADC_FIFO_VALID_BYTES;
-	u32 val;
+	int buf_len  = FIFO_HALF_FULL_DEPTH - (FIFO_HALF_FULL_DEPTH % push_steps);
+	u32 val, i;
 	val = readl_relaxed(info->regs + GUC_CTRL_NOR_STS0);
 	if (val & GUC_NOR_FIFO_EMPTY) {
 		goto exit;
@@ -517,26 +517,11 @@ static irqreturn_t guc_adc_thread_irq(int irq, void *dev_id)
 
 	val = readl_relaxed(info->regs + GUC_CTRL_NOR_STS2);
 	if (val & GUC_NOR_FIFO_HALF_FULL_INT) {
-		while (buffer < sample_buffer_boundary) {
-			/* burst read 8 times to reduce while times */
-			*buffer++ = guc_adc_nor_fifo_read(info);
-			*buffer++ = guc_adc_nor_fifo_read(info);
-			*buffer++ = guc_adc_nor_fifo_read(info);
-			*buffer++ = guc_adc_nor_fifo_read(info);
-			*buffer++ = guc_adc_nor_fifo_read(info);
-			*buffer++ = guc_adc_nor_fifo_read(info);
-			*buffer++ = guc_adc_nor_fifo_read(info);
+		for (i = 0; i < buf_len; i++) {
 			*buffer++ = guc_adc_nor_fifo_read(info);
 		}
 		buffer = info->sample_buffer;
-		while (buffer < sample_buffer_boundary) {
-			/* push 4 times to reduce while times */
-			iio_push_to_buffers(indio_dev, buffer);
-			buffer += push_steps;
-			iio_push_to_buffers(indio_dev, buffer);
-			buffer += push_steps;
-			iio_push_to_buffers(indio_dev, buffer);
-			buffer += push_steps;
+		for (i = 0; i < buf_len / push_steps; i++) {
 			iio_push_to_buffers(indio_dev, buffer);
 			buffer += push_steps;
 		}
