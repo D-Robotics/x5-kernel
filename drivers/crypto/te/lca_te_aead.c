@@ -50,7 +50,6 @@ struct te_aead_handle {
 
 struct te_aead_ctx {
 	struct te_drvdata *drvdata;
-	struct mutex mutex;
 	te_algo_t alg;
 	unsigned int authsize;
 	union {
@@ -86,7 +85,6 @@ static void te_aead_exit(struct crypto_aead *tfm)
 			TE_ALG_GET_CHAIN_MODE(ctx->alg));
 	}
 
-	memset(ctx, 0, sizeof(*ctx));
 	pm_runtime_put_autosuspend(dev);
 
 	return ;
@@ -122,8 +120,6 @@ static int te_aead_init(struct crypto_aead *tfm)
 			TE_ALG_GET_CHAIN_MODE(ctx->alg));
 	}
 
-	mutex_init(&ctx->mutex);
-
 	pm_runtime_put_autosuspend(dev);
 	return rc;
 }
@@ -138,7 +134,6 @@ te_aead_setkey(struct crypto_aead *tfm, const u8 *key, unsigned int keylen)
 			container_of(alg, struct te_crypto_alg, aead_alg);
 	struct device *dev = drvdata_to_dev(te_alg->drvdata);
 
-	mutex_lock(&ctx->mutex);
 	pm_runtime_get_sync(dev);
 
 	switch (TE_ALG_GET_CHAIN_MODE(ctx->alg)) {
@@ -154,7 +149,6 @@ te_aead_setkey(struct crypto_aead *tfm, const u8 *key, unsigned int keylen)
 	}
 
 	pm_runtime_put_autosuspend(dev);
-	mutex_unlock(&ctx->mutex);
 	return rc;
 }
 
@@ -172,10 +166,9 @@ static int te_aead_setauthsize(
 		(authsize > crypto_aead_maxauthsize(tfm))) {
 		return -ENOTSUPP;
 	}
-	mutex_lock(&ctx->mutex);
+
 	ctx->authsize = authsize;
 	dev_dbg(dev, "authlen=%d\n", ctx->authsize);
-	mutex_unlock(&ctx->mutex);
 
 	return 0;
 }
@@ -222,9 +215,9 @@ static void te_aead_complete(struct te_async_request *te_req, int err)
 {
 	struct aead_request *req = (struct aead_request *)te_req->data;
 	struct crypto_aead *tfm = crypto_aead_reqtfm(req);
-	struct te_aead_ctx *ctx = crypto_aead_ctx(tfm);
+	struct te_aead_ctx *ctx_p = crypto_aead_ctx(tfm);
 	struct te_aead_req_ctx *areq_ctx = aead_request_ctx(req);
-	struct device *dev = drvdata_to_dev(ctx->drvdata);
+	struct device *dev = drvdata_to_dev(ctx_p->drvdata);
 
 	if(err == TE_ERROR_SECURITY) {
 		err = -EBADMSG;
@@ -234,44 +227,43 @@ static void te_aead_complete(struct te_async_request *te_req, int err)
 		/*copy auth_tag from buf to sg*/
 		scatterwalk_map_and_copy(areq_ctx->auth, req->dst,
 					 req->assoclen + req->cryptlen,
-					 ctx->authsize, 1);
+					 ctx_p->authsize, 1);
 
-		if (TE_ALG_GET_CHAIN_MODE(ctx->alg) == TE_CHAIN_MODE_GCM) {
+		if (TE_ALG_GET_CHAIN_MODE(ctx_p->alg) == TE_CHAIN_MODE_GCM) {
 			te_buf_mgr_free_memlist(&areq_ctx->enc.te_gcm_req->crypt.in);
 			te_buf_mgr_free_memlist(&areq_ctx->enc.te_gcm_req->crypt.out);
 			te_buf_mgr_free_memlist(&areq_ctx->enc.te_gcm_req->crypt.aad);
 			kfree(areq_ctx->enc.te_gcm_req);
 			areq_ctx->enc.te_gcm_req = NULL;
-		} else if (TE_ALG_GET_CHAIN_MODE(ctx->alg) == TE_CHAIN_MODE_CCM) {
+		} else if (TE_ALG_GET_CHAIN_MODE(ctx_p->alg) == TE_CHAIN_MODE_CCM) {
 			te_buf_mgr_free_memlist(&areq_ctx->enc.te_ccm_req->crypt.in);
 			te_buf_mgr_free_memlist(&areq_ctx->enc.te_ccm_req->crypt.out);
 			te_buf_mgr_free_memlist(&areq_ctx->enc.te_ccm_req->crypt.aad);
 			kfree(areq_ctx->enc.te_ccm_req);
 			areq_ctx->enc.te_ccm_req = NULL;
 		} else {
-			dev_err(dev, "Invalid algo:0x%x, not support \n", ctx->alg);
+			dev_err(dev, "Invalid algo:0x%x, not support \n", ctx_p->alg);
 		}
 	} else {
-		if (TE_ALG_GET_CHAIN_MODE(ctx->alg) == TE_CHAIN_MODE_GCM) {
+		if (TE_ALG_GET_CHAIN_MODE(ctx_p->alg) == TE_CHAIN_MODE_GCM) {
 			te_buf_mgr_free_memlist(&areq_ctx->dec.te_gcm_req->crypt.in);
 			te_buf_mgr_free_memlist(&areq_ctx->dec.te_gcm_req->crypt.out);
 			te_buf_mgr_free_memlist(&areq_ctx->dec.te_gcm_req->crypt.aad);
 			kfree(areq_ctx->dec.te_gcm_req);
 			areq_ctx->dec.te_gcm_req = NULL;
-		} else if (TE_ALG_GET_CHAIN_MODE(ctx->alg) == TE_CHAIN_MODE_CCM) {
+		} else if (TE_ALG_GET_CHAIN_MODE(ctx_p->alg) == TE_CHAIN_MODE_CCM) {
 			te_buf_mgr_free_memlist(&areq_ctx->dec.te_ccm_req->crypt.in);
 			te_buf_mgr_free_memlist(&areq_ctx->dec.te_ccm_req->crypt.out);
 			te_buf_mgr_free_memlist(&areq_ctx->dec.te_ccm_req->crypt.aad);
 			kfree(areq_ctx->dec.te_ccm_req);
 			areq_ctx->dec.te_ccm_req = NULL;
 		} else {
-			dev_err(dev, "Invalid algo:0x%x, not support \n", ctx->alg);
+			dev_err(dev, "Invalid algo:0x%x, not support \n", ctx_p->alg);
 		}
 	}
 	kfree(areq_ctx->auth);
 	areq_ctx->auth = NULL;
 
-	mutex_unlock(&ctx->mutex);
 	aead_request_complete(req, err);
 	pm_runtime_put_autosuspend(dev);
 }
@@ -306,20 +298,17 @@ static int te_aead_encrypt(struct aead_request *req)
 	struct scatterlist *src, *dst;
 	unsigned int l=0;
 
-	mutex_lock(&ctx->mutex);
 	src = scatterwalk_ffwd(areq_ctx->src, req->src, req->assoclen);
 	dst = src;
 
 	if (req->src != req->dst) {
+		/*TO BE COMFIRMED: need to copy aad to dst or not ???*/
 		dst = scatterwalk_ffwd(areq_ctx->dst, req->dst, req->assoclen);
 	}
 
 	areq_ctx->auth = kmalloc(crypto_aead_authsize(tfm), GFP_KERNEL);
-	if (!areq_ctx->auth) {
-		mutex_unlock(&ctx->mutex);
+	if (!areq_ctx->auth)
 		return -ENOMEM;
-	}
-
 	memset(areq_ctx->auth, 0, crypto_aead_authsize(tfm));
 	areq_ctx->op = TE_DRV_SCA_ENCRYPT;
 
@@ -458,7 +447,6 @@ static int te_aead_encrypt(struct aead_request *req)
 	return -EINPROGRESS;
 err:
 	pm_runtime_put_autosuspend(dev);
-	mutex_unlock(&ctx->mutex);
 	return rc;
 #else
 	return TE_ERROR_NOT_SUPPORTED;
@@ -478,7 +466,6 @@ static int te_aead_decrypt(struct aead_request *req)
 	struct scatterlist *src, *dst;
 	unsigned int l=0;
 
-	mutex_lock(&ctx->mutex);
 	src = scatterwalk_ffwd(areq_ctx->src, req->src, req->assoclen);
 	dst = src;
 
@@ -487,10 +474,8 @@ static int te_aead_decrypt(struct aead_request *req)
 	}
 
 	areq_ctx->auth = kmalloc(authsize, GFP_KERNEL);
-	if (!areq_ctx->auth){
-		mutex_unlock(&ctx->mutex);
+	if (!areq_ctx->auth)
 		return -ENOMEM;
-	}
 	memset(areq_ctx->auth, 0, authsize);
 	/*copy auth_tag from sg to buf*/
 	scatterwalk_map_and_copy(areq_ctx->auth, req->src,
@@ -577,6 +562,8 @@ static int te_aead_decrypt(struct aead_request *req)
 		areq_ctx->dec.te_ccm_req->base.flags = req->base.flags;
 		areq_ctx->dec.te_ccm_req->base.data = req;
 		areq_ctx->dec.te_ccm_req->base.completion = te_aead_complete;
+		//areq_ctx->dec.te_ccm_req->crypt.aadlen = req->assoclen;
+		//areq_ctx->dec.te_ccm_req->crypt.aad = sg_virt(req->src);
 		areq_ctx->dec.te_ccm_req->crypt.taglen = ctx->authsize;
 		areq_ctx->dec.te_ccm_req->crypt.tag = areq_ctx->auth;
 		areq_ctx->dec.te_ccm_req->crypt.op = TE_DRV_SCA_DECRYPT;
@@ -634,7 +621,6 @@ static int te_aead_decrypt(struct aead_request *req)
 	return -EINPROGRESS;
 err:
 	pm_runtime_put_autosuspend(dev);
-	mutex_unlock(&ctx->mutex);
 	return rc;
 
 #else

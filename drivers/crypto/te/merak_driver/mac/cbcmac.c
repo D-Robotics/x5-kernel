@@ -897,11 +897,9 @@ int te_cbcmac_afinish( te_cbcmac_ctx_t *ctx, te_cmac_request_t *req )
     }
 
     if( prv_ctx->npdlen ) {
-        osal_memset(prv_ctx->npdata + prv_ctx->npdlen, 0,
-                    ctx->crypt->blk_size - prv_ctx->npdlen);
         ret = te_sca_update(ctx->crypt,
                             true,
-                            ctx->crypt->blk_size,
+                            prv_ctx->npdlen,
                             prv_ctx->npdata,
                             NULL);
         if ( ret != TE_SUCCESS ) {

@@ -37,7 +37,6 @@ struct te_cipher_handle {
 
 struct lca_te_cipher_ctx {
 	struct te_drvdata *drvdata;
-	struct mutex mutex;
 	te_algo_t alg;
 	uint8_t *iv;             /**< initial vector or nonce(CTR) */
 	uint8_t *stream;         /**< stream block (CTR) */
@@ -139,7 +138,6 @@ static int lca_cipher_init(struct crypto_tfm *tfm)
 	}
 
 	ctx_p->tid = current->pid;
-	mutex_init(&ctx_p->mutex);
 err:
 	pm_runtime_put_autosuspend(dev);
 	return rc;
@@ -202,7 +200,6 @@ static int lca_te_cipher_setkey(struct crypto_skcipher *sktfm, const u8 *key,
 	struct lca_te_cipher_ctx *ctx_p = crypto_tfm_ctx(tfm);
 	struct device *dev = drvdata_to_dev(ctx_p->drvdata);
 
-	mutex_lock(&ctx_p->mutex);
 	pm_runtime_get_sync(dev);
 
 	/* weak key process for DES and 3DES, code borrowed from
@@ -227,7 +224,6 @@ static int lca_te_cipher_setkey(struct crypto_skcipher *sktfm, const u8 *key,
 
 out:
 	pm_runtime_put_autosuspend(dev);
-	mutex_unlock(&ctx_p->mutex);
 	return rc;
 }
 static void lca_te_cipher_complete(struct te_async_request *te_req, int err)
@@ -271,7 +267,6 @@ static void lca_te_cipher_complete(struct te_async_request *te_req, int err)
 			req_ctx->dec.te_cipher = NULL;
 		}
 	}
-	mutex_unlock(&ctx_p->mutex);
 	skcipher_request_complete(req, err);
 	pm_runtime_put_autosuspend(dev);
 }
@@ -286,13 +281,11 @@ static int lca_te_cipher_encrypt(struct skcipher_request *req)
 	te_cipher_ctx_t *ctx = NULL;
 	te_xts_ctx_t *xctx   = NULL;
 
-	mutex_lock(&ctx_p->mutex);
 	req_ctx->op = TE_DRV_SCA_ENCRYPT;
 
 	if(!_CHECK_CHIAIN_MODE_VALID(TE_ALG_GET_CHAIN_MODE(ctx_p->alg))){
 		dev_err(dev, "Unsupported cipher mode (%d)\n",
 			   TE_ALG_GET_CHAIN_MODE(ctx_p->alg));
-		mutex_unlock(&ctx_p->mutex);
 		return TE_ERROR_INVAL_ALG;
 	}
 
@@ -433,9 +426,9 @@ fail1:
 
 fail:
 	pm_runtime_put_autosuspend(dev);
-	mutex_unlock(&ctx_p->mutex);
 	return rc;
 }
+
 
 static int lca_te_cipher_decrypt(struct skcipher_request *req)
 {
@@ -447,13 +440,11 @@ static int lca_te_cipher_decrypt(struct skcipher_request *req)
 	te_cipher_ctx_t *ctx = NULL;
 	te_xts_ctx_t *xctx   = NULL;
 
-	mutex_lock(&ctx_p->mutex);
 	req_ctx->op = TE_DRV_SCA_DECRYPT;
 
 	if(!_CHECK_CHIAIN_MODE_VALID(TE_ALG_GET_CHAIN_MODE(ctx_p->alg))){
 		dev_err(dev, "Unsupported cipher mode (%d)\n",
 			   TE_ALG_GET_CHAIN_MODE(ctx_p->alg));
-		mutex_unlock(&ctx_p->mutex);
 		return TE_ERROR_INVAL_ALG;
 	}
 
@@ -594,7 +585,6 @@ fail1:
 
 fail:
 	pm_runtime_put_autosuspend(dev);
-	mutex_unlock(&ctx_p->mutex);
 	return rc;
 }
 

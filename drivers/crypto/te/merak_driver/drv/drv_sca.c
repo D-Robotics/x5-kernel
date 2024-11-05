@@ -2551,12 +2551,9 @@ int te_sca_import( te_crypt_ctx_t *ctx,
         return TE_ERROR_BAD_STATE;
     }
 
-    if ( (TE_DRV_SCA_STATE_INIT == sctx->state) ||
-         ((TE_DRV_SCA_STATE_READY == sctx->state) &&
-          (sctx->sess == INVALID_SESS_ID)) ) {
+    if ( TE_DRV_SCA_STATE_INIT == sctx->state ) {
         /*
-         * Open session if ctx is still in INIT state or
-         * READY state but no session attached.
+         * Open session if ctx is still in INIT state.
          */
         te_sess_slot_cat_t cat = TE_SLOT_CATEGORY_SHORT;
         te_sca_drv_t *drv = (te_sca_drv_t*)ctx->drv;
