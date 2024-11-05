@@ -25,6 +25,10 @@
         }                                                                      \
     } while (0)
 
+
+/* may need change according to Merak RTL config*/
+#define	TE_RSA_MAX_SIZE	(4 * 1024 / 8)
+
 struct te_akcipher_handle {
 	struct list_head akcipher_list;
 };
@@ -165,8 +169,7 @@ static int te_rsa_setpubkey(struct crypto_akcipher *tfm, const void *key,
 
 static unsigned int te_rsa_maxsize(struct crypto_akcipher *tfm)
 {
-	struct te_akcipher_ctx *ctx = akcipher_tfm_ctx(tfm);
-	return te_bn_bytelen(ctx->u.rsa.N);
+	return TE_RSA_MAX_SIZE;
 }
 
 static void te_akcipher_complete(struct te_async_request *te_req, int err)
@@ -177,22 +180,16 @@ static void te_akcipher_complete(struct te_async_request *te_req, int err)
 	struct te_rsa_req_ctx *areq_ctx = akcipher_request_ctx(req);
 	struct device *dev = drvdata_to_dev(ctx->drvdata);
 
-	/* Set req->dst_len to key_len */
 	if(areq_ctx->enc) {
 		req->dst_len = areq_ctx->rsa.public_args.size;
+		if(areq_ctx->buf) {
+			kfree_sensitive(areq_ctx->buf);
+			areq_ctx->buf = NULL;
+			areq_ctx->buflen = 0;
+		}
 	} else {
 		req->dst_len = areq_ctx->rsa.private_args.size;
 	}
-
-	sg_copy_from_buffer(req->dst, sg_nents(req->dst),
-			   (const void *)(areq_ctx->buf), req->dst_len);
-
-	if(areq_ctx->buf) {
-		kvfree(areq_ctx->buf);
-		areq_ctx->buf = NULL;
-		areq_ctx->buflen = 0;
-	}
-
 	akcipher_request_complete(req, err);
 	pm_runtime_put_autosuspend(dev);
 }
@@ -200,102 +197,40 @@ static void te_akcipher_complete(struct te_async_request *te_req, int err)
 static int te_rsa_encrypt(struct akcipher_request *req)
 {
 	int rc = 0;
-	int i = 0;
-	unsigned int offset = 0;
-	unsigned int key_len = 0;
 	struct crypto_akcipher *tfm = crypto_akcipher_reqtfm(req);
 	struct te_akcipher_ctx *ctx = akcipher_tfm_ctx(tfm);
 	struct te_rsa_req_ctx *areq_ctx = akcipher_request_ctx(req);
 	struct device *dev = drvdata_to_dev(ctx->drvdata);
 
 	memset(areq_ctx, 0, sizeof(*areq_ctx));
+	areq_ctx->rsa.public_args.N = ctx->u.rsa.N;
+	areq_ctx->rsa.public_args.E= ctx->u.rsa.E;
 
 	pm_runtime_get_sync(dev);
 
-	/*
-	 * The src and dst are scatterlist, so shall create a buffer to
-	 * hold the input/output data for driver.
-	 * There are several cases for src_len && dst_len:
-	 * src_len > key_len:
-	 *		Set buflen = src_len
-	 *		Read LSBs of key_len from req->src
-	 *		Check MSBs of (src_len - key_len) are 0.
-	 *
-	 * src_len == key_len:
-	 *		Set buflen = src_len
-	 *		Read Whole req->src
-	 *
-	 * src_len < key_len:
-	 *		Set buflen = key_len
-	 *		Read Whole req->src
-	 *		Set MSBs of key_len - src_len to 0.
-	 *
-	 * dst_len > key_len:
-	 *		Write dst with key_len
-	 *		Update dst_len to key_len
-	 *
-	 * dst_len == key_len:
-	 *		Write dst with key_len
-	 *		Update dst_len to key_len
-	 *
-	 * dst_len < key_len:
-	 *		Update dst_len to key_len
-	 *		return -EOVERFLOW
-	 *
+	/* here we can't pass through the input buffer to driver,
+	 * driver only support the input size equal to N size, so
+	 * we need to malloc a buf for the input data
 	 */
-
-	/* Init buflen to MAX(key_len, src_len) */
-	key_len = te_bn_bytelen(ctx->u.rsa.N);
-	if (req->src_len > key_len) {
-		areq_ctx->buflen = req->src_len;
-		offset = req->src_len - key_len;
-	} else {
-		areq_ctx->buflen = key_len;
-		offset = 0;
-	}
-
-	/* Check dst_len */
-	if (req->dst_len < key_len) {
-		req->dst_len = key_len;
-		rc = -EOVERFLOW;
+	areq_ctx->buflen = te_bn_bytelen(ctx->u.rsa.N);
+	if (req->src_len > areq_ctx->buflen) {
+		rc = -EINVAL;
 		goto err;
 	}
-
 	areq_ctx->buf = kzalloc(areq_ctx->buflen, GFP_KERNEL);
 	if (!areq_ctx->buf) {
 		rc = -ENOMEM;
-		areq_ctx->buflen = 0;
 		goto err;
 	}
 
-	/* we treat the input buffer as the bigendian data, so copy
-	 * the data to the tail of the buffer.
-	 * This covers areq_ctx->buflen == req->src_len and
-	 * areq_ctx->buflen > req->src_len
+	/* we treat the input buffer as the bignum data, so copy
+	 * the data to the tail of the buffer
 	 */
 	sg_copy_to_buffer(req->src, sg_nents(req->src),
 				areq_ctx->buf + areq_ctx->buflen - req->src_len, req->src_len);
-	if (offset != 0) {
-		/* Check MSBs of offset are 0 */
-		while(i < offset) {
-			if (areq_ctx->buf[i] != 0) {
-				rc = -EINVAL;
-				kvfree(areq_ctx->buf);
-				areq_ctx->buf = NULL;
-				areq_ctx->buflen = 0;
-				goto err;
-			}
-			i++;
-		}
-		/* Move data forward by offset */
-		memmove(areq_ctx->buf, areq_ctx->buf + offset, key_len);
-	}
-
-	areq_ctx->rsa.public_args.N = ctx->u.rsa.N;
-	areq_ctx->rsa.public_args.E= ctx->u.rsa.E;
 	areq_ctx->rsa.public_args.input = areq_ctx->buf;
-	areq_ctx->rsa.public_args.output = areq_ctx->buf;
-	areq_ctx->rsa.public_args.size = key_len;
+	areq_ctx->rsa.public_args.output = sg_virt(req->dst);
+	areq_ctx->rsa.public_args.size = areq_ctx->buflen;
 	areq_ctx->rsa.base.flags = req->base.flags;
 	areq_ctx->rsa.base.data = req;
 	areq_ctx->rsa.base.completion = te_akcipher_complete;
@@ -317,72 +252,20 @@ err:
 static int te_rsa_decrypt(struct akcipher_request *req)
 {
 	int rc = 0;
-	int i = 0;
-	unsigned int offset = 0;
-	unsigned int key_len = 0;
 	struct crypto_akcipher *tfm = crypto_akcipher_reqtfm(req);
 	struct te_akcipher_ctx *ctx = akcipher_tfm_ctx(tfm);
 	struct te_rsa_req_ctx *areq_ctx = akcipher_request_ctx(req);
 	struct device *dev = drvdata_to_dev(ctx->drvdata);
 
 	memset(areq_ctx, 0, sizeof(*areq_ctx));
-
-	/* See comments in te_rsa_encrypt() */
-	/* Init buflen to MAX(key_len, src_len) */
-	key_len = te_bn_bytelen(ctx->u.rsa.N);
-	if (req->src_len > key_len) {
-		areq_ctx->buflen = req->src_len;
-		offset = req->src_len - key_len;
-	} else {
-		areq_ctx->buflen = key_len;
-		offset = 0;
-	}
-
-	/* Check dst_len */
-	if (req->dst_len < key_len) {
-		req->dst_len = key_len;
-		rc = -EOVERFLOW;
-		goto err;
-	}
-
-	areq_ctx->buf = kzalloc(areq_ctx->buflen, GFP_KERNEL);
-	if (!areq_ctx->buf) {
-		rc = -ENOMEM;
-		areq_ctx->buflen = 0;
-		goto err;
-	}
-
-	/* we treat the input buffer as the bigendian data, so copy
-	 * the data to the tail of the buffer.
-	 * This covers areq_ctx->buflen == req->src_len and
-	 * areq_ctx->buflen > req->src_len
-	 */
-	sg_copy_to_buffer(req->src, sg_nents(req->src),
-				areq_ctx->buf + areq_ctx->buflen - req->src_len, req->src_len);
-	if (offset != 0) {
-		/* Check MSBs of offset are 0 */
-		while(i < offset) {
-			if (areq_ctx->buf[i] != 0) {
-				rc = -EINVAL;
-				kvfree(areq_ctx->buf);
-				areq_ctx->buf = NULL;
-				areq_ctx->buflen = 0;
-				goto err;
-			}
-			i++;
-		}
-		/* Move data forward by offset */
-		memmove(areq_ctx->buf, areq_ctx->buf + offset, key_len);
-	}
-
 	areq_ctx->rsa.private_args.N = ctx->u.rsa.N;
 	areq_ctx->rsa.private_args.E= ctx->u.rsa.E;
 	areq_ctx->rsa.private_args.D= ctx->u.rsa.D;
 	areq_ctx->rsa.private_args.P= ctx->u.rsa.P;
 	areq_ctx->rsa.private_args.Q= ctx->u.rsa.Q;
-	areq_ctx->rsa.private_args.input = areq_ctx->buf;
-	areq_ctx->rsa.private_args.output = areq_ctx->buf;
-	areq_ctx->rsa.private_args.size = key_len;
+	areq_ctx->rsa.private_args.input = sg_virt(req->src);
+	areq_ctx->rsa.private_args.output = sg_virt(req->dst);
+	areq_ctx->rsa.private_args.size = req->src_len;
 	areq_ctx->rsa.base.flags = req->base.flags;
 	areq_ctx->rsa.base.data = req;
 	areq_ctx->rsa.base.completion = te_akcipher_complete;
@@ -391,15 +274,10 @@ static int te_rsa_decrypt(struct akcipher_request *req)
 	pm_runtime_get_sync(dev);
 	rc = te_rsa_private_async(&areq_ctx->rsa);
 	if (rc != TE_SUCCESS) {
-		kvfree(areq_ctx->buf);
-		areq_ctx->buf = NULL;
-		areq_ctx->buflen = 0;
-		goto err;
+		pm_runtime_put_autosuspend(dev);
 	}
-	return -EINPROGRESS;
-err:
-	pm_runtime_put_autosuspend(dev);
-	return rc;
+
+	return ((rc == TE_SUCCESS) ? (-EINPROGRESS):rc);
 }
 
 static int te_rsa_init(struct crypto_akcipher *tfm)
@@ -473,8 +351,6 @@ static struct te_akcipher_alg *te_akcipher_create_alg(struct te_akcipher_templat
 
 	alg->base.cra_ctxsize = sizeof(struct te_akcipher_ctx);
 	alg->base.cra_flags = CRYPTO_ALG_ASYNC;
-	/* Set the alg->reqsize in case use it w.t.o/before the .init() call */
-	alg->reqsize = tmpl->reqsize;
 
 	t_alg->akcipher_alg = *alg;
 	t_alg->reqsize = tmpl->reqsize;
