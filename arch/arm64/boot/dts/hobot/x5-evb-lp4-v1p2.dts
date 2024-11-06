@@ -10,5 +10,5 @@
 #include "x5-evb.dtsi"
 
 / {
-	model = "D-Robotics X5 EVB LP4 1_B board";
+	model = "D-Robotics X5 EVB LP4 V1P2 board";
 };

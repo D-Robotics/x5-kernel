@@ -17,6 +17,8 @@
 #include <dt-bindings/pinctrl/horizon-pinfunc.h>
 
 / {
+	compatible = "D-Robotics, x5";
+
 	aliases {
 		mipihost0 = &mipi_host0;
 		mipihost1 = &mipi_host1;
