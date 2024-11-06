@@ -766,9 +766,9 @@
 			compatible = "hobot,boardinfo";
 			soc_gen = "x5";
 			soc_name = "x5m";
-			hw_name = "00000000";
-			board_version = "00000000";
-			board_name = "000000000000";
+			hw_name = "0000000000000000"; /* 16Btyes */
+			board_version = "0000000000000000"; /* 16Btyes */
+			board_name = "00000000000000000000000000000000";  /* 32Btyes */
 			bootdevice_name = "00000000";
 			soc_uid = "00000000000000000000000000000000";
 			ddr_vendor = "0";

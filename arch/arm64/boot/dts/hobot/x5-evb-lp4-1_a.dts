@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
- * dts for Sunrise5 EVB platform
+ * dts for Sunrise5 EVB 1_A board
  *
  * Copyright (C) 2024 D-Robotics Inc.
  *
@@ -15,8 +15,8 @@
 #include <autoconf.h>
 
 / {
-	model = "Horizon Robotics X5 EVB board";
-	compatible = "Horizon, x5";
+	model = "D-Robotics X5 EVB LP4 1_A board";
+	compatible = "D-Robotics, x5";
 
 	#address-cells = <2>;
 	#size-cells = <2>;
