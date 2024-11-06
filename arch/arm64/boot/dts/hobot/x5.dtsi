@@ -766,11 +766,11 @@
 		/* Sunrise5 soc information*/
 		socinfo: socinfo{
 			compatible = "hobot,boardinfo";
-			soc_gen = "x5";
-			soc_name = "x5m";
+			soc_gen = "X5";
+			soc_name = "X5M";
 			hw_name = "0000000000000000"; /* 16Btyes */
 			board_version = "0000000000000000"; /* 16Btyes */
-			board_name = "00000000000000000000000000000000";  /* 32Btyes */
+			hw_info = "00000000000000000000000000000000";  /* 32Btyes */
 			bootdevice_name = "00000000";
 			soc_uid = "00000000000000000000000000000000";
 			ddr_vendor = "0";

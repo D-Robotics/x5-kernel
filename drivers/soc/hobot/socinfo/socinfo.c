@@ -43,7 +43,7 @@ const char *soc_gen;
 const char *soc_name;
 const char *hw_name;
 const char *board_version;
-const char *board_name;
+const char *hw_info;
 const char *bootdevice_name;
 const char *soc_uid;
 const char *ddr_vendor;
@@ -125,7 +125,7 @@ const static struct _DDR_vendor_info ddr_vendor_info[] = {
 };
 
 const char *ddr_freq_array[] = {"unkown", "3200", "3733", "4266"};
-const char *ddr_type_array[] = {"unkown", "lpddr4", "lpddr4x"};
+const char *ddr_type_array[] = {"unkown", "LPDDR4", "LPDDR4X"};
 const char *ddr_size_array[] = {"1024MB", "2048MB", "4096MB", "8192MB"};
 
 ssize_t soc_gen_show(struct class *class,
@@ -168,13 +168,13 @@ ssize_t board_version_show(struct class *class,
 	return strlen(buf);
 }
 
-ssize_t board_name_show(struct class *class,
+ssize_t hw_info_show(struct class *class,
 			struct class_attribute *attr, char *buf)
 {
-	if (!buf || !board_name || !ddr_vendor || !ddr_size || !ddr_freq)
+	if (!buf || !hw_info || !ddr_vendor || !ddr_size || !ddr_freq)
 		return 0;
-	snprintf(buf, BUF_LEN, "%s-%s-%s-%s\n",
-			 board_name, ddr_vendor, ddr_size, ddr_freq);
+	snprintf(buf, BUF_LEN, "%s_%s_%s_%s\n",
+			 hw_info, ddr_vendor, ddr_size, ddr_freq);
 
 	return strlen(buf);
 }
@@ -224,7 +224,7 @@ ssize_t ddr_freq_show(struct class *class,
 {
 	if (!buf || !ddr_freq)
 		return 0;
-	snprintf(buf, BUF_LEN, "%s\n", ddr_freq);
+	snprintf(buf, BUF_LEN, "%s Mbps\n", ddr_freq);
 
 	return strlen(buf);
 }
@@ -297,8 +297,8 @@ static struct class_attribute hw_name_attribute =
 static struct class_attribute board_version_attribute =
 	__ATTR(board_version, 0444, board_version_show, NULL);
 
-static struct class_attribute board_name_attribute =
-	__ATTR(board_name, 0444, board_name_show, NULL);
+static struct class_attribute hw_info_attribute =
+	__ATTR(hw_info, 0444, hw_info_show, NULL);
 
 static struct class_attribute bootdevice_name_attribute =
 	__ATTR(bootdevice_name, 0444, bootdevice_name_show, NULL);
@@ -332,7 +332,7 @@ static struct attribute *socinfo_attributes[] = {
 	&soc_name_attribute.attr,
 	&hw_name_attribute.attr,
 	&board_version_attribute.attr,
-	&board_name_attribute.attr,
+	&hw_info_attribute.attr,
 	&bootdevice_name_attribute.attr,
 	&soc_uid_attribute.attr,
 	&ddr_vender_attribute.attr,
@@ -394,7 +394,7 @@ static int socinfo_probe(struct platform_device *pdev)
 		read_from_property(pdev, "soc_name", &soc_name) ||
 		read_from_property(pdev, "hw_name", &hw_name) ||
 		read_from_property(pdev, "board_version", &board_version) ||
-		read_from_property(pdev, "board_name", &board_name) ||
+		read_from_property(pdev, "hw_info", &hw_info) ||
 		read_from_property(pdev, "bootdevice_name", &bootdevice_name) ||
 		read_from_property(pdev, "soc_uid", &soc_uid) ||
 		read_from_property(pdev, "board_id", &board_id)) {
