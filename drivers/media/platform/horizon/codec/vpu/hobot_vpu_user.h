@@ -44,12 +44,17 @@ typedef struct hb_vpu_drv_firmware {
 typedef struct hb_vpu_drv_buffer {
 	uint32_t size;
 	uint64_t phys_addr;
+	uint64_t phys_addr_cb;
+	uint64_t phys_addr_cr;
 
 	/* kernel logical address in use kernel */
 	uint64_t base;
 
 	/* virtual user space address */
 	uint64_t virt_addr;
+	uint64_t virt_addr_cb;
+	uint64_t virt_addr_cr;
+
 	//coverity[misra_c_2012_rule_5_7_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
 	uint64_t iova;
 	//coverity[misra_c_2012_rule_5_7_violation:SUPPRESS], ## violation reason SYSSW_V_10.3_03
