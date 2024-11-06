@@ -17,6 +17,8 @@
 #include <linux/regulator/consumer.h>
 #include <linux/iio/buffer.h>
 #include <linux/iio/iio.h>
+#include <linux/iio/sysfs.h>
+#include <linux/iio/buffer_impl.h>
 #include <linux/iio/iio-opaque.h>
 #include <linux/iio/trigger.h>
 #include <linux/iio/trigger_consumer.h>
@@ -169,6 +171,8 @@
 #define GUC_ADC_TIMEOUT_US   10000
 #define FIFO_HALF_FULL_DEPTH (32)
 #define GUC_ADC_FIFO_VALID_BITS (16u)
+#define GUC_ADC_FIFO_VALID_LEN 10
+#define GUC_ADC_CHANNEL_NUM 10
 #define GUC_ADC_FIFO_VALID_BYTES (GUC_ADC_FIFO_VALID_BITS / BITS_PER_BYTE)
 
 /* adc calibration information in eFuse */
@@ -186,6 +190,10 @@
 #define GUC_FIFO_SIZE	      ((GUC_FULL_FIFO_DEPTH << GUC_FIFO_WIDTH_OFFSET))
 #define GUC_HALF_FIFO_SIZE    (((GUC_FIFO_SIZE) >> 1))
 #define GUC_DMA_BUFFER_SIZE   (((GUC_FIFO_SIZE) << 1))
+
+static unsigned long cycle_period = 100; // Default time period 100ms
+int switch_bit = 1;
+static struct iio_buffer_setup_ops guc_adc_buffer_setup_ops;
 
 enum convert_mode {
 	SCAN = 0,
@@ -220,7 +228,12 @@ struct guc_adc {
 	u16 *sample_buffer;
 	u32 sample_nums;
 	u32 sample_rate;
-	struct mutex adc_lock;
+	rwlock_t adc_lock;
+	struct hrtimer timer;
+	int channle_stat[GUC_ADC_CHANNEL_NUM];
+	int len;
+	int cur_channel;
+	struct iio_dev *indio_dev;
 };
 
 #define GUC_ADC_CHANNEL(_index, _id, _res)                                                   \
@@ -263,9 +276,9 @@ MODULE_DEVICE_TABLE(of, guc_adc_match);
 static inline bool guc_adc_is_busy(struct guc_adc *info)
 {
 	bool is_busy;
-	mutex_lock(&info->adc_lock);
+	read_lock_bh(&info->adc_lock);
 	is_busy = readl_relaxed(info->regs + GUC_CTRL_NOR_CTRL2);
-	mutex_unlock(&info->adc_lock);
+	read_unlock_bh(&info->adc_lock);
 	return is_busy;
 }
 
@@ -321,10 +334,10 @@ static inline void guc_adc_error_abort(struct guc_adc *info, bool abort)
 /*
  * Enable sample channel(n).
  */
-static void guc_adc_nor_channel_enable(struct guc_adc *info, struct iio_chan_spec const *chan,
+static void guc_adc_nor_channel_enable(struct guc_adc *info, int channel,
 				       bool enable)
 {
-	u32 flag, channel = chan->channel;
+	u32 flag;
 
 	flag = readl_relaxed(info->regs + GUC_CTRL_NOR_CTRL3);
 	if (enable)
@@ -373,9 +386,9 @@ static inline u32 guc_adc_nor_fifo_read(struct guc_adc *info)
  */
 static inline void guc_adc_nor_start(struct guc_adc *info, bool enable)
 {
-	mutex_lock(&info->adc_lock);
+	write_lock(&info->adc_lock);
 	writel_relaxed(enable ? 0x01u : 0x00u, info->regs + GUC_CTRL_NOR_CTRL2);
-	mutex_unlock(&info->adc_lock);
+	write_unlock(&info->adc_lock);
 }
 
 /*
@@ -406,7 +419,7 @@ static int guc_adc_conversion(struct guc_adc *info, struct iio_chan_spec const *
 	guc_adc_nor_fifo_reset(info);
 	guc_adc_nor_irq_set(info, (u32)GUC_NOR_SAMPLE_DONE_INT_EN);
 	guc_adc_fifo_read_enable(info, true);
-	guc_adc_nor_channel_enable(info, chan, true);
+	guc_adc_nor_channel_enable(info, chan->channel, true);
 	guc_adc_nor_start(info, true);
 
 	tmflag = wait_for_completion_timeout(&info->completion, msecs_to_jiffies(GUC_ADC_TIMEOUT_US));
@@ -415,7 +428,7 @@ static int guc_adc_conversion(struct guc_adc *info, struct iio_chan_spec const *
 	}
 
 	guc_adc_nor_start(info, false); /* timeout or normal, adc should be stopped */
-	guc_adc_nor_channel_enable(info, chan, false);
+	guc_adc_nor_channel_enable(info, chan->channel, false);
 	guc_adc_nor_irq_set(info, (u32)~(GUC_NOR_INT_MASK));
 	guc_adc_fifo_read_enable(info, false);
 
@@ -636,14 +649,31 @@ err_release:
 	return ret;
 }
 
+/*
+ * Move data read from FIFO to buffer.
+ */
 static void guc_adc_dma_buffer_done(void *data)
 {
 	struct iio_dev *indio_dev = data;
 	struct guc_adc *info	  = iio_priv(indio_dev);
+	u16 buffer[FIFO_HALF_FULL_DEPTH];
+	u32 i, offset;
+	static int flag = 0;
+	static int reset = 0;
+	static int cur_channel = -1;
+	u16 mark = 1 << GUC_ADC_FIFO_VALID_LEN;
 	u16 *buf;
-	u16 buffer[32];
-	u32 i;
-	u32 offset;
+
+	if (reset ^ switch_bit){
+		reset = switch_bit;
+		cur_channel = -1;
+	}
+
+	if(cur_channel != info->cur_channel) {
+		cur_channel = info->cur_channel;
+		flag = 1;
+		info->skip_data_sz = 0;
+	}
 
 	// drop first fifo data
 	if (info->skip_data_sz < GUC_FIFO_SIZE) {
@@ -652,11 +682,15 @@ static void guc_adc_dma_buffer_done(void *data)
 	}
 
 	buf    = (u16 *)&info->rx_buf[info->bufi];
-	offset = indio_dev->scan_bytes >> 1;
+	offset = indio_dev->scan_bytes / GUC_ADC_FIFO_VALID_BYTES;
 	memcpy(buffer, buf, info->rx_block_sz);
 
-	for (i = 0; i < info->rx_block_sz >> 1; i++) {
+	for (i = 0; i < info->rx_block_sz / GUC_ADC_FIFO_VALID_BYTES; i++) {
 		buffer[i] = (buffer[i] >> SAMPLE_OFFSET) - info->calibration_offset;
+	}
+	if (flag && (info->len > 1)) {
+		flag = 0;
+		buffer[0] = mark + info->cur_channel;
 	}
 	for (i = 0; i < info->rx_block_sz / indio_dev->scan_bytes; i++) {
 		iio_push_to_buffers(indio_dev, &buffer[i * offset]);
@@ -668,6 +702,9 @@ exit:
 	}
 }
 
+/*
+ * Configure DMA.
+ */
 static int guc_adc_dma_start(struct iio_dev *indio_dev)
 {
 	struct guc_adc *info = iio_priv(indio_dev);
@@ -709,9 +746,51 @@ static int guc_adc_dma_start(struct iio_dev *indio_dev)
 	return 0;
 }
 
-static int guc_adc_postenable(struct iio_dev *indio_dev)
+/*
+ * Switch channel.
+ */
+static enum hrtimer_restart iio_hrtime_handler(struct hrtimer *timer)
 {
-	int ret, i;
+	struct guc_adc *info;
+	static int channel = 0;
+	static int index = 0;
+	static int reset = 0;
+	int ret = 0;
+	info = container_of(timer, struct guc_adc, timer);
+
+	if (!(reset ^ switch_bit)) {
+		dmaengine_terminate_async(info->dma_chan);
+		guc_adc_nor_start(info, false);
+		guc_adc_fifo_read_enable(info, false);
+		guc_adc_dma_irq_enable(info, false);
+		guc_adc_nor_channel_enable(info, channel, false);
+		guc_adc_controller_reset(info);
+		guc_adc_nor_fifo_reset(info);
+		ret = guc_adc_dma_start(info->indio_dev);
+		if (ret) {
+			dev_err(&info->indio_dev->dev, "Can't start dma\n");
+			return ret;
+		}
+	} else {
+		index = 0;
+		reset  = switch_bit;
+	}
+
+	index = (index  +  info->len) % (info->len);
+	channel = info->channle_stat[index];
+	info->cur_channel = channel;
+	index = index + 1;
+	guc_adc_fifo_read_enable(info, true);
+	guc_adc_dma_irq_enable(info, true);
+	guc_adc_nor_channel_enable(info, channel, true);
+	guc_adc_nor_start(info, true);
+	hrtimer_forward_now(timer, ktime_set(0, cycle_period * 1000000));
+	return HRTIMER_RESTART;
+}
+
+static int guc_adc_cpu_postenable(struct iio_dev *indio_dev)
+{
+	int i;
 	struct guc_adc *info = iio_priv(indio_dev);
 	unsigned long chan_num = 0;
 	info->bufi	   = 0;
@@ -722,57 +801,86 @@ static int guc_adc_postenable(struct iio_dev *indio_dev)
 	guc_adc_nor_mode(info, SCAN);
 	info->sample_nums = 0;
 	guc_adc_nor_fifo_reset(info);
-
-	if (info->dma_chan) {
-		if (chan_num & (chan_num - 1)) {
-			dev_err(&indio_dev->dev, "dma mode only supports one channel\n");
-			return -EBUSY;
-		}
-		ret = guc_adc_dma_start(indio_dev);
-		if (ret) {
-			dev_err(&indio_dev->dev, "Can't start dma\n");
-			return ret;
-		}
-	}
-
-	if (info->dma_chan) {
-		guc_adc_dma_irq_enable(info, true);
-	} else {
-		guc_adc_nor_irq_set(info, (u32)GUC_NOR_FIFO_HALF_FULL_INT_EN);
-	}
+	guc_adc_nor_irq_set(info, (u32)GUC_NOR_FIFO_HALF_FULL_INT_EN);
 	guc_adc_fifo_read_enable(info, true);
 
 	for_each_set_bit (i, indio_dev->active_scan_mask, indio_dev->masklength) {
-		guc_adc_nor_channel_enable(info, &indio_dev->channels[i], true);
+		guc_adc_nor_channel_enable(info, (&indio_dev->channels[i])->channel, true);
 	}
 	guc_adc_nor_start(info, true);
 	return 0;
 }
 
-static int guc_adc_predisable(struct iio_dev *indio_dev)
+static int guc_adc_dma_postenable(struct iio_dev *indio_dev)
 {
-	int i;
+	int ret, i;
 	struct guc_adc *info = iio_priv(indio_dev);
-	if (info->dma_chan) {
-		dmaengine_terminate_sync(info->dma_chan);
+	const struct iio_chan_spec *chan;
+	info->bufi	   = 0;
+	info->skip_data_sz = 0;
+	/* use iio framework, switch adc to scan mode */
+	guc_adc_controller_reset(info);
+	guc_adc_nor_mode(info, SCAN);
+	info->sample_nums = 0;
+	guc_adc_nor_fifo_reset(info);
+	ret = guc_adc_dma_start(indio_dev);
+	if (ret) {
+		dev_err(&indio_dev->dev, "Can't start dma\n");
+		return ret;
 	}
-	guc_adc_nor_start(info, false);
-	guc_adc_fifo_read_enable(info, false);
-	if (info->dma_chan) {
-		guc_adc_dma_irq_enable(info, false);
-	} else {
-		guc_adc_nor_irq_set(info, (u32)~(GUC_NOR_INT_MASK));
-	}
+
 	for_each_set_bit (i, indio_dev->active_scan_mask, indio_dev->masklength) {
-		guc_adc_nor_channel_enable(info, &indio_dev->channels[i], false);
+		chan = &indio_dev->channels[i];
+		info->channle_stat[info->len] = chan->channel;
+		info->len++;
+	}
+
+	if (info->len > 1) {
+		hrtimer_init(&info->timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
+		info->timer.function = iio_hrtime_handler;
+		hrtimer_start(&info->timer, ktime_set(0, 0), HRTIMER_MODE_REL);
+	} else {
+		guc_adc_dma_irq_enable(info, true);
+		guc_adc_fifo_read_enable(info, true);
+		info->cur_channel = chan->channel;
+		guc_adc_nor_channel_enable(info, chan->channel, true);
+		guc_adc_nor_start(info, true);
 	}
 	return 0;
 }
 
-static const struct iio_buffer_setup_ops guc_adc_buffer_setup_ops = {
-	.postenable = guc_adc_postenable,
-	.predisable = guc_adc_predisable,
-};
+static int guc_adc_cpu_predisable(struct iio_dev *indio_dev)
+{
+	int i;
+	struct guc_adc *info = iio_priv(indio_dev);
+
+	guc_adc_nor_start(info, false);
+	guc_adc_fifo_read_enable(info, false);
+	guc_adc_nor_irq_set(info, (u32)~(GUC_NOR_INT_MASK));
+	for_each_set_bit (i, indio_dev->active_scan_mask, indio_dev->masklength) {
+		guc_adc_nor_channel_enable(info, (&indio_dev->channels[i])->channel, false);
+	}
+	return 0;
+}
+
+static int guc_adc_dma_predisable(struct iio_dev *indio_dev)
+{
+	int i;
+	struct guc_adc *info = iio_priv(indio_dev);
+	switch_bit = ~switch_bit;
+	if (info->len > 1)
+		hrtimer_cancel(&info->timer);
+	dmaengine_terminate_sync(info->dma_chan);
+	guc_adc_nor_start(info, false);
+	guc_adc_fifo_read_enable(info, false);
+	guc_adc_dma_irq_enable(info, false);
+	memset(info->channle_stat, 0, sizeof(info->channle_stat));
+	info->len = 0;
+	for_each_set_bit (i, indio_dev->active_scan_mask, indio_dev->masklength) {
+		guc_adc_nor_channel_enable(info, (&indio_dev->channels[i])->channel, false);
+	}
+	return 0;
+}
 
 static int guc_adc_set_trigger(struct platform_device *pdev)
 {
@@ -795,6 +903,45 @@ static int guc_adc_set_trigger(struct platform_device *pdev)
 	return 0;
 }
 
+static ssize_t cycle_period_show(struct device *dev, struct device_attribute *attr, char *buf) {
+	return sprintf(buf, "%lu\n", cycle_period);
+}
+
+static ssize_t cycle_period_store(struct device *dev, struct device_attribute *attr, const char *buf, size_t len) {
+	struct iio_dev *indio_dev = dev_to_iio_dev(dev);
+	struct iio_buffer *buffer = indio_dev->buffer;
+	unsigned long new_timeout;
+	int ret;
+
+	if (!list_empty(&(buffer->buffer_list))) {
+		dev_err(dev, "ERROR: period is only allowed to be configured when no ADC channel is enabled\n");
+		return -EBUSY;
+	}
+	ret = kstrtoul(buf, 10, &new_timeout);
+	if (ret) {
+		if (ret == -EINVAL)
+			dev_err(dev, "ERROR: Only base 10 number is allowed!\n");
+		return ret;
+	}
+
+	cycle_period = new_timeout;
+	return len;
+}
+
+static DEVICE_ATTR(cycle_period, S_IWUSR | S_IRUGO, cycle_period_show, cycle_period_store);
+
+static int guc_adc_set_ops(struct iio_dev *indio_dev) {
+	struct guc_adc *info = iio_priv(indio_dev);
+
+	if (info->dma_chan) {
+		guc_adc_buffer_setup_ops.postenable = guc_adc_dma_postenable;
+		guc_adc_buffer_setup_ops.predisable = guc_adc_dma_predisable;
+	} else {
+		guc_adc_buffer_setup_ops.postenable = guc_adc_cpu_postenable;
+		guc_adc_buffer_setup_ops.predisable = guc_adc_cpu_predisable;
+	}
+	return 0;
+}
 static int guc_adc_probe(struct platform_device *pdev)
 {
 	int ret, i;
@@ -811,6 +958,7 @@ static int guc_adc_probe(struct platform_device *pdev)
 		return -ENOMEM;
 	}
 	info = iio_priv(indio_dev);
+	info->indio_dev = indio_dev;
 	platform_set_drvdata(pdev, indio_dev);
 
 	/* setup sample buffer */
@@ -969,6 +1117,7 @@ static int guc_adc_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "failed to set trigger\n");
 		return ret;
 	}
+	guc_adc_set_ops(indio_dev);
 	ret = devm_iio_triggered_buffer_setup(&indio_dev->dev, indio_dev, iio_pollfunc_store_time,
 					      guc_adc_trigger_handler, &guc_adc_buffer_setup_ops);
 	if (ret) {
@@ -990,9 +1139,23 @@ static int guc_adc_probe(struct platform_device *pdev)
 
 	init_completion(&info->completion);
 	info->nb.notifier_call = guc_adc_volt_notify;
-	mutex_init(&info->adc_lock);
+	rwlock_init(&info->adc_lock);
+
+	ret = devm_iio_device_register(&pdev->dev, indio_dev);
+	if (ret) {
+		dev_err(&pdev->dev, "could not register iio (adc)");
+		return ret;
+	}
+
+	if (info->dma_chan) {
+		ret = device_create_file(&indio_dev->dev, &dev_attr_cycle_period);
+		if (ret) {
+			dev_err(&pdev->dev, "Failed to create device file cycle_period");
+			return ret;
+		}
+	}
 	dev_info(&pdev->dev, "GUC Initialize Finish\n");
-	return devm_iio_device_register(&pdev->dev, indio_dev);
+	return ret;
 }
 
 static int guc_adc_remove(struct platform_device *pdev)
@@ -1004,7 +1167,7 @@ static int guc_adc_remove(struct platform_device *pdev)
 
 	guc_adc_nor_start(info, false);
 	for (i = 0; i < indio_dev->num_channels; ++i) {
-		guc_adc_nor_channel_enable(info, &indio_dev->channels[i], false);
+		guc_adc_nor_channel_enable(info, (&indio_dev->channels[i])->channel, false);
 	}
 	guc_adc_nor_irq_set(info, (u32)GUC_NOR_INT_ALL_DISABLE);
 	guc_adc_clk_disable(info);
