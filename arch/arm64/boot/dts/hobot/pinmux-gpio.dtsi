@@ -1,4 +1,11 @@
 // SPDX-License-Identifier: GPL-2.0
+/*
+ * dtsi for pinctrl regarding gpio of Sunrise5 board
+ *
+ * Copyright(C) 2024, D-Robotics Co., Ltd. All rights reserved
+ *
+ */
+
  #include <dt-bindings/pinctrl/horizon-pinfunc.h>
  #include <dt-bindings/pinctrl/horizon-lsio-pinfunc.h>
  #include <dt-bindings/pinctrl/horizon-hsio-pinfunc.h>

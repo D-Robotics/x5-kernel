@@ -2,7 +2,7 @@
 /*
  * dts for Sunrise5 EVB platform
  *
- * Copyright (C) 2024 Horizon Robotics Inc.
+ * Copyright (C) 2024 D-Robotics Inc.
  *
  */
 
@@ -765,4 +765,3 @@
 	status = "okay";
 	ipc-hal = <&ipc_instance2>;
 };
-
