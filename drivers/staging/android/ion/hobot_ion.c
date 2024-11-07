@@ -1506,7 +1506,7 @@ static int32_t hobot_ion_get_heap_info(struct device_node *rnode, char *heap_nam
 					= ion_pool_reserved.start;
 				hobot_heaps[heap_id].size
 					= resource_size(&ion_pool_reserved);
-				(void)pr_info("Reserverd %s MEM start 0x%llx, size 0x%lx\n",
+				(void)pr_info("hobot_ion: Reserved %s MEM start 0x%llx, size 0x%lx\n",
 						heap_name,
 						hobot_heaps[heap_id].base,
 						hobot_heaps[heap_id].size);
@@ -1553,8 +1553,8 @@ static int32_t hobot_ion_get_heap_info(struct device_node *rnode, char *heap_nam
  */
 static int32_t hobot_heaps_prepare(struct hobot_ion *hb_ion_data)
 {
-	struct device_node *rnode;
-	int32_t ret = 0;
+	struct device_node *hb_node, *rnode;
+	int32_t err = 0, ret = 0;
 
 	if (hb_ion_data == NULL) {
 		return -EINVAL;
@@ -1591,11 +1591,19 @@ static int32_t hobot_heaps_prepare(struct hobot_ion *hb_ion_data)
 		return ret;
 	}
 
-	ret = hobot_ion_get_heap_info(rnode, "shared-dma-pool", (int32_t)ION_HEAP_TYPE_CUSTOM,
-							(size_t)0UL);
-	if (ret < 0) {
-		(void)pr_info("Hobot shared-dma-pool memory range get failed\n");
-		return ret;
+	hb_node = of_find_compatible_node(rnode, NULL, "shared-dma-pool");
+	if (hb_node != NULL) {
+		err = of_property_read_u64(hb_node, "reserved-size", &hb_ion_data->cma_reserved_size);
+		if (err != 0) {
+			hb_ion_data->cma_reserved_size = 0;
+		}
+		err = of_property_read_u64(hb_node, "default-size", &hb_ion_data->cma_default_size);
+		if (err != 0) {
+			hb_ion_data->cma_default_size = DFT_CMA_SIZE;
+		}
+		of_node_put(hb_node);
+	} else {
+		(void)of_node_get(rnode);
 	}
 
 	ret = hobot_ion_get_heap_info(rnode, "ion-sram", (int32_t)ION_HEAP_TYPE_CUSTOM,
