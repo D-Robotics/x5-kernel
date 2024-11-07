@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
- * dtsi for Sunrise5 EVB platform later than 1_A
+ * dtsi for Sunrise5 EVB platform
  *
  * Copyright (C) 2024 D-Robotics Inc.
  *
