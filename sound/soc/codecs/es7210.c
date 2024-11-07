@@ -90,6 +90,8 @@ static const struct regmap_config es7210_regmap_config = {
 	.max_register = 0x7f,
 };
 
+static void es7210_tdm_init_codec(u8 mode);
+
 static int es7210_read(u8 reg, u8 * rt_value, struct i2c_client *client)
 {
 	int ret;
@@ -1941,6 +1943,8 @@ static int es7210_pcm_startup(struct snd_pcm_substream *substream,
 		schedule_delayed_work(&es7210->pcm_pop_work,
 					  msecs_to_jiffies(100));
 	}
+
+	es7210_tdm_init_codec(es7210->tdm_mode);
 
 	/* Setting MIC GAIN */
 	if (es7210->channels > 0) {
