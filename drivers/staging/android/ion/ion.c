@@ -5685,7 +5685,10 @@ static int ion_heap_show(struct ion_heap *heap, struct seq_file *s,
 	seq_puts(s, "-------------------------------------------------------------------------\n");
 	heap_total_size = heap->total_size;
 	seq_puts(s, "-------------------------------------------------------------------------\n");
-	seq_printf(s, "%16s %16s %16zu\n", heap->name, "heap total size", heap_total_size);
+	if (heap->id == ION_HEAP_TYPE_SYSTEM || heap->id == ION_HEAP_TYPE_SYSTEM_CONTIG)
+		seq_printf(s, "%16s allocates from kernel heap\n", heap->name);
+	else
+		seq_printf(s, "%16s %16s %16zu\n", heap->name, "heap total size", heap_total_size);
 	seq_puts(s, "-------------------------------------------------------------------------\n");
 
 	seq_printf(s, "%16s %16s %16s %16s\n", "heap name", "client", "pid", "size");
