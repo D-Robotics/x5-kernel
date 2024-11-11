@@ -41,6 +41,7 @@
 static void __iomem *debug_base[NR_CPUS];
 static void __iomem *cti_base[NR_CPUS];
 
+#ifndef CONFIG_ARCH_HOBOT_X5
 void arch_enable_access(u32 cpu)
 {
 	writel(0xC5ACCE55, DBG_REG(cpu, EDLAR));
@@ -62,6 +63,7 @@ void arch_dump_pcsr(u32 cpu)
 		udelay(20);
 	}
 }
+#endif
 
 static inline void cti_enable_access(u32 cpu)
 {

@@ -4458,6 +4458,78 @@
 				resets = <&socrst SOC_TOP_TIMER1_RESET>;
 			};
 		};
+
+		coresight: coresight@2d010000 {
+			compatible = "hobot,coresight";
+			#address-cells = <1>;
+			#size-cells = <1>;
+			reg = <0x2d010000 0x800000>;
+			ranges;
+			dbg0: dbg0@2d010000 {
+				compatible = "hobot,coresight-dbg0";
+				reg = <0x2d010000 0x10000>;
+			};
+			hobot_cti0: hobot_cti0@2d020000 {
+				compatible = "hobot,coresight-cti0";
+				reg = <0x2d020000 0x10000>;
+			};
+			dbg1: dbg1@2d110000 {
+				compatible = "hobot,coresight-dbg1";
+				reg = <0x2d110000 0x10000>;
+			};
+			hobot_cti1: hobot_cti1@2d120000 {
+				compatible = "hobot,coresight-cti1";
+				reg = <0x2d120000 0x10000>;
+			};
+			dbg2: dbg2@2d210000 {
+				compatible = "hobot,coresight-dbg2";
+				reg = <0x2d210000 0x10000>;
+			};
+			hobot_cti2: hobot_cti2@2d220000 {
+				compatible = "hobot,coresight-cti2";
+				reg = <0x2d220000 0x10000>;
+			};
+			dbg3: dbg3@2d310000 {
+				compatible = "hobot,coresight-dbg3";
+				reg = <0x2d310000 0x10000>;
+			};
+			hobot_cti3: hobot_cti3@2d320000 {
+				compatible = "hobot,coresight-cti3";
+				reg = <0x2d320000 0x10000>;
+			};
+			dbg4: dbg4@2d410000 {
+				compatible = "hobot,coresight-dbg4";
+				reg = <0x2d410000 0x10000>;
+			};
+			hobot_cti4: hobot_cti4@2d420000 {
+				compatible = "hobot,coresight-cti4";
+				reg = <0x2d420000 0x10000>;
+			};
+			dbg5: dbg5@2d510000 {
+				compatible = "hobot,coresight-dbg5";
+				reg = <0x2d510000 0x10000>;
+			};
+			hobot_cti5: hobot_cti5@2d520000 {
+				compatible = "hobot,coresight-cti5";
+				reg = <0x2d520000 0x10000>;
+			};
+			dbg6: dbg6@2d610000 {
+				compatible = "hobot,coresight-dbg6";
+				reg = <0x2d610000 0x10000>;
+			};
+			hobot_cti6: hobot_cti6@2d620000 {
+				compatible = "hobot,coresight-cti6";
+				reg = <0x2d620000 0x10000>;
+			};
+			dbg7: dbg7@2d710000 {
+				compatible = "hobot,coresight-dbg7";
+				reg = <0x2d710000 0x10000>;
+			};
+			hobot_cti7: hobot_cti7@2d720000 {
+				compatible = "hobot,coresight-cti7";
+				reg = <0x2d720000 0x10000>;
+			};
+		};
 	};
 
 	/* dsp */

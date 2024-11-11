@@ -82,6 +82,10 @@
 #include <linux/rtmutex.h>
 #endif
 
+#ifdef CONFIG_LOCKUP_DETECTOR
+#include <linux/nmi.h>
+#endif
+
 /* shared constants to be used in various sysctls */
 const int sysctl_vals[] = { 0, 1, 2, 3, 4, 100, 200, 1000, 3000, INT_MAX, 65535, -1 };
 EXPORT_SYMBOL(sysctl_vals);
@@ -1894,8 +1898,8 @@ static struct ctl_table kern_table[] = {
 		.maxlen         = sizeof(int),
 		.mode           = 0644,
 		.proc_handler   = proc_hardlockup_det_en,
-		.extra1         = &zero,
-		.extra2         = &one,
+		.extra1         = SYSCTL_ONE,
+		.extra2         = SYSCTL_ONE,
 	},
 #ifdef CONFIG_HOBOT_CORESIGHT
 	{
@@ -1904,8 +1908,8 @@ static struct ctl_table kern_table[] = {
 		.maxlen         = sizeof(int),
 		.mode           = 0644,
 		.proc_handler   = proc_panic_on_hardlockup,
-		.extra1         = &zero,
-		.extra2         = &one,
+		.extra1         = SYSCTL_ZERO,
+		.extra2         = SYSCTL_ONE,
 	},
 #endif
 #endif

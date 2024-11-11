@@ -19,17 +19,20 @@
 #include <linux/platform_device.h>
 #include <soc/hobot/hobot_coresight.h>
 
+#ifndef CONFIG_ARCH_HOBOT_X5
 void coresight_dump_pcsr(u32 cpu)
 {
 	arch_enable_access(cpu);
 	arch_dump_pcsr(cpu);
 }
+#endif
 
 void coresight_trigger_panic(int cpu)
 {
+#ifndef CONFIG_ARCH_HOBOT_X5
 	arch_enable_access(cpu);
 	arch_dump_pcsr(cpu);
-
+#endif
 	/* Halt the dest cpu */
 	pr_emerg("Going to halt cpu%d\n", cpu);
 	if (arch_halt_cpu(cpu)) {
