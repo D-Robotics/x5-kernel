@@ -96,11 +96,15 @@ static inline void hardlockup_detector_disable(void) {}
 
 #if defined(CONFIG_HOBOT_HARDLOCKUP_DETECTOR)
 extern int hardlockup_det_en;
+#if defined(CONFIG_HOBOT_CORESIGHT)
 extern int panic_on_hardlockup;
+#endif
 extern int proc_hardlockup_det_en(struct ctl_table *, int ,
 			void __user *, size_t *, loff_t *);
+#if defined(CONFIG_HOBOT_CORESIGHT)
 extern int proc_panic_on_hardlockup(struct ctl_table *, int ,
 			void __user *, size_t *, loff_t *);
+#endif
 #endif
 
 #if defined(CONFIG_HARDLOCKUP_DETECTOR_PERF)

@@ -23,7 +23,10 @@
 #include <linux/sched/debug.h>
 #include <linux/sched/isolation.h>
 #include <linux/stop_machine.h>
+
+#ifdef CONFIG_HOBOT_CORESIGHT
 #include <soc/hobot/hobot_coresight.h>
+#endif
 
 #include <asm/irq_regs.h>
 #include <linux/kvm_para.h>
@@ -182,6 +185,10 @@ static DEFINE_PER_CPU(struct hrtimer, watchdog_hrtimer);
 static DEFINE_PER_CPU(bool, softlockup_touch_sync);
 static DEFINE_PER_CPU(unsigned long, hrtimer_interrupts);
 static DEFINE_PER_CPU(unsigned long, hrtimer_interrupts_saved);
+#ifdef CONFIG_HOBOT_HARDLOCKUP_DETECTOR
+static DEFINE_PER_CPU(unsigned long, hrtimer_interrupts_chk[NR_CPUS]);
+static DEFINE_PER_CPU(int, det_period_offline[NR_CPUS]);
+#endif
 static unsigned long soft_lockup_nmi_warn;
 
 static int __init softlockup_panic_setup(char *str)
@@ -245,9 +252,12 @@ static void set_sample_period(void)
 	 * and hard thresholds) to increment before the
 	 * hardlockup detector generates a warning
 	 */
-
+#ifndef CONFIG_HOBOT_HARDLOCKUP_DETECTOR
+	sample_period = get_softlockup_thresh() * ((u64)NSEC_PER_SEC / 5);
+#else
 	/*set default sample_period to 1 second for hardlockup detection */
 	sample_period = get_softlockup_thresh() * ((u64)NSEC_PER_SEC / 20);
+#endif
 	watchdog_update_hrtimer_threshold(sample_period);
 }
 
@@ -338,7 +348,9 @@ bool is_hardlockup(void)
 
 #ifdef CONFIG_HOBOT_HARDLOCKUP_DETECTOR
 int __read_mostly hardlockup_det_en = true;
+#ifdef CONFIG_HOBOT_CORESIGHT
 int panic_on_hardlockup = true;
+#endif
 
 /* proc handler for /proc/sys/kernel/hardlockup_det_en */
 int proc_hardlockup_det_en(struct ctl_table *table, int write,
@@ -355,6 +367,7 @@ out:
 	return ret;
 }
 
+#ifdef CONFIG_HOBOT_CORESIGHT
 /* proc handler for /proc/sys/kernel/panic_on_hardlockup */
 int proc_panic_on_hardlockup(struct ctl_table *table, int write,
 		    void __user *buffer, size_t *lenp, loff_t *ppos)
@@ -369,25 +382,45 @@ int proc_panic_on_hardlockup(struct ctl_table *table, int write,
 out:
 	return ret;
 }
+#endif
 
-static unsigned int watchdog_next_cpu(unsigned int cpu)
+/*
+ * returns <  nr_cpu_ids if found it
+ * returns >= nr_cpu_ids if NOT found
+ */
+static unsigned int watchdog_next_cpu(unsigned int self)
 {
 	unsigned int next_cpu;
 
-	next_cpu = cpu + 1;
-	if (next_cpu >= NR_CPUS)
-		next_cpu = 0;
+	next_cpu = cpumask_next_wrap(self, cpu_online_mask, self, true);
+	while (next_cpu < nr_cpu_ids) {
+		if (per_cpu(det_period_offline[self], next_cpu) == false) {
+			/*
+			 * find the target cpu which keeps online all
+			 * the time in current hardlockup detection period
+			 */
+			break;
+		}
+		/*
+		 * skip the cpus which had offline history in
+		 * the current hardlockup detection period and
+		 * reset the flag for next period
+		 */
+		per_cpu(det_period_offline[self], next_cpu) = false;
+		next_cpu = cpumask_next_wrap(next_cpu, cpu_online_mask, self, true);
+	}
 
 	return next_cpu;
 }
 
 static int is_hardlockup_other_cpu(unsigned int cpu)
 {
+	unsigned long self = smp_processor_id();
 	unsigned long hrint = per_cpu(hrtimer_interrupts, cpu);
 
-	if (per_cpu(hrtimer_interrupts_saved, cpu) == hrint)
+	if (per_cpu(hrtimer_interrupts_chk[self], cpu) == hrint)
 		return 1;
-	per_cpu(hrtimer_interrupts_saved, cpu) = hrint;
+	per_cpu(hrtimer_interrupts_chk[self], cpu) = hrint;
 
 	return 0;
 }
@@ -408,6 +441,8 @@ static void watchdog_check_hardlockup_other_cpu(void)
 
 	/* check for a hardlockup on the next cpu */
 	next_cpu = watchdog_next_cpu(smp_processor_id());
+	if (next_cpu >= nr_cpu_ids)
+		return;
 
 	smp_rmb();
 
@@ -427,6 +462,24 @@ static void watchdog_check_hardlockup_other_cpu(void)
 		coresight_trigger_panic(next_cpu);
 #endif
 	}
+}
+
+/*
+ * Mark the det_period_offline flag and reset the corresponding detection
+ * context when the cpu is transiting to offline
+ */
+static int reset_detection_context(unsigned int cpu)
+{
+	int i;
+
+	per_cpu(hrtimer_interrupts, cpu) = 0;
+	for (i = 0; i < NR_CPUS; i++) {
+		/* mark the det_period_offline flag */
+		per_cpu(det_period_offline[i], cpu) = true;
+		per_cpu(hrtimer_interrupts_chk[i], cpu) = -1;
+	}
+
+	return 0;
 }
 #endif
 
@@ -964,6 +1017,9 @@ static void __init watchdog_sysctl_init(void)
 
 void __init lockup_detector_init(void)
 {
+#ifdef CONFIG_HOBOT_HARDLOCKUP_DETECTOR
+	int ret, cpu;
+#endif
 	if (tick_nohz_full_enabled())
 		pr_info("Disabling watchdog on nohz_full cores by default\n");
 
@@ -974,4 +1030,13 @@ void __init lockup_detector_init(void)
 		nmi_watchdog_available = true;
 	lockup_detector_setup();
 	watchdog_sysctl_init();
+
+#ifdef CONFIG_HOBOT_HARDLOCKUP_DETECTOR
+	ret = cpuhp_setup_state(CPUHP_AP_ONLINE_DYN, "hb_hardlockup:online",
+					NULL, reset_detection_context);
+	if (ret < 0)
+		pr_emerg("failed to register cpuhp online callback");
+	for (cpu = 0; cpu < NR_CPUS; cpu++)
+		reset_detection_context(cpu);
+#endif
 }
