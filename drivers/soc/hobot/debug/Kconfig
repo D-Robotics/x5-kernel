@@ -2,3 +2,9 @@ config HOBOT_HARDLOCKUP_DETECTOR
 	bool "support the hard deadlock detection"
 	help
 	  support the hard deadlock detection.
+
+config HOBOT_CORESIGHT
+	bool "support coresight features"
+	help
+	  Support coresight features such as dump pcsr, trigger panic etc.
+

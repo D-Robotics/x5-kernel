@@ -23,6 +23,7 @@
 #include <linux/sched/debug.h>
 #include <linux/sched/isolation.h>
 #include <linux/stop_machine.h>
+#include <soc/hobot/hobot_coresight.h>
 
 #include <asm/irq_regs.h>
 #include <linux/kvm_para.h>
@@ -337,6 +338,7 @@ bool is_hardlockup(void)
 
 #ifdef CONFIG_HOBOT_HARDLOCKUP_DETECTOR
 int __read_mostly hardlockup_det_en = true;
+int panic_on_hardlockup = true;
 
 /* proc handler for /proc/sys/kernel/hardlockup_det_en */
 int proc_hardlockup_det_en(struct ctl_table *table, int write,
@@ -349,6 +351,21 @@ int proc_hardlockup_det_en(struct ctl_table *table, int write,
 		goto out;
 	pr_warn("turn %s hobot hardlockup detector\n",
 		hardlockup_det_en == 0 ? "off" : "on");
+out:
+	return ret;
+}
+
+/* proc handler for /proc/sys/kernel/panic_on_hardlockup */
+int proc_panic_on_hardlockup(struct ctl_table *table, int write,
+		    void __user *buffer, size_t *lenp, loff_t *ppos)
+{
+	int ret;
+
+	ret = proc_dointvec_minmax(table, write, buffer, lenp, ppos);
+	if (ret || !write)
+		goto out;
+	pr_warn("turn %s hobot panic_on_hardlockup\n",
+		panic_on_hardlockup == 0 ? "off" : "on");
 out:
 	return ret;
 }
@@ -397,6 +414,18 @@ static void watchdog_check_hardlockup_other_cpu(void)
 	if (is_hardlockup_other_cpu(next_cpu)) {
 		pr_emerg("BUG: CPU%d detected hard LOCKUP on CPU%d\n",
 			smp_processor_id(), next_cpu);
+#ifdef CONFIG_HOBOT_CORESIGHT
+		if (panic_on_hardlockup == false)
+			return;
+		pr_emerg("will trigger panic on CPU%d via coresight\n", next_cpu);
+
+		/*
+		 * stop other cpus' detecion before
+		 * triggering panic on hardlockup cpu
+		 */
+		hardlockup_det_en = false;
+		coresight_trigger_panic(next_cpu);
+#endif
 	}
 }
 #endif

@@ -1889,6 +1889,15 @@ static struct ctl_table kern_table[] = {
 	},
 #ifdef CONFIG_HOBOT_HARDLOCKUP_DETECTOR
 	{
+		.procname       = "panic_on_hardlockup",
+		.data           = &panic_on_hardlockup,
+		.maxlen         = sizeof(int),
+		.mode           = 0644,
+		.proc_handler   = proc_panic_on_hardlockup,
+		.extra1         = &zero,
+		.extra2         = &one,
+	},
+	{
 		.procname       = "hardlockup_det_en",
 		.data           = &hardlockup_det_en,
 		.maxlen         = sizeof(int),
