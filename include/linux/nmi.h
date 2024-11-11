@@ -94,6 +94,12 @@ static inline void hardlockup_detector_disable(void) {}
 # define NMI_WATCHDOG_SYSCTL_PERM	0444
 #endif
 
+#if defined(CONFIG_HOBOT_HARDLOCKUP_DETECTOR)
+extern int hardlockup_det_en;
+extern int proc_hardlockup_det_en(struct ctl_table *, int ,
+			void __user *, size_t *, loff_t *);
+#endif
+
 #if defined(CONFIG_HARDLOCKUP_DETECTOR_PERF)
 extern void arch_touch_nmi_watchdog(void);
 extern void hardlockup_detector_perf_stop(void);

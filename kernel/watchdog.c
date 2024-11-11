@@ -244,7 +244,9 @@ static void set_sample_period(void)
 	 * and hard thresholds) to increment before the
 	 * hardlockup detector generates a warning
 	 */
-	sample_period = get_softlockup_thresh() * ((u64)NSEC_PER_SEC / 5);
+
+	/*set default sample_period to 1 second for hardlockup detection */
+	sample_period = get_softlockup_thresh() * ((u64)NSEC_PER_SEC / 20);
 	watchdog_update_hrtimer_threshold(sample_period);
 }
 
@@ -333,6 +335,72 @@ bool is_hardlockup(void)
 	return false;
 }
 
+#ifdef CONFIG_HOBOT_HARDLOCKUP_DETECTOR
+int __read_mostly hardlockup_det_en = true;
+
+/* proc handler for /proc/sys/kernel/hardlockup_det_en */
+int proc_hardlockup_det_en(struct ctl_table *table, int write,
+		    void __user *buffer, size_t *lenp, loff_t *ppos)
+{
+	int ret;
+
+	ret = proc_dointvec_minmax(table, write, buffer, lenp, ppos);
+	if (ret || !write)
+		goto out;
+	pr_warn("turn %s hobot hardlockup detector\n",
+		hardlockup_det_en == 0 ? "off" : "on");
+out:
+	return ret;
+}
+
+static unsigned int watchdog_next_cpu(unsigned int cpu)
+{
+	unsigned int next_cpu;
+
+	next_cpu = cpu + 1;
+	if (next_cpu >= NR_CPUS)
+		next_cpu = 0;
+
+	return next_cpu;
+}
+
+static int is_hardlockup_other_cpu(unsigned int cpu)
+{
+	unsigned long hrint = per_cpu(hrtimer_interrupts, cpu);
+
+	if (per_cpu(hrtimer_interrupts_saved, cpu) == hrint)
+		return 1;
+	per_cpu(hrtimer_interrupts_saved, cpu) = hrint;
+
+	return 0;
+}
+
+static void watchdog_check_hardlockup_other_cpu(void)
+{
+	unsigned int next_cpu;
+
+	if (!hardlockup_det_en)
+		return;
+	/*
+	 * Test for hardlockups every 3 samples.  The sample period is
+	 *  watchdog_thresh * 2 / 5, so 3 samples gets us back to slightly over
+	 *  watchdog_thresh (over by 20%).
+	 */
+	if (__this_cpu_read(hrtimer_interrupts) % 3 != 0)
+		return;
+
+	/* check for a hardlockup on the next cpu */
+	next_cpu = watchdog_next_cpu(smp_processor_id());
+
+	smp_rmb();
+
+	if (is_hardlockup_other_cpu(next_cpu)) {
+		pr_emerg("BUG: CPU%d detected hard LOCKUP on CPU%d\n",
+			smp_processor_id(), next_cpu);
+	}
+}
+#endif
+
 static void watchdog_interrupt_count(void)
 {
 	__this_cpu_inc(hrtimer_interrupts);
@@ -367,6 +435,11 @@ static enum hrtimer_restart watchdog_timer_fn(struct hrtimer *hrtimer)
 
 	if (!watchdog_enabled)
 		return HRTIMER_NORESTART;
+
+#ifdef CONFIG_HOBOT_HARDLOCKUP_DETECTOR
+	/* detect the hardlockups on the next cpu */
+	watchdog_check_hardlockup_other_cpu();
+#endif
 
 	/* kick the hardlockup detector */
 	watchdog_interrupt_count();

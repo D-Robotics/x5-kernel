@@ -1,0 +1,4 @@
+config HOBOT_HARDLOCKUP_DETECTOR
+	bool "support the hard deadlock detection"
+	help
+	  support the hard deadlock detection.

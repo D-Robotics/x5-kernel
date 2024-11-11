@@ -5,6 +5,13 @@ menuconfig HOBOT_SOC_DRIVERS
         bool "HOBOT SOC drivers support"
         depends on ARCH_HOBOT
 
+menuconfig HOBOT_SOC_DEBUG
+        bool "Kernel Debugging Support on Hobot Platform"
+        depends on ARCH_HOBOT
+        default y
+        help
+          Say yes to enable the kernle debugging drivers for Hobot platform
+
 source "drivers/soc/hobot/bpu/Kconfig"
 source "drivers/soc/hobot/socinfo/Kconfig"
 source "drivers/soc/hobot/reboot_reason/Kconfig"
@@ -12,3 +19,6 @@ source "drivers/soc/hobot/ddr_monitor/Kconfig"
 source "drivers/soc/hobot/firewall/Kconfig"
 source "drivers/soc/hobot/camera_power/Kconfig"
 source "drivers/soc/hobot/dsp/Kconfig"
+if HOBOT_SOC_DEBUG
+source "drivers/soc/hobot/debug/Kconfig"
+endif #HOBOT_SOC_DEBUG

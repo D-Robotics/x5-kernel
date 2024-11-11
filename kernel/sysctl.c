@@ -1887,6 +1887,17 @@ static struct ctl_table kern_table[] = {
 		.mode		= 0444,
 		.proc_handler	= proc_dointvec,
 	},
+#ifdef CONFIG_HOBOT_HARDLOCKUP_DETECTOR
+	{
+		.procname       = "hardlockup_det_en",
+		.data           = &hardlockup_det_en,
+		.maxlen         = sizeof(int),
+		.mode           = 0644,
+		.proc_handler   = proc_hardlockup_det_en,
+		.extra1         = &zero,
+		.extra2         = &one,
+	},
+#endif
 #if defined(CONFIG_X86_LOCAL_APIC) && defined(CONFIG_X86)
 	{
 		.procname       = "unknown_nmi_panic",
