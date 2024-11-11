@@ -14,7 +14,6 @@
 };
 
 &i2c2 {
-	status = "disabled";
 	/delete-node/ sc230ai@30;
 };
 
