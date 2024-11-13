@@ -3855,6 +3855,12 @@
 				#size-cells = <0>;
 				resets = <&socrst LSIO_SPI2_RESET>;
 				reset-names = "spi";
+
+				spidev@0 {
+					compatible = "dr,x5-spidev";
+					spi-max-frequency = <32000000>;
+					reg = <0>;
+				};
 			};
 
 			spi3: spi@34030000 {
