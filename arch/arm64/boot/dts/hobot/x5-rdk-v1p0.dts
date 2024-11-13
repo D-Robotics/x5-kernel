@@ -159,21 +159,9 @@
 				>;
 };
 
-// 40pin GPIO
 &ls_gpio0_porta {
 	pinctrl-names = "default";
-	pinctrl-0 = < &lsio_gpio0_0
-				  &lsio_gpio0_1
-				  &lsio_gpio0_2
-				  &lsio_gpio0_3
-				  &lsio_gpio0_8
-				  &lsio_gpio0_9
-				  &lsio_gpio0_13_rdk_v1p0 //USB HUB RESET high
-				  &lsio_gpio0_20
-				  &lsio_gpio0_21
-				  &lsio_gpio0_22
-				  &lsio_gpio0_23
-				>;
+	pinctrl-0 = <&lsio_gpio0_13_rdk_v1p0>;//USB HUB RESET high
 };
 
 &adc {
