@@ -2155,8 +2155,6 @@ DEBUGFS_READ_WRITE_FILE_OPS(last_rx);
 
 #endif /* CONFIG_RWNX_FULLMAC */
 
-struct dentry *dir_sta_dr = NULL;
-
 #ifdef CONFIG_RWNX_FULLMAC
 static void rwnx_rc_stat_work(struct work_struct *ws)
 {
@@ -2193,19 +2191,17 @@ static void rwnx_rc_stat_work(struct work_struct *ws)
 		int nb_rx_rate = N_CCK + N_OFDM;
 		struct rwnx_rc_config_save *rc_cfg, *next;
 
-		//if (sta->sta_idx >= NX_REMOTE_STA_MAX) {
+		if (sta->sta_idx >= NX_REMOTE_STA_MAX) {
 			scnprintf(sta_name, sizeof(sta_name), "bc_mc");
-		//} else {
-			//scnprintf(sta_name, sizeof(sta_name), "%pM", sta->mac_addr);
-		//}
-		if(dir_sta_dr != NULL)
-			debugfs_remove(dir_sta_dr); 
+		} else {
+			scnprintf(sta_name, sizeof(sta_name), "%pM", sta->mac_addr);
+		}
+
 		dir_sta = debugfs_create_dir(sta_name, dir_rc);
 		if (!dir_sta)
 			goto error;
 
 		rwnx_debugfs->dir_sta[sta->sta_idx] = dir_sta;
-		dir_sta_dr = dir_sta;
 
 		file = debugfs_create_file("stats", S_IRUSR, dir_sta, rwnx_hw,
 								   &rwnx_dbgfs_rc_stats_ops);
@@ -2294,8 +2290,8 @@ error_after_dir:
 	debugfs_remove_recursive(rwnx_debugfs->dir_sta[sta_idx]);
 	rwnx_debugfs->dir_sta[sta->sta_idx] = NULL;
 error:
-	dev_err(rwnx_hw->dev,
-			"Error while (un)registering debug entry for sta %d\n", sta_idx);
+	//dev_err(rwnx_hw->dev,
+			//"Error while (un)registering debug entry for sta %d\n", sta_idx);
 }
 
 void _rwnx_dbgfs_rc_stat_write(struct rwnx_debugfs *rwnx_debugfs, uint8_t sta_idx)
