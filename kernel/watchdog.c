@@ -347,9 +347,9 @@ bool is_hardlockup(void)
 }
 
 #ifdef CONFIG_HOBOT_HARDLOCKUP_DETECTOR
-int __read_mostly hardlockup_det_en = true;
+int __read_mostly hardlockup_det_en = false;
 #ifdef CONFIG_HOBOT_CORESIGHT
-int panic_on_hardlockup = true;
+int panic_on_hardlockup = false;
 #endif
 
 /* proc handler for /proc/sys/kernel/hardlockup_det_en */
