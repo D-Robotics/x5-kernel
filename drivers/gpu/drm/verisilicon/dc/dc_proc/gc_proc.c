@@ -282,7 +282,7 @@ static void aux_rotate(struct vs_n2d_aux *aux, unsigned int rotation, n2d_rectan
 	src.format   = config->ninputs;
 	src.handle   = handle;
 	src.alignedh = config->input_height[0];
-	src.alignedw = config->input_stride[0];
+	src.alignedw = src.width;
 	if (src.format == N2D_NV12 || src.format == N2D_NV21) {
 		src.alignedw = gcmALIGN(src.alignedw, 64);
 	}
@@ -302,7 +302,7 @@ static void aux_rotate(struct vs_n2d_aux *aux, unsigned int rotation, n2d_rectan
 	dst.format   = config->output_format;
 	dst.handle   = handle;
 	dst.alignedh = config->output_height;
-	dst.alignedw = config->output_stride;
+	dst.alignedw = dst.width;
 	if (dst.format == N2D_NV12 || dst.format == N2D_NV21) {
 		dst.alignedw = gcmALIGN(dst.alignedw, 64);
 	}
