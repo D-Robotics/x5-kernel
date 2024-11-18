@@ -320,7 +320,11 @@ int vs_gem_dumb_create(struct drm_file *file, struct drm_device *dev,
 	struct vs_gem_object *vs_obj;
 	unsigned int pitch = args->width * DIV_ROUND_UP(args->bpp, 8);
 
-	args->pitch = num_align(pitch, priv->pitch_alignment);
+	/* for RGB888,BGR888, pitch alignment should be 192*/
+	if (args->bpp == 24)
+		args->pitch = num_align(pitch, 192);
+	else
+		args->pitch = num_align(pitch, priv->pitch_alignment);
 
 	args->size = PAGE_ALIGN(args->pitch * args->height);
 
