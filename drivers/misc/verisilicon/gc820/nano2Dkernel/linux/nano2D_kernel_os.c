@@ -1582,7 +1582,7 @@ n2d_error_t n2d_kernel_os_user_signal_signal(n2d_os_t *os, n2d_uintptr_t handle,
 
 n2d_error_t n2d_kernel_os_user_signal_wait(n2d_os_t *os, n2d_uintptr_t handle, n2d_uint32_t wait)
 {
-	return n2d_kernel_os_signal_wait(os, (n2d_pointer)handle, N2D_TRUE, wait);
+	return n2d_kernel_os_signal_wait(os, (n2d_pointer)handle, N2D_FALSE, wait);
 }
 
 n2d_error_t n2d_kernel_os_get_page_size(n2d_os_t *os, n2d_uint32_t *page_size)
