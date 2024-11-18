@@ -834,7 +834,8 @@ n2d_error_t n2d_kernel_hardware_commit(n2d_hardware_t *hardware, n2d_uint32_t pr
 	n2d_uint32_t *user_command_tail	  = N2D_NULL;
 	n2d_uint32_t user_command_size	  = iface->size;
 	n2d_uint64_t user_command_address = iface->address + iface->offset;
-	n2d_cmd_buf_t *cmd_buf		  = &hardware->cmd_buf;
+	n2d_uint64_t user_command_tail_address = user_command_address + user_command_size;
+	n2d_cmd_buf_t *cmd_buf		       = &hardware->cmd_buf;
 	n2d_uint32_t *entry_logical	  = N2D_NULL;
 	n2d_uint64_t entry_address	  = 0;
 	n2d_user_event_t *queue		  = gcmUINT64_TO_PTR(iface->queue);
@@ -908,6 +909,11 @@ n2d_error_t n2d_kernel_hardware_commit(n2d_hardware_t *hardware, n2d_uint32_t pr
 		/* Link the user command to new wait-link*/
 		ONERROR(n2d_kernel_hardware_link(hardware, user_command_tail, entry_address,
 						 wait_link_size, N2D_NULL));
+
+		dcache_clean_poc(
+			(unsigned long)phys_to_virt(user_command_tail_address - link_size),
+			(unsigned long)phys_to_virt(user_command_tail_address));
+
 		/* Link to user command */
 		ONERROR(n2d_kernel_hardware_link(hardware, cmd_buf->wl_current_logical,
 						 user_command_address,
