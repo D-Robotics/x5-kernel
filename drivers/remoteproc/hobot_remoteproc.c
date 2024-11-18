@@ -2249,7 +2249,7 @@ static void hobot_remoteproc_coredump_work(struct work_struct *work) {
 		}
 
 		//dsp reset
-		reset_control_assert(pdata->rst);
+		rproc_shutdown(pdata->rproc);
 	}
 }
 
@@ -2302,7 +2302,6 @@ static int32_t parse_reserve_mem(struct platform_device *pdev) {
 
 	struct device_node *node;
         struct resource res;
-	u32 dsp_ddr_offset;
 	struct hobot_rproc_pdata *pdata = platform_get_drvdata(pdev);
 
 	ret = of_property_read_u32_index(pdev->dev.of_node, "dsp_iram0_map_addr", 0,
@@ -2353,11 +2352,6 @@ static int32_t parse_reserve_mem(struct platform_device *pdev) {
                 dev_err(&pdev->dev, "Get adsp_ddr failed\n");
                 return ret;
         }
-	ret = of_property_read_u32(pdev->dev.of_node, "dsp_ddr_offset", &dsp_ddr_offset);
-	if (ret) {
-		dev_err(&pdev->dev, "get ddr-offset error\n");
-		return -EINVAL;
-	}
 	ret = of_property_read_u32(pdev->dev.of_node, "dsp_ddr_size", &pdata->dsp_ddr_size);
 	if (ret) {
 		dev_err(&pdev->dev, "get ddr-size error\n");
@@ -2366,8 +2360,8 @@ static int32_t parse_reserve_mem(struct platform_device *pdev) {
 
 	dev_dbg(&pdev->dev, "iram0 0x%x dram0 0x%x dram1 0x%x ddr 0x%llx\n",
 		pdata->dsp_iram0_map_addr, pdata->dsp_dram0_map_addr,
-		pdata->dsp_dram1_map_addr, res.start + dsp_ddr_offset);
-	pdata->mem_reserved[0] = ioremap_wc(res.start + dsp_ddr_offset,
+		pdata->dsp_dram1_map_addr, res.start);
+	pdata->mem_reserved[0] = ioremap_wc(res.start,
 			pdata->dsp_ddr_size);
 	pdata->mem_reserved[1] = ioremap_wc(pdata->dsp_iram0_map_addr,
 			pdata->dsp_iram0_size);
