@@ -71,12 +71,64 @@ on_error:
     N2D_ASSERT(Hardware != N2D_NULL); \
 }
 
-n2d_error_t gcCheckContext(void)
+#define SWAP(a, b)      \
+	do {            \
+		a ^= b; \
+		b ^= a; \
+		a ^= b; \
+	} while (0)
+
+n2d_error_t gcCheckContext()
 {
     gcoTLS tls;
 
     N2D_ASSERT(n2d_user_os_get_tls(&tls) == N2D_SUCCESS);
     return (tls->s_running > 0) ? N2D_SUCCESS : N2D_NO_CONTEXT;
+}
+
+static n2d_point_t gcRotatePointSrc(
+    n2d_int32_t width,
+    n2d_int32_t height,
+    n2d_orientation_t orientation,
+    gcsSURF_INFO* Surface,
+    n2d_point_t point)
+{
+    n2d_point_t ret;
+
+    switch (orientation)
+    {
+        case N2D_90:
+            ret.x = height - point.y;
+            ret.y = point.x + Surface->alignedWidth - width;
+            break;
+
+        case N2D_180:
+            ret.x = Surface->alignedWidth - point.x;
+            ret.y = Surface->alignedHeight - point.y;
+            break;
+
+        case N2D_270:
+            ret.x = point.y + Surface->alignedHeight - height;
+            ret.y = width - point.x;
+            break;
+
+        case N2D_FLIP_X:
+            ret.x = point.x + Surface->alignedWidth - width;
+            ret.y = point.y;
+            break;
+
+        case N2D_FLIP_Y:
+            ret.x = point.x;
+            ret.y = point.y + Surface->alignedHeight - height;
+            break;
+
+        case N2D_0:
+        default:
+            ret = point;
+            break;
+    }
+
+    return ret;
 }
 
 static n2d_point_t gcRotatePoint(
@@ -118,6 +170,8 @@ static gcsRECT gcRotateRect(
     n2d_int32_t height,
     n2d_orientation_t orientation,
     gcsRECT rect,
+    gcsSURF_INFO* Surface,
+    n2d_bool_t isDst,
     n2d_int32_t* newwidth,
     n2d_int32_t* newheight
 )
@@ -160,8 +214,16 @@ static gcsRECT gcRotateRect(
         break;
     }
 
-    pt1 = gcRotatePoint(width, height, orientation, pt1);
-    pt2 = gcRotatePoint(width, height, orientation, pt2);
+    if (isDst)
+    {
+        pt1 = gcRotatePoint(width, height, orientation, pt1);
+        pt2 = gcRotatePoint(width, height, orientation, pt2);
+    }
+    else
+    {
+        pt1 = gcRotatePointSrc(width, height, orientation, Surface, pt1);
+        pt2 = gcRotatePointSrc(width, height, orientation, Surface, pt2);
+    }
 
     ret.left = pt1.x;
     ret.top = pt1.y;
@@ -182,6 +244,43 @@ static gcsRECT gcRotateRect(
     }
 
     return ret;
+}
+
+static n2d_error_t checkRectangle(
+    n2d_buffer_t* buffer,
+    n2d_rectangle_t* rect,
+    n2d_rectangle_t* correctRect)
+{
+    n2d_int32_t width = buffer->width;
+    n2d_int32_t height = buffer->height;
+
+    if (buffer->orientation == N2D_90 || buffer->orientation == N2D_270)
+    {
+        SWAP(width, height);
+    }
+
+    if (rect->x < 0 || rect->x > width ||
+        rect->y < 0 || rect->y > height ||
+        rect->width < 0 || rect->height < 0)
+    {
+        return N2D_INVALID_ARGUMENT;
+    }
+
+    correctRect->x = rect->x;
+    correctRect->y = rect->y;
+    correctRect->width = rect->width;
+    correctRect->height = rect->height;
+
+     if (correctRect->x + correctRect->width > width)
+    {
+        correctRect->width = width - correctRect->x;
+    }
+    if (correctRect->y + correctRect->height > height)
+    {
+        correctRect->height = height - correctRect->y;
+    }
+
+    return N2D_SUCCESS;
 }
 
 static gcsRECT gcRectIntersect(
@@ -229,6 +328,41 @@ static void gcRect2gcsRECT(
     dst->bottom = src->y + src->height;
 }
 
+static void gcSrcRectAlign(
+    n2d_int32_t width,
+    n2d_int32_t height,
+    n2d_orientation_t orientation,
+    gcsSURF_INFO* Surface,
+    n2d_rectangle_t* srcRect)
+{
+    switch (orientation)
+    {
+        case N2D_90:
+            srcRect->y = srcRect->y + Surface->alignedWidth - width;
+            break;
+
+        case N2D_180:
+            srcRect->x = srcRect->x + Surface->alignedWidth - width;
+            srcRect->y = srcRect->y + Surface->alignedHeight - height;
+            break;
+
+        case N2D_270:
+            srcRect->x = srcRect->x + Surface->alignedHeight - height;
+            break;
+
+        case N2D_FLIP_X:
+            srcRect->x = srcRect->x + Surface->alignedWidth - width;
+            break;
+
+        case N2D_FLIP_Y:
+            srcRect->y = srcRect->y + Surface->alignedHeight - height;
+            break;
+
+        case N2D_0:
+        default:
+            break;
+    }
+}
 
 static n2d_error_t gcEnableAlphaBlend(
     IN n2d_user_hardware_t* Hardware,
@@ -674,6 +808,53 @@ static n2d_error_t gcCheckTile(
 on_error:
     return error;
 }
+
+static n2d_error_t gcCheckDstRotation(
+    n2d_orientation_t  orientation,
+    n2d_bool_t  isWidthAlign,
+    n2d_bool_t  isHeightAlign)
+{
+    n2d_error_t error;
+
+    switch (orientation)
+    {
+    case N2D_0:
+        break;
+
+    case N2D_90:
+    case N2D_FLIP_X:
+        if (!isWidthAlign)
+        {
+            N2D_ON_ERROR(N2D_NOT_SUPPORTED);
+        }
+        break;
+
+    case N2D_180:
+        if (!isWidthAlign || !isHeightAlign)
+        {
+            N2D_ON_ERROR(N2D_NOT_SUPPORTED);
+        }
+        break;
+
+    case N2D_270:
+    case N2D_FLIP_Y:
+        if (!isHeightAlign)
+        {
+            N2D_ON_ERROR(N2D_NOT_SUPPORTED);
+        }
+        break;
+
+    default:
+        N2D_ON_ERROR(N2D_INVALID_ARGUMENT);
+    }
+
+    /* Success. */
+    return N2D_SUCCESS;
+
+on_error:
+    return error;
+}
+
 
 static n2d_bool_t _isMultiPlaneYUV(
     n2d_buffer_format_t format)
@@ -1463,6 +1644,8 @@ n2d_error_t n2d_fill(
     n2d_state_t* state;
     n2d_uint32_t    planes;
     n2d_user_hardware_t* hardware = N2D_NULL;
+    n2d_rectangle_t tempDstRect = {0};
+
     /* Check the context. */
     N2D_ON_ERROR(gcCheckContext());
 
@@ -1471,12 +1654,18 @@ n2d_error_t n2d_fill(
     {
         N2D_ON_ERROR(N2D_INVALID_ARGUMENT);
     }
+    if (N2D_NULL != rectangle)
+    {
+        N2D_ON_ERROR(checkRectangle(destination, rectangle, &tempDstRect));
+        rectangle = &tempDstRect;
+    }
 
     gcmGETHARDWARE(hardware);
 
     N2D_ON_ERROR(gcCheckDstFormat(destination->format, &planes));
 
     N2D_ON_ERROR(gcCheckTile(destination->tiling));
+    N2D_ON_ERROR(gcCheckDstRotation(destination->orientation, destination->width == destination->alignedw, destination->height == destination->alignedh));
 
     state = &hardware->state;
     dst = &state->dest.dstSurface;
@@ -1498,6 +1687,8 @@ n2d_error_t n2d_fill(
         destination->height,
         destination->orientation,
         rect,
+        dst,
+        N2D_TRUE,
         N2D_NULL,
         N2D_NULL);
 
@@ -1548,6 +1739,7 @@ n2d_error_t n2d_blit(
     gcs2D_MULTI_SOURCE* currentSrc;
     n2d_user_hardware_t* hardware = N2D_NULL;
     gce2D_COMMAND       command = gcv2D_BLT;
+    n2d_rectangle_t tempDstRect = { 0 }, tempSrcRect = { 0 };
 
     /* Check the context. */
     N2D_ON_ERROR(gcCheckContext());
@@ -1556,6 +1748,18 @@ n2d_error_t n2d_blit(
 
     /* Check the argument. */
     gcmVERIFY_ARGUMENT(destination != N2D_NULL);
+
+    if (N2D_NULL != destination_rectangle)
+    {
+        N2D_ON_ERROR(checkRectangle(destination, destination_rectangle, &tempDstRect));
+        destination_rectangle = &tempDstRect;
+    }
+
+    if (N2D_NULL != source && N2D_NULL != source_rectangle)
+    {
+        N2D_ON_ERROR(checkRectangle(source, source_rectangle, &tempSrcRect));
+        source_rectangle = &tempSrcRect;
+    }
 
     /*maskblit,*/
     // if ((&hardware->state.multiSrc[hardware->state.currentSrcIndex].maskPackConfig) != N2D_NULL
@@ -1587,6 +1791,7 @@ n2d_error_t n2d_blit(
 
     N2D_ON_ERROR(gcCheckDstFormat(destination->format, &planes));
     N2D_ON_ERROR(gcCheckTile(destination->tiling));
+    N2D_ON_ERROR(gcCheckDstRotation(destination->orientation, destination->width == destination->alignedw, destination->height == destination->alignedh));
 
     state = &hardware->state;
     dst = &state->dest.dstSurface;
@@ -1611,6 +1816,8 @@ n2d_error_t n2d_blit(
         dst_height,
         destination->orientation,
         rect,
+        dst,
+        N2D_TRUE,
         &dst_width,
         &dst_height
     );
@@ -1645,6 +1852,8 @@ n2d_error_t n2d_blit(
         src_height,
         source->orientation,
         currentSrc->srcRect,
+        &currentSrc->srcSurface,
+        N2D_FALSE,
         &src_width,
         &src_height);
 
@@ -1655,6 +1864,7 @@ n2d_error_t n2d_blit(
         src_width = source_rectangle->width;
         src_height = source_rectangle->height;
 
+        gcSrcRectAlign(source->width, source->height, source->orientation, &currentSrc->srcSurface, source_rectangle);
         gcRect2gcsRECT(&currentSrc->srcRect, source_rectangle);
 
         currentSrc->srcRect = gcRectIntersect(currentSrc->srcRect, tmprect);
@@ -1735,6 +1945,7 @@ n2d_error_t n2d_line(
 
     N2D_ON_ERROR(gcCheckDstFormat(destination->format, &planes));
     N2D_ON_ERROR(gcCheckTile(destination->tiling));
+    N2D_ON_ERROR(gcCheckDstRotation(destination->orientation, destination->width == destination->alignedw, destination->height == destination->alignedh));
 
     state = &hardware->state;
     dst = &state->dest.dstSurface;
@@ -1761,6 +1972,8 @@ n2d_error_t n2d_line(
         destination->height,
         destination->orientation,
         rect,
+        dst,
+        N2D_TRUE,
         N2D_NULL,
         N2D_NULL);
 
@@ -1854,6 +2067,8 @@ n2d_error_t n2d_set_source(
         src_height,
         source->orientation,
         rect,
+        &currentSrc->srcSurface,
+        N2D_FALSE,
         &src_width,
         &src_height);
 
@@ -1864,6 +2079,7 @@ n2d_error_t n2d_set_source(
         src_width = src_rect->width;
         src_height = src_rect->height;
 
+        gcSrcRectAlign(source->width, source->height, source->orientation, &currentSrc->srcSurface, src_rect);
         gcRect2gcsRECT(&currentSrc->srcRect, src_rect);
 
         tmprect = gcRectIntersect(currentSrc->srcRect, tmprect);
@@ -1959,6 +2175,7 @@ n2d_error_t n2d_multisource_blit(
 
     N2D_ON_ERROR(gcCheckDstFormat(destination->format, &planes));
     N2D_ON_ERROR(gcCheckTile(destination->tiling));
+    N2D_ON_ERROR(gcCheckDstRotation(destination->orientation, destination->width == destination->alignedw, destination->height == destination->alignedh));
 
     state = &hardware->state;
     dst = &state->dest.dstSurface;
@@ -1980,6 +2197,8 @@ n2d_error_t n2d_multisource_blit(
         dst_height,
         destination->orientation,
         rect,
+        dst,
+        N2D_TRUE,
         &dst_width,
         &dst_height
     );

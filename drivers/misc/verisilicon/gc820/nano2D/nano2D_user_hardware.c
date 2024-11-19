@@ -3605,6 +3605,14 @@ n2d_error_t gcGetSurfaceBufferSize(
     {
         offset = 256;
     }
+    else
+    {
+        if (format == N2D_NV12 || format == N2D_NV21 || format == N2D_P010_MSB || format == N2D_P010_LSB ||
+            format == N2D_YV12 || format == N2D_I420)
+        {
+            alignedWidth = gcmALIGN(alignedWidth, 64);
+        }
+    }
 
     alignedStride = (n2d_uint32_t)(alignedWidth * fbpps[0]);
 
