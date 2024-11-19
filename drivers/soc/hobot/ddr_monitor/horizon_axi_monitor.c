@@ -14,6 +14,8 @@
 #include <linux/clk.h>
 #include <linux/delay.h>
 #include <linux/notifier.h>
+#include <linux/pm_runtime.h>
+#include <linux/pm_domain.h>
 
 #include "horizon_axi_monitor.h"
 
@@ -534,12 +536,37 @@ static int axi_mon_parse_of(struct platform_device *pdev, struct axi_monitor *ax
 		dev_info(dev, "Got new axi-port:%s, idx:%d\n", port->name, port->idx);
 		/* Enable R/W bandwidth stat by default */
 		axi_mon_writel(axi_mon, PORT_EVENT_EN(i),
-					   (RD_BW_EN | RD_CMD_CNT_EN | RD_LATENCY_EN | RD_TOTAL_CYCLE_EN | RD_THROTTLE_EN | 
+					   (RD_BW_EN | RD_CMD_CNT_EN | RD_LATENCY_EN | RD_TOTAL_CYCLE_EN | RD_THROTTLE_EN |
 					   WR_BW_EN | WR_CMD_CNT_EN | WR_LATENCY_EN | WR_TOTAL_CYCLE_EN | WR_THROTTLE_EN));
 	}
 
 	return 0;
 }
+
+static int __maybe_unused axi_monitor_suspend(struct device *dev)
+{
+	return 0;
+}
+
+static int __maybe_unused axi_monitor_resume(struct device *dev)
+{
+	struct axi_monitor *axi_mon =
+		(struct axi_monitor *)dev_get_drvdata(dev);
+	int32_t i;
+
+	for (i = 0; i < axi_mon->ports_num; i++) {
+		/* Enable R/W bandwidth stat by default */
+		axi_mon_writel(axi_mon, PORT_EVENT_EN(i),
+					   (RD_BW_EN | RD_CMD_CNT_EN | RD_LATENCY_EN | RD_TOTAL_CYCLE_EN | RD_THROTTLE_EN |
+					   WR_BW_EN | WR_CMD_CNT_EN | WR_LATENCY_EN | WR_TOTAL_CYCLE_EN | WR_THROTTLE_EN));
+	}
+
+	axi_mon_writel(axi_mon, INT_EN, INT_ALL);
+	return 0;
+}
+
+static const struct dev_pm_ops axi_monitor_pm_ops = {
+	SET_SYSTEM_SLEEP_PM_OPS(axi_monitor_suspend, axi_monitor_resume)};
 
 static int axi_monitor_probe(struct platform_device *pdev)
 {
@@ -677,6 +704,7 @@ static struct platform_driver axi_monitor_driver = {
 	.driver = {
 		.name	= "axi_monitor",
 		.of_match_table = axi_monitor_match,
+		.pm = &axi_monitor_pm_ops,
 	}
 };
 module_platform_driver(axi_monitor_driver);
