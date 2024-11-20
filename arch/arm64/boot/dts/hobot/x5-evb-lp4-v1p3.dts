@@ -1,0 +1,43 @@
+// SPDX-License-Identifier: GPL-2.0
+/*
+ * dts for Sunrise5 EVB LP4 V1P3 board
+ *
+ * Copyright (C) 2024 D-Robotics Inc.
+ *
+ */
+
+/dts-v1/;
+#include "x5-evb.dtsi"
+
+/ {
+	model = "D-Robotics X5 EVB LP4 V1P3 board";
+};
+
+&horizon_tsn {
+	status = "disabled";
+
+	phy-mode = "rgmii-id";
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_enet &lsio_gpio0_31>;
+	phyreset-gpio = <&ls_gpio0_porta 31 GPIO_ACTIVE_LOW>;
+};
+
+&hobot_tsn {
+	status = "disabled";
+
+	phy-mode = "rgmii-id";
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_enet &lsio_gpio0_31>;
+	phyreset-gpio = <&ls_gpio0_porta 31 GPIO_ACTIVE_LOW>;
+};
+
+&gmac_tsn {
+	/* Use gmac_tsn or hobot_tsn for evb v1p2 board currently,
+	   horizon_tsn driver is not ready yet... */
+	status = "okay";
+
+	phy-mode = "rgmii-id";
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_enet &lsio_gpio0_31>;
+	phyreset-gpio = <&ls_gpio0_porta 31 GPIO_ACTIVE_LOW>;
+};
