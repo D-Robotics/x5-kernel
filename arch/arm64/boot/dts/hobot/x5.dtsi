@@ -4507,6 +4507,10 @@
 		i2c0 = <&i2c0>,"status";
 		i2c1 = <&i2c1>,"status";
 		i2c5 = <&i2c5>,"status";
+		pwm0 = <&pwm0>,"status";
+		pwm1 = <&pwm1>,"status";
+		pwm2 = <&pwm2>,"status";
+		pwm3 = <&pwm3>,"status";
 		dw_i2s1 = <&dw_i2s1>,"status";
 	};
 };
