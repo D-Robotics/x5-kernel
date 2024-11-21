@@ -4,7 +4,7 @@
 
 #include "tcan4x5x.h"
 
-#define TCAN4X5X_EXT_CLK_DEF 40000000
+#define TCAN4X5X_EXT_CLK_DEF 20000000
 
 #define TCAN4X5X_DEV_ID0 0x00
 #define TCAN4X5X_DEV_ID1 0x04
