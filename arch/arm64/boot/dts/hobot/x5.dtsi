@@ -3553,11 +3553,8 @@
 				pinctrl-0 = <&pinctrl_dsp_pdm_cko &pinctrl_dsp_pdm_in>;
 				arb-syscon = <&dsp_crm_syscon 0x10>;
 				arb,osr = <1>;
-				dmas = <&dsp_axi_dma 20>; //core 0
-				// dmas = <&dsp_axi_dma 19>; // core 1
-				// dmas = <&dsp_axi_dma 18>; // core 2
-				// dmas = <&dsp_axi_dma 17>; // core 3
-				dma-names = "rx";
+				dmas = <&dsp_axi_dma 20>, <&dsp_axi_dma 19>, <&dsp_axi_dma 18>, <&dsp_axi_dma 17>;
+				dma-names = "rx0", "rx1", "rx2", "rx3";
 				channel = <2>;
 				#sound-dai-cells = <0>;
 				status = "disabled";
