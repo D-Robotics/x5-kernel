@@ -10,6 +10,8 @@
 #include <linux/pm_runtime.h>
 #include "archband-pdm.h"
 
+#include "hobot-platform-x5.h"
+
 #define PERIOD_BYTES_MIN 4096
 #define BUFFER_BYTES_MAX (3 * 2 * 8 * PERIOD_BYTES_MIN)
 #define PERIODS_MIN 2
@@ -90,9 +92,14 @@ static void pdm_start(struct arb_pdm_dev *dev,
 	int i;
 	u32 val = 0;
 	int usecase = dev->config.usecase;
+	uint32_t pcma_en = 0;
+	uint32_t temp = 0;
 
 	pdm_write_reg(dev->pdm_base, PDM_WRAPPER_PCM_INTR_EN, dev->use_pio ? 0xf : 0x0);
-	pdm_write_reg(dev->pdm_base, PDM_WRAPPER_PCM_CHAN_CTRL, 0xff);
+	for (i = 0; i < dev->config.chan_nr; i++) {
+		temp |= BIT(i);
+	}
+	pdm_write_reg(dev->pdm_base, PDM_WRAPPER_PCM_CHAN_CTRL, temp);
 
 	for (i = 0; i < (dev->config.chan_nr >> 1); i++) {
 		pdm_update_bits(dev->pdm_base, PDM_CORE_CONF(i),
@@ -102,12 +109,14 @@ static void pdm_start(struct arb_pdm_dev *dev,
 		pdm_write_reg(dev->pdm_base, PDM_WRAPPER_CORE_DMA_CR(i),
 			      dev->use_pio ? 0x7 : 0x17);
 		val |= BIT(i);
+
+		pcma_en |= BIT(i);
 	}
 
 	pdm_update_bits(dev->pdm_base, PDM_CTRL_CORE_CONF(0),
 			PDM_CTRL_CORE_EN_MASK | PDM_CTRL_ACTIVE_MASK |
 				PDM_CTRL_USE_CASE_MASK,
-			PDM_CTRL_CORE_EN_VAL(1) | PDM_CTRL_ACTIVE_VAL(val) |
+			PDM_CTRL_CORE_EN_VAL(pcma_en) | PDM_CTRL_ACTIVE_VAL(val) |
 				PDM_CTRL_USE_CASE_VAL(usecase));
 }
 
@@ -584,6 +593,7 @@ static int arb_pdm_probe(struct platform_device *pdev)
 	struct snd_soc_dai_driver *arb_pdm_dai = &arb_dai_driver;
 	int ret, irq;
 	u32 tmp;
+	struct snd_soc_component_driver *arb_pdm_component_drv = NULL;
 
 	dev = devm_kzalloc(&pdev->dev, sizeof(*dev), GFP_KERNEL);
 	if (!dev)
@@ -632,7 +642,17 @@ static int arb_pdm_probe(struct platform_device *pdev)
 		return ret;
 
 	dev_set_drvdata(&pdev->dev, dev);
-	ret = devm_snd_soc_register_component(&pdev->dev, &arb_pdm_component,
+
+	arb_pdm_component_drv = (struct snd_soc_component_driver *)devm_kzalloc(&pdev->dev,
+			sizeof(*arb_pdm_component_drv), GFP_KERNEL);
+	if (!arb_pdm_component_drv)
+		return -ENOMEM;
+
+	ret = x5_i2s_platform_probe(pdev, arb_pdm_component_drv);
+	if (ret)
+		return -EINVAL;
+
+	ret = devm_snd_soc_register_component(&pdev->dev, arb_pdm_component_drv,
 					      arb_pdm_dai, 1);
 	if (ret != 0) {
 		dev_err(&pdev->dev, "not able to register dai\n");
@@ -656,9 +676,6 @@ static int arb_pdm_probe(struct platform_device *pdev)
 				"not able to devm_snd_soc_register_component dai\n");
 			return ret;
 		}
-	} else {
-		dev->use_pio = false;
-		ret = devm_snd_dmaengine_pcm_register(&pdev->dev, NULL, 0);
 	}
 
 	arb_pdm_disable(dev);
