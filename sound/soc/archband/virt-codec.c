@@ -8,7 +8,7 @@
 #include <sound/soc.h>
 #include "virt-codec.h"
 
-#define VIRT_FORMATS (SNDRV_PCM_FMTBIT_S16_LE | SNDRV_PCM_FMTBIT_S24_LE | SNDRV_PCM_FMTBIT_S32_LE)
+#define VIRT_FORMATS (SNDRV_PCM_FMTBIT_S16_LE | SNDRV_PCM_FMTBIT_S24_LE | SNDRV_PCM_FMTBIT_S24_3LE | SNDRV_PCM_FMTBIT_S32_LE)
 
 static int dm_set_dai_sysclk(struct snd_soc_dai *codec_dai, int clk_id,
 			     unsigned int freq, int dir)

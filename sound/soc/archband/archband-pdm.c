@@ -27,7 +27,7 @@ static const struct snd_pcm_hardware dw_pcm_hardware = {
 		 SNDRV_PCM_RATE_48000 | SNDRV_PCM_RATE_44100,
 	.rate_min = 16000,
 	.rate_max = 48000,
-	.formats = SNDRV_PCM_FMTBIT_S24_LE,
+	.formats = SNDRV_PCM_FMTBIT_S24_LE | SNDRV_PCM_FMTBIT_S24_3LE,
 	.channels_min = ARB_CHAN_MIN,
 	.channels_max = ARB_CHAN_MAX,
 	.buffer_bytes_max = BUFFER_BYTES_MAX,
@@ -154,6 +154,7 @@ static int arb_pdm_hw_params(struct snd_pcm_substream *substream,
 
 	switch (params_format(params)) {
 	case SNDRV_PCM_FORMAT_S24_LE:
+	case SNDRV_PCM_FORMAT_S24_3LE:
 		config->data_width = 32;
 		break;
 	default:
@@ -566,7 +567,7 @@ static struct snd_soc_dai_driver arb_dai_driver = {
 	.ops = &arb_pdm_dai_ops,
 	.capture.channels_min = ARB_CHAN_MIN,
 	.capture.channels_max = ARB_CHAN_MAX,
-	.capture.formats = (SNDRV_PCM_FMTBIT_S24_LE),
+	.capture.formats = (SNDRV_PCM_FMTBIT_S24_LE | SNDRV_PCM_FMTBIT_S24_3LE),
 	.capture.rates = SNDRV_PCM_RATE_16000 | SNDRV_PCM_RATE_32000 |
 			 SNDRV_PCM_RATE_48000 | SNDRV_PCM_RATE_44100,
 };
