@@ -238,7 +238,7 @@
 		compatible = "operating-points-v2";
 		opp-shared;
 		opp0 {
-				opp-hz = /bits/ 64 <996000000>;
+				opp-hz = /bits/ 64 <1000000000>;
 				opp-microvolt = <800000>;
 				clock-latency-ns = <500000>;
 		};

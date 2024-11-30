@@ -1141,7 +1141,14 @@ int32_t bpu_core_dvfs_register(struct bpu_core *core, const char *name)
 	core->dvfs->profile.get_cur_freq = bpu_core_get_freq;
 	core->dvfs->profile.get_dev_status = bpu_get_dev_status;
 	if (core->mclk != NULL) {
-		core->dvfs->profile.initial_freq = bpu_core_get_clk(core);
+		opp = devfreq_recommended_opp(core->dev, &core->dvfs->profile.initial_freq,
+				0);
+		if (IS_ERR(opp)) {
+			devm_kfree(core->dev, (void *)core->dvfs);
+			core->dvfs = NULL;
+			dev_err(core->dev, "Can't find opp\n");
+			return (int32_t)PTR_ERR(opp);
+		}
 	} else {
 		devm_kfree(core->dev, (void *)core->dvfs);
 		core->dvfs = NULL;
