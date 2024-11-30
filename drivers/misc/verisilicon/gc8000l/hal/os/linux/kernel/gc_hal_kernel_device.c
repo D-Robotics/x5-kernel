@@ -3118,13 +3118,14 @@ static int gc_df_target(struct device *dev, unsigned long *freq, u32 flags)
 	return 0;
 }
 
-static gceSTATUS gc_df_status(struct device *dev, struct devfreq_dev_status *stat)
+static int gc_df_status(struct device *dev, struct devfreq_dev_status *stat)
 {
 	gckKERNEL kernel = _GetValidKernel(galDevice);
 	gctUINT32 load	 = 0;
 	gceSTATUS status = gcvSTATUS_OK;
 	gctUINT32 count = 0;
 	gctBOOL clockState;
+	struct gpu_power_domain *gpd = &galDevice->platform->gpd;
 
 	gcmkHEADER();
 
@@ -3140,17 +3141,18 @@ static gceSTATUS gc_df_status(struct device *dev, struct devfreq_dev_status *sta
 
 OnError:
 
-	stat->current_frequency = (unsigned long)cur_freq;
+	stat->current_frequency = clk_get_rate(gpd->core_clk[gpd->clk_num - 1]);
 	stat->busy_time		= (unsigned long)load;
 	stat->total_time	= (unsigned long)100;
 
 	gcmkFOOTER_NO();
-	return status;
+	return status < 0 ? -EIO : 0;
 }
 
 static int gc_df_get_cur_freq(struct device *dev, unsigned long *freq)
 {
-	*freq = cur_freq;
+	struct gpu_power_domain *gpd = &galDevice->platform->gpd;
+	*freq = clk_get_rate(gpd->core_clk[gpd->clk_num - 1]);
 	return 0;
 }
 
