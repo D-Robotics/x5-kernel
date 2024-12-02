@@ -3652,7 +3652,7 @@
 			power-domains = <&power X5_DSP_HIFI5>;
 			consumer-dev = <&remoteproc_hifi5>;
 			clocks-num = <0>;
-			status = "okay";
+			status = "disabled";
 			ports-num = <1>;
 			ports-off = <0x0008>;
 		};
