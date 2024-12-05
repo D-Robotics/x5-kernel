@@ -13,24 +13,38 @@
 	model = "D-Robotics X5 EVB LP4 1_A board";
 };
 
-&i2c2 {
-	/delete-node/ sc230ai@30;
-};
-
 &i2c1 {
 	status = "disabled";
-	/delete-node/ sc230ai@30;
 };
 
 &i2c3 {
 	status = "okay";
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_i2c3>;
+
+	sc230ai@30 {
+		status = "okay";
+		compatible = "smartsens,sc230ai";
+		pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_sensor3_mclk &lsio_gpio1_6>;
+		reset-gpios = <&ls_gpio1_porta 6 GPIO_ACTIVE_HIGH>;	/* HIGH is ACTIVE LEVEL */
+		reg = <0x30>;
+		clocks = <&hpsclks X5_LSIO_SENSOR3_CLK>;
+		clock-names = "xclk";
+
+		port {
+			/* MIPI CSI-2 bus endpoint */
+			sc230ai_to_mipi_csi3: endpoint {
+				remote-endpoint = <&x5_mipi_csi3_from_sc230ai>;
+				clock-lanes = <0>;
+				data-lanes = <1>;	//1 lane
+			};
+		};
+	};
 };
 
 &i2c4 {
 	/delete-node/ lt8618@3b;
-	/delete-node/ sc230ai@30;
 };
 
 &i2c7 {
@@ -40,21 +54,6 @@
 /* SD Card */
 &sdio_0 {
 	no-1-8-v;
-};
-
-&csi0 {
-	/delete-node/ ports;
-};
-
-&csi1 {
-	/delete-node/ ports;
-};
-
-&csi2 {
-	/delete-node/ ports;
-};
-&csi3 {
-	/delete-node/ ports;
 };
 
 &mipi_host1 {
