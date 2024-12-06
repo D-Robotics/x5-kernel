@@ -1049,7 +1049,7 @@
 				clock-names = "core", "mcm", "axi", "hclk";
 				resets = <&socrst CAM_ISP8000_RESET>;
 				reset-names = "rst";
-				instances = <6>;
+				instances = <8>;
 				cam-ctrl = <&cam_ctrl>;
 				iommus = <&isp_iommu>;
 				power-domains = <&power X5_ISP>;
