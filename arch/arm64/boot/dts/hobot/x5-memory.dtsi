@@ -58,6 +58,28 @@
 		};
 
 		/* UBoot will enable corresponding node when ddr size is confirmed */
+		
+		/* For RDK */
+		ion_reserved: ion_reserved@A4100000 {
+			compatible = "ion-pool";
+			reg = <0x0 0xA4100000 0x0 0x14000000>; /* 320MiB */
+			status = "disabled";
+		};
+
+		ion_carveout: ion_carveout@C4100000 {
+			compatible = "ion-carveout";
+			reg = <0x0 0xB8100000 0x0 0x14000000>; /* 320MiB */
+			status = "disabled";
+		};
+
+		ion_cma: ion_cma@CC100000 {
+			compatible = "ion-cma";
+			alignment = <0x0 0x2000>;
+			reusable;
+			reg = <0x0 0xCC00000 0x0 0x08000000>; /* 128MiB */
+			status = "disabled";
+		};
+		
 		ion_reserved_1g: ion_reserved_1g@A4100000 {
 			compatible = "ion-pool";
 			reg = <0x0 0xA4100000 0x0 0x07000000>; /* 112MiB */
