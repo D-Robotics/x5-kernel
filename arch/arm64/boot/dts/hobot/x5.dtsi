@@ -4583,6 +4583,7 @@
 	ipc_hal: ipc_hal {
 		status = "disabled";
 		compatible = "hobot,hobot-ipc-hal";
+	};
 
 	__overrides__ {
 		uart1 = <&uart1>,"status";
