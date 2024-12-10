@@ -181,8 +181,6 @@ struct es7210_reg_config {
 	unsigned char reg_v;
 };
 static const struct es7210_reg_config es7210_tdm_reg_common_cfg1[] = {
-	{0x00, 0xFF},
-	{0x00, 0x32},
 	{0x09, 0x20},
 	{0x0A, 0x10},
 	{0x23, 0x2a},

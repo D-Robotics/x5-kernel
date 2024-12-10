@@ -2309,10 +2309,6 @@ static void es7210_tdm_init_codec(u8 mode)
 	 * Set Direct DB Gain
 	 */
 	es7210_multi_chips_update_bits(ES7210_ALC_COM_CFG2_REG1A, 0x03, 0x00);
-	es7210_multi_chips_write(ES7210_ALC1_MAX_GAIN_REG1E, 0xBF);
-	es7210_multi_chips_write(ES7210_ALC2_MAX_GAIN_REG1D, 0xBF);
-	es7210_multi_chips_write(ES7210_ALC3_MAX_GAIN_REG1C, 0xBF);
-	es7210_multi_chips_write(ES7210_ALC4_MAX_GAIN_REG1B, 0xBF);
 
 	es7210_multi_chips_write(ES7210_RESET_CTL_REG00, 0x73);
 	msleep(10);
