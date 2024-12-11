@@ -375,9 +375,16 @@ static inline void guc_adc_fifo_read_enable(struct guc_adc *info, bool enable)
 static inline u32 guc_adc_nor_fifo_read(struct guc_adc *info)
 {
 	u32 val;
-
+	u32 mid;
 	val = (readl_relaxed(info->regs + GUC_CTRL_NOR_STS1) & SAMPLE_MASK);
-	val = ((val >> SAMPLE_OFFSET) - info->calibration_offset);
+	mid = val >> SAMPLE_OFFSET;
+
+	if (likely(mid > info->calibration_offset)) {
+		val = mid - info->calibration_offset;
+	} else {
+		val = 0;
+	};
+
 	return val;
 }
 
