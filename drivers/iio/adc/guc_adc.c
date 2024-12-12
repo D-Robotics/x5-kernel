@@ -173,6 +173,7 @@
 #define GUC_ADC_FIFO_VALID_BITS (16u)
 #define GUC_ADC_FIFO_VALID_LEN 10
 #define GUC_ADC_CHANNEL_NUM 10
+#define GUC_ADC_MAX_VAL ((1 << GUC_ADC_FIFO_VALID_LEN) - 1)
 #define GUC_ADC_FIFO_VALID_BYTES (GUC_ADC_FIFO_VALID_BITS / BITS_PER_BYTE)
 
 /* adc calibration information in eFuse */
@@ -381,6 +382,7 @@ static inline u32 guc_adc_nor_fifo_read(struct guc_adc *info)
 
 	if (likely(mid > info->calibration_offset)) {
 		val = mid - info->calibration_offset;
+		val = (val > GUC_ADC_MAX_VAL) ? GUC_ADC_MAX_VAL : val;
 	} else {
 		val = 0;
 	};
@@ -693,7 +695,12 @@ static void guc_adc_dma_buffer_done(void *data)
 	memcpy(buffer, buf, info->rx_block_sz);
 
 	for (i = 0; i < info->rx_block_sz / GUC_ADC_FIFO_VALID_BYTES; i++) {
-		buffer[i] = (buffer[i] >> SAMPLE_OFFSET) - info->calibration_offset;
+		if (likely((buffer[i] >> SAMPLE_OFFSET) > info->calibration_offset)) {
+			buffer[i] = (buffer[i] >> SAMPLE_OFFSET) - info->calibration_offset;
+			buffer[i] = (buffer[i] > GUC_ADC_MAX_VAL) ? GUC_ADC_MAX_VAL : buffer[i];
+		} else {
+			buffer[i] = 0;
+		}
 	}
 	if (flag && (info->len > 1)) {
 		flag = 0;
