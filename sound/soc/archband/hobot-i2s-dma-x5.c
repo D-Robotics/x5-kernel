@@ -12,7 +12,7 @@
 /**
  * snd_pcm_hardware - the gobal variable for setting pcm hardware parameter
  */
-const struct snd_pcm_hardware hobot_pcm_hardware = {
+struct snd_pcm_hardware hobot_pcm_hardware = {
 	.info = (uint32_t)(SNDRV_PCM_INFO_INTERLEAVED) |
 			(uint32_t)(SNDRV_PCM_INFO_NONINTERLEAVED) |
 			(uint32_t)(SNDRV_PCM_INFO_BLOCK_TRANSFER) |
@@ -555,13 +555,8 @@ static int32_t x5_pcm_platform_hw_params(struct snd_soc_component *component,
  */
 static inline int32_t x5_pcm_platform_init_runtime(struct snd_pcm_substream *substream)
 {
-	int32_t ret;
-	ret = snd_soc_set_runtime_hwparams(substream, &hobot_pcm_hardware);
-	if (ret < 0) {
-		dev_err(substream2dev(substream),
-				"BUG: Failed to snd_soc_set_runtime_hwparams:%d\n", ret);
-		return ret;
-	}
+	int32_t ret = 0;
+
 	ret = hobot_snd_platform_data_init(substream);
 	if (ret < 0) {
 		dev_err(substream2dev(substream),
@@ -596,6 +591,7 @@ static int32_t x5_pcm_platform_open(struct snd_soc_component *component,
 	struct x5_dmadata *dmadata = NULL;
 	int32_t ret = 0;
 	char chan_name[32];
+	struct device *dma_dev;
 	//struct snd_pcm_runtime *runtime = substream->runtime;
 	if (substream == NULL) {
 		pr_err("BUG: NO usefull args for %s\n", __FUNCTION__);/*PRQA S ALL*/ /*qac-9.7.0-1036,1035,3200*/
@@ -619,6 +615,18 @@ static int32_t x5_pcm_platform_open(struct snd_soc_component *component,
 			return -ENXIO;
 		}
 	}
+
+	dma_dev = dmadata->dma_chan[0]->device->dev;
+	hobot_pcm_hardware.period_bytes_max = dma_get_max_seg_size(dma_dev);
+	ret = snd_soc_set_runtime_hwparams(substream, &hobot_pcm_hardware);
+	if (ret < 0) {
+		dev_err(substream2dev(substream),
+				"BUG: Failed to snd_soc_set_runtime_hwparams:%d\n", ret);
+		devm_kfree(substream->pcm->card->dev, (void *)dmadata);
+		dmadata = NULL;
+		return ret;
+	}
+
 	ret = snd_pcm_hw_constraint_integer(substream->runtime,
 					    SNDRV_PCM_HW_PARAM_PERIODS);
 	if (ret < 0) {

@@ -32,7 +32,7 @@
 #define I2S_PROCESS_MAX	(5)
 #define HOBOT_SIGI_I2S_NUM	(2)
 
-extern const struct snd_pcm_hardware hobot_pcm_hardware;
+extern struct snd_pcm_hardware hobot_pcm_hardware;
 
 #define HOBOT_I2S_BITS_TO_BYTES (3)
 #define HOBOT_PDMA_ALIGN (8)
