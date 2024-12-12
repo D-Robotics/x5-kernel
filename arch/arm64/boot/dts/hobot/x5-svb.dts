@@ -268,8 +268,6 @@
 
 &i2c0 {
 	status = "okay";
-	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_i2c0>;
 
 	eeprom: 24c16@50 {
 		compatible = "atmel,24c16";
@@ -303,9 +301,6 @@
 
 &i2c1 {
 	status = "okay";
-
-	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_i2c1>;
 
 	hdmi_bridge@3b {
 		compatible = "sil,sii9022";
@@ -356,8 +351,6 @@
 
 &i2c2 {
 	status = "okay";
-	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_i2c2>;
 
 	emc2301@2f {
 		compatible = "microchip,emc2301";
@@ -535,8 +528,6 @@
 
 &i2c3 {
 	status = "okay";
-	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_i2c3>;
 
 	ov5640_sensor3: camera@3c {
 		compatible = "ovti,ov5640";
@@ -563,9 +554,6 @@
 &i2c4 {
 	status = "okay";
 
-	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_i2c4>;
-
 	wm8962_codec_1: wm8962_codec@1a {
 		compatible = "wlf,wm8962";
 		reg = <0x1a>;
@@ -586,8 +574,6 @@
 
 &i2c5 {
 	status = "disabled";
-	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_i2c5>;
 	//need add rising/falling time for i2c running at 400K
 	i2c-scl-rising-time-ns = <20>;
 	i2c-scl-falling-time-ns = <4>;
@@ -596,8 +582,6 @@
 
 &i2c6 {
 	status = "disabled";
-	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_i2c6>;
 };
 
 &lpwm0 {
@@ -998,8 +982,6 @@
 
 &i2c7 {
 	status = "okay";
-	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_dsp_i2c7>;
 
 	ov5640_sensor2: camera@3c {
 		compatible = "ovti,ov5640";
