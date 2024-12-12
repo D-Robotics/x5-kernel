@@ -246,7 +246,6 @@ void hobot_pcm_free_dma_buffers(const struct snd_pcm *pcm)
 		if (buf->area == NULL)
 			continue;
 		dma_unmap_single(pcm->card->dev, buf->addr, buf->bytes, DMA_BIDIRECTIONAL);
-		devm_kfree(pcm->card->dev, buf->area);
 		buf->area = NULL;
 	}
 }
