@@ -134,44 +134,30 @@
 
 &uart1 {
 	status = "disabled";
-	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_uart1>;
 };
 
 &uart2 {
 	status = "disabled";
-	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_uart2>;
 };
 
 &uart3 {
 	status = "okay";
-	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_uart3>;
 };
 
 &uart4 {
 	status = "okay";
-	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_uart4>;
 };
 
 &uart5 {
 	status = "disabled";
-	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_uart5>;
 };
 
 &uart6 {
 	status = "disabled";
-	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_uart6>;
 };
 
 &uart7 {
 	status = "okay";
-	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_uart7>;
 };
 
 &adc {
@@ -643,14 +629,10 @@
 &emmc {
 	status = "okay";
 	max-frequency = <200000000>;
-	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_emmc>;
 };
 
 &spi0 {
 	status = "okay";
-	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_spi0>;
 
 	spi-nor@0 {
 		compatible = "jedec,spi-nor";
@@ -662,8 +644,6 @@
 
 &spi1 {
 	status = "disabled";
-	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_spi1>;
 
 	spi-nor@0 {
 		compatible = "jedec,spi-nor";
@@ -675,8 +655,6 @@
 
 &spi2 {
 	status = "disabled";
-	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_spi2>;
 
 	spi-nor@0 {
 		compatible = "jedec,spi-nor";
@@ -688,8 +666,6 @@
 
 &spi3 {
 	status = "disabled";
-	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_spi3>;
 
 	spi-nor@0 {
 		compatible = "jedec,spi-nor";
@@ -701,8 +677,6 @@
 
 &spi4 {
 	status = "disabled";
-	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_spi4>;
 
 	spi-nor@0 {
 		compatible = "jedec,spi-nor";
@@ -714,8 +688,6 @@
 
 &spi5 {
 	status = "okay";
-	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_spi5>;
 
 	spi-nor@0 {
 		compatible = "jedec,spi-nor";

@@ -130,20 +130,14 @@
 
 &uart7 {
 	status = "okay";
-	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_uart7>;
 };
 
 &uart1 {
 	status = "okay";
-	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_uart1>;
 };
 
 &uart2 {
 	status = "okay";
-	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_uart2>;
 };
 
 &axi_dmac {
@@ -232,15 +226,11 @@
 
 &emmc {
 	status = "okay";
-	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_emmc>;
 	fixed-emmc-driver-type = <2>;
 };
 
 &spi2 {
 	status = "okay";
-	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_spi2>;
 
 	icm42652@0 {
 		compatible = "invensense,icm42652";

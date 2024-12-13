@@ -3268,6 +3268,8 @@
 				disable-wp;
 				dwcmshc,no-cmd-conflict-check;
 				dwcmshc,positive-edge-drive;
+				pinctrl-names = "default";
+				pinctrl-0 = <&pinctrl_emmc>;
 			};
 
 			hsio_sys_con: syscon@35050000 {
@@ -3825,6 +3827,8 @@
 				#size-cells = <0>;
 				resets = <&socrst LSIO_SPI0_RESET>;
 				reset-names = "spi";
+				pinctrl-names = "default";
+				pinctrl-0 = <&pinctrl_spi0>;
 			};
 
 			spi1: spi@34010000 {
@@ -3842,6 +3846,8 @@
 				#size-cells = <0>;
 				resets = <&socrst LSIO_SPI1_RESET>;
 				reset-names = "spi";
+				pinctrl-names = "default";
+				pinctrl-0 = <&pinctrl_spi1>;
 			};
 
 			spi2: spi@34020000 {
@@ -3859,6 +3865,8 @@
 				#size-cells = <0>;
 				resets = <&socrst LSIO_SPI2_RESET>;
 				reset-names = "spi";
+				pinctrl-names = "default";
+				pinctrl-0 = <&pinctrl_spi2>;
 			};
 
 			spi3: spi@34030000 {
@@ -3876,6 +3884,8 @@
 				#size-cells = <0>;
 				resets = <&socrst LSIO_SPI3_RESET>;
 				reset-names = "spi";
+				pinctrl-names = "default";
+				pinctrl-0 = <&pinctrl_spi3>;
 			};
 
 			spi4: spi@34040000 {
@@ -3893,6 +3903,8 @@
 				#size-cells = <0>;
 				resets = <&socrst LSIO_SPI4_RESET>;
 				reset-names = "spi";
+				pinctrl-names = "default";
+				pinctrl-0 = <&pinctrl_spi4>;
 			};
 
 			spi5: spi@34050000 {
@@ -3910,6 +3922,8 @@
 				#size-cells = <0>;
 				resets = <&socrst LSIO_SPI5_RESET>;
 				reset-names = "spi";
+				pinctrl-names = "default";
+				pinctrl-0 = <&pinctrl_spi5>;
 			};
 
 			uart1: serial@34070000 {
@@ -3923,6 +3937,8 @@
 				interrupt-parent = <&gic>;
 				interrupts = <GIC_SPI 82 IRQ_TYPE_LEVEL_HIGH>;
 				resets = <&socrst LSIO_UART1_RESET>;
+				pinctrl-names = "default";
+				pinctrl-0 = <&pinctrl_uart1>;
 			};
 
 			uart2: serial@34080000 {
@@ -3937,6 +3953,8 @@
 				interrupts = <GIC_SPI 83 IRQ_TYPE_LEVEL_HIGH>;
 				resets = <&socrst LSIO_UART2_RESET>;
 				broken-auto-flow-control;
+				pinctrl-names = "default";
+				pinctrl-0 = <&pinctrl_uart2>;
 			};
 
 			uart3: serial@34090000 {
@@ -3951,6 +3969,8 @@
 				interrupts = <GIC_SPI 84 IRQ_TYPE_LEVEL_HIGH>;
 				resets = <&socrst LSIO_UART3_RESET>;
 				broken-auto-flow-control;
+				pinctrl-names = "default";
+				pinctrl-0 = <&pinctrl_uart3>;
 			};
 
 			uart4: serial@340a0000 {
@@ -3965,6 +3985,8 @@
 				interrupts = <GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>;
 				resets = <&socrst LSIO_UART4_RESET>;
 				broken-auto-flow-control;
+				pinctrl-names = "default";
+				pinctrl-0 = <&pinctrl_uart4>;
 			};
 
 			i2c0: i2c@340b0000 {
@@ -4266,6 +4288,8 @@
 				interrupts = <GIC_SPI 70 IRQ_TYPE_LEVEL_HIGH>;
 				resets = <&socrst LSIO_UART5_RESET>;
 				broken-auto-flow-control;
+				pinctrl-names = "default";
+				pinctrl-0 = <&pinctrl_uart5>;
 			};
 
 			uart6: serial@341b0000 {
@@ -4280,6 +4304,8 @@
 				interrupts = <GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH>;
 				resets = <&socrst LSIO_UART6_RESET>;
 				broken-auto-flow-control;
+				pinctrl-names = "default";
+				pinctrl-0 = <&pinctrl_uart6>;
 			};
 
 			uart7: serial@34060000 {
@@ -4293,6 +4319,8 @@
 				interrupt-parent = <&gic>;
 				interrupts = <GIC_SPI 81 IRQ_TYPE_LEVEL_HIGH>;
 				resets = <&socrst LSIO_UART7_RESET>;
+				pinctrl-names = "default";
+				pinctrl-0 = <&pinctrl_uart7>;
 			};
 
 			i2c5: i2c@341c0000 {
