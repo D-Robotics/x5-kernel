@@ -414,6 +414,12 @@
 	status = "okay";
 	dma-names = "tx", "rx";
 	dmas = <&axi_dmac 25>, <&axi_dmac 24>;
+
+	spidev@0 {
+		compatible = "dr,x5-spidev";
+		spi-max-frequency = <32000000>;
+		reg = <0>;
+	};
 };
 
 &dc8000_nano {
