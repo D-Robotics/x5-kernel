@@ -432,13 +432,9 @@ static int gua_pcm_open(struct snd_soc_component *component, struct snd_pcm_subs
 	return ret;
 }
 
-static int gua_dai_trigger_stop(struct snd_soc_component *component, struct snd_pcm_substream *substream)
+static int gua_dai_trigger_stop(struct snd_pcm_substream *substream)
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-	struct snd_soc_dai *cpu_dai = asoc_rtd_to_cpu(rtd, 0);
-	struct gua_audio_info *au_info = dev_get_drvdata(cpu_dai->dev);
-	struct pcm_info *pcm_info = &au_info->pcm_info;
-	int cmd;
 	int pcm_device = substream->pcm->device;
 
 	dev_info(rtd->dev, "AUDIO : pcm trigger stop\n");
@@ -447,16 +443,6 @@ static int gua_dai_trigger_stop(struct snd_soc_component *component, struct snd_
 		sync_pipeline_state(pcm_device, SNDRV_PCM_STREAM_PLAYBACK, PCM_TX_STOP);
 	} else {
 		sync_pipeline_state(pcm_device, SNDRV_PCM_STREAM_CAPTURE, PCM_RX_STOP);
-	}
-
-	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
-		cmd = PCM_TX_PERIOD_DONE;
-		pcm_info->data[pcm_device].message[cmd].send_msg.param.sw_pointer = 0;
-		pcm_info->data[pcm_device].message[cmd].recv_msg.param.hw_pointer = 0;
-	} else {
-		cmd = PCM_RX_PERIOD_DONE;
-		pcm_info->data[pcm_device].message[cmd].send_msg.param.sw_pointer = 0;
-		pcm_info->data[pcm_device].message[cmd].recv_msg.param.hw_pointer = 0;
 	}
 
 	return 0;
@@ -470,17 +456,26 @@ static int gua_pcm_close(struct snd_soc_component *component, struct snd_pcm_sub
 	struct pcm_info *pcm_info = &au_info->pcm_info;
 	int pcm_device = substream->pcm->device;
 	int ret = 0;
+	int cmd;
 
 	dev_info(rtd->dev, "AUDIO : pcm close\n");
 
-	ret = gua_dai_trigger_stop(component, substream);
+	//ret = gua_dai_trigger_stop(component, substream);
 	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
+		cmd = PCM_TX_PERIOD_DONE;
+		pcm_info->data[pcm_device].message[cmd].send_msg.param.sw_pointer = 0;
+		pcm_info->data[pcm_device].message[cmd].recv_msg.param.hw_pointer = 0;
 		sync_pipeline_state(pcm_device, SNDRV_PCM_STREAM_PLAYBACK, PCM_TX_CLOSE);
 	} else {
+		cmd = PCM_RX_PERIOD_DONE;
+		pcm_info->data[pcm_device].message[cmd].send_msg.param.sw_pointer = 0;
+		pcm_info->data[pcm_device].message[cmd].recv_msg.param.hw_pointer = 0;
 		sync_pipeline_state(pcm_device, SNDRV_PCM_STREAM_CAPTURE, PCM_RX_CLOSE);
 	}
 
 	flush_workqueue(pcm_info->rpmsg_wq);
+
+	flush_workqueue(pcm_info->gua_wq);
 
 	rtd->dai_link->ignore_suspend = 0;
 
@@ -570,14 +565,32 @@ static int gua_pcm_prepare(struct snd_soc_component *component, struct snd_pcm_s
 	}
 
 	ret = gua_pcm_set_buffer(substream);
-	ret |= gua_dai_trigger_start(substream);
 
 	return ret;
+}
+
+static void gua_work_handler(struct work_struct *work) {
+	struct gua_work *work_of_trigger = container_of(work, struct gua_work, work);
+	struct snd_pcm_substream *substream = work_of_trigger->data;
+
+	switch (work_of_trigger->task_type) {
+	case SNDRV_PCM_TRIGGER_START:
+		gua_dai_trigger_start(substream);
+		break;
+	case SNDRV_PCM_TRIGGER_STOP:
+		gua_dai_trigger_stop(substream);
+		break;
+	default:
+		break;
+	}
 }
 
 int gua_pcm_trigger(struct snd_soc_component *component, struct snd_pcm_substream *substream, int cmd)
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+	struct snd_soc_dai *cpu_dai = asoc_rtd_to_cpu(rtd, 0);
+	struct gua_audio_info *au_info = dev_get_drvdata(cpu_dai->dev);
+	struct pcm_info *pcm_info = &au_info->pcm_info;
 	int ret = 0;
 
 	dev_info(rtd->dev, "AUDIO : pcm trigger cmd[%d], with no message to DSP\n", cmd);
@@ -598,6 +611,10 @@ int gua_pcm_trigger(struct snd_soc_component *component, struct snd_pcm_substrea
 	default:
 		return -EINVAL;
 	}
+
+	pcm_info->gua_work->task_type = cmd;
+	pcm_info->gua_work->data = substream;
+	queue_work(pcm_info->gua_wq, &pcm_info->gua_work->work);
 
 	return ret;
 }
@@ -860,6 +877,20 @@ int gua_alsa_platform_register(struct device *dev)
 	component = snd_soc_lookup_component(dev, "platform-component");
 	if (!component)
 		return -EINVAL;
+
+	p_info->gua_work = devm_kzalloc(dev, sizeof(struct gua_work), GFP_KERNEL);
+	if (!p_info->gua_work) {
+		dev_err(dev, "AUDIO: Failed to alloc work\n");
+		return -ENOMEM;
+	}
+
+	p_info->gua_wq = create_singlethread_workqueue("gua_wq");
+	if (!p_info->gua_wq) {
+		dev_err(dev, "AUDIO: Failed to create workqueue\n");
+		return -ENOMEM;
+	}
+
+	INIT_WORK(&p_info->gua_work->work, gua_work_handler);
 
 	dev_info(dev, "AUDIO : ALSA platform driver probe succ\n");
 

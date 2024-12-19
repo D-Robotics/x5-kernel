@@ -404,6 +404,9 @@ static int gua_cpu_dai_remove(struct platform_device *pdev)
 	if (pcm_info->rpmsg_wq)
 		destroy_workqueue(pcm_info->rpmsg_wq);
 
+	if (pcm_info->gua_wq)
+		destroy_workqueue(pcm_info->gua_wq);
+
 	return 0;
 }
 

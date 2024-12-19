@@ -57,6 +57,18 @@ struct work_of_rpmsg {
 	struct work_struct work;			/*!< work task */
 };
 
+
+/**
+ * @brief Structure defining workqueue data.
+ *
+ * It contains work task, type and private data.
+ */
+struct gua_work {
+	struct work_struct work;	/*!< work task */
+	int task_type;			/*!< work task type */
+	void *data;			/*!< work private data */
+};
+
 /**
  * @brief Structure defining PCM data.
  * 
@@ -84,6 +96,8 @@ struct pcm_info {
 	struct device *dev;								/*!< for print debug */
 	struct workqueue_struct *rpmsg_wq;				/*!< workqueue for sending ASYNC message */
 	struct work_of_rpmsg work_list[WORK_MAX_NUM];	/*!< worklist for sending */
+	struct workqueue_struct *gua_wq;	/*!< workqueue for trigger handler */
+	struct gua_work *gua_work;	/*!< work info for trigger */
 	int work_write_index;							/*!< workueue work in index */
 	int work_read_index;							/*!< workueue work out index */
 	spinlock_t wq_lock;								/*!< workueue index lock */
