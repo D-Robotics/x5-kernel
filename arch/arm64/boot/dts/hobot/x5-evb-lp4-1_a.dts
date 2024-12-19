@@ -13,10 +13,6 @@
 	model = "D-Robotics X5 EVB LP4 1_A board";
 };
 
-&i2c1 {
-	status = "disabled";
-};
-
 &i2c3 {
 	status = "okay";
 
