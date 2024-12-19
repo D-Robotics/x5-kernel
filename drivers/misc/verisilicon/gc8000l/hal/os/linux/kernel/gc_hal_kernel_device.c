@@ -1079,6 +1079,7 @@ static int gc_vidmem_show(void *m, void *unused, gctBOOL all)
 	return 0;
 }
 
+#ifdef CONFIG_DEBUG_FS
 static int gc_reserved_mem_usage_show(void *m)
 {
 	int len			= 0;
@@ -1250,7 +1251,6 @@ static int gc_reserved_mem_usage_show(void *m)
 	return 0;
 }
 
-#ifdef CONFIG_DEBUG_FS
 static inline int strtoint_from_user(const char __user *s, size_t count, int *res)
 {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 0, 0)

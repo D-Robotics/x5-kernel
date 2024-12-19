@@ -171,7 +171,6 @@ static struct class *device_class = NULL;
 static n2d_linux_platform_t *platform		  = N2D_NULL;
 static n2d_linux_module_parameters_t global_param = {0};
 static struct n2d_gl_device *global_device;
-static unsigned int dump_core_mask = 0x00000001;
 static struct horizon_n2d_dev *global_n2d;
 
 static int gpu_resume(struct platform_device *dev);
@@ -319,6 +318,7 @@ static int dump_trigger_show(struct seq_file *m, void *data)
 	return 0;
 }
 
+static unsigned int dump_core_mask = 0x00000001;
 static int dump_trigger_store(const char __user *buf, size_t count, void *data)
 {
 	unsigned int mask = 0;
@@ -365,9 +365,9 @@ static n2d_error_t create_debug_fs(struct n2d_gl_device *gl_device)
 
 	ONERROR(n2d_debugfs_dir_init(dir, N2D_NULL, "n2d"));
 	ONERROR(n2d_debugfs_dir_crestefiles(dir, info_list, N2D_COUNTOF(info_list), gl_device));
+on_error:
 #endif
 
-on_error:
 	return error;
 }
 
