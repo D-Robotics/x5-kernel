@@ -339,7 +339,9 @@ static void axi_calculate_statistics(struct axi_monitor *axi_mon)
 	reg_ok_to = 500000; /* 100ms reg stable time */
 	while (reg_ok_to) {
 		int_status = axi_mon_readl(axi_mon, INT_STATUS);
-		if (int_status & REG_OK) {
+		if ((int_status & REG_OK) || (axi_mon->int_status & REG_OK)) {
+			axi_mon->int_status &= ~(REG_OK);
+			axi_mon_writel(axi_mon, INT_STATUS, int_status);
 			break;
 		}
 		udelay(100);
