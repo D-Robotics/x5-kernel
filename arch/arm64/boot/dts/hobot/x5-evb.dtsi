@@ -338,6 +338,15 @@
 			};
 		};
 	};
+
+	/* pcf8563 */
+	pcf8563@0x51 {
+		compatible = "nxp,pcf8563";
+		status = "okay";
+		reg = <0x51>;
+		interrupts = <GIC_SPI 66 IRQ_TYPE_LEVEL_LOW>;
+		clock-output-names = "wifi-32k-clk";
+	};
 };
 
 &i2c7 {
