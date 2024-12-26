@@ -536,13 +536,21 @@ static int gua_pcm_set_buffer(struct snd_pcm_substream *substream)
 static int gua_dai_trigger_start(struct snd_pcm_substream *substream)
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+	struct snd_soc_dai *cpu_dai = asoc_rtd_to_cpu(rtd, 0);
+	struct gua_audio_info *au_info = dev_get_drvdata(cpu_dai->dev);
+	struct pcm_info *pcm_info = &au_info->pcm_info;
 	int pcm_device = substream->pcm->device;
+	int cmd;
 
 	dev_info(rtd->dev, "AUDIO : pcm trigger start\n");
 
 	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
+		cmd = PCM_TX_PERIOD_DONE;
+		pcm_info->data[pcm_device].message[cmd].recv_msg.param.hw_pointer = 0;
 		sync_pipeline_state(pcm_device, SNDRV_PCM_STREAM_PLAYBACK, PCM_TX_START);
 	} else {
+		cmd = PCM_RX_PERIOD_DONE;
+		pcm_info->data[pcm_device].message[cmd].recv_msg.param.hw_pointer = 0;
 		sync_pipeline_state(pcm_device, SNDRV_PCM_STREAM_CAPTURE, PCM_RX_START);
 	}
 
