@@ -720,18 +720,18 @@
 
 		efuse: efuse@20301000 {
 			compatible = "horizon,tef12fcll64x32hd18phrm-efuse";
-			reg = <0x20301000 0xfc>;
+			reg = <0x20301150 0x38>;
 			#address-cells = <1>;
 			#size-cells = <1>;
 			clocks = <&hpsclks X5_SEC_APB_CLK>;
 			clock-names = "pclk_efuse";
 
 			/* Data cells */
-			efuse_adc_offset: adc-offset@74 {
-				reg = <0x74 0x20>;
+			efuse_adc_offset: adc-offset@24 {
+				reg = <0x24 0x4>;
 			};
-			efuse_adc_trimming: adc-trimming@74 {
-				reg = <0x74 0x20>;
+			efuse_adc_trimming: adc-trimming@24 {
+				reg = <0x24 0x4>;
 			};
 		};
 
