@@ -40,6 +40,8 @@
 #define LSIO_0_CLK_ENB		0xA8
 #define LSIO_1_CLK_ENB		0xB0
 
+#define DIV_200MHZ  (5 << 12)
+
 #define X5_PLL_RATE(_rate, _prediv, _mint, _mfrac, _postdivp, _divvcop, _postdivr, _divvcor)	\
 {									\
 	.rate	= _rate##U,						\
@@ -180,6 +182,7 @@ static struct x5_rate_list soc_gen_rates[] = {
 	{X5_LSIO_SENSOR2_CLK,		24000000},
 	{X5_LSIO_SENSOR3_CLK,		24000000},
 	{X5_BPU_NOC_PCLK,		200000000},
+	{X5_LSIO_ADC_CLK,		25000000},
 };
 
 struct drobot_clk_provider {
@@ -363,7 +366,7 @@ static int crm_hps_clk_init(struct platform_device *pdev)
 	struct drobot_clk_provider *ctx;
 	struct clk_hw **hws;
 	void __iomem *base;
-	int ret, i;
+	int ret, i, val;
 	u32 pll_match = 0;
 	u32 qspi_boot = 0;
 
@@ -429,10 +432,7 @@ static int crm_hps_clk_init(struct platform_device *pdev)
 	hws[X5_CODEC_NOC_CLK] = drobot_clk_register_generator_flags_no_idle("codec_noc_clk", soc_gen_src_sels, ARRAY_SIZE(soc_gen_src_sels), base + HPS_CLK_GEN + 0x40, CLK_IS_CRITICAL);
 	hws[X5_GPU_NOC_CLK] = drobot_clk_register_generator_flags_no_idle("gpu_noc_clk", soc_gen_src_sels, ARRAY_SIZE(soc_gen_src_sels), base + HPS_CLK_GEN + 0x60, CLK_IS_CRITICAL);
 	hws[X5_ROM_ACLK] = drobot_clk_register_generator_flags_no_idle("rom_aclk", soc_gen_src_sels, ARRAY_SIZE(soc_gen_src_sels), base + HPS_CLK_GEN + 0x80, CLK_IS_CRITICAL);
-	if (qspi_boot)
-		hws[X5_TOP_APB_CLK] = drobot_clk_register_generator_flags_no_idle("top_apb_clk", qspi_apb_gen_src_sels, ARRAY_SIZE(qspi_apb_gen_src_sels), base + HPS_CLK_GEN + 0xA0, CLK_IS_CRITICAL);
-	else
-		hws[X5_TOP_APB_CLK] = drobot_clk_register_generator_flags_no_idle("top_apb_clk", apb_gen_src_sels, ARRAY_SIZE(apb_gen_src_sels), base + HPS_CLK_GEN + 0xA0, CLK_IS_CRITICAL);
+	hws[X5_TOP_APB_CLK] = drobot_clk_register_generator_flags_no_idle("top_apb_clk", qspi_apb_gen_src_sels, ARRAY_SIZE(qspi_apb_gen_src_sels), base + HPS_CLK_GEN + 0xA0, CLK_IS_CRITICAL);
 
 	hws[X5_WDT_PCLK] = drobot_clk_hw_register_gate_no_idle("wdt_pclk", "top_apb_clk", base + TOP_CLK_ENB, 4, 0);
 	hws[X5_DMA_PCLK] = drobot_clk_hw_register_gate_no_idle("dma_pclk", "top_apb_clk", base + TOP_CLK_ENB, 5, 0);
@@ -603,7 +603,7 @@ static int crm_hps_clk_init(struct platform_device *pdev)
 	hws[X5_LSIO_SENSOR2_CLK] = drobot_clk_register_generator_flags_no_idle("lsio_sensor2_clk", soc_gen_src_sels, ARRAY_SIZE(soc_gen_src_sels), base + HPS_CLK_GEN + 0x960, CLK_IGNORE_UNUSED);
 	hws[X5_LSIO_SENSOR3_CLK] = drobot_clk_register_generator_flags_no_idle("lsio_sensor3_clk", soc_gen_src_sels, ARRAY_SIZE(soc_gen_src_sels), base + HPS_CLK_GEN + 0x980, CLK_IGNORE_UNUSED);
 	hws[X5_BPU_NOC_PCLK] = drobot_clk_register_generator_flags_no_idle("bpu_noc_pclk", apb_gen_src_sels, ARRAY_SIZE(apb_gen_src_sels), base + HPS_CLK_GEN + 0x9A0, CLK_IS_CRITICAL);
- 	hws[X5_LSIO_ADC_CLK] = drobot_clk_register_generator_no_idle("adc_clk", soc_gen_src_sels, ARRAY_SIZE(soc_gen_src_sels), base + HPS_CLK_GEN + 0x9C0);
+	hws[X5_LSIO_ADC_CLK] = drobot_clk_register_generator_no_idle("adc_clk", qspi_apb_gen_src_sels, ARRAY_SIZE(qspi_apb_gen_src_sels), base + HPS_CLK_GEN + 0x9C0);
 
 	hws[X5_LSIO_UART7_CLK] = drobot_clk_hw_register_gate_no_idle("uart7_clk", "top_apb_clk", base + LSIO_0_CLK_ENB, 0, 0);
 	hws[X5_LSIO_UART1_CLK] = drobot_clk_hw_register_gate_no_idle("uart1_clk", "top_apb_clk", base + LSIO_0_CLK_ENB, 1, 0);
@@ -648,6 +648,19 @@ static int crm_hps_clk_init(struct platform_device *pdev)
 	hws[X5_LSIO_UART6_PCLK] = drobot_clk_hw_register_gate_no_idle("uart6_pclk", "top_apb_clk", base + LSIO_1_CLK_ENB, 5, 0);
 	hws[X5_LSIO_I2C5_PCLK] = drobot_clk_hw_register_gate_no_idle("i2c5_pclk", "top_apb_clk", base + LSIO_1_CLK_ENB, 6, 0);
 	hws[X5_LSIO_I2C6_PCLK] = drobot_clk_hw_register_gate_no_idle("i2c6_pclk", "top_apb_clk", base + LSIO_1_CLK_ENB, 7, 0);
+	if (qspi_boot) {
+		clk_set_rate(hws[X5_TOP_APB_CLK]->clk, 100000000);
+		clk_set_rate(hws[X5_HSIO_QSPI_BUS_CLK]->clk, 100000000);
+	} else {
+		val = readl(base + PLL_POSTDIV_OFFSET);
+		val &= ~PLL_POSTDIVR_MASK;
+		val |= DIV_200MHZ;
+		writel(val, base + PLL_POSTDIV_OFFSET);
+		wmb();
+		clk_get_rate(hws[X5_CPU_PLL_R]->clk);
+		clk_set_rate(hws[X5_TOP_APB_CLK]->clk, 200000000);
+		clk_set_rate(hws[X5_HSIO_QSPI_BUS_CLK]->clk, 200000000);
+	}
 
 	for(i = 0; i < ARRAY_SIZE(soc_gen_rates); i++)
 		clk_set_rate(hws[soc_gen_rates[i].id]->clk, soc_gen_rates[i].rate);
@@ -656,14 +669,6 @@ static int crm_hps_clk_init(struct platform_device *pdev)
 		clk_set_rate(hws[X5_CPU_SCLK]->clk, 1200000000);
 	} else {
 		clk_set_rate(hws[X5_CPU_SCLK]->clk, 1200000000);
-	}
-
-	if (qspi_boot) {
-		clk_set_rate(hws[X5_TOP_APB_CLK]->clk, 100000000);
-		clk_set_rate(hws[X5_HSIO_QSPI_BUS_CLK]->clk, 100000000);
-	} else {
-		clk_set_rate(hws[X5_TOP_APB_CLK]->clk, 200000000);
-		clk_set_rate(hws[X5_HSIO_QSPI_BUS_CLK]->clk, 200000000);
 	}
 
 	ret = devm_of_clk_add_hw_provider(dev, of_clk_hw_onecell_get, &ctx->clk_hw_data);
