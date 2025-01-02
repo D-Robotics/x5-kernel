@@ -4605,7 +4605,7 @@
 	/* dsp */
 	duplex_card: duplex_card {
 		compatible = "duplex-audio-card";
-		status = "disable";
+		status = "disabled";
 	};
 
 	hobot_sound_machine: hobot_sound_machine {
