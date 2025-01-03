@@ -956,6 +956,32 @@ static int guc_adc_set_ops(struct iio_dev *indio_dev) {
 	}
 	return 0;
 }
+
+static int guc_adc_get_sample_rate(struct guc_adc *info)
+{
+	int ret = 0;
+	u32 sample_rate = info->sample_rate;
+
+	switch (sample_rate) {
+		case 260000:
+			info->sample_rate = 1560000;
+			break;
+		case 210000:
+			info->sample_rate = 1250000;
+			break;
+		case 130000:
+			info->sample_rate = 780000;
+			break;
+		case 100000:
+			info->sample_rate = 630000;
+			break;
+		default:
+			ret = -EINVAL;
+			break;
+	}
+	return ret;
+}
+
 static int guc_adc_probe(struct platform_device *pdev)
 {
 	int ret, i;
@@ -1012,9 +1038,13 @@ static int guc_adc_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "invalid or missing value for guc,sample_rate\n");
 		return ret;
 	}
-	if (info->dma_chan)
-		info->sample_rate *= 6;
-
+	if (info->dma_chan) {
+		ret = guc_adc_get_sample_rate(info);
+		if (ret) {
+			dev_err(&pdev->dev, "Sample rate is not within the allowed range\n");
+			return ret;
+		}
+	}
 	ret = clk_set_rate(info->clk, info->sample_rate << 4);
 	if (ret) {
 		dev_err(&pdev->dev, "failed to set sample rate\n");
