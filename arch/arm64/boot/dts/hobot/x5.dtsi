@@ -985,7 +985,9 @@
 				power-domains = <&power X5_ISP>;
 				consumer-dev = <&isp>;
 
-				clocks-num = <0>;
+				clocks-num = <1>;
+				clocks = <&hpsclks X5_CAM_ISP8000_CLK>;
+				clock-names = "isp_core_clk";
 
 				status = "okay";
 				ports-num = <1>;
@@ -998,7 +1000,9 @@
 				power-domains = <&power X5_ISP>;
 				consumer-dev = <&isp>;
 
-				clocks-num = <0>;
+				clocks-num = <1>;
+				clocks = <&hpsclks X5_CAM_ISP8000_CLK>;
+				clock-names = "isp_core_clk";
 
 				status = "okay";
 				ports-num = <1>;
@@ -1011,7 +1015,9 @@
 				power-domains = <&power X5_ISP>;
 				consumer-dev = <&isp>;
 
-				clocks-num = <0>;
+				clocks-num = <1>;
+				clocks = <&hpsclks X5_CAM_ISP8000_CLK>;
+				clock-names = "isp_core_clk";
 
 				status = "okay";
 				ports-num = <1>;
@@ -1024,7 +1030,9 @@
 				power-domains = <&power X5_ISP>;
 				consumer-dev = <&isp>;
 
-				clocks-num = <0>;
+				clocks-num = <1>;
+				clocks = <&hpsclks X5_CAM_ISP8000_CLK>;
+				clock-names = "isp_core_clk";
 
 				status = "okay";
 				ports-num = <1>;
