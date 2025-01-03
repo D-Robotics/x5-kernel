@@ -1,0 +1,60 @@
+// SPDX-License-Identifier: GPL-2.0
+/*
+ * dts for Sunrise5 EVB LP4 V2P0 board
+ *
+ * Copyright (C) 2024 D-Robotics Inc.
+ *
+ */
+
+/dts-v1/;
+#include "x5-evb.dtsi"
+
+/ {
+	model = "D-Robotics X5 EVB LP4X V2P0 board";
+};
+
+/* ANT_CTRL1 */
+&hsio_iomuxc {
+	hsio_gpio0_23: hsio_gpio0_23 {
+		horizon,pins = <
+			HSIO_SDIO_WP	HSIO_PINMUX_2	BIT_OFFSET8		MUX_ALT2	&pconf_output_high
+		>;
+	};
+
+	pinctrl_sdio: sdiogrp {
+		horizon,pins = <
+			HSIO_SDIO_CLK	HSIO_PINMUX_0	BIT_OFFSET30	MUX_ALT0	&pconf_sd_sdio_pu_ds5_ipctrl
+			HSIO_SDIO_CMD	HSIO_PINMUX_0	BIT_OFFSET28	MUX_ALT0	&pconf_sd_sdio_pu_ds3_ipctrl
+			HSIO_SDIO_DATA0	HSIO_PINMUX_1	BIT_OFFSET0		MUX_ALT0	&pconf_sd_sdio_pu_ds3_ipctrl
+			HSIO_SDIO_DATA1	HSIO_PINMUX_2	BIT_OFFSET30	MUX_ALT0	&pconf_sd_sdio_pu_ds3_ipctrl
+			HSIO_SDIO_DATA2	HSIO_PINMUX_2	BIT_OFFSET28	MUX_ALT0	&pconf_sd_sdio_pu_ds3_ipctrl
+			HSIO_SDIO_DATA3	HSIO_PINMUX_2	BIT_OFFSET26	MUX_ALT0	&pconf_sd_sdio_pu_ds3_ipctrl
+		>;
+	};
+};
+
+/* ANT_CTRL2 */
+&lsio_iomuxc {
+	lsio_gpio1_4: lsio_gpio1_4 {
+		horizon,pins = <
+			LSIO_SPI0_SSN	LSIO_PINMUX_1	BIT_OFFSET2	MUX_ALT2	&pconf_output_low
+		>;
+	};
+};
+
+/* RF_PWR_EN */
+&aon_iomuxc {
+	aon_gpio_3: aon_gpio_3 {
+		horizon,pins = <
+			AON_GPIO0_PIN3	INVALID_PINMUX	BIT_OFFSET0		MUX_ALT0	&pconf_output_high
+		>;
+	};
+};
+
+/* SDIO */
+&sdio_1 {
+	status = "okay";
+
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_sdio &aon_gpio_3 &hsio_gpio0_23 &lsio_gpio1_4>;
+};
