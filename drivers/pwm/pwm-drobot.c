@@ -54,6 +54,9 @@ struct drobot_pwm_chip {
 #define PWM_CR(x)				(0x24 + (0x20 * (x)))
 #define PWM_SR(x)				(0x28 + (0x20 * (x)))
 
+#define PWM_MAX_PERIOD 20000000000ULL
+#define PWM_MIN_PERIOD 1000ULL
+
 #define to_drobot_pwm_chip(_chip) container_of(_chip, struct drobot_pwm_chip, chip)
 
 enum {
@@ -142,6 +145,11 @@ static int drobot_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
 	drobot_pwm_disable(chip, pwm);
 
 	clk = clk_get_rate(drobot->clk);
+
+	if (!(state->period >= PWM_MIN_PERIOD && state->period <= PWM_MAX_PERIOD)) {
+		dev_warn(chip->dev, "The range of period should be between 1us and 20s.\n");
+		return -EINVAL;
+	}
 
 	period_cycles = div64_u64(clk * state->period,
 			(unsigned long long)NSEC_PER_SEC);
