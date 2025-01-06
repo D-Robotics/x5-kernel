@@ -702,6 +702,9 @@ static int32_t hobot_dsp_resource_table_update(struct rproc *rproc, const struct
 			return -EINVAL;
 		}
 
+		if (hdr->type == RSC_VERSION)
+			continue;
+
 		struct fw_rsc_devmem *rsc = _rsc;
 		if (i == 0) //sram0
 			rsc->pa = pdata->sram0.pa;
@@ -760,22 +763,80 @@ static uint64_t hobot_dsp_elf_get_boot_addr(struct rproc *rproc, const struct fi
 	return rproc_elf_get_boot_addr(rproc, fw);
 }
 
+#define MAJOR_VERSION_LAST (1)
+#define MINOR_VERSION_LAST (1)
+static int rproc_handle_version(struct rproc *rproc, struct fw_rsc_version *rsc,
+		int offset, int avail) {
+	struct device *dev = &rproc->dev;
+	char version[VERSION_LEN] = {'\0'};
+	char *versionp = version;
+	char *ver[2] = {NULL};
+	int32_t i = 0;
+	struct hobot_rproc_pdata *pdata = rproc->priv;
+	int ret = 0;
+	long major_version = 0, minor_version = 0;
+	char *tmp;
+
+	strncpy(pdata->version.version, rsc->version, VERSION_LEN - 1);
+	pdata->version.version[VERSION_LEN - 1] = '\0';
+	strncpy(pdata->version.compile_time, rsc->compile_time, COMPILE_TIME_LEN - 1);
+	pdata->version.compile_time[COMPILE_TIME_LEN - 1] = '\0';
+	strncpy(pdata->version.git_hash_id, rsc->git_hash_id, GIT_HASH_ID_LEN - 1);
+	pdata->version.git_hash_id[GIT_HASH_ID_LEN - 1] = '\0';
+
+	memcpy(version, pdata->version.version, VERSION_LEN - 1);
+
+	for (i = 0; i < 2; i++)
+		ver[i] = strsep(&versionp, ".");
+
+	tmp = ver[0];
+	while (*tmp && !isdigit(*tmp)) {
+		tmp++;
+	}
+	ret = kstrtol(tmp, 10, &major_version);
+	if (ret < 0) {
+		dev_err(dev, "Failed to convert %s to num\n", tmp);
+		return ret;
+	}
+	ret = kstrtol(ver[1], 10, &minor_version);
+	if (ret < 0) {
+		dev_err(dev, "Failed to convert %s to num\n", ver[1]);
+		return ret;
+	}
+	dev_info(dev, "ver[0] %s\n", ver[0]);
+        dev_info(dev, "ver[1] %s\n", ver[1]);
+	dev_info(dev, "compile_time %s\n", pdata->version.compile_time);
+	dev_info(dev, "hash %s\n", pdata->version.git_hash_id);
+
+	if (major_version < MAJOR_VERSION_LAST) {
+		dev_err(dev, "Invalid major version\n");
+		return -1;
+	} else if (minor_version < MINOR_VERSION_LAST) {
+		dev_err(dev, "Invalid minor version\n");
+		return -1;
+	}
+
+	return ret;
+}
+
 static int32_t hobot_dsp_handle_rsc(struct rproc *rproc, u32 rsc_type, void *_rsc,
 			  int offset, int avail)
 {
-	struct rproc_mem_entry *mapping;
+	struct rproc_mem_entry *mapping = NULL;
 	struct device *dev = &rproc->dev;
-	struct fw_rsc_devmem *rsc = _rsc;
+	struct fw_rsc_devmem *rsc;
+	struct fw_rsc_version *rsc1;
 	int ret = 0;
 	dma_addr_t pa;
 	uint32_t da_hi, pa_hi, da_of;
 	struct hobot_rproc_pdata *pdata = rproc->priv;
 
-	mapping = kzalloc(sizeof(*mapping), GFP_KERNEL);
-	if (!mapping)
-		return -ENOMEM;
-
 	if (rsc_type == RSC_LITE_DEVMEM) {
+		mapping = kzalloc(sizeof(*mapping), GFP_KERNEL);
+		if (!mapping)
+			return -ENOMEM;
+
+		rsc = _rsc;
 		pa = rsc->pa & 0xFFFFFFFF;
 		pa |= ((dma_addr_t)(rsc->reserved & X5_DDR_HIGH_MASK)) << 32;
 
@@ -810,6 +871,11 @@ static int32_t hobot_dsp_handle_rsc(struct rproc *rproc, u32 rsc_type, void *_rs
 
 		dev_dbg(dev, "[%s]%s: da = 0x%x pa = 0x%x/0x%llx va = 0x%px len = 0x%x\n",
 			__func__, rsc->name, rsc->da, rsc->pa, pa, mapping->va, rsc->len);
+	} else if (rsc_type == RSC_VERSION) {
+		rsc1 = _rsc;
+		ret = rproc_handle_version(rproc, rsc1, offset, avail);
+		if (ret < 0)
+			dev_err(dev, "get rproc version failed, ret %d\n", ret);
 	} else {
 		ret = -ENAVAIL;
 		dev_err(dev, "%s bad rsc_type of %d\n", __func__, rsc_type);
@@ -817,9 +883,9 @@ static int32_t hobot_dsp_handle_rsc(struct rproc *rproc, u32 rsc_type, void *_rs
 	}
 
 	return 0;
-
 out:
-	kfree(mapping);
+	if (mapping)
+		kfree(mapping);
 	return ret;
 }
 
@@ -2120,6 +2186,21 @@ static ssize_t hb_show_dspthread(struct device *dev,
 
 static DEVICE_ATTR(dspthread, 0644, hb_show_dspthread, hb_store_dspthread);
 
+static ssize_t hb_store_version(struct device *dev, struct device_attribute *attr,
+		const char *buf, size_t count) {
+	return 0;
+}
+
+static ssize_t hb_show_version(struct device *dev, struct device_attribute *attr,
+		char *buf) {
+	struct hobot_rproc_pdata *pdata = dev_get_drvdata(dev);
+
+	return snprintf(buf, sizeof(pdata->version)*2, "version = %s\ncompile_time = %s\ngit_hash_id = %s\n",
+			pdata->version.version, pdata->version.compile_time, pdata->version.git_hash_id);
+}
+
+static DEVICE_ATTR(version, 0644, hb_show_version, hb_store_version);
+
 static ssize_t hb_show_hifi5_clk_rate(struct device *dev, struct device_attribute *attr, char *buf) {
 	struct platform_device *pdev = to_platform_device(dev);
 	struct hobot_rproc_pdata *pdata = platform_get_drvdata(pdev);
@@ -2435,6 +2516,16 @@ static int32_t hobot_resource_table_init(struct platform_device *pdev) {
 	return 0;
 }
 
+#define DEVICE_ATTRS(dev) do {\
+	device_create_file(dev, &dev_attr_fw_dump); \
+	device_create_file(dev, &dev_attr_suspend_test); \
+	device_create_file(dev, &dev_attr_wakeup_status); \
+	device_create_file(dev, &dev_attr_hifi5_clk_rate); \
+	device_create_file(dev, &dev_attr_dspthread); \
+	device_create_file(dev, &dev_attr_loglevel); \
+	device_create_file(dev, &dev_attr_thread_info); \
+	device_create_file(dev, &dev_attr_version); \
+} while (0)
 
 static int32_t hobot_remoteproc_probe(struct platform_device *pdev)
 {
@@ -2567,52 +2658,13 @@ static int32_t hobot_remoteproc_probe(struct platform_device *pdev)
 	}
 	g_hifi5_res.rproc = rproc;
 
-	ret = device_create_file(&pdev->dev, &dev_attr_fw_dump);
-	if (ret != 0) {
-		dev_err(&pdev->dev, "BUG: Can not creat dump kobject\n");
-		goto create_file_out; /*PRQA S ALL*/ /*qac-0.7.0-2001*/
-	}
-
-	ret = device_create_file(&pdev->dev, &dev_attr_suspend_test);
-	if (ret != 0) {
-		dev_err(&pdev->dev, "BUG: Can not creat dump kobject\n");
-		goto create_file_out1; /*PRQA S ALL*/ /*qac-0.7.0-2001*/
-	}
-
-	ret = device_create_file(&pdev->dev, &dev_attr_wakeup_status);
-	if (ret != 0) {
-		dev_err(&pdev->dev, "BUG: Can not creat dump kobject\n");
-		goto create_file_out2; /*PRQA S ALL*/ /*qac-0.7.0-2001*/
-	}
-
-	ret = device_create_file(&pdev->dev, &dev_attr_hifi5_clk_rate);
-	if (ret != 0) {
-		dev_err(&pdev->dev, "BUG: Can not create hifi5 clk rate\n");
-		goto create_file_out3;
-	}
-
-	ret = device_create_file(&pdev->dev, &dev_attr_dspthread);
-	if (ret != 0) {
-		dev_err(&pdev->dev, "BUG: Can not create dspthread\n");
-		goto create_file_out4;
-	}
-
-	ret = device_create_file(&pdev->dev, &dev_attr_loglevel);
-	if (ret != 0) {
-		dev_err(&pdev->dev, "BUG: Can not create loglevel\n");
-		goto create_file_out5;
-	}
-
-	ret = device_create_file(&pdev->dev, &dev_attr_thread_info);
-	if (ret != 0) {
-		goto create_file_out6;
-	}
+	DEVICE_ATTRS(&pdev->dev);
 
 #ifdef CONFIG_HOBOT_REMOTEPROC_PM
 	ret = hobot_remoteproc_pm_ctrl(pdata, 0, 0);
 	if (ret < 0) {
 		dev_err(&pdev->dev, "HIFI pm disable error\n");
-		goto create_file_out7;
+		goto create_file_out;
 	}
 #endif
 
@@ -2622,20 +2674,6 @@ static int32_t hobot_remoteproc_probe(struct platform_device *pdev)
 	pr_info("hobot_remoteproc_probe end\n");
 
 	return 0;
-create_file_out7:
-	device_remove_file(&pdev->dev, &dev_attr_thread_info);
-create_file_out6:
-	device_remove_file(&pdev->dev, &dev_attr_loglevel);
-create_file_out5:
-	device_remove_file(&pdev->dev, &dev_attr_dspthread);
-create_file_out4:
-	device_remove_file(&pdev->dev, &dev_attr_hifi5_clk_rate);
-create_file_out3:
-	device_remove_file(&pdev->dev, &dev_attr_wakeup_status);
-create_file_out2:
-	device_remove_file(&pdev->dev, &dev_attr_suspend_test);
-create_file_out1:
-	device_remove_file(&pdev->dev, &dev_attr_fw_dump);
 create_file_out:
 	rproc_del(pdata->rproc);
 deinit_proc_out:
@@ -2663,6 +2701,7 @@ static int32_t hobot_remoteproc_remove(struct platform_device *pdev) {
 	device_remove_file(&pdev->dev, &dev_attr_dspthread);
 	device_remove_file(&pdev->dev, &dev_attr_loglevel);
 	device_remove_file(&pdev->dev, &dev_attr_thread_info);
+	device_remove_file(&pdev->dev, &dev_attr_version);
 
 	complete(&pdata->completion_boot);
 

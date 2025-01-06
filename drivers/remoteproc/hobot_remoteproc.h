@@ -130,6 +130,22 @@ struct hobot_rsc_table {
 	uint32_t pa;
 };
 
+#define VERSION_LEN (48)
+#define COMPILE_TIME_LEN (16)
+#define GIT_HASH_ID_LEN (40)
+
+struct hobot_rproc_version {
+	char version[VERSION_LEN];
+	char compile_time[COMPILE_TIME_LEN];
+	char git_hash_id[GIT_HASH_ID_LEN];
+};
+
+struct fw_rsc_version {
+	u8 version[VERSION_LEN];
+	u8 compile_time[COMPILE_TIME_LEN];
+	u8 git_hash_id[GIT_HASH_ID_LEN];
+} __packed;
+
 /**
  * struct hobot_rproc_pdata - hobot remote processor instance state
  * @rproc: rproc handle
@@ -251,6 +267,8 @@ struct hobot_rproc_pdata {
 	struct mutex mutex_boot;
 	int32_t wait_timeout;
 	struct completion completion_boot;
+
+	struct hobot_rproc_version version;
 };
 
 static inline void *log_memcpy(void *dest, void *src, unsigned int num)
