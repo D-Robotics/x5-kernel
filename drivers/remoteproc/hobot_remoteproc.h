@@ -217,6 +217,7 @@ struct hobot_rproc_pdata {
 	uint32_t dsp_dram0_size;
 	uint32_t dsp_dram1_map_addr;
 	uint32_t dsp_dram1_size;
+	uint32_t dsp_ddr_addr;
 	uint32_t dsp_ddr_size;
 
 	struct workqueue_struct *wq_coredump;
