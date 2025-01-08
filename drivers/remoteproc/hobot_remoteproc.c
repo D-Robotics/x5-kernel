@@ -795,7 +795,7 @@ static int32_t hobot_dsp_handle_rsc(struct rproc *rproc, u32 rsc_type, void *_rs
 		mapping->da = rsc->da;
 		mapping->len = rsc->len;
 
-		if (rsc->pa != rsc->da) {
+		if (rsc->pa != rsc->da && (rsc->pa >= pdata->dsp_ddr_addr && rsc->pa <= (pdata->dsp_ddr_addr + pdata->dsp_ddr_size))) {
 			da_hi = rsc->da >> 28;
 			pa_hi = rsc->pa >> 28;
 			da_of = ((da_hi % 4) * 8);
@@ -2352,15 +2352,12 @@ static int32_t parse_reserve_mem(struct platform_device *pdev) {
                 dev_err(&pdev->dev, "Get adsp_ddr failed\n");
                 return ret;
         }
-	ret = of_property_read_u32(pdev->dev.of_node, "dsp_ddr_size", &pdata->dsp_ddr_size);
-	if (ret) {
-		dev_err(&pdev->dev, "get ddr-size error\n");
-		return -EINVAL;
-	}
 
 	dev_dbg(&pdev->dev, "iram0 0x%x dram0 0x%x dram1 0x%x ddr 0x%llx\n",
 		pdata->dsp_iram0_map_addr, pdata->dsp_dram0_map_addr,
 		pdata->dsp_dram1_map_addr, res.start);
+	pdata->dsp_ddr_addr = res.start;
+	pdata->dsp_ddr_size = res.end - res.start + 1;
 	pdata->mem_reserved[0] = ioremap_wc(res.start,
 			pdata->dsp_ddr_size);
 	pdata->mem_reserved[1] = ioremap_wc(pdata->dsp_iram0_map_addr,
