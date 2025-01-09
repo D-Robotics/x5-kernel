@@ -1255,6 +1255,25 @@ static struct attribute_group es8311_debug_attr_group = {
 	.attrs	= es8311_debug_attrs,
 };
 
+static int32_t es8311_i2c_suspend(struct device *dev)
+{
+	int32_t ret = 0;
+	dev_info(dev, "%s\n", __func__);
+	return ret;
+}
+
+static int32_t es8311_i2c_resume(struct device *dev)
+{
+	int32_t ret = 0;
+	dev_info(dev, "%s\n", __func__);
+	return ret;
+}
+
+static const struct dev_pm_ops es8311_i2c_pm_ops = {
+	.suspend = es8311_i2c_suspend,
+	.resume = es8311_i2c_resume,
+};
+
 static int es8311_i2c_probe(struct i2c_client *i2c_client,
 					const struct i2c_device_id *id)
 {
@@ -1337,6 +1356,7 @@ static struct i2c_driver es8311_i2c_driver = {
 		.name	= "es8311",
 		.owner	= THIS_MODULE,
 		.of_match_table = es8311_if_dt_ids,
+		.pm = &es8311_i2c_pm_ops,
 	},
 	.shutdown = es8311_i2c_shutdown,
 	.probe = es8311_i2c_probe,
