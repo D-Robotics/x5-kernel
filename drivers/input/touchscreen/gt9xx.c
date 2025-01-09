@@ -2168,7 +2168,7 @@ static void gtp_late_resume(struct early_suspend *h)
 
 static int gtp_register_powermanager(struct goodix_ts_data *ts)
 {
-	int ret;
+	int ret = 0;
 #if defined(CONFIG_FB)
 	INIT_WORK(&ts->fb_notify_work, fb_notify_resume_work);
 	ts->notifier.notifier_call = gtp_fb_notifier_callback;

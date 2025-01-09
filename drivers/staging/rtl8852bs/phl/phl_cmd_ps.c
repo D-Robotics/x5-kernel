@@ -2428,7 +2428,7 @@ enum rtw_phl_status phl_register_ps_module(struct phl_info_t *phl_info)
 {
 	enum rtw_phl_status phl_status = RTW_PHL_STATUS_FAILURE;
 	struct phl_cmd_dispatch_engine *disp_eng = &(phl_info->disp_eng);
-	struct phl_bk_module_ops bk_ops = {0};
+	struct phl_bk_module_ops bk_ops;
 	u8 i = 0;
 
 	PHL_INFO("[PS_CMD], %s(): \n", __func__);

@@ -55,25 +55,28 @@ config VERISILICON_WRITEBACK
 	bool
 	depends on DRM_VERISILICON
 
-config DC8000_NANO_WRITEBACK_DEBUG
-	bool "Writeback debug function for DC8000 Nano"
-	select VERISILICON_WRITEBACK
-	depends on VERISILICON_DC8000_NANO
-	help
-	  This is a debug feature when DC8000 nano has writeback function
-	  integrated.
-	  Say Y if your hardware support this function and you want to use
-	  writeback function.
+choice
+    prompt "Select the Writeback debug function"
+    config DC8000_NANO_WRITEBACK_DEBUG
+        bool "Writeback debug function for DC8000 Nano"
+        select VERISILICON_WRITEBACK
+        depends on VERISILICON_DC8000_NANO
+        help
+          This is a debug feature when DC8000 nano has writeback function
+          integrated.
+          Say Y if your hardware support this function and you want to use
+          writeback function.
 
-config VERISILICON_WRITEBACK_SIF
-	bool "Writeback function by SIF"
-	select VERISILICON_WRITEBACK
-	depends on VERISILICON_DC8000_NANO
-	help
-	  Writeback function supported by SIF. SIF is an external IP from
-	  DC8000 nano. Using SIF, you have the capbility to use drm writeback
-	  function. Note this option should not be enabled simultaneously with
-	  DC8000_NANO_WRITEBACK_DEBUG.
+    config VERISILICON_WRITEBACK_SIF
+        bool "Writeback function by SIF"
+        select VERISILICON_WRITEBACK
+        depends on VERISILICON_DC8000_NANO
+        help
+          Writeback function supported by SIF. SIF is an external IP from
+          DC8000 nano. Using SIF, you have the capbility to use drm writeback
+          function. Note this option should not be enabled simultaneously with
+          DC8000_NANO_WRITEBACK_DEBUG.
+endchoice
 
 config VERISILICON_GEM_ION
 	bool "GEM support ion interfaces"

@@ -25,7 +25,7 @@
 #include "hobot_ion_iommu.h"
 #include <linux/ion.h>
 #if IS_ENABLED(CONFIG_ARM_SMMU_V3)
-#include "arm-smmu-v3.h"
+#include "./arm/arm-smmu-v3/arm-smmu-v3.h"
 #endif
 #if IS_ENABLED(CONFIG_HOBOT_IOVMM)
 /**

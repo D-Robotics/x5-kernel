@@ -4,6 +4,7 @@
 #
 
 obj-$(CONFIG_HOBOT_AXI_MONITOR) += axi_monitor_framework.o
-axi_monitor_framework-objs	:=  horizon_axi_monitor.o \
-								horizon_noc_qos.o
+axi_monitor_framework-objs	:=  horizon_axi_monitor.o
+obj-$(CONFIG_HOBOT_AXI_MONITOR) += horizon_axi_monitor.o
+obj-$(HOBOT_NOC_QOS) += horizon_noc_qos.o
 obj-$(CONFIG_HOBOT_AXI_MONITOR_DEBUGFS) += horizon_axi_monitor_debugfs.o
