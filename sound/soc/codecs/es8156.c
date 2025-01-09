@@ -555,6 +555,25 @@ static struct snd_soc_component_driver soc_codec_dev_es8156 = {
 #endif
 };
 
+static int32_t es8156_i2c_suspend(struct device *dev)
+{
+	int32_t ret = 0;
+	dev_info(dev, "%s\n", __func__);
+	return ret;
+}
+
+static int32_t es8156_i2c_resume(struct device *dev)
+{
+	int32_t ret = 0;
+	dev_info(dev, "%s\n", __func__);
+	return ret;
+}
+
+static const struct dev_pm_ops es8156_i2c_pm_ops = {
+	.suspend = es8156_i2c_suspend,
+	.resume = es8156_i2c_resume,
+};
+
 /*
 *es8156 7bit i2c address:CE pin:0 0x08 / CE pin:1 0x09
 */
@@ -678,6 +697,7 @@ static struct i2c_driver es8156_i2c_driver = {
 	.driver = {
 		.name		= "es8156",
 		.of_match_table = es8156_of_match,
+		.pm = &es8156_i2c_pm_ops,
 	},
 	.probe    = es8156_i2c_probe,
 	.remove   = es8156_i2c_remove,

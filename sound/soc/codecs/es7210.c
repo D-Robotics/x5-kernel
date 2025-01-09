@@ -2606,6 +2606,26 @@ static struct attribute_group es7210_debug_attr_group = {
 	.attrs = es7210_debug_attrs,
 };
 
+static int32_t es7210_i2c_suspend(struct device *dev)
+{
+	int32_t ret = 0;
+	dev_info(dev, "%s\n", __func__);
+	return ret;
+}
+
+static int32_t es7210_i2c_resume(struct device *dev)
+{
+	int32_t ret = 0;
+	dev_info(dev, "%s\n", __func__);
+	return ret;
+}
+
+static const struct dev_pm_ops es7210_i2c_pm_ops = {
+	.suspend = es7210_i2c_suspend,
+	.resume = es7210_i2c_resume,
+};
+
+
 /*
  * If the i2c layer weren't so broken, we could pass this kind of data
  * around
@@ -2784,6 +2804,7 @@ static struct i2c_driver es7210_i2c_driver = {
 	.driver = {
 		   .name = "es7210",
 		   .owner = THIS_MODULE,
+		   .pm = &es7210_i2c_pm_ops,
 #if ES7210_MATCH_DTS_EN
 		   .of_match_table = es7210_dt_ids,
 #endif
