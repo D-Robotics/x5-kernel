@@ -542,6 +542,7 @@ static int dw8250_probe(struct platform_device *pdev)
 	p->serial_out	= dw8250_serial_out;
 	p->set_ldisc	= dw8250_set_ldisc;
 	p->set_termios	= dw8250_set_termios;
+	p->cyclic	= false;
 
 	p->membase = devm_ioremap(dev, regs->start, resource_size(regs));
 	if (!p->membase)
@@ -570,7 +571,9 @@ static int dw8250_probe(struct platform_device *pdev)
 		p->serial_in = dw8250_serial_in32;
 		p->serial_out = dw8250_serial_out32;
 	}
-
+	if (device_property_read_bool(dev, "dw-uart,dma-cyclic")) {
+		p->cyclic = true;
+	}
 	if (device_property_read_bool(dev, "dcd-override")) {
 		/* Always report DCD as active */
 		data->msr_mask_on |= UART_MSR_DCD;

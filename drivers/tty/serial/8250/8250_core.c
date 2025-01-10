@@ -1019,7 +1019,7 @@ int serial8250_register_8250_port(const struct uart_8250_port *up)
 		uart->rs485_stop_tx	= up->rs485_stop_tx;
 		uart->lsr_save_mask	= up->lsr_save_mask;
 		uart->dma		= up->dma;
-
+		uart->port.cyclic	= up->port.cyclic;
 		/* Take tx_loadsz from fifosize if it wasn't set separately */
 		if (uart->port.fifosize && !uart->tx_loadsz)
 			uart->tx_loadsz = uart->port.fifosize;

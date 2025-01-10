@@ -11,6 +11,10 @@
 
 #include "8250.h"
 
+#define RX_DMA_SIZE	(1024)
+#define RX_DMA_PERIODS	(RX_DMA_SIZE / 16) /* TODO: Set from FIFO size and Trig lvl */
+#define TX_DMA_SIZE	(RX_DMA_SIZE / RX_DMA_PERIODS)
+
 static void __dma_tx_complete(void *param)
 {
 	struct uart_8250_port	*p = param;
@@ -35,6 +39,58 @@ static void __dma_tx_complete(void *param)
 	if (ret || !dma->tx_running)
 		serial8250_set_THRI(p);
 
+	spin_unlock_irqrestore(&p->port.lock, flags);
+}
+static void __dma_rx_complete_cyclic(void *param)
+{
+	struct uart_8250_port	*p = param;
+	struct uart_8250_dma	*dma = p->dma;
+	struct tty_port		*tty_port = &p->port.state->port;
+	struct dma_tx_state	state;
+	enum dma_status		dma_status;
+	int			count;
+	unsigned int head, tail;
+	unsigned char *buf = dma->rx_buf;
+
+	/*
+	 * New DMA Rx can be started during the completion handler before it
+	 * could acquire port's lock and it might still be ongoing. Don't to
+	 * anything in such case.
+	 */
+	dma_status = dmaengine_tx_status(dma->rxchan, dma->rx_cookie, &state);
+
+	if (dma_status == DMA_ERROR)
+		return;
+
+	buf += dma->rx_pos;
+	head = dma->rx_pos;
+	tail = dma->rx_size - state.residue;
+
+	if (tail < head) {
+		count = (dma->rx_size - head) + tail;
+		tty_insert_flip_string(tty_port, buf, dma->rx_size - head);
+		buf = dma->rx_buf;
+		tty_insert_flip_string(tty_port, buf, tail);
+	} else {
+		count = tail - head;
+		tty_insert_flip_string(tty_port, buf, count);
+	}
+
+	p->port.icount.rx += count;
+	dma->rx_pos = tail;
+
+	tty_flip_buffer_push(tty_port);
+}
+
+static void dma_rx_complete_cyclic(void *param)
+{
+	struct uart_8250_port *p = param;
+	struct uart_8250_dma *dma = p->dma;
+	unsigned long flags;
+
+	spin_lock_irqsave(&p->port.lock, flags);
+	if (dma->rx_running)
+		__dma_rx_complete_cyclic(p);
 	spin_unlock_irqrestore(&p->port.lock, flags);
 }
 
@@ -102,6 +158,7 @@ int serial8250_tx_dma(struct uart_8250_port *p)
 	}
 
 	dma->tx_size = CIRC_CNT_TO_END(xmit->head, xmit->tail, UART_XMIT_SIZE);
+	dma->tx_size = min_t(unsigned int, dma->tx_size , TX_DMA_SIZE);
 
 	serial8250_do_prepare_tx_dma(p);
 
@@ -131,6 +188,35 @@ int serial8250_tx_dma(struct uart_8250_port *p)
 err:
 	dma->tx_err = 1;
 	return ret;
+}
+
+int serial8250_rx_dma_cyclic(struct uart_8250_port *p)
+{
+	struct uart_8250_dma		*dma = p->dma;
+	struct dma_async_tx_descriptor	*desc;
+
+	if (dma->rx_running)
+		return 0;
+
+	serial8250_do_prepare_rx_dma(p);
+
+	desc = dmaengine_prep_dma_cyclic(dma->rxchan, dma->rx_addr,
+					 dma->rx_size, dma->rx_size / RX_DMA_PERIODS,
+					 DMA_DEV_TO_MEM,
+					 DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
+	if (!desc)
+		return -EBUSY;
+
+	dma->rx_running = 1;
+	dma->rx_pos = 0;
+	desc->callback = dma_rx_complete_cyclic;
+	desc->callback_param = p;
+
+	dma->rx_cookie = dmaengine_submit(desc);
+
+	dma_async_issue_pending(dma->rxchan);
+
+	return 0;
 }
 
 int serial8250_rx_dma(struct uart_8250_port *p)
@@ -182,15 +268,21 @@ int serial8250_request_dma(struct uart_8250_port *p)
 	dma_cap_mask_t		mask;
 	struct dma_slave_caps	caps;
 	int			ret;
-
+	struct uart_port	*up = &p->port;
 	/* Default slave configuration parameters */
 	dma->rxconf.direction		= DMA_DEV_TO_MEM;
 	dma->rxconf.src_addr_width	= DMA_SLAVE_BUSWIDTH_1_BYTE;
 	dma->rxconf.src_addr		= rx_dma_addr + UART_RX;
+	if (p->port.cyclic) {
+		dma->rxconf.src_msize		= up->fifosize / 4;
+		dma->rxconf.dst_msize		= up->fifosize / 4;
+	}
 
 	dma->txconf.direction		= DMA_MEM_TO_DEV;
 	dma->txconf.dst_addr_width	= DMA_SLAVE_BUSWIDTH_1_BYTE;
 	dma->txconf.dst_addr		= tx_dma_addr + UART_TX;
+	dma->txconf.src_msize		= 1;
+	dma->txconf.dst_msize		= 1;
 
 	dma_cap_zero(mask);
 	dma_cap_set(DMA_SLAVE, mask);
@@ -236,7 +328,7 @@ int serial8250_request_dma(struct uart_8250_port *p)
 
 	/* RX buffer */
 	if (!dma->rx_size)
-		dma->rx_size = PAGE_SIZE;
+		dma->rx_size = RX_DMA_SIZE;
 
 	dma->rx_buf = dma_alloc_coherent(dma->rxchan->device->dev, dma->rx_size,
 					&dma->rx_addr, GFP_KERNEL);
@@ -277,6 +369,8 @@ void serial8250_release_dma(struct uart_8250_port *p)
 
 	/* Release RX resources */
 	dmaengine_terminate_sync(dma->rxchan);
+	if (p->port.cyclic)
+		dma->rx_running = 0;
 	dma_free_coherent(dma->rxchan->device->dev, dma->rx_size, dma->rx_buf,
 			  dma->rx_addr);
 	dma_release_channel(dma->rxchan);

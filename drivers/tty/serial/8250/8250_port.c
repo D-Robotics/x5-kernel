@@ -1918,8 +1918,15 @@ static bool handle_rx_dma(struct uart_8250_port *up, unsigned int iir)
 		fallthrough;
 	case UART_IIR_RLSI:
 	case UART_IIR_RX_TIMEOUT:
-		serial8250_rx_dma_flush(up);
-		return true;
+		if (!up->port.cyclic) {
+			serial8250_rx_dma_flush(up);
+			return true;
+		} else {
+			up->ier = serial_port_in(&up->port, UART_IER);
+			up->ier &= ~(UART_IER_RLSI | UART_IER_RDI);
+			serial_port_out(&up->port, UART_IER, up->ier);
+			return false;
+		}
 	}
 	return up->dma->rx_dma(up);
 }
@@ -3331,8 +3338,13 @@ void serial8250_set_defaults(struct uart_8250_port *up)
 	if (up->dma) {
 		if (!up->dma->tx_dma)
 			up->dma->tx_dma = serial8250_tx_dma;
-		if (!up->dma->rx_dma)
-			up->dma->rx_dma = serial8250_rx_dma;
+		if (!up->dma->rx_dma) {
+			if (up->port.cyclic) {
+				up->dma->rx_dma = serial8250_rx_dma_cyclic;
+			} else {
+				up->dma->rx_dma = serial8250_rx_dma;
+			}
+		}
 	}
 }
 EXPORT_SYMBOL_GPL(serial8250_set_defaults);

@@ -580,6 +580,7 @@ struct uart_port {
 	struct serial_rs485	rs485_supported;	/* Supported mask for serial_rs485 */
 	struct gpio_desc	*rs485_term_gpio;	/* enable RS485 bus termination */
 	struct serial_iso7816   iso7816;
+	bool 			cyclic;
 	void			*private_data;		/* generic platform data pointer */
 };
 
