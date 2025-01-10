@@ -3948,6 +3948,7 @@
 				resets = <&socrst LSIO_UART1_RESET>;
 				pinctrl-names = "default";
 				pinctrl-0 = <&pinctrl_uart1>;
+				dw-uart,dma-cyclic;
 			};
 
 			uart2: serial@34080000 {
@@ -3964,6 +3965,7 @@
 				broken-auto-flow-control;
 				pinctrl-names = "default";
 				pinctrl-0 = <&pinctrl_uart2>;
+				dw-uart,dma-cyclic;
 			};
 
 			uart3: serial@34090000 {
@@ -3980,6 +3982,7 @@
 				broken-auto-flow-control;
 				pinctrl-names = "default";
 				pinctrl-0 = <&pinctrl_uart3>;
+				dw-uart,dma-cyclic;
 			};
 
 			uart4: serial@340a0000 {
@@ -3996,6 +3999,7 @@
 				broken-auto-flow-control;
 				pinctrl-names = "default";
 				pinctrl-0 = <&pinctrl_uart4>;
+				dw-uart,dma-cyclic;
 			};
 
 			i2c0: i2c@340b0000 {
@@ -4299,6 +4303,7 @@
 				broken-auto-flow-control;
 				pinctrl-names = "default";
 				pinctrl-0 = <&pinctrl_uart5>;
+				dw-uart,dma-cyclic;
 			};
 
 			uart6: serial@341b0000 {
@@ -4315,6 +4320,7 @@
 				broken-auto-flow-control;
 				pinctrl-names = "default";
 				pinctrl-0 = <&pinctrl_uart6>;
+				dw-uart,dma-cyclic;
 			};
 
 			uart7: serial@34060000 {
@@ -4330,6 +4336,7 @@
 				resets = <&socrst LSIO_UART7_RESET>;
 				pinctrl-names = "default";
 				pinctrl-0 = <&pinctrl_uart7>;
+				dw-uart,dma-cyclic;
 			};
 
 			i2c5: i2c@341c0000 {
