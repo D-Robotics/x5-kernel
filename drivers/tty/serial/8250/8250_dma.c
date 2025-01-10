@@ -348,7 +348,10 @@ int serial8250_request_dma(struct uart_8250_port *p)
 		ret = -ENOMEM;
 		goto err;
 	}
-
+	dma->rx_dma(p);
+	if (!p->port.cyclic) {
+		serial8250_rx_dma_flush(p);
+	}
 	dev_dbg_ratelimited(p->port.dev, "got both dma channels\n");
 
 	return 0;
