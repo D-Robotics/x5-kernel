@@ -10,7 +10,7 @@
 #include "x5-evb.dtsi"
 
 / {
-	model = "D-Robotics X5 EVB LP4X V2P0 board";
+	model = "D-Robotics X5 EVB LP4 V2P0 board";
 };
 
 /* ANT_CTRL1 */
