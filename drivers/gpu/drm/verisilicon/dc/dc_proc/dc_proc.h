@@ -428,6 +428,7 @@ void dc_plane_destroy(struct vs_plane *vs_plane);
 void dc_plane_vblank(struct vs_plane *vs_plane, u32 irq_status);
 void dc_plane_suspend(struct vs_plane *vs_plane);
 void dc_plane_resume(struct vs_plane *vs_plane);
+int dc_plane_post_create(struct dc_plane *dc_plane);
 int dc_crtc_create_prop(struct dc_crtc *dc_crtc);
 int dc_crtc_init(struct dc_crtc *dc_crtc, struct dc_crtc_info *dc_crtc_info,
 		 struct list_head *device_list);

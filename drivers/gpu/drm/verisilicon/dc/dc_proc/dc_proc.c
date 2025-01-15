@@ -587,6 +587,11 @@ int dc_plane_init(struct dc_plane *dc_plane, struct dc_plane_info *dc_plane_info
 			      dc_plane_info->num_proc, device_list, vs_plane_info);
 }
 
+int dc_plane_post_create(struct dc_plane *dc_plane)
+{
+	return __dc_proc_post_create(&dc_plane->list);
+}
+
 static void dc_plane_commit(struct vs_plane *vs_plane)
 {
 	struct dc_plane *dc_plane = to_dc_plane(vs_plane);

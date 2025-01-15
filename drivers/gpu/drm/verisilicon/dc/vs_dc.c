@@ -132,6 +132,10 @@ static int dc_bind(struct device *dev, struct device *master, void *data)
 		if (ret)
 			goto err_cleanup_planes;
 
+		ret = dc_plane_post_create(dc_plane);
+		if (ret)
+			goto err_cleanup_planes;
+
 		ret = dc_plane_create_prop(dc_plane);
 		if (ret)
 			goto err_cleanup_planes;

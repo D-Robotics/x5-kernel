@@ -31,6 +31,7 @@
 #include <linux/of_graph.h>
 #include <linux/component.h>
 #include <linux/iommu.h>
+#include <linux/pm_runtime.h>
 
 #include <drm/drm_of.h>
 #include <drm/drm_crtc.h>
@@ -104,9 +105,18 @@ int vs_drm_iommu_attach_device(struct drm_device *drm_dev, struct device *dev)
 {
 	struct vs_drm_private *priv = drm_to_vs_priv(drm_dev);
 	int ret;
+	bool skip_suspend;
 
 	if (!has_iommu)
 		return 0;
+
+	ret = pm_runtime_resume_and_get(drm_dev->dev);
+	if (ret < 0 && ret != -EACCES) {
+		dev_err(drm_dev->dev, "failed to resume %d\n", ret);
+		return ret;
+	}
+
+	skip_suspend = (ret == -EACCES);
 
 	if (!priv->domain) {
 		priv->domain = iommu_get_domain_for_dev(dev);
@@ -121,6 +131,15 @@ int vs_drm_iommu_attach_device(struct drm_device *drm_dev, struct device *dev)
 		return ret;
 	}
 
+	if (skip_suspend)
+		return 0;
+
+	ret = pm_runtime_put_sync_suspend(drm_dev->dev);
+	if (ret) {
+		dev_err(drm_dev->dev, "Failed to suspend %d\n", ret);
+		return ret;
+	}
+
 	return 0;
 }
 
@@ -131,7 +150,11 @@ void vs_drm_iommu_detach_device(struct drm_device *drm_dev, struct device *dev)
 	if (!has_iommu)
 		return;
 
+	pm_runtime_resume_and_get(drm_dev->dev);
+
 	iommu_detach_device(priv->domain, dev);
+
+	pm_runtime_put(drm_dev->dev);
 
 	if (priv->dma_dev == dev)
 		priv->dma_dev = drm_dev->dev;
@@ -199,6 +222,8 @@ static int vs_drm_bind(struct device *dev)
 
 	drm_mode_config_init(drm_dev);
 
+	pm_runtime_enable(dev);
+
 	/* Now try and bind all our sub-components */
 	ret = component_bind_all(dev, drm_dev);
 	if (ret)
@@ -244,8 +269,6 @@ static void vs_drm_unbind(struct device *dev)
 	drm_kms_helper_poll_fini(drm_dev);
 
 	component_unbind_all(drm_dev->dev, drm_dev);
-
-
 
 #ifdef CONFIG_VERISILICON_GEM_ION
 	if (priv->client) {

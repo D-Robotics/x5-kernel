@@ -41,6 +41,7 @@
 #include "vs_drv.h"
 #include "nano2D_kernel_driver.h"
 #include "nano2D.h"
+#include "linux/pm_runtime.h"
 
 struct gpu_plane_context {
 	struct drm_framebuffer *fb_display;
@@ -55,6 +56,8 @@ struct gpu_plane_proc {
 	struct dc_proc base;
 	/** add gpu node structure here */
 	struct vs_n2d_aux *aux;
+	struct drm_device *drm_dev; // save pointer to detach iommo domain when destroy
+	struct device_link *link;   /* runtime PM link from gc proc to drm device */
 	bool updating; // new framebuffer is pushed in, current fb can be recycled in next vblank
 };
 
@@ -463,7 +466,14 @@ static void gpu_proc_commit_plane(struct dc_proc *dc_proc) {}
 
 static void gpu_proc_destroy_plane(struct dc_proc *dc_proc)
 {
-	struct gpu_plane_proc *hw_plane = to_gpu_plane_proc(dc_proc);
+	struct gpu_plane_proc *hw_plane		= to_gpu_plane_proc(dc_proc);
+	struct vs_n2d_aux *aux			= hw_plane->aux;
+	const struct gpu_plane_info *plane_info = hw_plane->base.info->info;
+
+	if (!(plane_info->features & GPU_PLANE_OUT)) {
+		vs_drm_iommu_detach_device(hw_plane->drm_dev, aux->dev);
+		device_link_del(hw_plane->link);
+	}
 
 	kfree(hw_plane);
 }
@@ -557,6 +567,33 @@ static struct dc_proc *gpu_proc_create_plane(struct device *dev, const struct dc
 	return &hw_plane->base;
 }
 
+static int gpu_proc_post_create_plane(struct dc_proc *dc_proc)
+{
+	struct vs_plane *vs_plane		= proc_to_vs_plane(dc_proc);
+	struct drm_device *drm_dev		= vs_plane->base.dev;
+	struct gpu_plane_proc *hw_plane		= to_gpu_plane_proc(dc_proc);
+	struct vs_n2d_aux *aux			= hw_plane->aux;
+	const struct gpu_plane_info *plane_info = hw_plane->base.info->info;
+	int ret;
+
+	if (plane_info->features & GPU_PLANE_OUT)
+		return 0;
+	pr_info("%s: %d\n", __FILE__, __LINE__);
+	hw_plane->link =
+		device_link_add(drm_dev->dev, aux->dev, DL_FLAG_STATELESS | DL_FLAG_PM_RUNTIME);
+
+	hw_plane->drm_dev = drm_dev;
+
+	ret = vs_drm_iommu_attach_device(drm_dev, aux->dev);
+	if (ret) {
+		dev_err(aux->dev, "failed to attach to drm iommu domain");
+	}
+
+	pr_info("%s: %d\n", __FILE__, __LINE__);
+
+	return ret;
+}
+
 static void gpu_proc_vblank(struct dc_proc *dc_proc)
 {
 	struct gpu_plane_proc *hw_plane = to_gpu_plane_proc(dc_proc);
@@ -574,6 +611,7 @@ static void gpu_proc_vblank(struct dc_proc *dc_proc)
 
 const struct dc_proc_funcs gpu_plane_funcs = {
 	.create		  = gpu_proc_create_plane,
+	.post_create	  = gpu_proc_post_create_plane,
 	.update		  = gpu_proc_update_plane,
 	.disable	  = gpu_proc_disable_plane,
 	.check		  = gpu_proc_check_plane,

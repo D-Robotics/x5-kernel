@@ -29,6 +29,7 @@
  */
 
 #include <linux/dma-buf.h>
+#include "linux/pm_runtime.h"
 
 #include "vs_drv.h"
 #include "vs_gem.h"
@@ -221,6 +222,8 @@ static void vs_gem_free_object(struct drm_gem_object *obj)
 	else
 		vs_gem_free_buf(vs_obj);
 
+	pm_runtime_put(obj->dev->dev);
+
 	drm_gem_object_release(obj);
 
 	kfree(vs_obj);
@@ -250,6 +253,12 @@ static struct vs_gem_object *vs_gem_alloc_object(struct drm_device *dev, size_t 
 		drm_gem_object_release(obj);
 		goto err_free;
 	}
+
+	ret = pm_runtime_resume_and_get(dev->dev);
+	/* creation of multiple drm_gem_objects wakes drm device multiple times, return error when
+	 * this is not the case */
+	if (ret && ret != EPERM)
+		DRM_DEV_ERROR(dev->dev, "failed to wake up drm device. %d\n", ret);
 
 	return vs_obj;
 
@@ -334,7 +343,17 @@ int vs_gem_dumb_create(struct drm_file *file, struct drm_device *dev,
 
 struct drm_gem_object *vs_gem_prime_import(struct drm_device *dev, struct dma_buf *dma_buf)
 {
-	return drm_gem_prime_import_dev(dev, dma_buf, to_dma_dev(dev));
+	struct drm_gem_object *obj;
+	int ret;
+
+	ret = pm_runtime_resume_and_get(dev->dev);
+
+	obj = drm_gem_prime_import_dev(dev, dma_buf, to_dma_dev(dev));
+
+	if (!ret)
+		pm_runtime_put(dev->dev);
+
+	return obj;
 }
 
 struct drm_gem_object *vs_gem_prime_import_sg_table(struct drm_device *dev,

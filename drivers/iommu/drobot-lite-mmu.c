@@ -34,7 +34,7 @@ static void __enable_iommu(struct lite_mmu_iommu *iommu, bool enable)
 	if (enable)
 		value = BIT_CTRL_ENABLE;
 
-	if(value == readl( iommu->base + MMU_REG_CTRL))
+	if (value == readl(iommu->base + MMU_REG_CTRL))
 		return;
 
 	writel(value, iommu->base + MMU_REG_CTRL);
@@ -171,12 +171,45 @@ static void lite_mmu_detach_device(struct iommu_domain *iommu_domain, struct dev
 	__enable_iommu(iommu, false);
 }
 
+static void copy_mapping_table(struct lite_mmu_domain *old_domain,
+			       struct lite_mmu_domain *new_domain)
+{
+	u8 i;
+
+	for (i = 0; i < MAP_TABLE_SIZE; i++) {
+		if (old_domain->map_ref_cnt[i]) {
+			if (!new_domain->map_ref_cnt[i]) {
+				new_domain->map_table[i]   = old_domain->map_table[i];
+				new_domain->map_ref_cnt[i] = old_domain->map_ref_cnt[i];
+			}
+		}
+	}
+}
+
+static void __flush_current_domain(struct lite_mmu_iommu *iommu)
+{
+	unsigned long flags;
+	struct lite_mmu_domain *domain;
+
+	if (!iommu->domain)
+		return;
+
+	domain = to_lite_mmu_domain(iommu->domain);
+
+	spin_lock_irqsave(&domain->map_table_lock, flags);
+	__update_iommu(iommu, domain->map_table);
+	spin_unlock_irqrestore(&domain->map_table_lock, flags);
+	__enable_iommu(iommu, true);
+}
+
+/* All device in new domain need to be powered on */
 static int lite_mmu_attach_device(struct iommu_domain *iommu_domain, struct device *dev)
 {
-	struct lite_mmu_iommu *iommu   = dev_iommu_priv_get(dev);
-	struct lite_mmu_domain *domain = to_lite_mmu_domain(iommu_domain);
+	struct lite_mmu_iommu *iommu	   = dev_iommu_priv_get(dev);
+	struct lite_mmu_domain *domain	   = to_lite_mmu_domain(iommu_domain);
+	struct lite_mmu_domain *old_domain = NULL;
 	unsigned long flags;
-	int32_t ret = 0;
+	int ret;
 
 	if (!iommu)
 		return -ENODEV;
@@ -185,8 +218,10 @@ static int lite_mmu_attach_device(struct iommu_domain *iommu_domain, struct devi
 	if (iommu->domain == iommu_domain)
 		return 0;
 
-	if (iommu->domain)
+	if (iommu->domain) {
+		old_domain = to_lite_mmu_domain(iommu->domain);
 		lite_mmu_detach_device(iommu->domain, dev);
+	}
 
 	iommu->domain = iommu_domain;
 
@@ -201,16 +236,15 @@ static int lite_mmu_attach_device(struct iommu_domain *iommu_domain, struct devi
 		return ret;
 	}
 
-	/* sync map table to HW */
-	spin_lock_irqsave(&domain->map_table_lock, flags);
-	__update_iommu(iommu, domain->map_table);
-	spin_unlock_irqrestore(&domain->map_table_lock, flags);
-	__enable_iommu(iommu, true);
-	ret = pm_runtime_put_sync_suspend(iommu->dev);
-	if (ret) {
-		dev_err(dev, "Failed to suspend %d\n", ret);
-		return ret;
+	if (old_domain) {
+		copy_mapping_table(old_domain, domain);
+		__flush_domain(domain);
+	} else {
+		__flush_current_domain(iommu);
 	}
+
+	pm_runtime_put_sync_suspend(iommu->dev);
+
 	return 0;
 }
 
@@ -248,10 +282,8 @@ static int lite_mmu_map(struct iommu_domain *iommu_domain, unsigned long _iova, 
 	}
 
 	spin_unlock_irqrestore(&domain->map_table_lock, flags);
-	pr_debug("%s: Mapping Phys:%#llx(%#lx), start:[%#x]-%#x, end:[%#x]-%#x\n",
-			 __func__, paddr, size,
-			 start_idx, domain->map_table[start_idx],
-			 end_idx, domain->map_table[end_idx]);
+	pr_debug("%s: Mapping Phys:%#llx(%#lx), start:[%#x]-%#x, end:[%#x]-%#x\n", __func__, paddr,
+		size, start_idx, domain->map_table[start_idx], end_idx, domain->map_table[end_idx]);
 	if (dirty)
 		__flush_domain(domain);
 	return 0;
@@ -367,7 +399,7 @@ static const struct iommu_ops lite_mmu_ops = {
 	.device_group	    = lite_mmu_device_group,
 	.pgsize_bitmap	    = LITE_MMU_PGSIZE_BITMAP,
 	.of_xlate	    = lite_mmu_of_xlate,
-	.def_domain_type = lite_mmu_def_domain_type,
+	.def_domain_type    = lite_mmu_def_domain_type,
 	.owner		    = THIS_MODULE,
 	.default_domain_ops = &(const struct iommu_domain_ops){
 		.attach_dev   = lite_mmu_attach_device,
@@ -479,7 +511,9 @@ static int __maybe_unused litemmu_pm_runtime_suspend(struct device *dev)
 
 static int __maybe_unused litemmu_pm_runtime_resume(struct device *dev)
 {
-	lite_mmu_restore_mapping(dev);
+	struct lite_mmu_iommu *iommu = dev_get_drvdata(dev);
+
+	__flush_current_domain(iommu);
 	return 0;
 }
 
@@ -487,18 +521,17 @@ static const struct dev_pm_ops lite_mmu_pm_ops = {
 	SET_SYSTEM_SLEEP_PM_OPS(lite_mmu_suspend, lite_mmu_resume)
 		SET_RUNTIME_PM_OPS(litemmu_pm_runtime_suspend, litemmu_pm_runtime_resume, NULL)};
 
-static const struct of_device_id lite_mmu_dt_ids[] = {
-	{ .compatible = "d-robotics,lite_mmu" },
-	{ /* sentinel */ }
-};
+static const struct of_device_id lite_mmu_dt_ids[] = {{.compatible = "d-robotics,lite_mmu"},
+						      {/* sentinel */}};
 
 static struct platform_driver lite_mmu_driver = {
 	.probe = lite_mmu_probe,
-	.driver = {
-		.name = "lite_mmu",
-		.of_match_table = lite_mmu_dt_ids,
-		.pm = &lite_mmu_pm_ops,
-	},
+	.driver =
+		{
+			.name		= "lite_mmu",
+			.of_match_table = lite_mmu_dt_ids,
+			.pm		= &lite_mmu_pm_ops,
+		},
 };
 
 static int __init lite_mmu_init(void)
