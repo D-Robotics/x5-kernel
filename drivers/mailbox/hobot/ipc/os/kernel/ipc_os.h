@@ -50,6 +50,6 @@ int32_t ipc_os_poll_channels(int32_t instance);
 struct ipc_instance_cfg *ipc_os_get_def_info(int32_t instance, const struct ipc_instance_cfg *cfg);
 int32_t ipc_os_mbox_open(int32_t instance);
 int32_t ipc_os_mbox_close(int32_t instance);
-int32_t ipc_os_mbox_notify(int32_t instance);
+int32_t ipc_os_mbox_notify(int32_t instance, int32_t chan_id);
 
 #endif /* IPC_OS_H */

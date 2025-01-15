@@ -900,9 +900,6 @@ int32_t ipc_shm_tx(int32_t instance, int32_t chan_id, void *buf, size_t size)
 	struct ipc_shm_pool *pool;
 	struct ipc_shm_bd bd;
 	int32_t err;
-	int32_t mask;
-
-	mask = chan_id << (4 * instance + 1);
 
 	/* check if instance is used */
 	if (ipc_instance_is_free(instance) != IPC_SHM_INSTANCE_USED) {
@@ -910,8 +907,6 @@ int32_t ipc_shm_tx(int32_t instance, int32_t chan_id, void *buf, size_t size)
 
 		return -EINVAL;
 	}
-
-	writel(mask, ipc_shm_priv_data[instance].ipc_shm_mask);
 
 	chan = get_channel(instance, chan_id);
 	if ((chan == NULL) || (buf == NULL) || (size == 0u)) {
@@ -943,7 +938,7 @@ int32_t ipc_shm_tx(int32_t instance, int32_t chan_id, void *buf, size_t size)
 	}
 
 	/* notify remote that data is available */
-	err = ipc_os_mbox_notify(instance);
+	err = ipc_os_mbox_notify(instance, chan_id);
 	if (err < 0) {
 		ipc_err("send notify failed\n");
 
