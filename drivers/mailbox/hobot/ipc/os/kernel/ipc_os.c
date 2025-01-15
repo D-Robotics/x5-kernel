@@ -470,7 +470,7 @@ int32_t ipc_os_mbox_close(int32_t instance)
  * @callergraph
  * @design
  */
-int32_t ipc_os_mbox_notify(int32_t instance)
+int32_t ipc_os_mbox_notify(int32_t instance, int32_t chan_id)
 {
 	int err = 0;
 	uint32_t tmp_data[NUM_DATA] = {0, 0, 0, 0, 0, 0, NUM_DATA};
@@ -488,7 +488,7 @@ int32_t ipc_os_mbox_notify(int32_t instance)
 
 	mutex_lock(&priv.id[instance].notify_mutex_lock);
 
-	mask = readl(priv.ipc_shm_mask);
+	mask = chan_id << (4 * instance + 1);
 	mask = mask | (1 << (4 * instance));
 	writel(mask, priv.ipc_shm_mask);
 
@@ -501,7 +501,6 @@ int32_t ipc_os_mbox_notify(int32_t instance)
 
 	if (priv.id[instance].trans_flags & SPIN_WAIT) {
 		err = mbox_flush(priv.id[instance].mchan, priv.id[instance].timeout);
-
 		if (err < 0) {
 			ipc_err("ipc instance %d: mailbox no ack : %d\n", instance, err);
 			mutex_unlock(&priv.id[instance].notify_mutex_lock);
