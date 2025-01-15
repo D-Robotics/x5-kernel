@@ -330,8 +330,8 @@
 		reg = <0>;
 		#address-cells = <1>;
 		#size-cells = <1>;
-		spi-max-frequency = <10000000>;
-		bosch,mram-cfg = <0x0 0 0 16 0 0 1 1>;
+		spi-max-frequency = <18000000>;
+		bosch,mram-cfg = <0x0 8 8 16 8 8 1 1>;
 		interrupt-parent = <&ls_gpio1_porta>;
 		interrupts = <4 IRQ_TYPE_EDGE_FALLING>;
 		device-wake-gpios = <&ls_gpio1_porta 6 GPIO_ACTIVE_LOW>;
