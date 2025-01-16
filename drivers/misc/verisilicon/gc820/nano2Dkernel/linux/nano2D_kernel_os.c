@@ -1319,14 +1319,14 @@ on_error:
 
 n2d_uint32_t n2d_kernel_os_peek_with_core(n2d_os_t *os, n2d_uint32_t core, n2d_uint32_t address)
 {
-	return *(uint32_t *)(((uint8_t *)os->device->register_bases_mapped[core]) + address);
+	return *(n2d_uint32_t *)(((uint8_t *)os->device->register_bases_mapped[core]) + address);
 }
 
 void n2d_kernel_os_poke_with_core(n2d_os_t *os, n2d_uint32_t core, n2d_uint32_t address,
 				  n2d_uint32_t data)
 {
 	/* Write data to the GPU register. */
-	*(uint32_t *)(((uint8_t *)os->device->register_bases_mapped[core]) + address) = data;
+	*(n2d_uint32_t *)(((uint8_t *)os->device->register_bases_mapped[core]) + address) = data;
 }
 
 n2d_uint32_t n2d_kernel_os_get_base_address(n2d_os_t *os)
