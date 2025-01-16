@@ -6829,6 +6829,9 @@ static int eth_phy_setup(struct hobot_priv *priv)
 	priv->phylink_config.dev = &priv->ndev->dev;
 	priv->phylink_config.type = PHYLINK_NETDEV;
 
+	/* Indicate that the MAC is responsible for PHY PM */
+	priv->phylink_config.mac_managed_pm = true;
+
 	if (!fwnode)
 		fwnode = dev_fwnode(priv->device);
 
@@ -6838,8 +6841,10 @@ static int eth_phy_setup(struct hobot_priv *priv)
 		netdev_err(priv->ndev, "phylink_create fail\n");
 		return PTR_ERR(phylink);/*PRQA S 4460*/
 	}
+
 	priv->phylink = phylink;
 	priv->speed = -1;
+
 	return 0;
 }
 
