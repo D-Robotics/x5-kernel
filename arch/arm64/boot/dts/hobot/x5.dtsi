@@ -4603,7 +4603,7 @@
 	};
 
 	dsp0: dsp0 {
-		status = "okay";
+		status = "disabled";
 		compatible = "hobot,dsp0";
 	};
 
