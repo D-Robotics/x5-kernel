@@ -54,25 +54,31 @@ struct clk_cpu {
 	struct clk_hw hw;
 	void __iomem *reg;
 	u8 offset;
+	spinlock_t lock;
 };
 
-static void reg_set_clear(void __iomem *reg, u32 set, u32 clear)
+static void reg_set_clear(struct clk_cpu *cclk, void __iomem *reg, u32 set, u32 clear)
 {
 	u32 val;
+	unsigned long flags;
 
+	spin_lock_irqsave(&cclk->lock, flags);
 	val = readl(reg);
 
 	val &= ~clear;
 	val |= set;
 
 	writel(val, reg);
+	spin_unlock_irqrestore(&cclk->lock, flags);
 }
 
 static void gen_set_clear(struct clk_cpu *cclk, u32 set, u32 clear)
 {
 	u32 val;
 	u8 i;
+	unsigned long flags;
 
+	spin_lock_irqsave(&cclk->lock, flags);
 	val = readl(cclk->reg);
 
 	val &= ~clear;
@@ -80,6 +86,8 @@ static void gen_set_clear(struct clk_cpu *cclk, u32 set, u32 clear)
 
 	for (i = 0; i < CPU_NUMS; i++)
 		writel(val, cclk->reg + (i * 0x20));
+
+	spin_unlock_irqrestore(&cclk->lock, flags);
 }
 
 static int clk_gen_endisable(struct clk_hw *hw, int enable)
@@ -87,7 +95,9 @@ static int clk_gen_endisable(struct clk_hw *hw, int enable)
 	struct clk_cpu *cclk = to_clk_cpu(hw);
 	u32 reg;
 	u8 i;
+	unsigned long flags;
 
+	spin_lock_irqsave(&cclk->lock, flags);
 	reg = readl(cclk->reg);
 
 	if (enable)
@@ -99,6 +109,7 @@ static int clk_gen_endisable(struct clk_hw *hw, int enable)
 	for (i = 0; i < CPU_NUMS; i++)
 		writel(reg, cclk->reg + (i * 0x20));
 
+	spin_unlock_irqrestore(&cclk->lock, flags);
 	return 0;
 }
 
@@ -367,11 +378,11 @@ static int clk_cpu_set_rate(struct clk_hw *hw, unsigned long rate,
 
 	val = SET_CCLK_PREDIV(peri_table.prediv) | SET_CCLK_POSTDIV(peri_table.postdiv);
 	mask = CCLK_PRE_DIV_MASK | CCLK_POST_DIV_MASK;
-	reg_set_clear(cclk->reg + CCLK_PERI_OFFSET, val, mask);
+	reg_set_clear(cclk, cclk->reg + CCLK_PERI_OFFSET, val, mask);
 
 	val = SET_CCLK_PREDIV(gic_table.prediv) | SET_CCLK_POSTDIV(gic_table.postdiv);
 	mask = CCLK_PRE_DIV_MASK | CCLK_POST_DIV_MASK;
-	reg_set_clear(cclk->reg + CCLK_GIC_OFFSET, val, mask);
+	reg_set_clear(cclk, cclk->reg + CCLK_GIC_OFFSET, val, mask);
 
 	val = SET_CCLK_PREDIV(table.prediv) | SET_CCLK_POSTDIV(table.postdiv);
 	mask = CCLK_PRE_DIV_MASK | CCLK_POST_DIV_MASK;
@@ -468,11 +479,11 @@ static int clk_cpu_set_rate_and_parent(struct clk_hw *hw,
 
 	val = SET_CCLK_PREDIV(peri_table.prediv) | SET_CCLK_POSTDIV(peri_table.postdiv) | SET_CCLK_MUX(index);
 	mask = CCLK_MUX_MASK | CCLK_PRE_DIV_MASK | CCLK_POST_DIV_MASK;
-	reg_set_clear(cclk->reg + CCLK_PERI_OFFSET, val, mask);
+	reg_set_clear(cclk, cclk->reg + CCLK_PERI_OFFSET, val, mask);
 
 	val = SET_CCLK_PREDIV(gic_table.prediv) | SET_CCLK_POSTDIV(gic_table.postdiv) | SET_CCLK_MUX(index);
 	mask = CCLK_MUX_MASK | CCLK_PRE_DIV_MASK | CCLK_POST_DIV_MASK;
-	reg_set_clear(cclk->reg + CCLK_GIC_OFFSET, val, mask);
+	reg_set_clear(cclk, cclk->reg + CCLK_GIC_OFFSET, val, mask);
 
 	val = SET_CCLK_PREDIV(table.prediv) | SET_CCLK_POSTDIV(table.postdiv) | SET_CCLK_MUX(index);
 	mask = CCLK_MUX_MASK | CCLK_PRE_DIV_MASK | CCLK_POST_DIV_MASK;
@@ -523,6 +534,8 @@ struct clk_hw *drobot_clk_register_cpu(const char *name, const char * const *par
 
 	cclk->reg = reg;
 	cclk->hw.init = &init;
+
+	spin_lock_init(&cclk->lock);
 
 	hw = &cclk->hw;
 	ret = clk_hw_register(NULL, hw);

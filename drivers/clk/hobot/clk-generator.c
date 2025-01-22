@@ -44,11 +44,15 @@ struct clk_generator {
 	struct device *idle;
 	u32 iso_id;
 	bool skip_wait_idle;
+	spinlock_t lock;
 };
 
 static void gen_set_clear(struct clk_generator *gen, u32 set, u32 clear)
 {
 	u32 val;
+	unsigned long flags;
+
+	spin_lock_irqsave(&gen->lock, flags);
 
 	val = readl(gen->reg);
 
@@ -56,6 +60,8 @@ static void gen_set_clear(struct clk_generator *gen, u32 set, u32 clear)
 	val |= set;
 
 	writel(val, gen->reg);
+
+	spin_unlock_irqrestore(&gen->lock, flags);
 }
 
 static int clk_gen_endisable(struct clk_hw *hw, int enable)
@@ -63,22 +69,29 @@ static int clk_gen_endisable(struct clk_hw *hw, int enable)
 	struct clk_generator *gen = to_clk_generator(hw);
 	u32 reg;
 	int ret = 0;
+	unsigned long flags;
+
+	if (!enable)
+		if (gen->iso_id != 0xff)
+			ret = drobot_idle_request(gen->idle, gen->iso_id, true, gen->skip_wait_idle);
+
+	spin_lock_irqsave(&gen->lock, flags);
 
 	reg = readl(gen->reg);
 
-	if ((reg & GEN_EN) == (enable << GEN_EN_SHIFT))
+	if ((reg & GEN_EN) == (enable << GEN_EN_SHIFT)) {
+		spin_unlock_irqrestore(&gen->lock, flags);
 		return ret;
+	}
 
 	if (enable)
 		reg |= GEN_EN;
 	else
 		reg &= ~GEN_EN;
 
-	if (!enable)
-		if (gen->iso_id != 0xff)
-			ret = drobot_idle_request(gen->idle, gen->iso_id, true, gen->skip_wait_idle);
-
 	writel(reg, gen->reg);
+
+	spin_unlock_irqrestore(&gen->lock, flags);
 
 	if (enable)
 		if (gen->iso_id != 0xff)
@@ -420,11 +433,14 @@ static int clk_generator_i2s_set_parent(struct clk_hw *hw, u8 index)
 {
 	struct clk_generator *gen = to_clk_generator(hw);
 	u32 val;
+	unsigned long flags;
 
+	spin_lock_irqsave(&gen->lock, flags);
 	val = readl(gen->i2s_mux_reg) & (~GENMASK(gen->offset + 1, gen->offset));
 	val |= index << gen->offset;
 
 	writel(val, gen->i2s_mux_reg);
+	spin_unlock_irqrestore(&gen->lock, flags);
 
 	return 0;
 }
@@ -488,6 +504,7 @@ struct clk_hw *drobot_clk_register_generator(const char *name, const char *const
 	gen->iso_id = iso_id;
 	gen->skip_wait_idle = skip_wait_idle;
 
+	spin_lock_init(&gen->lock);
 	hw = &gen->hw;
 	ret = clk_hw_register(NULL, hw);
 	if (ret) {
@@ -525,6 +542,7 @@ struct clk_hw *drobot_clk_register_i2s_generator(const char *name, const char *c
 	gen->idle = idle;
 	gen->iso_id = iso_id;
 
+	spin_lock_init(&gen->lock);
 	hw = &gen->hw;
 	ret = clk_hw_register(NULL, hw);
 	if (ret) {
