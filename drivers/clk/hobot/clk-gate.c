@@ -17,6 +17,7 @@ struct drobot_clk_gate {
 	struct device *idle;
 	u32 iso_id;
 	bool skip_wait_idle;
+	spinlock_t lock;
 };
 
 #define to_drobot_clk_gate(_hw) container_of(_hw, struct drobot_clk_gate, hw)
@@ -26,21 +27,29 @@ static int clk_gate_endisable(struct clk_hw *hw, int enable)
 	struct drobot_clk_gate *gate = to_drobot_clk_gate(hw);
 	u32 reg;
 	int ret = 0;
+	unsigned long flags;
+
+	if (!enable)
+		if (gate->iso_id != 0xff)
+			ret = drobot_idle_request(gate->idle, gate->iso_id, true, gate->skip_wait_idle);
+
+	spin_lock_irqsave(&gate->lock, flags);
 
 	reg = readl(gate->reg);
-	if ((reg & BIT(gate->bit_idx)) == (enable << gate->bit_idx))
+
+	if ((reg & BIT(gate->bit_idx)) == (enable << gate->bit_idx)) {
+		spin_unlock_irqrestore(&gate->lock, flags);
 		return ret;
+	}
 
 	if (enable)
 		reg |= BIT(gate->bit_idx);
 	else
 		reg &= ~BIT(gate->bit_idx);
 
-	if (!enable)
-		if (gate->iso_id != 0xff)
-			ret = drobot_idle_request(gate->idle, gate->iso_id, true, gate->skip_wait_idle);
-
 	writel(reg, gate->reg);
+
+	spin_unlock_irqrestore(&gate->lock, flags);
 
 	if (enable)
 		if (gate->iso_id != 0xff)
@@ -107,6 +116,7 @@ struct clk_hw *drobot_clk_hw_register_gate(const char *name, const char *parent_
 	gate->iso_id = iso_id;
 	gate->skip_wait_idle = skip_wait_idle;
 
+	spin_lock_init(&gate->lock);
 	hw = &gate->hw;
 	ret = clk_hw_register(NULL, hw);
 	if (ret) {
