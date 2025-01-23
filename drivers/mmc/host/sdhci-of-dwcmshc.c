@@ -722,13 +722,13 @@ static void dwcmshc_x5_toggle_sd_power(struct mmc_host *mmc)
 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
 	struct dwcmshc_priv *priv = sdhci_pltfm_priv(pltfm_host);
 	struct x5_priv *x5_priv = priv->priv;
-	u16 toggle_interval_us = 1000;
+	u16 toggle_interval_ms = 100;
 
 	if (!IS_ERR_OR_NULL(x5_priv->power_gpio)) {
 		dev_dbg(mmc_dev(mmc), "Toggling power-gpio with interval %u us\n",
-				toggle_interval_us);
+				toggle_interval_ms);
 		gpiod_set_value_cansleep(x5_priv->power_gpio, 0);
-		udelay(toggle_interval_us);
+		mdelay(toggle_interval_ms);
 		gpiod_set_value_cansleep(x5_priv->power_gpio, 1);
 	}
 	return;
