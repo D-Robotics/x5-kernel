@@ -346,6 +346,7 @@ snd-soc-wm-hubs-objs := wm_hubs.o
 snd-soc-wsa881x-objs := wsa881x.o
 snd-soc-wsa883x-objs := wsa883x.o
 snd-soc-zl38060-objs := zl38060.o
+snd-soc-googlevoicehat-codec-objs := googlevoicehat-codec.o
 # Amp
 snd-soc-max9877-objs := max9877.o
 snd-soc-max98504-objs := max98504.o
@@ -707,6 +708,7 @@ obj-$(CONFIG_SND_SOC_WM_HUBS)	+= snd-soc-wm-hubs.o
 obj-$(CONFIG_SND_SOC_WSA881X)	+= snd-soc-wsa881x.o
 obj-$(CONFIG_SND_SOC_WSA883X)	+= snd-soc-wsa883x.o
 obj-$(CONFIG_SND_SOC_ZL38060)	+= snd-soc-zl38060.o
+obj-$(CONFIG_SND_SOC_HIWONDER_GOOGLEVOICEHAT_SOUNDCARD)  += snd-soc-googlevoicehat-codec.o
 
 # Amp
 obj-$(CONFIG_SND_SOC_MAX9877)	+= snd-soc-max9877.o
@@ -725,3 +727,4 @@ obj-$(CONFIG_SND_SOC_SIMPLE_MUX)	+= snd-soc-simple-mux.o
 obj-$(CONFIG_SND_SOC_ES7210) 	+= es7210.o
 obj-$(CONFIG_SND_SOC_ES8156)	+= es8156.o
 obj-$(CONFIG_SND_SOC_ES8311)	+= es8311.o
+
