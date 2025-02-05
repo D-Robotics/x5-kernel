@@ -299,6 +299,7 @@ static int x5_set_dll(struct sdhci_host *host, int degrees)
 	u16 sdhci_clk_reg_val;
 	ktime_t timeout;
 	unsigned long flags;
+	int ret = 0;
 
 	spin_lock_irqsave(&host->lock, flags);
 	sdhci_clk_reg_val = sdhci_readw(host, SDHCI_CLOCK_CONTROL);
@@ -320,7 +321,8 @@ static int x5_set_dll(struct sdhci_host *host, int degrees)
 		if (timedout) {
 			pr_err("%s: execute tuning dll obs never stabilized.\n",
 			       mmc_hostname(host->mmc));
-			return -1;
+			ret = -1;
+			goto out;
 		}
 		udelay(10);
 	}
@@ -329,6 +331,7 @@ static int x5_set_dll(struct sdhci_host *host, int degrees)
 	sdhci_writew(host, sdhci_clk_reg_val, SDHCI_CLOCK_CONTROL);
 	priv->current_dll = degrees;
 
+out:
 	spin_unlock_irqrestore(&host->lock, flags);
 	return 0;
 }
