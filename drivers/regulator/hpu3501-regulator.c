@@ -267,6 +267,12 @@ static void hpu3501_board_init(struct device *parent,
 	if (hpu3501_regulator->ocp_cfg2r != 0)
 		hpu3501_write(parent, HPU3501_OCP_CFG2R,
 			      hpu3501_regulator->ocp_cfg2r);
+
+	if (hpu3501_regulator->reg0x53 != 0) {
+		pr_info("hpu3501 set reg 0x%x to 0x%x\n", HPU3501_REG_0X53, hpu3501_regulator->reg0x53);
+		hpu3501_write(parent, HPU3501_REG_0X53,
+			      hpu3501_regulator->reg0x53);
+	}
 }
 
 static int hpu3501_regulator_probe(struct platform_device *pdev)
@@ -330,6 +336,11 @@ static int hpu3501_regulator_probe(struct platform_device *pdev)
 		if (of_property_read_u32(np, "ocp_cfg2r",
 					 &hpu3501_regulator->ocp_cfg2r)) {
 			dev_info(dev, "ocp_cfg2r will be default value\n");
+		}
+		if (of_property_read_u32(np, "reg0x53",
+					 &hpu3501_regulator->reg0x53)) {
+			dev_info(dev, "reg 0x53 will be default value 0x4\n");
+			hpu3501_regulator->reg0x53 = 0x4;
 		}
 	} else {
 		dev_err(pa_dev, "dts node get failed\n");

@@ -40,7 +40,7 @@
 #define HPU3501_LDO2_CFG1_VSET 0x24
 #define HPU3501_LDO2_CFG2_VSET 0x25
 #define HPU3501_LDO3_VSET 0x27
-
+#define HPU3501_REG_0X53 0x53
 /* VSET - [7:0] */
 #define HPU3501_VSET_MASK8 0xff
 
@@ -72,6 +72,7 @@ struct hpu3501_regulator {
 	u32 fault_cfgr;
 	u32 ocp_cfg1r;
 	u32 ocp_cfg2r;
+	u32 reg0x53;
 };
 
 /**
