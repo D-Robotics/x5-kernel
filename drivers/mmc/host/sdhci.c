@@ -160,8 +160,11 @@ static void sdhci_set_card_detection(struct sdhci_host *host, bool enable)
 		return;
 
 	if (enable) {
-		present = sdhci_readl(host, SDHCI_PRESENT_STATE) &
-				      SDHCI_CARD_PRESENT;
+		if (host->mmc->ops->get_cd)
+			present = host->mmc->ops->get_cd(host->mmc);
+		else
+			present = sdhci_readl(host, SDHCI_PRESENT_STATE) &
+						SDHCI_CARD_PRESENT;
 
 		host->ier |= present ? SDHCI_INT_CARD_REMOVE :
 				       SDHCI_INT_CARD_INSERT;

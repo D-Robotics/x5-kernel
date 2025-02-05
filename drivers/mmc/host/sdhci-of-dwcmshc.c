@@ -21,6 +21,7 @@
 #include <linux/pm_runtime.h>
 
 #include "sdhci-pltfm.h"
+#include "sdhci.h"
 
 #define SDHCI_DWCMSHC_ARG2_STUFF	GENMASK(31, 16)
 
@@ -719,6 +720,30 @@ static int dwcmshc_x5_start_signal_voltage_switch(struct mmc_host *mmc,
 	return sdhci_start_signal_voltage_switch(mmc, ios);
 }
 
+static int dwcmshc_x5_get_cd(struct mmc_host *mmc)
+{
+	struct sdhci_host *host = mmc_priv(mmc);
+	int ret;
+
+	/* If nonremovable, assume that the card is always present. */
+	if (!mmc_card_is_removable(mmc))
+		return 1;
+
+	/* Host native card detect */
+	ret = !!(sdhci_readl(host, SDHCI_PRESENT_STATE) & SDHCI_CARD_PRESENT);
+
+	/* !(host->ier & ((SDHCI_INT_CARD_INSERT | SDHCI_INT_CARD_REMOVE))) means just after sdhci init
+	 * sdhci init will clear all ier and just add some default ier which without card insert and card remove
+	 * when do sdhci init the present reg will reset to 0 and need delay some time to reflect the right value
+	 * so after do sdhci init delay some time then get present reg again */
+	if (!ret && !(host->ier & ((SDHCI_INT_CARD_INSERT | SDHCI_INT_CARD_REMOVE)))) {
+		udelay(100);
+		ret = !!(sdhci_readl(host, SDHCI_PRESENT_STATE) & SDHCI_CARD_PRESENT);
+	}
+
+	return ret;
+}
+
 static void dwcmshc_x5_toggle_sd_power(struct mmc_host *mmc)
 {
 	struct sdhci_host *host = mmc_priv(mmc);
@@ -956,7 +981,7 @@ static int dwcmshc_probe(struct platform_device *pdev)
 				dwcmshc_x5_toggle_sd_power(host->mmc);
 
 			host->mmc_host_ops.start_signal_voltage_switch = dwcmshc_x5_start_signal_voltage_switch;
-			/* TODO: Add power for reboot reset SD card slot */
+			host->mmc_host_ops.get_cd = dwcmshc_x5_get_cd;
 			x5_priv->reset = devm_reset_control_get_optional(mmc_dev(host->mmc), "sd_rst");
 			if (IS_ERR(x5_priv->reset)) {
 				err = PTR_ERR(x5_priv->reset);
