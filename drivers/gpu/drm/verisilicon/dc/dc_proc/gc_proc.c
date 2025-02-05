@@ -360,6 +360,26 @@ static void update_cfg(struct vs_n2d_aux *aux, struct drm_framebuffer *dst,
 	pr_debug("%s: out addr 1 = 0x%llx.\n", __func__, dma_addr[1]);
 }
 
+static bool need_create_gpu_fb(struct drm_plane_state *plane_state)
+{
+	struct drm_rect *dst;
+	u32 width, height;
+
+	if (!context.gpu_out)
+		return true;
+
+	dst    = &plane_state->dst;
+	width  = drm_rect_width(dst);
+	height = drm_rect_height(dst);
+
+	if (context.gpu_out->width != width || context.gpu_out->height != height) {
+		drm_framebuffer_put(context.gpu_out);
+		return true;
+	}
+
+	return false;
+}
+
 static int create_fb(struct dc_proc *dc_proc)
 {
 	struct gpu_plane_proc *hw_plane		= to_gpu_plane_proc(dc_proc);
@@ -387,14 +407,6 @@ static int create_fb(struct dc_proc *dc_proc)
 		if (i > 0)
 			fbreq.offsets[i] = fbreq.pitches[i - 1] *
 					   drm_format_info_plane_height(info, fbreq.height, i - 1);
-	}
-
-	if (context.gpu_out) { /* if size changes, realloc the buffer */
-		if (context.gpu_out->width != fbreq.width ||
-		    context.gpu_out->height != fbreq.height)
-			drm_framebuffer_put(context.gpu_out);
-		else
-			return 0;
 	}
 
 	fb = vs_create_fb_internal(plane->dev, &fbreq);
@@ -427,7 +439,7 @@ static void gpu_proc_update_plane(struct dc_proc *dc_proc, void *old_drm_plane_s
 		return;
 	}
 
-	if (!context.gpu_out) {
+	if (need_create_gpu_fb(plane_state)) {
 		if (create_fb(dc_proc) != 0) {
 			return;
 		}
