@@ -38,6 +38,7 @@
 #include <linux/workqueue.h>
 #include <linux/reset.h>
 #include <linux/delay.h>
+#include <linux/dma-mapping.h>
 
 #include <drm/drm_fourcc.h>
 #include <drm/drm_framebuffer.h>
@@ -202,6 +203,12 @@ static int sif_probe(struct platform_device *pdev)
 	struct device *dev = &pdev->dev;
 	struct vs_sif *sif;
 	int irq, ret;
+
+	ret = dma_set_mask_and_coherent(dev, DMA_BIT_MASK(40));
+	if (ret < 0) {
+		dev_err(dev, "Could not set dma mask of sif device.\n");
+		return ret;
+	}
 
 	sif = devm_kzalloc(dev, sizeof(*sif), GFP_KERNEL);
 	if (!sif)
