@@ -4867,6 +4867,8 @@ int __sdhci_add_host(struct sdhci_host *host)
 		goto unirq;
 	}
 
+	sdhci_enable_card_detection(host);
+
 	ret = mmc_add_host(mmc);
 	if (ret)
 		goto unled;
@@ -4877,8 +4879,6 @@ int __sdhci_add_host(struct sdhci_host *host)
 		(host->flags & SDHCI_USE_ADMA) ?
 		(host->flags & SDHCI_USE_64_BIT_DMA) ? "ADMA 64-bit" : "ADMA" :
 		(host->flags & SDHCI_USE_SDMA) ? "DMA" : "PIO");
-
-	sdhci_enable_card_detection(host);
 
 	return 0;
 
