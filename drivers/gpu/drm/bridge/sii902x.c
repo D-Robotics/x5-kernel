@@ -424,8 +424,8 @@ static void sii902x_bridge_mode_set(struct drm_bridge *bridge,
 		buf[4] = (adj->vtotal / 2 + 1) & 0xFF;
 		buf[5] = (adj->vtotal / 2 + 1) >> 8;
 		buf[6] = adj->hsync_end - adj->hsync_start + 1;
-		buf[8] = (adj->vsync_start - adj->vdisplay) / 2 + 1;
-		buf[9] = (adj->vsync_end - adj->vsync_start) / 2;
+		buf[8] = (adj->vtotal - adj->vsync_end) / 2;
+		buf[9] = (adj->vsync_end - adj->vsync_start) / 2 + 1;
 	} else {
 		/* progressive */
 		buf[0] = SII902X_TPI_EMBEDDED_SYNC;

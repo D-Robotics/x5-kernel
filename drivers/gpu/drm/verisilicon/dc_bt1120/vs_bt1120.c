@@ -59,7 +59,7 @@
 #define BT1120_CRTC_NAME      "crtc-bt1120"
 #define DC_CRTC_NAME	      "crtc-dc8000"
 #define BT1120_AUX_DEV_NAME   "vs_sif"
-
+#define BT1120_EAV_SIZE	      4
 struct device *bt1120_dev;
 
 /*
@@ -572,19 +572,16 @@ static void bt1120_disp_update_scan(struct bt1120_disp *bt1120_disp, struct bt11
 	} else {
 		scan->v_sync_start = 1;
 		scan->v_sync_stop =
-			scan->v_sync_start + (mode->vsync_end - mode->vsync_start + 1) / 2 - 1;
+			scan->v_sync_start + (mode->vsync_end - mode->vsync_start + 1) / 2;
 		scan->v_total	     = mode->vtotal / 2 + 1;
 		scan->v_active_start = scan->v_sync_stop + (mode->vtotal - mode->vsync_end) / 2;
 		scan->v_active_stop  = scan->v_active_start + mode->vdisplay / 2 - 1;
-
 		reg_value = bt1120_read(bt1120_disp->bt1120, REG_BT1120_IMG_PIX_HSTRIDE_CTL);
 		bt1120_write(bt1120_disp->bt1120, REG_BT1120_IMG_PIX_HSTRIDE_CTL, reg_value * 2);
-
 		reg_value = bt1120_read(bt1120_disp->bt1120, REG_BT1120_IMG_PIX_VSIZE_CTL);
 		bt1120_write(bt1120_disp->bt1120, REG_BT1120_IMG_PIX_VSIZE_CTL, reg_value / 2);
 	}
-
-	if (scan->h_total - scan->h_active_stop > 0)
+	if (scan->h_total - scan->h_active_stop + 1 >= BT1120_EAV_SIZE)
 		scan->hfp_range = 1;
 	else
 		scan->hfp_range = 0;
@@ -960,15 +957,15 @@ static irqreturn_t bt1120_isr(int irq, void *data)
 
 			if (bt1120->is_odd_field) {
 				bt1120_write(bt1120, REG_BT1120_IMG_IN_BADDR_Y_CTL,
-					     y_addr + stride * HSTRIDE_UNIT_SIZE);
+					     y_addr + stride * HSTRIDE_UNIT_SIZE / 2);
 				bt1120_write(bt1120, REG_BT1120_IMG_IN_BADDR_UV_CTL,
-					     uv_addr + stride * HSTRIDE_UNIT_SIZE);
+					     uv_addr + stride * HSTRIDE_UNIT_SIZE / 2);
 				bt1120->is_odd_field = false;
 			} else {
 				bt1120_write(bt1120, REG_BT1120_IMG_IN_BADDR_Y_CTL,
-					     y_addr - stride * HSTRIDE_UNIT_SIZE);
+					     y_addr - stride * HSTRIDE_UNIT_SIZE / 2);
 				bt1120_write(bt1120, REG_BT1120_IMG_IN_BADDR_UV_CTL,
-					     uv_addr - stride * HSTRIDE_UNIT_SIZE);
+					     uv_addr - stride * HSTRIDE_UNIT_SIZE / 2);
 				bt1120->is_odd_field = true;
 			}
 		}
