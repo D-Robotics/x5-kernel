@@ -872,7 +872,7 @@ enum rtw_phl_status phl_register_btc_module(struct phl_info_t *phl_info)
 {
 	enum rtw_phl_status sts = RTW_PHL_STATUS_FAILURE;
 	struct phl_cmd_dispatch_engine *disp_eng = &(phl_info->disp_eng);
-	struct phl_bk_module_ops bk_ops = {0};
+	struct phl_bk_module_ops bk_ops;
 	u8 i = 0;
 
 	PHL_INFO("[BTCCMD], %s(): \n", __func__);
@@ -1022,7 +1022,7 @@ int rtw_phl_btc_notify(void *phl, enum RTW_PHL_BTC_NOTIFY notify,
 }
 void rtw_phl_btc_role_notify(void *phl, u8 role_id, enum role_state rstate)
 {
-	struct rtw_phl_btc_ntfy ntfy = {0};
+	struct rtw_phl_btc_ntfy ntfy;
 	struct rtw_phl_btc_role_info_param *prinfo = &ntfy.u.rinfo;
 
 	prinfo->role_id = role_id;

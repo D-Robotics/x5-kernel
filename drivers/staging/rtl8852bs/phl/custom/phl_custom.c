@@ -430,7 +430,7 @@ enum rtw_phl_status
 phl_register_custom_module(struct phl_info_t *phl_info, u8 band_idx)
 {
 	enum rtw_phl_status phl_status = RTW_PHL_STATUS_FAILURE;
-	struct phl_bk_module_ops bk_ops = {0};
+	struct phl_bk_module_ops bk_ops;
 
 	bk_ops.init = _phl_custom_mdl_init;
 	bk_ops.deinit = _phl_custom_mdl_deinit;

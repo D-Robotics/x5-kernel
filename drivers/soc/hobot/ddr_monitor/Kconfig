@@ -7,6 +7,13 @@ config HOBOT_AXI_MONITOR
 	help
 	  Say y here to support horizon soc AXI master performance monitor.
 
+config HOBOT_NOC_QOS
+	tristate "Horizon Noc Qos Driver"
+	depends on HOBOT_AXI_MONITOR
+	default y
+	help
+	  Say y here to support horizon soc Noc Qos Driver.
+
 config HOBOT_AXI_MONITOR_DEBUGFS
 	bool "Horizon AXI Performance Monitor debug fs interfaces"
 	depends on HOBOT_AXI_MONITOR

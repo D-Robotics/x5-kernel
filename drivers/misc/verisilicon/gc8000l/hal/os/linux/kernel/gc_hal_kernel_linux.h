@@ -322,7 +322,7 @@ gceSTATUS gckOS_FreeAllocators(gckOS Os);
 gceSTATUS _ConvertLogical2Physical(gckOS Os, gctPOINTER Logical, gctUINT32 ProcessID,
 				   PLINUX_MDL Mdl, gctPHYS_ADDR_T *Physical);
 
-gctBOOL _QuerySignal(gckOS Os, gctSIGNAL Signal);
+gceSTATUS _QuerySignal(gckOS Os, gctSIGNAL Signal);
 
 static inline gctINT _GetProcessID(void)
 {
