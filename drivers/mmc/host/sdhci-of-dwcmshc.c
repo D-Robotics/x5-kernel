@@ -334,7 +334,7 @@ static int x5_set_dll(struct sdhci_host *host, int degrees)
 
 out:
 	spin_unlock_irqrestore(&host->lock, flags);
-	return 0;
+	return ret;
 }
 
 static int dwcmshc_x5_execute_tuning(struct sdhci_host *host, u32 opcode)
