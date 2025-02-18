@@ -2239,7 +2239,9 @@
 			power-domains = <&power X5_BPU>;
 			consumer-dev = <&bpu>;
 
-			clocks-num = <0>;
+			clocks-num = <1>;
+			clocks = <&hpsclks X5_BPU_MCLK_2X_CLK>;
+			clock-names = "cnn_mclk";
 
 			status = "okay";
 			ports-num = <1>;
