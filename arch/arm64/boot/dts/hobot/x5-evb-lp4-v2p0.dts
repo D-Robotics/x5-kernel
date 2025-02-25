@@ -57,6 +57,7 @@
 
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_sdio &aon_gpio_3 &hsio_gpio0_23 &lsio_gpio1_4>;
+	power-gpios = <&aon_gpio_porta 3 GPIO_ACTIVE_HIGH>;
 };
 
 /* RTC1 */
