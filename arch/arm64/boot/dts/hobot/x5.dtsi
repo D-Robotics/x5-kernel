@@ -3851,7 +3851,7 @@
 				clocks = <&hpsclks X5_LSIO_SPI1_CLK>;
 				interrupt-parent = <&gic>;
 				interrupts = <GIC_SPI 76 IRQ_TYPE_LEVEL_HIGH>;
-				num-cs = <2>;
+				num-cs = <1>;
 				reg-io-width = <4>;
 				#address-cells = <1>;
 				#size-cells = <0>;
@@ -3878,12 +3878,6 @@
 				reset-names = "spi";
 				pinctrl-names = "default";
 				pinctrl-0 = <&pinctrl_spi2>;
-
-				spidev@0 {
-					compatible = "dr,x5-spidev";
-					spi-max-frequency = <32000000>;
-					reg = <0>;
-				};
 			};
 
 			spi3: spi@34030000 {
@@ -4019,6 +4013,8 @@
 				clock-frequency = <100000>;
 				resets = <&socrst LSIO_I2C0_APB_RESET>;
 				i2c-sda-hold-time-ns = <30>;
+				pinctrl-names = "default";
+				pinctrl-0 = <&pinctrl_i2c0>;
 			};
 
 			i2c1: i2c@340c0000 {
@@ -4051,6 +4047,8 @@
 				clock-frequency = <100000>;
 				resets = <&socrst LSIO_I2C2_APB_RESET>;
 				i2c-sda-hold-time-ns = <30>;
+				pinctrl-names = "default";
+				pinctrl-0 = <&pinctrl_i2c2>;
 			};
 
 			i2c3: i2c@340e0000 {
@@ -4066,6 +4064,8 @@
 				clock-frequency = <100000>;
 				resets = <&socrst LSIO_I2C3_APB_RESET>;
 				i2c-sda-hold-time-ns = <30>;
+				pinctrl-names = "default";
+				pinctrl-0 = <&pinctrl_i2c3>;
 			};
 
 			i2c4: i2c@340f0000 {
@@ -4081,6 +4081,8 @@
 				clock-frequency = <100000>;
 				resets = <&socrst LSIO_I2C4_APB_RESET>;
 				i2c-sda-hold-time-ns = <30>;
+				pinctrl-names = "default";
+				pinctrl-0 = <&pinctrl_i2c4>;
 			};
 
 			lpwm0: lpwm@34100000 {
@@ -4330,6 +4332,8 @@
 				clock-frequency = <100000>;
 				resets = <&socrst LSIO_I2C5_APB_RESET>;
 				i2c-sda-hold-time-ns = <30>;
+				pinctrl-names = "default";
+				pinctrl-0 = <&pinctrl_i2c5>;
 			};
 
 			i2c6: i2c@341d0000 {
@@ -4345,6 +4349,8 @@
 				clock-frequency = <100000>;
 				resets = <&socrst LSIO_I2C6_APB_RESET>;
 				i2c-sda-hold-time-ns = <30>;
+				pinctrl-names = "default";
+				pinctrl-0 = <&pinctrl_i2c6>;
 			};
 		};
 
@@ -4603,7 +4609,7 @@
 	};
 
 	dsp0: dsp0 {
-		status = "disabled";
+		status = "okay";
 		compatible = "hobot,dsp0";
 	};
 
