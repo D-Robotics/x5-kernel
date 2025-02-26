@@ -58,6 +58,15 @@
 #include "nano2D_kernel_vidmem.h"
 #include "nano2D_kernel_event.h"
 
+
+#ifndef MAX_HANDLES_PER_PASS
+#define MAX_HANDLES_PER_PASS 256
+#endif
+
+#ifndef MAX_PASSES
+#define MAX_PASSES 10
+#endif
+
 static n2d_error_t do_open(n2d_kernel_t *kernel, n2d_uint32_t process)
 {
 	n2d_error_t error = N2D_SUCCESS;
@@ -83,28 +92,223 @@ static n2d_error_t do_open(n2d_kernel_t *kernel, n2d_uint32_t process)
 on_error:
 	return error;
 }
+static n2d_error_t do_free(n2d_kernel_t *kernel, n2d_core_id_t core, n2d_uint32_t process,
+			   n2d_kernel_command_free_t *u);
+static n2d_error_t do_unmap(n2d_kernel_t *kernel, n2d_core_id_t core, n2d_uint32_t process,
+			    n2d_kernel_command_unmap_t *u);
+static n2d_error_t do_user_signal(n2d_kernel_t *kernel, n2d_core_id_t core, n2d_uint32_t process,
+				  n2d_kernel_command_user_signal_t *u);
+
+/*
+ * do_close - Completes a full cleanup when a process is closing. This includes:
+ * 1) Enumerating all leftover vidmem buffers for the given process and doing
+ *    unmap + free (similar to the user's n2d_free).
+ * 2) Enumerating all leftover signals (type == N2D_SIGNAL_TYPE) that might need
+ *    destruction. (In this design, signals are stored under process=0, so we
+ *    attempt to destroy them if their refcount permits.)
+ * 3) Detaching the process from the DB.
+ *
+ * This approach ensures that in case of abnormal termination or normal release,
+ * the kernel replicates the same sequence as user-level (n2d_free, n2d_close):
+ * unmap first, free next, destroy signals if any, then detach.
+ *
+ * Note: We assume we have:
+ *  - n2d_kernel_db_list_all_handles(...) for enumerating actual handles from DB.
+ *  - The ability to check handle 'type' by calling n2d_kernel_db_get(..., &type, ...).
+ */
 
 static n2d_error_t do_close(n2d_kernel_t *kernel, n2d_uint32_t process)
 {
 	n2d_error_t error = N2D_SUCCESS;
-	// n2d_uint32_t i = 0, j = 0;
-	// n2d_uint32_t dev_num	  = kernel->dev_num;
-	// n2d_uint32_t dev_core_num = kernel->dev_core_num;
-	// n2d_int32_t dev_ref_old	  = -1;
+	int pass;
 
-	// gcmkASSERT(dev_core_num <= NANO2D_DEV_CORE_COUNT);
+	/* Step 1: Enumerate leftover buffers for 'process' and do unmap -> free. */
+	for (pass = 0; pass < MAX_PASSES; pass++)
+	{
+		n2d_uint32_t handles[MAX_HANDLES_PER_PASS];
+		n2d_uint32_t handle_count = 0;
 
-	// n2d_kernel_os_atom_dec(kernel->os, kernel->dev_ref, &dev_ref_old);
+		/* List all vidmem handles for this process. */
+		error = n2d_kernel_db_list_all_handles(
+			kernel->db,
+			process,
+			handles,
+			&handle_count,
+			MAX_HANDLES_PER_PASS
+		);
+		if (error == N2D_NOT_FOUND)
+		{
+			/* The process node is gone from DB; nothing more to do. */
+			break;
+		}
+		else if (error == N2D_OUT_OF_MEMORY)
+		{
+			/* Not enough space in local array. Could do partial free or break. */
+			break;
+		}
+		else if (error != N2D_SUCCESS)
+		{
+			/* Some other error. */
+			goto on_error;
+		}
 
-	// if (dev_ref_old == 1) {
-	// 	for (i = 0; i < dev_num; i++) {
-	// 		for (j = 0; j < dev_core_num; j++)
-	// 			ONERROR(n2d_kernel_hardware_stop(kernel->sub_dev[i]->hardware[j]));
-	// 	}
-	// }
+		if (handle_count == 0)
+		{
+			/* No leftover buffers. */
+			break;
+		}
 
-	ONERROR(n2d_kernel_db_attach_process(kernel->db, process, N2D_FALSE));
-	// n2d_kernel_os_print("Detach process:%d\n", process);
+		{
+			int i;
+			int freed_any = 0;
+
+			for (i = 0; i < (int)handle_count; i++)
+			{
+				/* We replicate n2d_free logic: unmap first, then free. */
+
+				/* 1) do_unmap. */
+				{
+					n2d_kernel_command_unmap_t unmap_cmd;
+					n2d_error_t unmap_error;
+
+					unmap_cmd.handle = handles[i];
+					unmap_error = do_unmap(kernel, 0, process, &unmap_cmd);
+
+					/*
+						* If unmap_error is N2D_SUCCESS, we unmapped something.
+						* If unmap_error is N2D_NOT_FOUND or N2D_INVALID_ARGUMENT,
+						* it might have been unmapped already, so ignore.
+						* Otherwise, treat as a real error.
+						*/
+					if ((unmap_error != N2D_SUCCESS) &&
+						(unmap_error != N2D_NOT_FOUND) &&
+						(unmap_error != N2D_INVALID_ARGUMENT))
+					{
+						error = unmap_error;
+						goto on_error;
+					}
+				}
+
+				/* 2) do_free. */
+				{
+					n2d_kernel_command_free_t free_cmd;
+					n2d_error_t free_error;
+
+					free_cmd.handle = handles[i];
+					free_error = do_free(kernel, 0, process, &free_cmd);
+
+					/*
+						* If free_error == N2D_SUCCESS, we definitely freed one.
+						* If free_error == N2D_NOT_FOUND, maybe it was already freed; ignore.
+						* Otherwise, treat as a real error.
+						*/
+					if (free_error == N2D_SUCCESS)
+					{
+						freed_any++;
+					}
+					else if ((free_error != N2D_NOT_FOUND) &&
+								(free_error != N2D_SUCCESS))
+					{
+						error = free_error;
+						goto on_error;
+					}
+				}
+			}
+
+			/*
+				* If we did not free anything this pass, we stop to avoid loops.
+				*/
+			if (freed_any == 0)
+				break;
+		}
+	}
+
+	/* Step 2: Attempt to destroy leftover signals stored under process=0 (if any). */
+	/* Because the code design uses process=0 for signals, we try to enumerate them by type. */
+	for (pass = 0; pass < MAX_PASSES; pass++)
+	{
+		n2d_uint32_t handles[MAX_HANDLES_PER_PASS];
+		n2d_uint32_t handle_count = 0;
+		int i;
+		int destroyed_any = 0;
+
+		/* Enumerate all handles for process=0. */
+		error = n2d_kernel_db_list_all_handles(
+			kernel->db,
+			0,
+			handles,
+			&handle_count,
+			MAX_HANDLES_PER_PASS
+		);
+		if (error == N2D_NOT_FOUND)
+		{
+			/* No DB entry for process=0, break. */
+			break;
+		}
+		else if (error == N2D_OUT_OF_MEMORY)
+		{
+			/* Not enough space in local array, break or partial. */
+			break;
+		}
+		else if (error != N2D_SUCCESS)
+		{
+			goto on_error;
+		}
+
+		if (handle_count == 0)
+			break; /* no leftover signals */
+
+		for (i = 0; i < (int)handle_count; i++)
+		{
+			n2d_db_type_t type = N2D_UNKONW_TYPE;
+			n2d_uintptr_t dummy;
+
+			/* Query the DB to see if this handle is a signal. */
+			error = n2d_kernel_db_get(kernel->db, 0, handles[i], &type, &dummy);
+			if (error == N2D_NOT_FOUND)
+			{
+				/* Already removed, ignore. */
+				continue;
+			}
+			else if (error != N2D_SUCCESS)
+			{
+				/* Real error. */
+				goto on_error;
+			}
+
+			if (type == N2D_SIGNAL_TYPE)
+			{
+				/* Attempt to destroy the signal. */
+				n2d_kernel_command_user_signal_t signal_cmd;
+				n2d_error_t sig_err;
+
+				memset(&signal_cmd, 0, sizeof(signal_cmd));
+				signal_cmd.command = N2D_USER_SIGNAL_DESTROY;
+				signal_cmd.handle = (n2d_int32_t)handles[i];
+
+				sig_err = do_user_signal(kernel, 0, 0, &signal_cmd);
+				/* If the refcount is not 1, the actual destruction might not happen. */
+				if (sig_err == N2D_SUCCESS)
+				{
+					destroyed_any++;
+				}
+				else if ((sig_err != N2D_NOT_FOUND) &&
+							(sig_err != N2D_SUCCESS) &&
+							(sig_err != N2D_INVALID_ARGUMENT))
+				{
+					/* Real error. */
+					error = sig_err;
+					goto on_error;
+				}
+			}
+		}
+
+		if (destroyed_any == 0)
+			break;
+	}
+
+	/* Step 3: Detach the process from DB. */
+	error = n2d_kernel_db_attach_process(kernel->db, process, N2D_FALSE);
 
 on_error:
 	return error;

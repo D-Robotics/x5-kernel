@@ -386,3 +386,45 @@ n2d_error_t n2d_kernel_db_destroy(n2d_kernel_t *kernel, n2d_db_t *db)
 
 	return N2D_SUCCESS;
 }
+
+
+/* n2d_kernel_db_list_all_handles
+ * Enumerate all allocated handles for 'process' in DB. Output up to 'max_count' handles into 'handles'.
+ * '*handle_count' will be assigned the actual enumerated number.
+ */
+n2d_error_t n2d_kernel_db_list_all_handles(n2d_db_t *db,
+											n2d_uint32_t process,
+											n2d_uint32_t *handles,
+											n2d_uint32_t *handle_count,
+											n2d_uint32_t max_count)
+{
+	n2d_error_t error = N2D_SUCCESS;
+	n2d_hash_map_t *hash_map = N2D_NULL;
+	n2d_db_process_node_t *process_node = N2D_NULL;
+	n2d_bool_t get_mutex = N2D_FALSE;
+
+	if (!db || !handles || !handle_count)
+		return N2D_INVALID_ARGUMENT;
+
+	/* Lock DB. */
+	error = n2d_kernel_os_mutex_acquire(db->kernel->os, db->mutex, N2D_INFINITE);
+	if (error != N2D_SUCCESS)
+		return error;
+	get_mutex = N2D_TRUE;
+
+	/* Find the process node and its hash_map. */
+	error = _db_list_find_process_hash_map(db->db_list, process, &hash_map, &process_node);
+	if (error != N2D_SUCCESS) {
+		/* If not found, we can say 0 handle or return error directly. */
+		error = N2D_NOT_FOUND;
+		goto on_error;
+	}
+
+	/* Enumerate all keys (handles) in the process hash_map. */
+	error = n2d_hash_map_iterate_keys(hash_map, handles, handle_count, max_count);
+
+on_error:
+	if (get_mutex)
+		n2d_kernel_os_mutex_release(db->kernel->os, db->mutex);
+	return error;
+}

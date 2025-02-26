@@ -217,6 +217,42 @@ n2d_error_t n2d_hash_map_destroy(n2d_hash_map_t *hash_map)
 	return error;
 }
 
+/* n2d_hash_map_iterate_keys
+ * Enumerate all keys in the hash map. 'keys' is an output array of size 'max_count'.
+ * '*count' will return how many keys were actually written.
+ *
+ * Return N2D_SUCCESS if we enumerated successfully (even if zero keys).
+ * Return N2D_OUT_OF_MEMORY if there are more keys than 'max_count' can hold.
+ */
+n2d_error_t n2d_hash_map_iterate_keys(n2d_hash_map_t *hash_map,
+										n2d_uint32_t *keys,
+										n2d_uint32_t *count,
+										n2d_uint32_t max_count)
+{
+	n2d_uint32_t i;
+	n2d_uint32_t found = 0;
+
+	if (!hash_map || !keys || !count)
+		return N2D_INVALID_ARGUMENT;
+
+	for (i = 0; i < hash_map->size; i++) {
+		n2d_hash_node_t *node = hash_map->hash_array[i];
+		while (node) {
+			if (found >= max_count) {
+				/* We don't have enough space to store more keys. */
+				return N2D_OUT_OF_MEMORY;
+			}
+			keys[found] = node->key;
+			found++;
+			node = node->next;
+		}
+	}
+
+	*count = found;
+	return N2D_SUCCESS;
+}
+
+
 n2d_error_t n2d_hash_map_insert(n2d_hash_map_t *hash_map, n2d_uint32_t key, n2d_uintptr_t data1,
 				n2d_uintptr_t data2)
 {

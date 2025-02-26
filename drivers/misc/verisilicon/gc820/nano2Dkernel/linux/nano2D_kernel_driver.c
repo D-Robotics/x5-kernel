@@ -892,10 +892,31 @@ static int drv_release(struct inode *inode, struct file *file)
 {
 	int allocate_count = 0;
 
-	n2d_kernel_dispatch(global_device->kernel, N2D_KERNEL_COMMAND_CLOSE, 0, 0, N2D_NULL);
+	/* 1) Dispatch N2D_KERNEL_COMMAND_CLOSE => do_close => free leftover resources */
+	n2d_kernel_dispatch(global_device->kernel,
+						N2D_KERNEL_COMMAND_CLOSE,
+						0,
+						0,
+						N2D_NULL);
+
+	/* 2) Now check allocate_count. */
 	n2d_check_allocate_count(&allocate_count);
-	if (allocate_count)
-		pr_err("Allocated %d memory\n", allocate_count);
+
+	{
+		/* Compare with the baseline from the end of gpu_probe. */
+		int diff = allocate_count - global_device->lifecycle_alloc_count;
+
+		if (diff != 0)
+		{
+			/* There's a mismatch => possible leak for resources that should be freed now. */
+			pr_err("nano2D: leftover memory after release: %d\n", diff);
+		}
+		else
+		{
+			/* Everything that was allocated after probe is freed. */
+			pr_debug("nano2D: no leftover memory after release.\n");
+		}
+	}
 
 	gpu_poweroff();
 
@@ -1942,6 +1963,7 @@ static int __devinit gpu_probe(struct platform_device *pdev)
 #endif
 {
 	n2d_error_t error;
+	n2d_int32_t tempCount;
 	n2d_uint32_t ret;
 	global_device = NULL;
 	struct device *dev_p = &(pdev->dev);
@@ -2026,6 +2048,9 @@ static int __devinit gpu_probe(struct platform_device *pdev)
 
 	aux->dev = dev_p;
 
+	n2d_check_allocate_count(&tempCount);
+	global_device->lifecycle_alloc_count = tempCount;
+	pr_info("nano2D: after probe, allocate_count = %d\n", tempCount);
 	return 0;
 
 on_error:

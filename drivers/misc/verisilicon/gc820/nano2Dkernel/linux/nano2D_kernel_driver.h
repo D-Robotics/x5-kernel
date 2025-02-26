@@ -130,6 +130,8 @@ struct n2d_gl_device {
 
 	struct memory_heap heap;
 	struct memory_heap command_heap;
+
+	n2d_int32_t lifecycle_alloc_count;
 };
 
 #define N2D_CH_MAX 5

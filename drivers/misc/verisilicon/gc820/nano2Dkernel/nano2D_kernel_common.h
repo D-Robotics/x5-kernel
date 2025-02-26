@@ -113,6 +113,11 @@ n2d_error_t n2d_hash_map_get(n2d_hash_map_t *hash_map, n2d_uint32_t key, n2d_uin
 n2d_error_t n2d_hash_map_get_remove(n2d_hash_map_t *hash_map, n2d_uint32_t key,
 				    n2d_uintptr_t *data1, n2d_uintptr_t *data2);
 
+n2d_error_t n2d_hash_map_iterate_keys(n2d_hash_map_t *hash_map,
+										n2d_uint32_t *keys,
+										n2d_uint32_t *count,
+										n2d_uint32_t max_count);
+
 /* list */
 /*
  * This is a simple doubly linked list implementation.

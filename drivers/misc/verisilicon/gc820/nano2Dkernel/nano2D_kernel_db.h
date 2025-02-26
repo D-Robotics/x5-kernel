@@ -104,6 +104,12 @@ n2d_error_t n2d_kernel_db_construct(n2d_kernel_t *kernel, n2d_db_t **db);
 
 n2d_error_t n2d_kernel_db_destroy(n2d_kernel_t *kernel, n2d_db_t *db);
 
+n2d_error_t n2d_kernel_db_list_all_handles(n2d_db_t *db,
+											n2d_uint32_t process,
+											n2d_uint32_t *handles,
+											n2d_uint32_t *handle_count,
+											n2d_uint32_t max_count);
+
 #ifdef __cplusplus
 }
 #endif
