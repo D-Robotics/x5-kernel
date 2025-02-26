@@ -120,10 +120,6 @@
 	cpu-supply = <&vdd08_cpu_reg>;
 };
 
-&rtc {
-	status = "disabled";
-};
-
 &x5_bpu_pd {
 	bpu-supply = <&vdd08_bpu_1_reg>;
 };
@@ -207,15 +203,7 @@
 				};
 			};
 		};
-		hpu3501-rtc {
-			opsel = <0>;
-			// AON_RTC_ALARM_N_1V8 - AON_GPIO_PIN2
 
-			pinctrl-names = "default";
-			pinctrl-0 = <&aon_gpio_2>;
-			interrupt-parent = <&aon_gpio_porta>;
-			interrupts = <2 IRQ_TYPE_EDGE_RISING>;
-		};
 	};
 
 	sc230ai@30 {
@@ -505,7 +493,6 @@
 	status = "disabled";
 };
 
-
 &dw_i2s1 {
 	status = "okay";
 	#sound-dai-cells = <1>;
@@ -546,7 +533,7 @@
 };
 
 &remoteproc_hifi5 {
-	status = "disabled";
+	status = "okay";
 	hifi5-rpmsg-channel-mapping = <0x00>, <0x00>;
 	msg-wrapper = <&ipc_wrapper>;
 	remoteproc-ipc = <&ipc_instance1>;

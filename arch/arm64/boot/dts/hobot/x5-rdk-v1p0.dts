@@ -321,6 +321,7 @@
 	pinctrl-0 = <&pinctrl_spi1 &pinctrl_spi1_ssn1>;
 	dma-names = "tx", "rx";
 	dmas = <&axi_dmac 23>, <&axi_dmac 22>;
+	num-cs = <2>;
 
 	spidev@0 {
 		compatible = "dr,x5-spidev";
@@ -332,6 +333,14 @@
 		compatible = "dr,x5-spidev";
 		spi-max-frequency = <32000000>;
 		reg = <1>;
+	};
+};
+
+&spi2 {
+	spidev@0 {
+		compatible = "dr,x5-spidev";
+		spi-max-frequency = <32000000>;
+		reg = <0>;
 	};
 };
 
@@ -507,11 +516,12 @@
 	status = "okay";
 };
 
+&hifi5_qos {
+	status = "disabled";
+};
+
 &remoteproc_hifi5 {
 	status = "disabled";
-	hifi5-rpmsg-channel-mapping = <0x00>, <0x00>;
-	msg-wrapper = <&ipc_wrapper>;
-	remoteproc-ipc = <&ipc_instance1>;
 };
 
 &hpsclks {
@@ -764,4 +774,8 @@ the following ports need to be deleted */
 	/* use aon gpio7 as efuse power */
 	pinctrl-names = "default";
 	pinctrl-0 = <&aon_gpio_7>;
+};
+
+&dsp0{
+		status = "disabled";
 };
