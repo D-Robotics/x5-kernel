@@ -51,8 +51,9 @@ const char *ddr_type;
 const char *ddr_freq;
 const char *ddr_size;
 const char *board_id;
+const char *sec_chip;
+const char *sec_boot;
 
-static unsigned int secure_chip = 0;
 static void __iomem *sec_flag_addr;
 struct _reg_info g_bak_slot_info;
 struct _reg_info g_boot_count;
@@ -250,12 +251,22 @@ ssize_t board_id_show(struct class *class,
 	return strlen(buf);
 }
 
-ssize_t secure_chip_show(struct class *class,
+ssize_t sec_chip_show(struct class *class,
 			struct class_attribute *attr, char *buf)
 {
-	if (!buf || !secure_chip)
+	if (!buf || !sec_chip)
 		return 0;
-	snprintf(buf, BUF_LEN, "%d\n", secure_chip);
+	snprintf(buf, BUF_LEN, "%s\n", sec_chip);
+
+	return strlen(buf);
+}
+
+ssize_t sec_boot_show(struct class *class,
+	struct class_attribute *attr, char *buf)
+{
+	if (!buf || !sec_boot)
+	return 0;
+	snprintf(buf, BUF_LEN, "%s\n", sec_boot);
 
 	return strlen(buf);
 }
@@ -321,8 +332,11 @@ static struct class_attribute ddr_size_attribute =
 static struct class_attribute board_id_attribute =
 	__ATTR(board_id, 0444, board_id_show, NULL);
 
-static struct class_attribute secure_chip_attribute =
-	__ATTR(secure_chip, 0444, secure_chip_show, NULL);
+static struct class_attribute sec_chip_attribute =
+	__ATTR(sec_chip, 0444, sec_chip_show, NULL);
+
+	static struct class_attribute sec_boot_attribute =
+	__ATTR(sec_boot, 0444, sec_boot_show, NULL);
 
 static struct class_attribute bak_slot_attribute =
 	__ATTR(bak_slot, 0644, bak_slot_show, bak_slot_store);
@@ -340,7 +354,8 @@ static struct attribute *socinfo_attributes[] = {
 	&ddr_freq_attribute.attr,
 	&ddr_size_attribute.attr,
 	&board_id_attribute.attr,
-	&secure_chip_attribute.attr,
+	&sec_chip_attribute.attr,
+	&sec_boot_attribute.attr,
 	&bak_slot_attribute.attr,
 	NULL
 };
@@ -397,7 +412,9 @@ static int socinfo_probe(struct platform_device *pdev)
 		read_from_property(pdev, "hw_info", &hw_info) ||
 		read_from_property(pdev, "bootdevice_name", &bootdevice_name) ||
 		read_from_property(pdev, "soc_uid", &soc_uid) ||
-		read_from_property(pdev, "board_id", &board_id)) {
+		read_from_property(pdev, "board_id", &board_id) ||
+		read_from_property(pdev, "sec_chip", &sec_chip) ||
+		read_from_property(pdev, "sec_boot", &sec_boot)) {
 		return -1;
 	}
 

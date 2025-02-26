@@ -778,6 +778,8 @@
 			ddr_freq = "0";
 			ddr_size = "0";
 			board_id = "00000000";
+			sec_chip = "0000000000000000";
+			sec_boot = "0000000000000000";
 			bak_slot_reg = <0x31021000 4 8 0x0000ff00>;
 			boot_count_reg = <0x31021000 4 0 0x000000ff>;
 			reg = <0x31021008 0x4>;   /* ddr info reg */
