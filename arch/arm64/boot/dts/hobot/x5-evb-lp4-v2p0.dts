@@ -58,3 +58,10 @@
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_sdio &aon_gpio_3 &hsio_gpio0_23 &lsio_gpio1_4>;
 };
+
+/* RTC1 */
+&i2c4 {
+    pcf8563@51 {
+        status = "disabled";  // X5 v2.0 EVB removed pcf8563
+    };
+};
