@@ -56,6 +56,7 @@ struct drobot_pwm_chip {
 
 #define PWM_MAX_PERIOD 20000000000ULL
 #define PWM_MIN_PERIOD 1000ULL
+#define PWM_DUTY_FIFO_SIZE 64
 
 #define to_drobot_pwm_chip(_chip) container_of(_chip, struct drobot_pwm_chip, chip)
 
@@ -75,6 +76,22 @@ static const struct of_device_id drobot_pwm_dt_ids[] = {
 	{ /* sentinel */ }
 };
 MODULE_DEVICE_TABLE(of, drobot_pwm_dt_ids);
+static bool drobot_pwm_get_status(struct pwm_chip *chip, struct pwm_device *pwm)
+{
+	struct drobot_pwm_chip *drobot_pwm = to_drobot_pwm_chip(chip);
+	u32 val = 0;
+	u8 channel = pwm->hwpwm;
+
+	val = readl(drobot_pwm->base + PWM_MCR);
+	if (channel == 0) {
+		if (val & PWM_CHANNEL0_EN)
+			return true;
+	}else {
+		if (val & PWM_CHANNEL1_EN)
+			return true;
+	}
+	return false;
+}
 
 static void drobot_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
 {
@@ -111,6 +128,7 @@ static void drobot_pwm_duty_set(struct pwm_chip *chip, struct pwm_device *pwm,
 	u16 duty = 0;
 	u8 channel = pwm->hwpwm;
 	u32 duty_cycles = 0;
+	int fifo_depth = PWM_DUTY_FIFO_SIZE / (sizeof(u16) * 8);
 	struct drobot_pwm_chip *drobot = to_drobot_pwm_chip(chip);
 
 	clk = clk_get_rate(drobot->clk);
@@ -124,7 +142,8 @@ static void drobot_pwm_duty_set(struct pwm_chip *chip, struct pwm_device *pwm,
 		dev_warn(chip->dev, "Warning! Duty is set as 0, no waveform!\n");
 
 	/* set duty reg */
-	writel(duty, drobot->base + PWM_PW16AR(channel));
+	for (int i = 0; i < fifo_depth; i++)
+		writel(duty, drobot->base + PWM_PW16AR(channel));
 }
 
 static int drobot_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
@@ -139,10 +158,12 @@ static int drobot_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
 	u8 div_reg = 0;
 	u32 prd_prescale = 0; /* prd * prescale */
 	u8 channel = pwm->hwpwm;
+	bool pwm_status = 0;
 	struct drobot_pwm_chip *drobot = to_drobot_pwm_chip(chip);
 
 	/* Clear FIFO in multichannel mode. */
-	drobot_pwm_disable(chip, pwm);
+	if (!state->enabled)
+		drobot_pwm_disable(chip, pwm);
 
 	clk = clk_get_rate(drobot->clk);
 
@@ -194,7 +215,8 @@ static int drobot_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
 
 	writel(val, drobot->base + PWM_CTR(channel));
 
-	if (state->enabled)
+	pwm_status = drobot_pwm_get_status(chip, pwm);
+	if (!pwm_status && state->enabled)
 		drobot_pwm_enable(chip, pwm);
 
 	return 0;
