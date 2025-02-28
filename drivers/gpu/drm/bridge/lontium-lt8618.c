@@ -1427,6 +1427,7 @@ static void lt8618_init(struct lt8618 *lt8618)
 static int lt8618_probe(struct i2c_client *client, const struct i2c_device_id *id)
 {
 	struct i2c_adapter *adapter = client->adapter;
+	struct device *dev = &client->dev;
 	int ret = 0;
 	struct lt8618 *lt8618;
 
@@ -1458,6 +1459,7 @@ static int lt8618_probe(struct i2c_client *client, const struct i2c_device_id *i
 		goto err;
 	}
 
+	dev_set_drvdata(dev, lt8618);
 	i2c_set_clientdata(client, lt8618);
 
 	client->flags = I2C_CLIENT_SCCB;
@@ -1478,8 +1480,11 @@ err:
 static void lt8618_remove(struct i2c_client *client)
 {
 	struct lt8618 *lt8618 = i2c_get_clientdata(client);
-	if (lt8618)
+	if (lt8618) {
+		drm_bridge_remove(&lt8618->bridge);
 		devm_kfree(&client->dev, lt8618);
+	}
+
 }
 
 static const struct of_device_id lt8618_dt_ids[] = {
