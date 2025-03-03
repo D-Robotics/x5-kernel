@@ -56,6 +56,7 @@
 #include <linux/slab.h>
 #include <linux/miscdevice.h>
 #include <linux/uaccess.h>
+#include <linux/delay.h>
 
 #include "gc_hal_kernel_linux.h"
 #include "gc_hal_driver.h"
@@ -71,6 +72,11 @@ MODULE_LICENSE("Dual MIT/GPL");
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0)
 MODULE_IMPORT_NS(VFS_internal_I_am_really_a_filesystem_and_am_NOT_a_driver);
 #endif
+
+// Global variables for synchronization
+static atomic_t activeIoctlCount = ATOMIC_INIT(0); // Tracks active ioctl calls
+static DEFINE_MUTEX(drvLock); // Mutex to protect shutdown process
+static bool isShutdown = false; // Indicates if the device is shutting down
 
 static struct class *gpu_class = gcvNULL;
 
@@ -667,8 +673,25 @@ static long drv_ioctl(struct file *filp, unsigned int ioctlCode, unsigned long a
 
 	gcmkHEADER_ARG("filp=%p ioctlCode=%u arg=%lu", filp, ioctlCode, arg);
 
-	if ((dev_index = iminor(file_inode(filp))) >= gcdDEVICE_COUNT)
+	// Step 1: Acquire the lock and check if shutdown has started
+	mutex_lock(&drvLock);
+
+	if (isShutdown) {
+		// Device is shutting down, reject the request
+		mutex_unlock(&drvLock);
 		return -ENODEV;
+	}
+
+	// Increment active ioctl counter before proceeding
+	atomic_inc(&activeIoctlCount);
+
+	// Unlock to allow other ioctls or shutdown to proceed
+	mutex_unlock(&drvLock);
+
+	if ((dev_index = iminor(file_inode(filp))) >= gcdDEVICE_COUNT){
+		atomic_dec(&activeIoctlCount);
+		return -ENODEV;
+	}
 
 	data = filp->private_data;
 
@@ -846,6 +869,10 @@ static long drv_ioctl(struct file *filp, unsigned int ioctlCode, unsigned long a
 	ret = 0;
 
 OnError:
+
+	// Step 2: Decrement active ioctl counter before exiting
+	atomic_dec(&activeIoctlCount);
+
 	gcmkFOOTER();
 	return ret;
 }
@@ -1217,6 +1244,23 @@ static int __devexit viv_dev_remove(struct platform_device *pdev)
 
 static void viv_dev_shutdown(struct platform_device *pdev)
 {
+	unsigned long timeout = jiffies + msecs_to_jiffies(5000);
+	// Step 1: Lock and set isShutdown flag
+	mutex_lock(&drvLock);
+	isShutdown = true;
+	mutex_unlock(&drvLock);
+
+	// Step 2: Wait until all active ioctl calls finish
+	// This ensures that no ioctl is still accessing released resources
+	while (atomic_read(&activeIoctlCount) != 0 && time_before(jiffies, timeout)) {
+		msleep(10); // Sleep for 10ms before checking again
+	}
+
+	// Step 3: If timeout occurs, print a warning
+	if (atomic_read(&activeIoctlCount) != 0) {
+		pr_warn("%s: Timeout waiting for active ioctl calls to complete! Proceeding with shutdown.\n",__func__);
+	}
+
 	galDevice->gotoShutdown = gcvTRUE;
 
 	viv_dev_remove(pdev);
