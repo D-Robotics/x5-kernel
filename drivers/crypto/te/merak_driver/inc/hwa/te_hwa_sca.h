@@ -114,6 +114,7 @@ typedef struct te_hwa_sca {
     int (*get_key)(struct te_hwa_sca *h, uint8_t key[32]);
     int (*get_suspd_msk)(struct te_hwa_sca *h, te_sca_suspd_msk_t *suspd);
     int (*set_suspd_msk)(struct te_hwa_sca *h, const te_sca_suspd_msk_t *suspd);
+    int (*cqwm_ctrl)(struct te_hwa_sca *h, bool en);
 } te_hwa_sca_t;
 
 int te_hwa_sca_alloc( struct te_sca_regs *regs,

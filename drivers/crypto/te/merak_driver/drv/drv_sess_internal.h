@@ -218,6 +218,7 @@ typedef struct te_sess_cmd_agent {
     sqlist_t *cur;                      /**< current work task */
     int qidx;                           /**< queue index */
     sqlist_t queues[MAX_SLOT_NUM];      /**< task queues */
+    uint32_t cq_thresh;                 /**< CQ fill threshold */
 } te_sess_cmd_agent_t;
 
 /**
@@ -275,7 +276,7 @@ int te_sess_slg_wrapout_one( te_sess_slot_gov_t *sltgov,
 int te_sess_slg_wrapout_all( te_sess_slot_gov_t *sltgov );
 
 /* command agent */
-int te_sess_ca_init( te_sess_module_ctx_t *mctx);
+int te_sess_ca_init( te_sess_module_ctx_t *mctx, uint32_t cq_depth );
 int te_sess_ca_destroy( te_sess_module_ctx_t *mctx );
 void te_sess_ca_prepare_task( int32_t slotid,
                               uint32_t *cmdptr,

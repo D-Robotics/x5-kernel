@@ -295,6 +295,7 @@ enum {
 #define SCA_DRV_CTR_LEN_96      (0x02U)
 #define SCA_DRV_CTR_LEN_128     (0x03U)
 
+#define SCA_LLT_PRE_NENT        (32U) /* Pre-allocated llst table entries */
 #define SCA_DRV_LINKLIST_NODE_MAX_LEN       (LLST_ENTRY_SZ_MAX)
 
 #define KEY_SRC_MODK            (0x00U)
@@ -335,6 +336,14 @@ typedef struct sca_drv_key {
 } sca_drv_key_t;
 
 /**
+ * Link list table structure.
+ */
+typedef struct sca_ll_tab {
+    /* Link list entries */
+    link_list_t ents[SCA_LLT_PRE_NENT] __attribute__((aligned(ALIGNED_SIZE)));
+} sca_ll_tab_t;
+
+/**
  * SCA context magic number
  */
 #define SCA_CTX_MAGIC   0x43616373U /**< "scaC" */
@@ -349,6 +358,7 @@ typedef struct sca_drv_ctx {
     sca_drv_key_t key;              /**< cipher key */
     te_sca_state_t state;           /**< sca state */
     te_sess_id_t sess;              /**< session handler */
+    sca_ll_tab_t llt;               /**< linklist table on the shelf */
 } sca_drv_ctx_t;
 
 /**
@@ -719,7 +729,7 @@ int te_sca_drv_init( te_sca_drv_t *drv,
                      "Fatal error, can't read sca supported algorithms!\n" );
 
     ctl.csq_en = 1;
-    ctl.cq_wm = 1;
+    ctl.cq_wm = TE_CQ_WM;
 #ifndef CFG_TE_DYNCLK_CTL
     ctl.clk_en = 1;
 #endif
@@ -1640,6 +1650,33 @@ __out__:
     return ret;
 }
 
+/**
+ * Compare two te_memlist_t: lst1 and lst2.
+ * Return 0 if lst1 and lst2 are the same.
+ * Otherwise return 1.
+ */
+static int sca_memlist_cmp(const te_memlist_t *lst1, const te_memlist_t *lst2)
+{
+    int ret = 0;
+
+    if (lst1->nent == lst2->nent) {
+        size_t i = 0;
+
+        for (i = 0; i < lst1->nent; i++) {
+            if ((lst1->ents[i].buf != lst2->ents[i].buf) ||
+                (lst1->ents[i].len != lst2->ents[i].len)) {
+                ret = 1;
+                goto out;
+            }
+        }
+    } else {
+        ret = 1;
+    }
+
+out:
+    return ret;
+}
+
 static inline size_t _te_sca_get_total_len_phy_node_count(te_memlist_t *list,
                                                           size_t *phy_count)
 {
@@ -2020,153 +2057,184 @@ __out__:
     return ret;
 }
 
-typedef struct align_settle_info {
-    void *head_addr;
-    void *tail_addr;
-} align_settle_info_t;
-
-/**
- *  case#1 src's nent = 1, len <= DMA_CACHELINE_SIZE(64)
- *         dst case#1 src.ents[0].buf DAM aligned, let dst.ents[0].buf = src.ents[0].buf
- *                    so does it's length.
- *         dst case#2 src.ents[0].buf DAM not aligned let dst.ents[0].buf = new malloc buf,
- *                    dst.ents[0].len = round_up(src.ents[0].buf) - src.ents[0].buf.
- *                    dst.ents[1].buf = src.ents[0].buf + dst.ents[0].len
- *                    dst.ents[1].len = src.ents[0].len - dst.ents[0].len
- *  case#2 src's nent =1, len > DMA_CACHELINE_SIZE(64)
- *        dst case#1 src.ents[0].buf DAM not aligned let dst.ents[0].buf = new malloc buf,
- *                    dst.ents[0].len = round_up(src.ents[0].buf) - src.ents[0].buf.
- *                    dst.ents[1].buf = src.ents[0].buf + dst.ents[0].len
- *                    dst.ents[1].len = src.ents[0].len - dst.ents[0].len
- *        dst case#2 src.ents[0].buf DAM aligned
- *                    dst.ents[0].buf = src.ents[0].buf.
- *                    dst.ents[0].len = round_down(src.ents[0].len).
- *                    dst.ents[1].buf = src.ents[0].buf + dst.ents[0].len
- *                    dst.ents[1].len = src.ents[0].len - dst.ents[0].len
- *  case#3 src's nent > 1
- *         dst case#1 both src.ents[0].buf and src.ents[last].len DAM aligned,
- *                    let dst.ents = src.ents
- *         dst case#2 src.ents[0].buf aligned src.ents[last].len DAM not aligned,
- *                    dst.nent = src.nent + 1.
- *                    dst.ents[src.nent - 1].buf = src.ents[0].buf
- *                    dst.ents[src.nent - 1].len = src.ents[src.nent - 1].len - src.ents[src.nent - 1].len % DMA_ALIGNED_SIZE
- *                    dst.ents[src.nent].buf = src.ents[src.nent - 1].buf + dst.ents[src.nent - 1].len
- *                    dst.ents[src.nent].len = src.ents[src.nent - 1].len - dst.ents[src.nent - 1].len
- *         dst case#3 src.ents[0].buf not aligned src.ents[last].len DAM aligned,
- *                    dst.nent = src.nent + 1.
- *                    dst.ents[0].buf = new malloc dma aligned buf.
- *                    dst.ents[0].len = round_up(src.ents[0].buf) - src.ents[0].buf
- *                    dst.ents[1].buf = src.ents[0].buf + dst.ents[0].len
- *                    dst.ents[1].len = src.ents[0].len - dst.ents[0].len
- *         dst case#4 src.ents[0].buf not aligned src.ents[last].len DAM not aligned,
- *                    dst.nent = src.nent + 2.
- *                    dst.ents[0].buf = new malloc dma aligned buf.
- *                    dst.ents[0].len = round_up(src.ents[0].buf) - src.ents[0].buf
- *                    dst.ents[1].buf = src.ents[0].buf + dst.ents[0].len
- *                    dst.ents[1].len = src.ents[0].len - dst.ents[0].len
- *                    dst.ents[src.nent - 1].buf = src.ents[0].buf
- *                    dst.ents[src.nent - 1].len = src.ents[src.nent - 1].len - src.ents[src.nent - 1].len % DMA_ALIGNED_SIZE
- *                    dst.ents[src.nent].buf = src.ents[src.nent - 1].buf + dst.ents[src.nent - 1].len
- *                    dst.ents[src.nent].len = src.ents[src.nent - 1].len - dst.ents[src.nent - 1].len
- */
-static int te_settle_cacheline_alignment( te_memlist_t *dst,
-                                          const te_memlist_t *src,
-                                          align_settle_info_t *info )
+#define SCA_UP_FLAGS_LLIN_NEW     (1U)
+#define SCA_UP_FLAGS_LLOUT_NEW    (1U << 1U)
+static int sca_prepare_update_ext( te_crypt_ctx_t *ctx,
+                                   bool islast,
+                                   link_list_t **ll_in,
+                                   link_list_t **ll_out,
+                                   te_memlist_t *in,
+                                   te_memlist_t *out,
+                                   sca_payload_t *payload,
+                                   uint32_t *flags )
 {
-    uintptr_t head = 0;
-    size_t cp_len = 0;
     int ret = TE_SUCCESS;
+    sca_drv_ctx_t *drv_ctx = NULL;
+    uint8_t bypass = 0x00U;
+    link_list_t *__in = NULL;
+    link_list_t *__out = NULL;
+    size_t in_phy_count = 0;
+    size_t out_phy_count = 0;
+    size_t in_len = 0;
+    uint32_t ns_attr = 0U;
+    uint32_t llofs = 0U;
+    uint32_t llflgs = 0U;
 
-    if (!src || !src->nent ) {
-        return TE_SUCCESS;
+    in_len = _te_sca_get_total_len_phy_node_count(in, &in_phy_count);
+    if ((!islast && (in_len % ctx->blk_size))) {
+        ret = TE_ERROR_BAD_INPUT_LENGTH;
+        _SCA_DRV_OUT_;
     }
-    if (src && src->nent && !src->ents) {
-        return TE_ERROR_BAD_PARAMS;
-    }
-    dst->ents = (te_mement_t *)osal_calloc(src->nent + 2, sizeof(*dst->ents));
-    if (!dst->ents) {
-        ret = TE_ERROR_OOM;
-        goto out;
-    }
-    dst->nent = 0;
-    /**< settle head */
-    head = (uintptr_t)src->ents[0].buf;
-    if (head & (TE_DMA_ALIGNED - 1)) {
-        /**< get distance to ROUND_UP(cache_line_size) */
-        cp_len = UTILS_ROUND_UP(head, TE_DMA_ALIGNED) - head;
-        if (cp_len > src->ents[0].len) {
-            cp_len = src->ents[0].len;
+
+    /* hw requirement: total len of in === out's*/
+    if (TE_OPERATION_MAC != TE_ALG_GET_CLASS(ctx->alg)){
+        if (in_len != _te_sca_get_total_len_phy_node_count(out,
+                            &out_phy_count)) {
+            ret = TE_ERROR_BAD_INPUT_LENGTH;
+            _SCA_DRV_OUT_;
         }
-        info->head_addr = (uint8_t *)osal_malloc_aligned( TE_DMA_ALIGNED,
-                                                          TE_DMA_ALIGNED );
-        if (!info->head_addr) {
-            OSAL_LOG_ERR("%s +%d malloc aligned for head failed\n", __FILE__, __LINE__);
-            ret = TE_ERROR_OOM;
-            goto err_head;
-        }
-        dst->ents[0].buf = info->head_addr;
-        dst->ents[0].len = cp_len;
-        dst->nent++;
-        /**< check if should insert new node to head or just replace it */
-        if (cp_len == src->ents[0].len) {
-            if ( 1U == src->nent ) {
-                goto out;
+    }
+
+    drv_ctx = (sca_drv_ctx_t *)ctx;
+    TE_ASSERT_MSG( drv_ctx->magic == SCA_CTX_MAGIC,
+                "fatal error: Not valid SCA driver context\n" );
+    switch (drv_ctx->state) {
+        default:
+        case TE_DRV_SCA_STATE_RAW:
+        case TE_DRV_SCA_STATE_INIT:
+        case TE_DRV_SCA_STATE_READY:
+        case TE_DRV_SCA_STATE_LAST:
+            ret = TE_ERROR_BAD_STATE;
+            _SCA_DRV_OUT_;
+            break;
+        case TE_DRV_SCA_STATE_START:
+        case TE_DRV_SCA_STATE_UPDATE:
+            if ((in_phy_count + 1) > (SCA_LLT_PRE_NENT - llofs)) {
+                __in = (link_list_t *)osal_malloc_aligned((in_phy_count + 1)
+                                                     * sizeof(link_list_t),
+                                                     ALIGNED_SIZE);
+                if (NULL == __in) {
+                    ret = TE_ERROR_OOM;
+                    _SCA_DRV_OUT_;
+                }
+
+                llflgs |= SCA_UP_FLAGS_LLIN_NEW;
+            } else {
+                __in = &drv_ctx->llt.ents[llofs];
+                /* Round up the llofs for the next linklist table if any */
+                llofs += ROUND_UP(in_phy_count + 1U,
+                                  LINK_LIST_ALIGN / sizeof(link_list_t));
+                if (llofs > SCA_LLT_PRE_NENT) {
+                    llofs = SCA_LLT_PRE_NENT;
+                }
             }
-            osal_memcpy( &dst->ents[dst->nent], &src->ents[1],
-                        (src->nent - 1) * sizeof(*dst->ents) );
-            dst->nent += (src->nent - 1);
-        } else {
-            /** copy left of the list and update node#1 */
-            osal_memcpy( &dst->ents[dst->nent], &src->ents[0],
-                        src->nent * sizeof(*dst->ents) );
-            dst->ents[dst->nent].buf = (uint8_t *)dst->ents[dst->nent].buf +
-                                                                dst->ents[0].len;
-            dst->ents[dst->nent].len = src->ents[0].len - dst->ents[0].len;
-            dst->nent += src->nent;
-        }
-    } else {
-        osal_memcpy( &dst->ents[dst->nent], src->ents,
-                        src->nent * sizeof(*dst->ents) );
-        dst->nent += src->nent;
+            OSAL_ASSERT((((uintptr_t)__in) & (ALIGNED_SIZE - 1U)) == 0U);
+
+            /**
+             * Clean(in) is more than enough here. The reason for using
+             * flush(in) is to save the flush(out) in case of in-place
+             * encryption or decryption.
+             */
+            _te_sca_flush_memlist(in);
+            osal_memset(__in, 0x00, (in_phy_count + 1) * sizeof(link_list_t));
+            /*convert vitual address to phy */
+            ret = _te_sca_visual_list_to_phy_list(__in, in);
+            if (TE_SUCCESS != ret) {
+                goto cleanup;
+            }
+            osal_cache_clean((uint8_t *)__in,
+                                 (in_phy_count + 1) * sizeof(link_list_t));
+
+            if (NULL != out && NULL != out->ents) {
+                if ((out_phy_count + 1) > (SCA_LLT_PRE_NENT - llofs)) {
+                    __out = (link_list_t *)osal_malloc_aligned((out_phy_count + 1)\
+                                                       *  sizeof(link_list_t),
+                                                       ALIGNED_SIZE );
+                    if (NULL == __out) {
+                        ret = TE_ERROR_OOM;
+                        goto cleanup;
+                    }
+
+                    llflgs |= SCA_UP_FLAGS_LLOUT_NEW;
+                } else {
+                    __out = &drv_ctx->llt.ents[llofs];
+                    llofs += ROUND_UP(out_phy_count + 1U,
+                                      LINK_LIST_ALIGN / sizeof(link_list_t));
+                    if (llofs > SCA_LLT_PRE_NENT) {
+                        llofs = SCA_LLT_PRE_NENT;
+                    }
+                }
+                OSAL_ASSERT((((uintptr_t)__out) & (ALIGNED_SIZE - 1U)) == 0U);
+
+                osal_memset(__out, 0x00, (out_phy_count + 1) * sizeof(link_list_t));
+                /*convert vitual address to phy */
+                ret = _te_sca_visual_list_to_phy_list(__out, out);
+                if (TE_SUCCESS != ret) {
+                    goto cleanup1;
+                }
+                osal_cache_clean((uint8_t *)__out,
+                                    (out_phy_count + 1) * sizeof(link_list_t));
+                /**
+                 * Skip flush(out) in case of in-place encryption/decryption.
+                 * In order to avoid buffer linefill, just check the buf ptr and
+                 * len, but not touch the data stored in buffers.
+                 */
+                if (sca_memlist_cmp(in, out)) {
+                    _te_sca_flush_memlist(out);
+                }
+            }
+
+            /*make process command*/
+            MAKE_CMD_PROC(payload->buf,
+                          payload->size,
+                          bypass,
+                          (TE_DRV_SCA_ENCRYPT == drv_ctx->op) ? 0x00 : 0x01,
+                          islast ? 0x01 : 0x00,
+                          ADDR_TYPE_LINK_LIST,
+                          ADDR_TYPE_LINK_LIST,
+                          TRIGGER_INT,
+                          osal_virt_to_phys(__in),
+                          0,
+                          osal_virt_to_phys(__out));
+            /* set the non-secure attibute for src & dst */
+            ret = te_com_set_nsec_attr(osal_virt_to_phys(__in),
+                                       (in_phy_count + 1) * sizeof(link_list_t),
+                                       &ns_attr, SCA_PROC_SRC_NS_SHIFT);
+            if (ret != TE_SUCCESS) {
+                goto cleanup1;
+            }
+            ret = te_com_set_nsec_attr(osal_virt_to_phys(__out),
+                                       (out_phy_count + 1) * sizeof(link_list_t),
+                                       &ns_attr, SCA_PROC_DST_NS_SHIFT);
+            if (ret != TE_SUCCESS) {
+                goto cleanup1;
+            }
+            payload->buf[0] |= ns_attr;
+            break;
     }
-    /**< settle tail, check last node's alignment. */
-    if (dst->nent > 0 && (dst->ents[dst->nent - 1].len & (TE_DMA_ALIGNED - 1))) {
-        /**< append one node to the tail */
-        info->tail_addr = osal_malloc_aligned( TE_DMA_ALIGNED,
-                                               TE_DMA_ALIGNED );
-        if (!info->tail_addr) {
-            ret = TE_ERROR_OOM;
-            goto err_tail;
-        }
-        /** two cases:
-         *  case#1:
-         *        len < cache line size, in this case just replace last node.
-         *  case#2:
-         *        len > cache line size, in this case split in to two nodes.
-         *        should revise original last node's len, and append one node
-         *        to the tail.
-         */
-        cp_len = dst->ents[dst->nent - 1].len & (TE_DMA_ALIGNED - 1);
-        if (cp_len < dst->ents[dst->nent - 1].len) {
-            dst->ents[dst->nent].buf = info->tail_addr;
-            dst->ents[dst->nent].len = cp_len;
-            /**< update original node length */
-            dst->ents[dst->nent - 1].len -= cp_len;
-            dst->nent++;
-        } else {
-            dst->ents[dst->nent - 1].buf = info->tail_addr;
-        }
+    *ll_in = __in;
+    *ll_out = __out;
+    *flags = llflgs;
+    _SCA_DRV_OUT_;
+
+cleanup1:
+    if ((NULL != __out) && ((llflgs & SCA_UP_FLAGS_LLOUT_NEW) != 0U)){
+        osal_free(__out);
+        __out = NULL;
     }
-    goto out;
-err_tail:
-    OSAL_SAFE_FREE(info->head_addr);
-err_head:
-    OSAL_SAFE_FREE(dst->ents);
-    osal_memset(dst, 0x00, sizeof(*dst));
-out:
+cleanup:
+    if ((NULL != __in) && ((llflgs & SCA_UP_FLAGS_LLIN_NEW) != 0U)){
+        osal_free(__in);
+        __in = NULL;
+    }
+__out__:
     return ret;
 }
 
+/**
+ * The cache line alignment has been handled in 'lca_te_buf_mgr.c' for LCA.
+ * So, remove the logics here to avoid duplication.
+ */
 int te_sca_uplist( te_crypt_ctx_t *ctx,
                    bool islast,
                    te_memlist_t *in,
@@ -2175,11 +2243,11 @@ int te_sca_uplist( te_crypt_ctx_t *ctx,
     int ret = TE_SUCCESS;
     sca_drv_ctx_t *drv_ctx = NULL;
     uint32_t buf[SCA_PROC_CMD_SIZE] = {0};
-    te_memlist_t _out = {0};    /**< out list after allignment settled */
     link_list_t *ll_in = NULL;
     link_list_t *ll_out = NULL;
     sca_payload_t payload = {0};
-    align_settle_info_t info = {0};
+    uint32_t flags = 0U;
+
     __SCA_DRV_VERIFY_PARAMS__(ctx);
     __SCA_DRV_VERIFY_PARAMS__(in);
     if (TE_OPERATION_MAC != TE_ALG_GET_CLASS(ctx->alg)) {
@@ -2188,18 +2256,16 @@ int te_sca_uplist( te_crypt_ctx_t *ctx,
     drv_ctx = (sca_drv_ctx_t *)ctx;
     TE_ASSERT_MSG( drv_ctx->magic == SCA_CTX_MAGIC,
                 "fatal error: Not valid SCA driver context\n" );
-    /**< settle cache line alignment */
-    ret = te_settle_cacheline_alignment(&_out, (const te_memlist_t *)out,
-                                        &info);
-    __SCA_DRV_CHECK_CONDITION__(ret);
+
     payload.buf = buf;
-    ret = _te_sca_prepare_update( ctx,
+    ret = sca_prepare_update_ext( ctx,
                                   islast,
                                   &ll_in,
                                   &ll_out,
                                   in,
-                                  &_out,
-                                  &payload);
+                                  out,
+                                  &payload,
+                                  &flags );
     if (TE_SUCCESS != ret) {
         OSAL_LOG_ERR("%s +%d_te_sca_prepare_update failed:%X\n",
                                         __func__, __LINE__, ret);
@@ -2211,18 +2277,11 @@ int te_sca_uplist( te_crypt_ctx_t *ctx,
         goto err_sess_submit;
     }
 
-    _te_sca_invalid_memlist(&_out);
-    if (info.head_addr) {
-        osal_memcpy(out->ents[0].buf, _out.ents[0].buf, _out.ents[0].len);
-    }
-    /**< if tail node changed then copy the output to origin's */
-    if (info.tail_addr) {
-        osal_memcpy( ((uint8_t *)out->ents[out->nent - 1].buf +
-                                 out->ents[out->nent - 1].len -
-                                 _out.ents[_out.nent - 1].len),
-                     _out.ents[_out.nent-1].buf,
-                     _out.ents[_out.nent-1].len );
-    }
+    /**
+     * The invalidate(out) cannot be saved. Otherwise the driver
+     * might see stale data.
+     */
+    _te_sca_invalid_memlist(out);
     if (islast) {
         drv_ctx->state = TE_DRV_SCA_STATE_LAST;
     }else{
@@ -2230,12 +2289,13 @@ int te_sca_uplist( te_crypt_ctx_t *ctx,
     }
 
 err_sess_submit:
-    OSAL_SAFE_FREE(ll_in);
-    OSAL_SAFE_FREE(ll_out);
-    OSAL_SAFE_FREE(_out.ents);
+    if ((flags & SCA_UP_FLAGS_LLIN_NEW) != 0U) {
+        OSAL_SAFE_FREE(ll_in);
+    }
+    if ((flags & SCA_UP_FLAGS_LLOUT_NEW) != 0U) {
+        OSAL_SAFE_FREE(ll_out);
+    }
 err_pepare_update:
-    OSAL_SAFE_FREE(info.head_addr);
-    OSAL_SAFE_FREE(info.tail_addr);
 __out__:
     return ret;
 }
@@ -3129,4 +3189,3 @@ __out__:
 }
 
 #endif /* CFG_TE_ASYNC_EN */
-

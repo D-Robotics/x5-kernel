@@ -317,4 +317,6 @@
 /* Link list entry size limit to 2^32 Bytes */
 #define LLST_ENTRY_SZ_MAX   (0x100000000ULL)
 
+#define TE_CQ_WM               1U
+
 #endif /* __TRUSTENGINE_DEFINES_H__ */

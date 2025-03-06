@@ -508,7 +508,7 @@ int te_hash_drv_init( te_hash_drv_t *drv,
     TE_ASSERT_MSG( ret == TE_SUCCESS,
                      "Fatal error, can't read host top conf!\n" );
     ctl.csq_en = 1;
-    ctl.cq_wm = 1;
+    ctl.cq_wm = TE_CQ_WM;
     ret = hash_drv_capacity( drv, &drv->pd->caps );
     TE_ASSERT_MSG( ret == TE_SUCCESS,
                      "Fatal error, failed to read hash driver capacity!\n" );

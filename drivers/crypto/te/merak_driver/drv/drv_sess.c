@@ -1359,7 +1359,8 @@ te_sess_inst_t *te_sess_module_init( void *hwa, bool ishash )
         goto err1;
     }
 
-    ret = te_sess_ca_init( mctx );
+    ret = te_sess_ca_init( mctx, ishash ? conf.sram.hash_cq_depth :
+                                          conf.sram.sca_cq_depth );
     if ( ret ) {
         goto err2;
     }

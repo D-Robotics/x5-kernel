@@ -167,7 +167,14 @@ typedef struct te_xts_request {
     te_memlist_t src;
     te_memlist_t dst;
     int res;
+    void *priv[];            /**< private context */
 } te_xts_request_t;
+
+/**
+ * \brief           This function obtains the xts private async context size.
+ * \return          \c Private context size in bytes.
+ */
+int te_xts_get_async_ctx_size(void);
 
 /**
  * \brief           This function performs an XTS encryption or decryption

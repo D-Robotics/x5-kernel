@@ -183,21 +183,36 @@ void te_sess_ea_dispatch_event( te_sess_event_agent_t *ea )
     TE_ASSERT_MSG( (intr.stat.cq_wr_err == 0), "Fatal error, CQ write error\n");
     TE_ASSERT_MSG( (intr.stat.csq_rd_err == 0), "Fatal error, CSQ read error\n");
 
+#ifdef CFG_TE_IRQ_EN
+    /* Mask cq_wm interrupt */
+    ret = hwa->cqwm_ctrl( hwa, false );
+    TE_ASSERT_MSG( ret == TE_SUCCESS,
+                   "Fatal error, can't disable %s cqwm intr!\n",
+                   (mctx->ishash ? "hash" : "sca") );
+#endif /* CFG_TE_IRQ_EN */
+
     /* Handle CSQ first, CSQ full will block whole host */
     /* Fetch all of CSQ item */
     while ( 1 ) {
+#ifndef CFG_TE_IRQ_EN
         osal_spin_lock_irqsave( &ea->lock, &flags );
+#endif
         /* Get CSQ event available info */
         ret = hwa->state( hwa, &stat );
         TE_ASSERT_MSG( (ret == TE_SUCCESS), "Fatal error, Can't get host stat\n" );
         csqcnt = stat.csq_ocpd_slots;
         if ( csqcnt == 0 ) {
+#ifndef CFG_TE_IRQ_EN
             osal_spin_unlock_irqrestore( &ea->lock, flags );
+#endif
             break;
         }
 
         ret = hwa->csq_read( hwa, &entry );
         slotid = entry.slot;
+#ifdef CFG_TE_IRQ_EN
+        osal_spin_lock_irqsave( &ea->lock, &flags );
+#endif
         /* Dequeue first item from queue */
         list = sqlist_dequeue( &ea->queues[slotid] );
         item = SQLIST_CONTAINER( list, item, list );

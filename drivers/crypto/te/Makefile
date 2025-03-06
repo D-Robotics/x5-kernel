@@ -12,6 +12,7 @@ TE_SW_TOP     := $(srctree)/$(src)/merak_driver
 override SQLIST_DIR     := $(CUR_SRC_DIR)/hosal/misc/sqlist
 override HOSAL_API_DIR := $(CUR_SRC_DIR)/hosal/apis
 
+TE_NUM_WORKERS ?= $(CONFIG_NR_CPUS)
 include $(TE_SW_TOP)/te_common.mk
 -include $(TE_SW_TOP)/hwa/res.mk
 
@@ -28,6 +29,7 @@ ccflags-y  =                                                \
              $(TE_CFLAGS)                                   \
              -DCFG_TE_IRQ_EN                                \
              -DCFG_TE_ASYNC_EN                              \
+             -DCFG_TE_XTS_WB_IV_DIS                         \
              -DOSAL_ENV_LINUX_KERNEL                        \
              -DOSAL_LOG_PREFIX_NAME=\"KERNEL\ \"            \
              -DOSAL_MAX_LOG_LEVEL=$(OSAL_MAX_LOG_LEVEL)     \

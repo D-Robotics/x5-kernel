@@ -7,27 +7,24 @@
 #include "te_regs.h"
 
 #define OSAL_SPIN_LOCK_INIT(spin) __extension__({         \
-    osal_spin_lock_init(spin);                            \
+    OSAL_SUCCESS;                                         \
 })
 
 #define OSAL_SPIN_LOCK_DESTROY(spin) do {                 \
-    osal_spin_lock_destroy(spin);                         \
 } while(0)
 
 #define OSAL_SPIN_LOCK(spin) do {                         \
-    osal_spin_lock(spin);                                 \
 } while(0)
 
 #define OSAL_SPIN_UNLOCK(spin) do {                       \
-    osal_spin_unlock(spin);                               \
 } while(0)
 
 #define OSAL_SPIN_LOCK_IRQSAVE(spin, flags) do {          \
-    osal_spin_lock_irqsave((spin),(flags));               \
+    (void)flags;                                          \
 } while(0)
 
 #define OSAL_SPIN_UNLOCK_IRQRESTORE(spin, flags) do {     \
-    osal_spin_unlock_irqrestore((spin),(flags));          \
+    (void)flags;                                          \
 } while(0)
 
 /**
@@ -262,9 +259,16 @@ static int sca_eoi(te_hwa_sca_t *h, const te_sca_int_t *status)
     u.stat = status->stat;
     ctx = HWA_SCA_CTX(h);
     HWA_SCA_LOCK_IRQ(ctx);
-    ctx->regs->intr_stat1 = HTOLE32(status->cmd_fin);
-    ctx->regs->intr_stat2 = HTOLE32(status->op_err);
-    SCA_REG_SET(ctx->regs, intr_stat0, u.val);
+    if (status->cmd_fin != 0U) {
+        ctx->regs->intr_stat1 = HTOLE32(status->cmd_fin);
+    }
+    if (status->op_err != 0U) {
+        ctx->regs->intr_stat2 = HTOLE32(status->op_err);
+    }
+    u.stat.cq_wm = 0; /* Drop the RO cq_wm bit */
+    if (u.val != 0U) {
+        SCA_REG_SET(ctx->regs, intr_stat0, u.val);
+    }
     HWA_SCA_UNLOCK_IRQ(ctx);
 
     return TE_SUCCESS;
@@ -405,6 +409,30 @@ static int sca_set_suspd_msk(te_hwa_sca_t *h, const te_sca_suspd_msk_t *suspd)
     return TE_SUCCESS;
 }
 
+static int sca_cqwm_ctrl(te_hwa_sca_t *h, bool en)
+{
+    union {
+        te_sca_int_stat_t stat;
+        uint32_t val;
+    } u = {0};
+    hwa_sca_ctx_t *ctx = NULL;
+
+    if (!h) {
+        return TE_ERROR_BAD_PARAMS;
+    }
+
+    ctx = HWA_SCA_CTX(h);
+    HWA_SCA_LOCK_IRQ(ctx);
+    u.val = SCA_REG_GET(ctx->regs, intr_msk0);
+    if (u.stat.cq_wm != !en) {
+        u.stat.cq_wm = !en;
+        SCA_REG_SET(ctx->regs, intr_msk0, u.val);
+    }
+    HWA_SCA_UNLOCK_IRQ(ctx);
+
+    return TE_SUCCESS;
+}
+
 int te_hwa_sca_alloc( struct te_sca_regs *regs,
                       struct te_hwa_host *host,
                       bool ishash,
@@ -492,6 +520,7 @@ int te_hwa_sca_init( struct te_sca_regs *regs,
     hwa->get_key       = sca_get_key;
     hwa->get_suspd_msk = sca_get_suspd_msk;
     hwa->set_suspd_msk = sca_set_suspd_msk;
+    hwa->cqwm_ctrl     = sca_cqwm_ctrl;
 
     return TE_SUCCESS;
 

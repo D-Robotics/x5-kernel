@@ -43,6 +43,7 @@ static int te_sess_slg_find_free_slot( te_sess_slot_gov_t *sltgov,
     unsigned long nr = 0;
     int id = -1;
 
+recheck:
     /* Check if we have free slot */
     if (cat == TE_SLOT_CATEGORY_LONG) {
         bitmap = sltgov->lslt_free;
@@ -54,6 +55,11 @@ static int te_sess_slg_find_free_slot( te_sess_slot_gov_t *sltgov,
 
     nr = te_sess_find_first_bit( &bitmap, bitsz );
     if (nr == bitsz) {
+        if (TE_SLOT_CATEGORY_SHORT == cat) {
+            /* Try the long slots if out of short slots */
+            cat = TE_SLOT_CATEGORY_LONG;
+            goto recheck;
+        }
         id = -1;
     } else {
         id = (int)nr;

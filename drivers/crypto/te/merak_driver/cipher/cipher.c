@@ -1525,21 +1525,17 @@ int te_cipher_clone( const te_cipher_ctx_t *src,
 
 #ifdef CFG_TE_ASYNC_EN
 
-typedef struct acipher_ctx {
-    te_cipher_ctx_t *ctx;
-    te_cipher_request_t *req;
-}te_acipher_ctx_t;
+#define CIPHER_WORKER_CTX(req) (te_worker_task_t *)((req)->priv)
 
 static void execute_cipher_ecb_crypt(te_worker_task_t *task)
 {
     int ret = TE_SUCCESS;
-    te_acipher_ctx_t *aecb = task->param;
-    te_cipher_ctx_t *ctx = aecb->ctx;
-    te_cipher_request_t *req = aecb->req;
+    te_cipher_ctx_t *ctx = (te_cipher_ctx_t *)task->param;
+    te_cipher_request_t *req = container_of((void*(*)[])task,
+                                            te_cipher_request_t,
+                                            priv);
 
     ret = te_cipher_ecb_list( ctx, req->op, &req->src, &req->dst);
-    osal_free(task);
-    osal_free(aecb);
 
     req->res = ret;
     req->base.completion( &req->base, req->res );
@@ -1549,8 +1545,8 @@ static void execute_cipher_ecb_crypt(te_worker_task_t *task)
 int te_cipher_aecb(te_cipher_ctx_t *ctx, te_cipher_request_t *req)
 {
     int ret = TE_SUCCESS;
-    te_acipher_ctx_t *aecb = NULL;
     te_worker_task_t *task = NULL;
+
     if((NULL == ctx)
         || (NULL == ctx->crypt)
         || (NULL == req)) {
@@ -1558,28 +1554,13 @@ int te_cipher_aecb(te_cipher_ctx_t *ctx, te_cipher_request_t *req)
         __CIPHER_OUT__;
     }
 
-    aecb = osal_calloc(1, sizeof(*aecb));
-    if (NULL == aecb) {
-        ret = TE_ERROR_OOM;
-        __CIPHER_OUT__;
-    }
-
-    task = osal_calloc(1, sizeof(*task));
-    if (NULL == task) {
-        ret = TE_ERROR_OOM;
-        goto err1;
-    }
-
-    task->param = (void *)aecb;
+    task = CIPHER_WORKER_CTX(req);
+    task->param = (void *)ctx;
     task->execute = execute_cipher_ecb_crypt;
-    aecb->ctx = ctx;
-    aecb->req = req;
     te_worker_pool_enqueue(task);
 
     return TE_SUCCESS;
 
-err1:
-    osal_free(aecb);
 __out__:
     return ret;
 }
@@ -1587,13 +1568,12 @@ __out__:
 static void execute_cipher_cbc_crypt(te_worker_task_t *task)
 {
     int ret = TE_SUCCESS;
-    te_acipher_ctx_t *acbc = task->param;
-    te_cipher_ctx_t *ctx = acbc->ctx;
-    te_cipher_request_t *req = acbc->req;
+    te_cipher_ctx_t *ctx = (te_cipher_ctx_t *)task->param;
+    te_cipher_request_t *req = container_of((void*(*)[])task,
+                                            te_cipher_request_t,
+                                            priv);
 
     ret = te_cipher_cbc_list(ctx, req->op, req->iv, &req->src, &req->dst);
-    osal_free(task);
-    osal_free(acbc);
 
     req->res = ret;
     req->base.completion(&req->base, req->res);
@@ -1604,35 +1584,20 @@ int te_cipher_acbc( te_cipher_ctx_t *ctx,
                     te_cipher_request_t *req )
 {
     int ret = TE_SUCCESS;
-    te_acipher_ctx_t *acbc = NULL;
     te_worker_task_t *task = NULL;
+
     if((NULL == ctx) || (NULL == ctx->crypt) || (NULL == req)) {
         ret = TE_ERROR_OOM;
         __CIPHER_OUT__;
     }
 
-    acbc = osal_calloc(1, sizeof(*acbc));
-    if (NULL == acbc) {
-        ret = TE_ERROR_OOM;
-        __CIPHER_OUT__;
-    }
-
-    task = osal_calloc(1, sizeof(*task));
-    if (NULL == task) {
-        ret = TE_ERROR_OOM;
-        goto err1;
-    }
-
-    task->param = (void *)acbc;
+    task = CIPHER_WORKER_CTX(req);
+    task->param = (void *)ctx;
     task->execute = execute_cipher_cbc_crypt;
-    acbc->ctx = ctx;
-    acbc->req = req;
     te_worker_pool_enqueue(task);
 
     return TE_SUCCESS;
 
-err1:
-    osal_free(acbc);
 __out__:
     return ret;
 }
@@ -1640,13 +1605,12 @@ __out__:
 static void execute_cipher_ofb_crypt(te_worker_task_t *task)
 {
     int ret = TE_SUCCESS;
-    te_acipher_ctx_t *aofb = task->param;
-    te_cipher_ctx_t *ctx = aofb->ctx;
-    te_cipher_request_t *req = aofb->req;
+    te_cipher_ctx_t *ctx = (te_cipher_ctx_t *)task->param;
+    te_cipher_request_t *req = container_of((void*(*)[])task,
+                                            te_cipher_request_t,
+                                            priv);
 
     ret = te_cipher_ofb_list(ctx, req->off, req->iv, &req->src, &req->dst);
-    osal_free(task);
-    osal_free(aofb);
 
     req->res = ret;
     req->base.completion(&req->base, req->res);
@@ -1660,8 +1624,8 @@ int te_cipher_aofb( te_cipher_ctx_t *ctx,
                     te_cipher_request_t *req )
 {
     int ret = TE_SUCCESS;
-    te_acipher_ctx_t *aofb = NULL;
     te_worker_task_t *task = NULL;
+
     if((NULL == ctx)
         || (NULL == ctx->crypt)
         || (NULL == req)) {
@@ -1669,28 +1633,13 @@ int te_cipher_aofb( te_cipher_ctx_t *ctx,
         __CIPHER_OUT__;
     }
 
-    aofb = osal_calloc(1, sizeof(*aofb));
-    if (NULL == aofb) {
-        ret = TE_ERROR_OOM;
-        __CIPHER_OUT__;
-    }
-
-    task = osal_calloc(1, sizeof(*task));
-    if (NULL == task) {
-        ret = TE_ERROR_OOM;
-        goto err1;
-    }
-
-    task->param = (void *)aofb;
+    task = CIPHER_WORKER_CTX(req);
+    task->param = (void *)ctx;
     task->execute = execute_cipher_ofb_crypt;
-    aofb->ctx = ctx;
-    aofb->req = req;
     te_worker_pool_enqueue(task);
 
     return TE_SUCCESS;
 
-err1:
-    osal_free(aofb);
 __out__:
     return ret;
 }
@@ -1698,14 +1647,13 @@ __out__:
 static void execute_cipher_ctr_crypt(te_worker_task_t *task)
 {
     int ret = TE_SUCCESS;
-    te_acipher_ctx_t *actr = task->param;
-    te_cipher_ctx_t *ctx = actr->ctx;
-    te_cipher_request_t *req = actr->req;
+    te_cipher_ctx_t *ctx = (te_cipher_ctx_t *)task->param;
+    te_cipher_request_t *req = container_of((void*(*)[])task,
+                                            te_cipher_request_t,
+                                            priv);
 
     ret = te_cipher_ctr_list(ctx, req->off, req->iv,
                              req->stream, &req->src, &req->dst);
-    osal_free(task);
-    osal_free(actr);
 
     req->res = ret;
     req->base.completion(&req->base, req->res);
@@ -1718,36 +1666,27 @@ static void execute_cipher_ctr_crypt(te_worker_task_t *task)
 int te_cipher_actr(te_cipher_ctx_t *ctx, te_cipher_request_t *req)
 {
     int ret = TE_SUCCESS;
-    te_acipher_ctx_t *actr = NULL;
     te_worker_task_t *task = NULL;
+
     if((NULL == ctx) || (NULL == ctx->crypt) || (NULL == req)) {
         ret = TE_ERROR_OOM;
         __CIPHER_OUT__;
     }
 
-    actr = osal_calloc(1, sizeof(*actr));
-    if (NULL == actr) {
-        ret = TE_ERROR_OOM;
-        __CIPHER_OUT__;
-    }
-
-    task = osal_calloc(1, sizeof(*task));
-    if (NULL == task) {
-        ret = TE_ERROR_OOM;
-        goto err1;
-    }
-
-    task->param = (void *)actr;
+    task = CIPHER_WORKER_CTX(req);
+    task->param = (void *)ctx;
     task->execute = execute_cipher_ctr_crypt;
-    actr->ctx = ctx;
-    actr->req = req;
     te_worker_pool_enqueue(task);
 
     return TE_SUCCESS;
 
-err1:
-    osal_free(actr);
 __out__:
     return ret;
 }
+
+int te_cipher_get_async_ctx_size(void)
+{
+     return sizeof(te_worker_task_t);
+}
+
 #endif /* CFG_TE_ASYNC_EN */

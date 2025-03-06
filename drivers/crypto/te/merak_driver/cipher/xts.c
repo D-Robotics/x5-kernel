@@ -8,6 +8,91 @@
 #include "../common/te_worker_pool.h"
 
 /**
+ * Set CFG_TE_QUIRK_XTS_TWEAK to 1 to promote the xts performance by advancing
+ * the tweak generation.
+ * It is not efficient to generate the tweak via the CE driver for the data
+ * unit is just 16 byte long.
+ */
+#ifndef CFG_TE_QUIRK_XTS_TWEAK
+#define CFG_TE_QUIRK_XTS_TWEAK 1
+#endif
+
+#if CFG_TE_QUIRK_XTS_TWEAK
+/**
+ * The tweak is generated in the following order with this patch:
+ * 1. Use "<cipher>-generic" (software) to encrypt the data unit.
+ *    It requires the CONFIG_CRYPTO_AES=y|m.
+ * 2. Use the TE driver to encrypt the data unit, in case the software <cipher>
+ *    is not available.
+ */
+#include "cipher_generic.source"
+
+typedef struct cipher_ext_ctx {
+    te_crypt_ctx_t *crypt; /* Put it in the beginning */
+    cipher_generic_ctx_t ciph;
+} cipher_ext_ctx_t;
+
+#define te_cipher_init(ctx, hdl, malg) ({                                      \
+    int _ret;                                                                  \
+    _ret = te_cipher_init((struct te_cipher_ctx *)(ctx), (hdl), (malg));       \
+    if (TE_SUCCESS == _ret) {                                                  \
+        cipher_generic_init(&(ctx)->ciph, (malg));                             \
+    }                                                                          \
+    _ret;                                                                      \
+})
+#define te_cipher_free(ctx) ({                                                 \
+    if ((ctx)->ciph.tfm != NULL) {                                             \
+        cipher_generic_free(&(ctx)->ciph);                                     \
+        (ctx)->ciph.tfm = NULL;                                                \
+    }                                                                          \
+    te_cipher_free((struct te_cipher_ctx *)(ctx));                             \
+})
+#define te_cipher_clone(src, dst) ({                                           \
+    if ((src)->ciph.tfm != NULL) {                                             \
+        cipher_generic_clone(&(src)->ciph, &(dst)->ciph);                      \
+    }                                                                          \
+    te_cipher_clone((struct te_cipher_ctx *)(src),                             \
+                    (struct te_cipher_ctx *)(dst));                            \
+})
+#define te_cipher_setkey(ctx, key, bits) ({                                    \
+    int _ret;                                                                  \
+    if ((ctx)->ciph.tfm != NULL) {                                             \
+        _ret = cipher_generic_setkey(&(ctx)->ciph, (key), (bits));             \
+    } else {                                                                   \
+        _ret = te_cipher_setkey((struct te_cipher_ctx *)(ctx), (key), (bits)); \
+    }                                                                          \
+    _ret;                                                                      \
+})
+#define te_cipher_setseckey(ctx, skey) ({                                      \
+    int _ret = TE_ERROR_NOT_SUPPORTED;                                         \
+    if (NULL == (ctx)->ciph.tfm) {                                             \
+        _ret = te_cipher_setseckey((struct te_cipher_ctx *)(ctx), (skey));     \
+    }                                                                          \
+    _ret;                                                                      \
+})
+#define te_cipher_setseckey_v2(ctx, skey) ({                                   \
+    int _ret = TE_ERROR_NOT_SUPPORTED;                                         \
+    if (NULL == (ctx)->ciph.tfm) {                                             \
+        _ret = te_cipher_setseckey_v2((struct te_cipher_ctx *)(ctx), (skey));  \
+    }                                                                          \
+    _ret;                                                                      \
+})
+#define te_cipher_ecb(ctx, op, len, in, out) ({                                \
+    int _ret;                                                                  \
+    if ((ctx)->ciph.tfm != NULL) {                                             \
+        _ret = cipher_generic_ecb(&(ctx)->ciph, (op), (len), (in), (out));     \
+    } else {                                                                   \
+        /* Fallback to TE_600 driver */                                        \
+        _ret = te_cipher_ecb((struct te_cipher_ctx *)(ctx), (op), (len),       \
+                             (in), (out));                                     \
+    }                                                                          \
+    _ret;                                                                      \
+})
+
+#define te_cipher_ctx_t cipher_ext_ctx_t
+#endif /* CFG_TE_QUIRK_XTS_TWEAK */
+
+/**
  * SCA XTS mode context
  * The last process must include >= 1 blk
  */
@@ -276,6 +361,7 @@ __out__:
     return ret;
 }
 
+#ifndef CFG_TE_XTS_WB_IV_DIS
 static void te_xts_mult_x(uint8_t *I)
 {
     int x = 0;
@@ -299,6 +385,7 @@ static void te_xts_update_tweak(uint8_t *tweek, size_t blocks)
         te_xts_mult_x(tweek);
     }
 }
+#endif /* !CFG_TE_XTS_WB_IV_DIS */
 
 int te_xts_crypt( te_xts_ctx_t *ctx,
                   te_sca_operation_t op,
@@ -345,6 +432,7 @@ int te_xts_crypt( te_xts_ctx_t *ctx,
     if (TE_SUCCESS != ret) {
         goto cleanup;
     }
+#ifndef CFG_TE_XTS_WB_IV_DIS
     te_xts_update_tweak( prv_ctx->etwk,
                          UTILS_ROUND_UP(len, ctx->crypt->blk_size) /
                                      ctx->crypt->blk_size);
@@ -357,6 +445,7 @@ int te_xts_crypt( te_xts_ctx_t *ctx,
         goto cleanup;
     }
     osal_memcpy(data_unit, prv_ctx->etwk, prv_ctx->ecb.crypt->blk_size);
+#endif /* !CFG_TE_XTS_WB_IV_DIS */
     ret = te_sca_finish(ctx->crypt, NULL, 0);
     __XTS_OUT__;
 cleanup:
@@ -413,6 +502,7 @@ int te_xts_crypt_list( te_xts_ctx_t *ctx,
 
     ret = te_sca_finish(ctx->crypt, NULL, 0);
     __XTS_CHECK_CONDITION__(ret);
+#ifndef CFG_TE_XTS_WB_IV_DIS
     te_xts_update_tweak( prv_ctx->etwk,
                          UTILS_ROUND_UP(te_memlist_get_total_len(in),
                                         ctx->crypt->blk_size) /
@@ -424,6 +514,7 @@ int te_xts_crypt_list( te_xts_ctx_t *ctx,
                          prv_ctx->etwk );
     __XTS_CHECK_CONDITION__(ret);
     osal_memcpy(data_unit, prv_ctx->etwk, prv_ctx->ecb.crypt->blk_size);
+#endif /* !CFG_TE_XTS_WB_IV_DIS */
     __XTS_OUT__;
 cleanup:
     te_sca_finish(ctx->crypt, NULL, 0);
@@ -500,17 +591,14 @@ int te_xts_clone( const te_xts_ctx_t *src,
 }
 
 #ifdef CFG_TE_ASYNC_EN
-typedef struct axts_ctx {
-    te_xts_ctx_t *ctx;
-    te_xts_request_t *req;
-} axts_ctx_t;
 
 static void execute_xts_crypt(te_worker_task_t *task)
 {
     int ret = TE_SUCCESS;
-    axts_ctx_t *axts = task->param;
-    te_xts_ctx_t *ctx = axts->ctx;
-    te_xts_request_t *req = axts->req;
+    te_xts_ctx_t *ctx = (te_xts_ctx_t *)task->param;
+    te_xts_request_t *req = container_of((void*(*)[])task,
+                                            te_xts_request_t,
+                                            priv);
     te_sca_operation_t op = req->op;
     te_memlist_t *in = &req->src;
     te_memlist_t *out = &req->dst;
@@ -518,8 +606,6 @@ static void execute_xts_crypt(te_worker_task_t *task)
 
     ret = te_xts_crypt_list(ctx, op, data_unit, in, out);
 
-    osal_free(task);
-    osal_free(axts);
     req->res = ret;
     req->base.completion(&req->base, ret);
     return;
@@ -529,7 +615,6 @@ int te_xts_acrypt(te_xts_ctx_t *ctx, te_xts_request_t *req)
 {
     int ret = TE_SUCCESS;
     size_t len = 0;
-    axts_ctx_t *axts = NULL;
     te_worker_task_t *task = NULL;
 
     if((NULL == ctx)
@@ -551,30 +636,21 @@ int te_xts_acrypt(te_xts_ctx_t *ctx, te_xts_request_t *req)
             __XTS_OUT__;
     }
 
-    axts = osal_calloc(1, sizeof(axts_ctx_t));
-    if (NULL == axts) {
-        ret = TE_ERROR_OOM;
-        __XTS_OUT__;
-    }
-
-    task = osal_calloc(1, sizeof(te_worker_task_t));
-    if (NULL == task) {
-        ret = TE_ERROR_OOM;
-        goto err1;
-    }
-
-    task->param = (void *)axts;
+    task = (te_worker_task_t *)(req->priv);
+    task->param = (void *)ctx;
     task->execute = execute_xts_crypt;
-    axts->ctx = ctx;
-    axts->req = req;
     te_worker_pool_enqueue(task);
 
     return TE_SUCCESS;
 
-err1:
-    osal_free(axts);
 __out__:
     return ret;
 }
+
+int te_xts_get_async_ctx_size(void)
+{
+     return sizeof(te_worker_task_t);
+}
+
 #endif
 

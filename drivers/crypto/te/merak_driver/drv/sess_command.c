@@ -9,6 +9,8 @@
 #include "drv_sess.h"
 #include "drv_sess_internal.h"
 
+#define FILL_CQ_THRESH  5U
+
 void te_sess_ca_prepare_task( int32_t slotid,
                               uint32_t *cmdptr,
                               uint32_t cmdlen,
@@ -109,48 +111,12 @@ static void sess_ca_wm_en( te_sess_cmd_agent_t *ca )
     int ret = TE_SUCCESS;
     te_sess_module_ctx_t *mctx = NULL;
     te_hwa_sca_t *hwa = NULL;
-    te_sca_int_t msk = { 0 };
 
     mctx = ca->mctx;
     hwa = (te_hwa_sca_t *)mctx->hwa;
-    ret = hwa->get_int_msk( hwa, &msk );
+    ret = hwa->cqwm_ctrl( hwa, true );
     TE_ASSERT_MSG( ret == TE_SUCCESS,
-                   "Fatal error, can't get %s intr mask!\n",
-                   (mctx->ishash ? "hash" : "sca") );
-
-    /* Enable water mark interrupt */
-    msk.stat.cq_wm = 0;
-
-    ret = hwa->set_int_msk( hwa, &msk );
-    TE_ASSERT_MSG( ret == TE_SUCCESS,
-                   "Fatal error, can't set %s intr mask!\n",
-                   (mctx->ishash ? "hash" : "sca") );
-#else
-    (void)ca;
-#endif
-}
-
-static void sess_ca_wm_dis( te_sess_cmd_agent_t *ca )
-{
-#ifdef CFG_TE_IRQ_EN
-    int ret = TE_SUCCESS;
-    te_sess_module_ctx_t *mctx = NULL;
-    te_hwa_sca_t *hwa = NULL;
-    te_sca_int_t msk = { 0 };
-
-    mctx = ca->mctx;
-    hwa = (te_hwa_sca_t *)mctx->hwa;
-    ret = hwa->get_int_msk( hwa, &msk );
-    TE_ASSERT_MSG( ret == TE_SUCCESS,
-                   "Fatal error, can't get %s intr mask!\n",
-                   (mctx->ishash ? "hash" : "sca") );
-
-    /* Disable water mark interrupt */
-    msk.stat.cq_wm = 1;
-
-    ret = hwa->set_int_msk( hwa, &msk );
-    TE_ASSERT_MSG( ret == TE_SUCCESS,
-                   "Fatal error, can't set %s intr mask!\n",
+                   "Fatal error, can't enable %s cqwm intr!\n",
                    (mctx->ishash ? "hash" : "sca") );
 #else
     (void)ca;
@@ -178,23 +144,19 @@ void te_sess_ca_fill( te_sess_cmd_agent_t *ca )
     /*Get CQ room info */
     ret = hwa->state(hwa, &stat);
     TE_ASSERT_MSG( (ret == TE_SUCCESS), "Fatal error, Can't get host stat\n");
+    if ( stat.cq_avail_slots < ca->cq_thresh ) {
+        goto out; /* Wait */
+    }
 
     roomsz = ( stat.cq_avail_slots * 4 );
-
     OSAL_LOG_TRACE( "Command Agent[%s]: CQ room: %d \n",
                     (mctx->ishash ? "hash" : "sca"), roomsz );
-
     /*
      * if cur task not done, fill CQ, directly.
      * if cur task done, shift to next Q, and fetch first task
      * if no room in CQ, end.
      */
     qidx = ca->qidx;
-
-    /* Disable water mark interrupt, since we already has room too fill */
-    if (roomsz) {
-        sess_ca_wm_dis( ca );
-    }
 
     while (roomsz) {
         if ( ca->cur == NULL ) {
@@ -255,15 +217,14 @@ void te_sess_ca_fill( te_sess_cmd_agent_t *ca )
         ca->cur = NULL;
         /* Indicate how many commands we filled in this fill call*/
         cmd++;
-        sess_ca_wm_dis( ca );
     }
 
+out:
     osal_spin_unlock_irqrestore( &ca->lock, flags );
-
     return;
 }
 
-int te_sess_ca_init( te_sess_module_ctx_t *mctx )
+int te_sess_ca_init( te_sess_module_ctx_t *mctx, uint32_t cq_depth )
 {
     int ret = TE_SUCCESS;
     int i = 0;
@@ -287,6 +248,7 @@ int te_sess_ca_init( te_sess_module_ctx_t *mctx )
         sqlist_init( &ca->queues[i] );
     }
 
+    ca->cq_thresh = UTILS_MIN(FILL_CQ_THRESH, (cq_depth - TE_CQ_WM + 1U));
     ca->mctx = mctx;
     mctx->cmd_agent = ca;
 

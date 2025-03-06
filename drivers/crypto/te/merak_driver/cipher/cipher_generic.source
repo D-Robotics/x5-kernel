@@ -1,0 +1,143 @@
+/*
+ * Copyright (c) 2025, Arm Technology (China) Co., Ltd.
+ * All rights reserved.
+ *
+ * The content of this file or document is CONFIDENTIAL and PROPRIETARY
+ * to Arm Technology (China) Co., Ltd. It is subject to the terms of a
+ * License Agreement between Licensee and Arm Technology (China) Co., Ltd
+ * restricting among other things, the use, reproduction, distribution
+ * and transfer. Each of the embodiments, including this information and
+ * any derivative work shall retain this copyright notice.
+ */
+/*
+ * Wrapper of the software cipher.
+ */
+#include <te_cipher.h>
+#include <linux/printk.h>
+#include <crypto/skcipher.h>
+#include <linux/err.h>
+#include <linux/completion.h>
+#include <linux/scatterlist.h>
+#include <linux/module.h>
+#include <linux/version.h>
+
+#if LINUX_VERSION_CODE > KERNEL_VERSION(5, 11, 0)
+#include <crypto/internal/cipher.h>
+
+MODULE_IMPORT_NS(CRYPTO_INTERNAL);
+#endif
+
+/* Copied from "crypto/internal.h" */
+unsigned int crypto_alg_extsize(struct crypto_alg *alg);
+
+typedef struct cipher_generic_ctx {
+    struct crypto_cipher *tfm;
+    te_algo_t malg;
+} cipher_generic_ctx_t;
+
+int cipher_generic_init(cipher_generic_ctx_t *ctx, te_algo_t malg)
+{
+    int ret = TE_SUCCESS, err = 0;
+    char driver[CRYPTO_MAX_ALG_NAME];
+    struct crypto_cipher *tfm = NULL;
+
+    if ((malg != TE_MAIN_ALGO_AES) && (malg != TE_MAIN_ALGO_SM4)) {
+        return TE_ERROR_BAD_PARAMS;
+    }
+
+    if (snprintf(driver, CRYPTO_MAX_ALG_NAME, "%s-generic",
+                 (TE_MAIN_ALGO_AES == malg) ? "aes" : "sm4") >=
+        CRYPTO_MAX_ALG_NAME) {
+        return TE_ERROR_EXCESS_DATA;
+    }
+
+    tfm = crypto_alloc_cipher(driver, 0, 0);
+    if (IS_ERR(tfm)) {
+        err = PTR_ERR(tfm);
+        if (-ENOENT == err) {
+            pr_debug("cipher: %s is not available!\n", driver);
+            ret = TE_ERROR_NOT_SUPPORTED;
+        } else {
+            pr_warn("cipher: error allocating %s: %d\n", driver, err);
+            ret = TE_ERROR_GENERIC;
+        }
+    } else {
+        ctx->tfm = tfm;
+        ctx->malg = malg;
+    }
+
+    return ret;
+}
+
+int cipher_generic_free(cipher_generic_ctx_t *ctx)
+{
+    if (ctx->tfm != NULL) {
+        crypto_free_cipher(ctx->tfm);
+    }
+    ctx->tfm = NULL;
+    return TE_SUCCESS;
+}
+
+int cipher_generic_clone(const cipher_generic_ctx_t *src,
+                         cipher_generic_ctx_t *dst)
+{
+    int ret = TE_SUCCESS;
+    uint32_t tfmlen;
+
+    if (NULL == src || NULL == src->tfm || NULL == dst) {
+        return TE_ERROR_BAD_PARAMS;
+    }
+
+    if (dst->tfm != NULL) {
+        cipher_generic_free(dst);
+        dst->tfm = NULL;
+    }
+
+    ret = cipher_generic_init(dst, src->malg);
+    if (ret != TE_SUCCESS) {
+        goto out;
+    }
+
+    /**
+    * Hack: copy the tfm state!
+    * This is working in case of pure software based cipher.
+    * Refer to crypto/aes_generic.c
+    */
+    tfmlen = sizeof(*src->tfm) + crypto_alg_extsize(src->tfm->base.__crt_alg);
+    memcpy(dst->tfm, src->tfm, tfmlen);
+
+out:
+    return ret;
+}
+
+int cipher_generic_setkey(cipher_generic_ctx_t *ctx, const uint8_t *key,
+                          uint32_t keybits)
+{
+    int err = 0;
+
+    err = crypto_cipher_setkey(ctx->tfm, key, keybits >> 3);
+    return (0 == err) ? TE_SUCCESS : TE_ERROR_GENERIC;
+}
+
+int cipher_generic_ecb(cipher_generic_ctx_t *ctx,
+                       te_sca_operation_t op,
+                       size_t len,
+                       const uint8_t *in,
+                       uint8_t *out)
+{
+    size_t i;
+
+    if (len & 15U) {
+        return TE_ERROR_BAD_PARAMS;
+    }
+
+    if (0U == len) {
+        return TE_SUCCESS;
+    }
+
+    for (i = 0; i < len; i += 16U) {
+        crypto_cipher_encrypt_one(ctx->tfm, out + i, in + i);
+    }
+
+    return TE_SUCCESS;
+}

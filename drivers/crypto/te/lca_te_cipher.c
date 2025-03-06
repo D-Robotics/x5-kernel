@@ -127,7 +127,9 @@ static int lca_cipher_init(struct crypto_tfm *tfm)
 		crypto_tfm_alg_name(tfm));
 
 	crypto_skcipher_set_reqsize(__crypto_skcipher_cast(tfm),
-				    sizeof(struct te_cipher_req_ctx));
+				    sizeof(struct te_cipher_req_ctx) +
+				    max(te_cipher_get_async_ctx_size(),
+					te_xts_get_async_ctx_size()));
 	memset(ctx_p, 0, sizeof(*ctx_p));
 
 	ctx_p->alg = te_alg->alg;

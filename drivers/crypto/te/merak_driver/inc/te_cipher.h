@@ -285,7 +285,14 @@ typedef struct te_cipher_request {
     te_memlist_t src;
     te_memlist_t dst;
     int res;
+    void *priv[];            /**< private context */
 } te_cipher_request_t;
+
+/**
+ * \brief           This function obtains the cipher private async context size.
+ * \return          \c Private context size in bytes.
+ */
+int te_cipher_get_async_ctx_size(void);
 
 /**
  * \brief           This function performs an asynchronous ECB encryption or
