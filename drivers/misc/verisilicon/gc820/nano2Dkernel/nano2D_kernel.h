@@ -79,6 +79,8 @@ struct n2d_kernel {
 	n2d_device_t *device;
 	n2d_sub_device_t *sub_dev[NANO2D_DEVICE_MAX];
 	n2d_db_t *db;
+
+	struct mutex do_close_lock;
 };
 
 /* This is the function to call from the driver to interface with the address. */

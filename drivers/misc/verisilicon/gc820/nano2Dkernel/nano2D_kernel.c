@@ -121,7 +121,7 @@ static n2d_error_t do_close(n2d_kernel_t *kernel, n2d_uint32_t process)
 {
 	n2d_error_t error = N2D_SUCCESS;
 	int pass;
-
+	mutex_lock(&kernel->do_close_lock);
 	/* Step 1: Enumerate leftover buffers for 'process' and do unmap -> free. */
 	for (pass = 0; pass < MAX_PASSES; pass++)
 	{
@@ -229,76 +229,67 @@ static n2d_error_t do_close(n2d_kernel_t *kernel, n2d_uint32_t process)
 	{
 		n2d_uint32_t handles[MAX_HANDLES_PER_PASS];
 		n2d_uint32_t handle_count = 0;
-		int i;
 		int destroyed_any = 0;
 
-		/* Enumerate all handles for process=0. */
-		error = n2d_kernel_db_list_all_handles(
-			kernel->db,
-			0,
-			handles,
-			&handle_count,
-			MAX_HANDLES_PER_PASS
-		);
+		/* enumerate all handles for process=0, which is where signals are stored */
+		error = n2d_kernel_db_list_all_handles(kernel->db,
+												0,
+												handles,
+												&handle_count,
+												MAX_HANDLES_PER_PASS);
 		if (error == N2D_NOT_FOUND)
-		{
-			/* No DB entry for process=0, break. */
-			break;
-		}
+			break; /* no signals */
 		else if (error == N2D_OUT_OF_MEMORY)
-		{
-			/* Not enough space in local array, break or partial. */
-			break;
-		}
+			break; /* array not big enough, partial or break */
 		else if (error != N2D_SUCCESS)
-		{
 			goto on_error;
-		}
 
 		if (handle_count == 0)
-			break; /* no leftover signals */
+			break;
 
-		for (i = 0; i < (int)handle_count; i++)
 		{
-			n2d_db_type_t type = N2D_UNKONW_TYPE;
-			n2d_uintptr_t dummy;
-
-			/* Query the DB to see if this handle is a signal. */
-			error = n2d_kernel_db_get(kernel->db, 0, handles[i], &type, &dummy);
-			if (error == N2D_NOT_FOUND)
+			int i;
+			for (i = 0; i < (int)handle_count; i++)
 			{
-				/* Already removed, ignore. */
-				continue;
-			}
-			else if (error != N2D_SUCCESS)
-			{
-				/* Real error. */
-				goto on_error;
-			}
+				n2d_db_type_t type = N2D_UNKONW_TYPE;
+				n2d_uintptr_t data_ptr = 0;
+				n2d_signal_t *_signal = NULL;
 
-			if (type == N2D_SIGNAL_TYPE)
-			{
-				/* Attempt to destroy the signal. */
-				n2d_kernel_command_user_signal_t signal_cmd;
-				n2d_error_t sig_err;
-
-				memset(&signal_cmd, 0, sizeof(signal_cmd));
-				signal_cmd.command = N2D_USER_SIGNAL_DESTROY;
-				signal_cmd.handle = (n2d_int32_t)handles[i];
-
-				sig_err = do_user_signal(kernel, 0, 0, &signal_cmd);
-				/* If the refcount is not 1, the actual destruction might not happen. */
-				if (sig_err == N2D_SUCCESS)
-				{
-					destroyed_any++;
-				}
-				else if ((sig_err != N2D_NOT_FOUND) &&
-							(sig_err != N2D_SUCCESS) &&
-							(sig_err != N2D_INVALID_ARGUMENT))
-				{
-					/* Real error. */
-					error = sig_err;
+				error = n2d_kernel_db_get(kernel->db, 0, handles[i], &type, &data_ptr);
+				if (error == N2D_NOT_FOUND)
+					continue; /* already removed by someone else */
+				else if (error != N2D_SUCCESS)
 					goto on_error;
+
+				if (type != N2D_SIGNAL_TYPE)
+					continue; /* not a signal */
+
+				_signal = (n2d_signal_t *)(n2d_uintptr_t)data_ptr;
+
+				/*
+					* If this signal belongs to the same process that is closing
+					* we attempt a DESTROY. The internal logic in
+					* n2d_kernel_os_signal_destroy checks refcount again.
+				*/
+				if ((_signal->process == process))
+				{
+					n2d_kernel_command_user_signal_t sig_cmd;
+					memset(&sig_cmd, 0, sizeof(sig_cmd));
+					sig_cmd.command = N2D_USER_SIGNAL_DESTROY;
+					sig_cmd.handle = (n2d_uintptr_t)handles[i];
+
+					{
+						n2d_error_t destroyErr = do_user_signal(kernel, 0, process, &sig_cmd);
+						if (destroyErr == N2D_SUCCESS)
+							destroyed_any++;
+						else if ((destroyErr != N2D_SUCCESS) &&
+									(destroyErr != N2D_NOT_FOUND) &&
+									(destroyErr != N2D_INVALID_ARGUMENT))
+						{
+							error = destroyErr;
+							goto on_error;
+						}
+					}
 				}
 			}
 		}
@@ -311,6 +302,7 @@ static n2d_error_t do_close(n2d_kernel_t *kernel, n2d_uint32_t process)
 	error = n2d_kernel_db_attach_process(kernel->db, process, N2D_FALSE);
 
 on_error:
+	mutex_unlock(&kernel->do_close_lock);
 	return error;
 }
 
@@ -769,6 +761,8 @@ n2d_error_t n2d_kernel_construct(n2d_device_t *device, n2d_kernel_t **kernel)
 			global_core_id++;
 		}
 	}
+
+	mutex_init(&_kernel->do_close_lock);
 
 	*kernel = _kernel;
 

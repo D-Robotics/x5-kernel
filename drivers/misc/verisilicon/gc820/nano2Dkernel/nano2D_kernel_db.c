@@ -112,6 +112,8 @@ n2d_error_t n2d_kernel_db_get_handle(n2d_db_t *db, n2d_uint32_t *handle)
 
 	ONERROR(n2d_handle_get(db->handle_bitmap, handle));
 
+	pr_debug("[N2D_DEBUG] get_handle: allocated handle=%u (free left=%u)\n",
+            *handle, db->handle_bitmap->free);
 on_error:
 	if (get_mutex)
 		n2d_kernel_os_mutex_release(db->kernel->os, db->mutex);
@@ -176,6 +178,9 @@ n2d_error_t n2d_kernel_db_insert(n2d_db_t *db, n2d_uint32_t process, n2d_uint32_
 	if (type == N2D_VIDMEM_TYPE)
 		process_node->allocate_count++;
 
+	pr_debug("[N2D_DEBUG] db_insert: process=%u handle=%u type=%d data=%p\n",
+            process, handle, type, (void*)data);
+
 on_error:
 	if (get_mutex)
 		n2d_kernel_os_mutex_release(db->kernel->os, db->mutex);
@@ -227,6 +232,7 @@ n2d_error_t n2d_kernel_db_remove(n2d_db_t *db, n2d_uint32_t process, n2d_uint32_
 	if (_type == N2D_VIDMEM_TYPE)
 		process_node->allocate_count--;
 
+	pr_debug("[N2D_DEBUG] db_remove: process=%u handle=%u\n", process, handle);
 on_error:
 	if (get_mutex)
 		n2d_kernel_os_mutex_release(db->kernel->os, db->mutex);
