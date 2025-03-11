@@ -744,13 +744,12 @@ static int dwcmshc_x5_get_cd(struct mmc_host *mmc)
 	return ret;
 }
 
-static void dwcmshc_x5_toggle_sd_power(struct mmc_host *mmc)
+static void dwcmshc_x5_toggle_sd_power(struct mmc_host *mmc,u32 toggle_interval_us)
 {
 	struct sdhci_host *host = mmc_priv(mmc);
 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
 	struct dwcmshc_priv *priv = sdhci_pltfm_priv(pltfm_host);
 	struct x5_priv *x5_priv = priv->priv;
-	u16 toggle_interval_us = 1000;
 
 	if (!IS_ERR_OR_NULL(x5_priv->power_gpio)) {
 		dev_dbg(mmc_dev(mmc), "Toggling power-gpio with interval %u us\n",
@@ -864,6 +863,7 @@ static int dwcmshc_probe(struct platform_device *pdev)
 	int err;
 	struct resource *res;
 	u32 extra;
+	u32 toggle_interval_us;
 
 	pltfm_data = device_get_match_data(&pdev->dev);
 	if (!pltfm_data) {
@@ -973,12 +973,17 @@ static int dwcmshc_probe(struct platform_device *pdev)
 			if (IS_ERR(x5_priv->voltage_gpio))
 				dev_warn(dev, "can not parse voltage gpio\n");
 
+			if (of_property_read_u32(pdev->dev.of_node, "toggle_interval_us", &toggle_interval_us)) {
+				dev_warn(dev, "Failed to read toggle_interval_us, using default\n");
+				toggle_interval_us = 1000;
+			}
+
 			x5_priv->power_gpio = devm_gpiod_get_optional(&pdev->dev, "power", GPIOD_OUT_LOW);
 			if (IS_ERR(x5_priv->power_gpio))
 				dev_warn(dev, "can not parse power gpio\n");
 			else
 				/* For warm boot, SD card need to be powered down */
-				dwcmshc_x5_toggle_sd_power(host->mmc);
+				dwcmshc_x5_toggle_sd_power(host->mmc,toggle_interval_us);
 
 			host->mmc_host_ops.start_signal_voltage_switch = dwcmshc_x5_start_signal_voltage_switch;
 			host->mmc_host_ops.get_cd = dwcmshc_x5_get_cd;
