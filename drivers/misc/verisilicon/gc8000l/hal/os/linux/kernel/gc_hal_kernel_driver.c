@@ -74,9 +74,41 @@ MODULE_IMPORT_NS(VFS_internal_I_am_really_a_filesystem_and_am_NOT_a_driver);
 #endif
 
 // Global variables for synchronization
-static atomic_t activeIoctlCount = ATOMIC_INIT(0); // Tracks active ioctl calls
+static atomic_t activeDrvCallCount = ATOMIC_INIT(0); // Tracks active drv_xxx calls
 static DEFINE_MUTEX(drvLock); // Mutex to protect shutdown process
 static bool isShutdown = false; // Indicates if the device is shutting down
+
+#define DRV_CALL_ENTER() \
+	bool drvLocked = false; \
+	do { \
+		/* Step 1: Acquire the lock and check if shutdown has started */ \
+		mutex_lock(&drvLock); \
+		drvLocked = true; \
+\
+		if (isShutdown) { \
+			/* Device is shutting down, reject the request */ \
+			ret = -ENODEV; \
+			goto OnError; \
+		} \
+\
+		/* Increment active drv_xxx counter before proceeding */ \
+		atomic_inc(&activeDrvCallCount); \
+\
+		/* Unlock to allow other drv_xxx or shutdown to proceed */ \
+		mutex_unlock(&drvLock); \
+		drvLocked = false; \
+	} while (0);
+
+#define DRV_CALL_EXIT() \
+	do { \
+		if (drvLocked) { \
+			mutex_unlock(&drvLock); \
+		} else { \
+			/* Step 2: Decrement active drv_xxx counter before exiting */ \
+			atomic_dec(&activeDrvCallCount); \
+		} \
+	} while (0);
+
 
 static struct class *gpu_class = gcvNULL;
 
@@ -540,7 +572,8 @@ void gckOS_DumpParam(void)
 
 static int drv_open(struct inode *inode, struct file *filp)
 {
-	gceSTATUS status	     = gcvSTATUS_OK;
+	int ret = -ENOTTY;
+	gceSTATUS status = gcvSTATUS_OK;
 	gcsHAL_PRIVATE_DATA_PTR data = gcvNULL;
 	gctUINT i, dev_index;
 	gctUINT attached = 0;
@@ -548,14 +581,19 @@ static int drv_open(struct inode *inode, struct file *filp)
 
 	gcmkHEADER_ARG("inode=%p filp=%p", inode, filp);
 
-	if ((dev_index = iminor(file_inode(filp))) >= gcdDEVICE_COUNT)
-		return -ENODEV;
+	DRV_CALL_ENTER();
+
+	if ((dev_index = iminor(file_inode(filp))) >= gcdDEVICE_COUNT) {
+		ret = -ENODEV;
+		goto OnError;
+	}
 
 	data = kmalloc(sizeof(gcsHAL_PRIVATE_DATA), GFP_KERNEL | __GFP_NOWARN);
 
 	if (data == gcvNULL) {
 		gcmkFOOTER_ARG("status=%d", gcvSTATUS_OUT_OF_MEMORY);
-		return -ENOMEM;
+		ret = -ENOMEM;
+		goto OnError;
 	}
 
 	data->isLocked = gcvFALSE;
@@ -578,6 +616,8 @@ static int drv_open(struct inode *inode, struct file *filp)
 
 	filp->private_data = data;
 
+	DRV_CALL_EXIT();
+
 	/* Success. */
 	gcmkFOOTER_NO();
 	return 0;
@@ -588,10 +628,13 @@ OnError:
 			gcmkVERIFY_OK(gckKERNEL_AttachProcess(device->kernels[i], gcvFALSE));
 	}
 
-	kfree(data);
+	if (data)
+		kfree(data);
+	
+	DRV_CALL_EXIT();
 
 	gcmkFOOTER_ARG("status=%d", status);
-	return -ENOTTY;
+	return ret;
 }
 
 static int drv_release(struct inode *inode, struct file *filp)
@@ -605,8 +648,12 @@ static int drv_release(struct inode *inode, struct file *filp)
 
 	gcmkHEADER_ARG("inode=%p filp=%p", inode, filp);
 
-	if ((dev_index = iminor(file_inode(filp))) >= gcdDEVICE_COUNT)
-		return -ENODEV;
+	DRV_CALL_ENTER();
+
+	if ((dev_index = iminor(file_inode(filp))) >= gcdDEVICE_COUNT) {
+		ret = -ENODEV;
+		goto OnError;
+	}
 
 	data = filp->private_data;
 
@@ -652,6 +699,8 @@ static int drv_release(struct inode *inode, struct file *filp)
 	ret = 0;
 
 OnError:
+	DRV_CALL_EXIT();
+
 	gcmkFOOTER();
 	return ret;
 }
@@ -673,24 +722,11 @@ static long drv_ioctl(struct file *filp, unsigned int ioctlCode, unsigned long a
 
 	gcmkHEADER_ARG("filp=%p ioctlCode=%u arg=%lu", filp, ioctlCode, arg);
 
-	// Step 1: Acquire the lock and check if shutdown has started
-	mutex_lock(&drvLock);
-
-	if (isShutdown) {
-		// Device is shutting down, reject the request
-		mutex_unlock(&drvLock);
-		return -ENODEV;
-	}
-
-	// Increment active ioctl counter before proceeding
-	atomic_inc(&activeIoctlCount);
-
-	// Unlock to allow other ioctls or shutdown to proceed
-	mutex_unlock(&drvLock);
+	DRV_CALL_ENTER();
 
 	if ((dev_index = iminor(file_inode(filp))) >= gcdDEVICE_COUNT){
-		atomic_dec(&activeIoctlCount);
-		return -ENODEV;
+		ret = -ENODEV;
+		goto OnError;
 	}
 
 	data = filp->private_data;
@@ -870,8 +906,7 @@ static long drv_ioctl(struct file *filp, unsigned int ioctlCode, unsigned long a
 
 OnError:
 
-	// Step 2: Decrement active ioctl counter before exiting
-	atomic_dec(&activeIoctlCount);
+	DRV_CALL_EXIT();
 
 	gcmkFOOTER();
 	return ret;
@@ -1244,21 +1279,21 @@ static int __devexit viv_dev_remove(struct platform_device *pdev)
 
 static void viv_dev_shutdown(struct platform_device *pdev)
 {
-	unsigned long timeout = jiffies + msecs_to_jiffies(5000);
+	unsigned long timeout = jiffies + msecs_to_jiffies(60000);
 	// Step 1: Lock and set isShutdown flag
 	mutex_lock(&drvLock);
 	isShutdown = true;
 	mutex_unlock(&drvLock);
 
-	// Step 2: Wait until all active ioctl calls finish
-	// This ensures that no ioctl is still accessing released resources
-	while (atomic_read(&activeIoctlCount) != 0 && time_before(jiffies, timeout)) {
+	// Step 2: Wait until all active drv_xxx calls finish
+	// This ensures that no drv_xxx is still accessing released resources
+	while (atomic_read(&activeDrvCallCount) != 0 && time_before(jiffies, timeout)) {
 		msleep(10); // Sleep for 10ms before checking again
 	}
 
 	// Step 3: If timeout occurs, print a warning
-	if (atomic_read(&activeIoctlCount) != 0) {
-		pr_warn("%s: Timeout waiting for active ioctl calls to complete! Proceeding with shutdown.\n",__func__);
+	if (atomic_read(&activeDrvCallCount) != 0) {
+		pr_warn("%s: Timeout waiting for active drv_xxx calls to complete! Proceeding with shutdown.\n",__func__);
 	}
 
 	galDevice->gotoShutdown = gcvTRUE;
