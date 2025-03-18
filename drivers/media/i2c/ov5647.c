@@ -91,6 +91,7 @@ struct ov5647_mode {
 	u64				pixel_rate;
 	int				hts;
 	int				vts;
+	struct v4l2_fract timeperframe_default;
 	const struct regval_list	*reg_list;
 	unsigned int			num_regs;
 };
@@ -306,7 +307,7 @@ static struct regval_list ov5647_1080p30_10bpp[] = {
 	{0x0100, 0x01},
 };
 
-static struct regval_list ov5647_2x2binned_10bpp[] = {
+static struct regval_list ov5647_2lane_960p_init_setting[] = {
 	{0x0100, 0x00},
 	{0x0103, 0x01},
 	{0x3034, 0x1a},
@@ -319,7 +320,7 @@ static struct regval_list ov5647_2x2binned_10bpp[] = {
 	{0x3612, 0x59},
 	{0x3618, 0x00},
 	{0x5000, 0x06},
-	{0x5002, 0x41},
+	{0x5002, 0x40},
 	{0x5003, 0x08},
 	{0x5a00, 0x08},
 	{0x3000, 0x00},
@@ -343,11 +344,13 @@ static struct regval_list ov5647_2x2binned_10bpp[] = {
 	{0x3806, 0x07},
 	{0x3807, 0xa3},
 	{0x3808, 0x05},
-	{0x3809, 0x10},
+	{0x3809, 0x00},// output size is 0x500, 1280
 	{0x380a, 0x03},
-	{0x380b, 0xcc},
+	{0x380b, 0xc0},//output size is 0x3c0, 960
 	{0x380c, 0x07},
 	{0x380d, 0x68},
+	{0x380e, 0x05},
+	{0x380f, 0x9B},
 	{0x3811, 0x0c},
 	{0x3813, 0x06},
 	{0x3814, 0x31},
@@ -389,7 +392,7 @@ static struct regval_list ov5647_2x2binned_10bpp[] = {
 	{0x4800, 0x24},
 	{0x3503, 0x03},
 	{0x3820, 0x41},
-	{0x3821, 0x07},
+	{0x3821, 0x06},
 	{0x350a, 0x00},
 	{0x350b, 0x10},
 	{0x3500, 0x00},
@@ -489,6 +492,169 @@ static struct regval_list ov5647_640x480_10bpp[] = {
 	{0x0100, 0x01},
 };
 
+static uint32_t ov5647_gain_lut[] = {
+	0x020,//1
+	0x020,
+	0x021,
+	0x022,
+	0x022,
+	0x023,
+	0x024,
+	0x025,
+	0x026,
+	0x026,
+	0x027,
+	0x028,
+	0x029,
+	0x02A,
+	0x02B,
+	0x02C,
+	0x02D,
+	0x02E,
+	0x02F,
+	0x030,
+	0x031,
+	0x032,
+	0x033,
+	0x034,
+	0x035,
+	0x036,
+	0x038,
+	0x039,
+	0x03A,
+	0x03B,
+	0x03D,
+	0x03E,
+	0x040,//2
+	0x041,
+	0x042,
+	0x044,
+	0x045,
+	0x047,
+	0x048,
+	0x04A,
+	0x04C,
+	0x04D,
+	0x04F,
+	0x051,
+	0x052,
+	0x054,
+	0x056,
+	0x058,
+	0x05A,
+	0x05C,
+	0x05E,
+	0x060,
+	0x062,
+	0x064,
+	0x067,
+	0x069,
+	0x06B,
+	0x06D,
+	0x070,
+	0x072,
+	0x075,
+	0x077,
+	0x07A,
+	0x07D,
+	0x080,
+	0x082,
+	0x085,
+	0x088,
+	0x08B,
+	0x08E,
+	0x091,
+	0x094,
+	0x098,
+	0x09B,
+	0x09E,
+	0x0A2,
+	0x0A5,
+	0x0A9,
+	0x0AD,
+	0x0B1,
+	0x0B5,
+	0x0B8,
+	0x0BD,
+	0x0C1,
+	0x0C5,
+	0x0C9,
+	0x0CE,
+	0x0D2,
+	0x0D7,
+	0x0DB,
+	0x0E0,
+	0x0E5,
+	0x0EA,
+	0x0EF,
+	0x0F5,
+	0x0FA,
+	0x0100,
+	0x0105,
+	0x010B,
+	0x0111,
+	0x0117,
+	0x011D,
+	0x0123,
+	0x0129,
+	0x0130,
+	0x0137,
+	0x013D,
+	0x0144,
+	0x014B,
+	0x0153,
+	0x015A,
+	0x0162,
+	0x016A,
+	0x0171,
+	0x017A,
+	0x0182,
+	0x018A,
+	0x0193,
+	0x019C,
+	0x01A5,
+	0x01AE,
+	0x01B7,
+	0x01C1,
+	0x01CB,
+	0x01D5,
+	0x01DF,
+	0x01EA,
+	0x01F5,
+	0x0200,
+	0x020B,
+	0x0216,
+	0x0222,
+	0x022E,
+	0x023A,
+	0x0247,
+	0x0253,
+	0x0260,
+	0x026E,
+	0x027B,
+	0x0289,
+	0x0297,
+	0x02A6,
+	0x02B5,
+	0x02C4,
+	0x02D4,
+	0x02E3,
+	0x02F4,
+	0x0304,
+	0x0315,
+	0x0326,
+	0x0338,
+	0x034A,
+	0x035D,
+	0x036F,
+	0x0383,
+	0x0396,
+	0x03AB,
+	0x03BF,
+	0x03D4,
+	0x03EA
+};
+
 static const struct ov5647_mode ov5647_modes[] = {
 	/* 2592x1944 full resolution full FOV 10-bit mode. */
 	{
@@ -508,6 +674,10 @@ static const struct ov5647_mode ov5647_modes[] = {
 		.pixel_rate	= 87500000,
 		.hts		= 2844,
 		.vts		= 0x7b0,
+		.timeperframe_default = {
+			.numerator = 100,
+			.denominator = 1500
+		},
 		.reg_list	= ov5647_2592x1944_10bpp,
 		.num_regs	= ARRAY_SIZE(ov5647_2592x1944_10bpp)
 	},
@@ -529,6 +699,10 @@ static const struct ov5647_mode ov5647_modes[] = {
 		.pixel_rate	= 81666700,
 		.hts		= 2416,
 		.vts		= 0x450,
+		.timeperframe_default = {
+			.numerator = 100,
+			.denominator = 3000
+		},
 		.reg_list	= ov5647_1080p30_10bpp,
 		.num_regs	= ARRAY_SIZE(ov5647_1080p30_10bpp)
 	},
@@ -538,8 +712,8 @@ static const struct ov5647_mode ov5647_modes[] = {
 			.code		= MEDIA_BUS_FMT_SBGGR10_1X10,
 			.colorspace	= V4L2_COLORSPACE_SRGB,
 			.field		= V4L2_FIELD_NONE,
-			.width		= 1296,
-			.height		= 972
+			.width		= 1280,
+			.height		= 960
 		},
 		.crop = {
 			.left		= OV5647_PIXEL_ARRAY_LEFT,
@@ -550,8 +724,12 @@ static const struct ov5647_mode ov5647_modes[] = {
 		.pixel_rate	= 81666700,
 		.hts		= 1896,
 		.vts		= 0x59b,
-		.reg_list	= ov5647_2x2binned_10bpp,
-		.num_regs	= ARRAY_SIZE(ov5647_2x2binned_10bpp)
+		.timeperframe_default = {
+			.numerator = 100,
+			.denominator = 3000
+		},
+		.reg_list	= ov5647_2lane_960p_init_setting,
+		.num_regs	= ARRAY_SIZE(ov5647_2lane_960p_init_setting)
 	},
 	/* 10-bit VGA full FOV 60fps. 2x2 binned and subsampled down to VGA. */
 	{
@@ -571,6 +749,10 @@ static const struct ov5647_mode ov5647_modes[] = {
 		.pixel_rate	= 55000000,
 		.hts		= 1852,
 		.vts		= 0x1f8,
+		.timeperframe_default = {
+			.numerator = 100,
+			.denominator = 6000
+		},
 		.reg_list	= ov5647_640x480_10bpp,
 		.num_regs	= ARRAY_SIZE(ov5647_640x480_10bpp)
 	},
@@ -758,7 +940,7 @@ static int ov5647_power_on(struct device *dev)
 	dev_dbg(dev, "OV5647 power on\n");
 
 	if (sensor->pwdn) {
-		gpiod_set_value_cansleep(sensor->pwdn, 0);
+		gpiod_set_value_cansleep(sensor->pwdn, 1);
 		msleep(PWDN_ACTIVE_DELAY_MS);
 	}
 
@@ -787,7 +969,7 @@ static int ov5647_power_on(struct device *dev)
 error_clk_disable:
 	clk_disable_unprepare(sensor->xclk);
 error_pwdn:
-	gpiod_set_value_cansleep(sensor->pwdn, 1);
+	gpiod_set_value_cansleep(sensor->pwdn, 0);
 
 	return ret;
 }
@@ -914,8 +1096,22 @@ error_unlock:
 	return ret;
 }
 
+static int ov5647_g_frame_interval(struct v4l2_subdev *sd,
+	struct v4l2_subdev_frame_interval *fi)
+{
+	struct ov5647 *sensor = to_sensor(sd);
+	const struct ov5647_mode *mode = sensor->mode;
+
+	mutex_lock(&sensor->lock);
+	fi->interval = mode->timeperframe_default;
+	mutex_unlock(&sensor->lock);
+
+	return 0;
+}
+
 static const struct v4l2_subdev_video_ops ov5647_subdev_video_ops = {
 	.s_stream =		ov5647_s_stream,
+	.g_frame_interval = ov5647_g_frame_interval,
 };
 
 static int ov5647_enum_mbus_code(struct v4l2_subdev *sd,
@@ -1233,7 +1429,7 @@ static int ov5647_s_ctrl(struct v4l2_ctrl *ctrl)
 		ret = ov5647_s_exposure_auto(sd, ctrl->val);
 		break;
 	case V4L2_CID_ANALOGUE_GAIN:
-		ret =  ov5647_s_analogue_gain(sd, ctrl->val);
+		ret =  ov5647_s_analogue_gain(sd, ov5647_gain_lut[ctrl->val]);
 		break;
 	case V4L2_CID_EXPOSURE:
 		ret = ov5647_s_exposure(sd, ctrl->val);
@@ -1292,7 +1488,7 @@ static int ov5647_init_controls(struct ov5647 *sensor)
 
 	/* min: 16 = 1.0x; max (10 bits); default: 32 = 2.0x. */
 	v4l2_ctrl_new_std(&sensor->ctrls, &ov5647_ctrl_ops,
-			  V4L2_CID_ANALOGUE_GAIN, 16, 1023, 1, 32);
+			  V4L2_CID_ANALOGUE_GAIN, 0, ARRAY_SIZE(ov5647_gain_lut), 1, 0);
 
 	/* By default, PIXEL_RATE is read only, but it does change per mode */
 	sensor->pixel_rate = v4l2_ctrl_new_std(&sensor->ctrls, &ov5647_ctrl_ops,
@@ -1390,9 +1586,9 @@ static int ov5647_probe(struct i2c_client *client)
 	}
 
 	/* Request the power down GPIO asserted. */
-	sensor->pwdn = devm_gpiod_get_optional(dev, "pwdn", GPIOD_OUT_HIGH);
+	sensor->pwdn = devm_gpiod_get_optional(dev, "reset", GPIOD_OUT_HIGH);
 	if (IS_ERR(sensor->pwdn)) {
-		dev_err(dev, "Failed to get 'pwdn' gpio\n");
+		dev_err(dev, "Failed to get 'reset' gpio\n");
 		return -EINVAL;
 	}
 
