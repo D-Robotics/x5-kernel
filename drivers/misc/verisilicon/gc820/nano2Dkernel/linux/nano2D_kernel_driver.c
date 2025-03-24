@@ -177,6 +177,7 @@ static struct horizon_n2d_dev *global_n2d;
 static int gpu_resume(struct platform_device *dev);
 static int gpu_suspend(struct platform_device *dev, pm_message_t state);
 
+static DEFINE_MUTEX(gpu_power_lock);
 struct client_data {
 	n2d_device_t *device;
 	int refcount;
@@ -860,22 +861,28 @@ static int release_contiguous_memory(struct memory_heap *heap)
 }
 
 static void gpu_poweron(void) {
-       n2d_int32_t power_ref_old = -1;
 
-       n2d_kernel_os_atom_inc(global_device->kernel->os, global_device->kernel->power_ref, &power_ref_old);
-       if (power_ref_old == 0) {
-               gpu_resume(N2D_NULL);
-       }
+	mutex_lock(&gpu_power_lock);
+
+	n2d_int32_t power_ref_old = -1;
+
+	n2d_kernel_os_atom_inc(global_device->kernel->os, global_device->kernel->power_ref, &power_ref_old);
+	if (power_ref_old == 0) {
+			gpu_resume(N2D_NULL);
+	}
+	mutex_unlock(&gpu_power_lock);
 }
 
 static void gpu_poweroff(void) {
-       n2d_int32_t power_ref_old = -1;
-       pm_message_t state = {0};
+	mutex_lock(&gpu_power_lock);
+	n2d_int32_t power_ref_old = -1;
+	pm_message_t state = {0};
 
-       n2d_kernel_os_atom_dec(global_device->kernel->os, global_device->kernel->power_ref, &power_ref_old);
-       if (power_ref_old == 1) {
-               gpu_suspend(N2D_NULL, state);
-       }
+	n2d_kernel_os_atom_dec(global_device->kernel->os, global_device->kernel->power_ref, &power_ref_old);
+	if (power_ref_old == 1) {
+			gpu_suspend(N2D_NULL, state);
+	}
+	mutex_unlock(&gpu_power_lock);
 }
 
 static int drv_open(struct inode *inode, struct file *file)
