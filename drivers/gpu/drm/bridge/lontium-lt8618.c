@@ -660,7 +660,7 @@ static int lt8618_ddc_fifo_fetch(struct lt8618 *lt8618, u8 *buf, u8 block,
 	pfifo = buf;
 	pos = offset + 128 * block;
 
-	if (len > LT8618_FIFO_MAX_LENGTH || pos > EDID_LENGTH * 2) {
+	if (len > LT8618_FIFO_MAX_LENGTH || pos > EDID_LENGTH * 4) {
 		DRM_ERROR("[EDID]: Failed to request DDC FIFO!\n");
 		DRM_ERROR("Invalid len or pos {%ldB,%ld}\n ", len, pos);
 		return -EOVERFLOW;
