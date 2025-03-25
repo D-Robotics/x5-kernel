@@ -9,14 +9,6 @@
 /dts-v1/;
 #include "x5-rdk.dtsi"
 
-&lsio_iomuxc {
-	lsio_gpio0_12: lsio_gpio0_12 {
-		horizon,pins = <
-			LSIO_UART4_RX	LSIO_PINMUX_3 BIT_OFFSET24	MUX_ALT2	&pconf_output_high
-		>;
-	};
-};
-
 / {
 	model = "D-Robotics X5 ND V0.1";
 
@@ -30,14 +22,48 @@
 			linux,default-trigger = "heartbeat";
 		};
 	};
-
 };
 
-//wifi antenna Onboard
+&dsp_iomuxc {
+	dsp_gpio0_15: dsp_gpio0_15 {
+		horizon,pins = <
+			DSP_PDM_IN0  DSP_PINMUX_0  BIT_OFFSET26  MUX_ALT1  &pconf_drv_pu_ds7_1v8
+		>;
+	};
+
+	dsp_gpio0_16: dsp_gpio0_16 {
+		horizon,pins = <
+			DSP_PDM_IN1  DSP_PINMUX_0  BIT_OFFSET28  MUX_ALT1  &pconf_drv_pu_ds7_1v8
+		>;
+	};
+
+	dsp_gpio0_17: dsp_gpio0_17 {
+		horizon,pins = <
+			DSP_PDM_IN2  DSP_PINMUX_0  BIT_OFFSET30  MUX_ALT1  &pconf_output_high
+		>;
+	};
+
+	dsp_gpio0_18: dsp_gpio0_18 {
+		horizon,pins = <
+			DSP_PDM_IN3  DSP_PINMUX_1  BIT_OFFSET0  MUX_ALT1  &pconf_output_low
+		>;
+	};
+};
+
+&lsio_iomuxc {
+	lsio_gpio0_12: lsio_gpio0_12 {
+		horizon,pins = <
+			LSIO_UART4_RX	LSIO_PINMUX_3 BIT_OFFSET24	MUX_ALT2	&pconf_output_high
+		>;
+	};
+};
+
 &dsp_gpio_porta {
 	pinctrl-names = "default";
-	pinctrl-0 = < &dsp_gpio0_17
-				  &dsp_gpio0_18
+	pinctrl-0 = < &dsp_gpio0_15
+					&dsp_gpio0_16
+					&dsp_gpio0_17
+					&dsp_gpio0_18
 				>;
 };
 
