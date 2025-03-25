@@ -91,6 +91,8 @@ struct ipc_shm_data_t {
 	struct mutex dev_lock;	/* dev lock */
 	struct ipc_shm_channel_t channel[IPCF_HAL_CHANNEL_NUM_MAX]; // channel
 
+	int32_t user_cnt;
+
 	/* for debug */
 	struct dentry *debugfs;
 	int32_t rdump, wdump;
@@ -623,15 +625,18 @@ static int32_t hal_channel_manage_init(struct ipc_shm_data_t *_ipc_shm_data,
 	spin_unlock_irqrestore(&_ipc_shm_data->channel[channel_id].rxfifo_lock, spinlock_flags);
 	write_unlock(&_ipc_shm_data->channel[channel_id].channel_lock);
 
-	retval = hb_ipc_open_instance(IPCF_INSTANCES_ID0, &ipchal_usercfg);
-	if (!retval) {
-		shm_dbg("ipc_shm_init success, num instance %d num channel %d\n",
-			 IPCF_INSTANCES_NUM, IPCF_HAL_CHANNEL_NUM_MAX);
-	} else {
-		shm_err("ipc_shm_init failed, ret %d!\n", retval);
+	if (_ipc_shm_data->user_cnt == 0) {
+		retval = hb_ipc_open_instance(IPCF_INSTANCES_ID0, &ipchal_usercfg);
+		if (!retval) {
+			shm_dbg("ipc_shm_init success, num instance %d num channel %d\n",
+				 IPCF_INSTANCES_NUM, IPCF_HAL_CHANNEL_NUM_MAX);
+		} else {
+			shm_err("ipc_shm_init failed, ret %d!\n", retval);
 
-		return retval;
+			return retval;
+		}
 	}
+	_ipc_shm_data->user_cnt++;
 
 	atomic_set(&_ipc_shm_data->channel[channel_id].state, 1); /* enable channel */
 
@@ -654,7 +659,9 @@ static int32_t hal_channel_manage_free(struct ipc_shm_data_t *_ipc_shm_data,
 		return -EINVAL;
 	}
 
-	hb_ipc_close_instance(IPCF_INSTANCES_ID0);
+	_ipc_shm_data->user_cnt--;
+	if (_ipc_shm_data->user_cnt == 0)
+		hb_ipc_close_instance(IPCF_INSTANCES_ID0);
 
 	atomic_set(&_ipc_shm_data->channel[channel_id].state, 0); /* disable channel */
 
