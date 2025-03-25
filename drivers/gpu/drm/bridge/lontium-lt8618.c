@@ -608,8 +608,7 @@ static enum hpd_status lt8618_get_hpd_status(struct lt8618 *lt8618)
 	regmap_write(lt8618->regmap, 0x80ee, 0x01); // enable IIC
 
 	regmap_read(lt8618->regmap, LT8618_REG_LINK_STATUS, &val);
-	if (test_bit(LINK_STATUS_OUTPUT_DC_POS, (unsigned long *)&val) ==
-	    LINK_STATUS_STABLE) {
+	if (val & (1U << LINK_STATUS_OUTPUT_DC_POS)) {
 		return hpd_status_plug_on;
 	}
 
@@ -653,7 +652,7 @@ static int lt8618_ddc_fifo_fetch(struct lt8618 *lt8618, u8 *buf, u8 block,
 	u8 *pfifo;
 	size_t pos;
 	unsigned int i, retry;
-	u8 ddc_status, fifo_status, fifo_data_count;
+	unsigned int ddc_status, fifo_status, fifo_data_count, fifo_content;
 	bool ddc_idle, fifo_empty;
 	u8 ddc_cfg[5];
 	u8 status = 0;
@@ -684,26 +683,23 @@ static int lt8618_ddc_fifo_fetch(struct lt8618 *lt8618, u8 *buf, u8 block,
 	ddc_idle = fifo_empty = 0;
 	for (retry = 0; retry < 5; retry++) {
 		schedule_timeout(msecs_to_jiffies(1));
-		regmap_read(lt8618->regmap, LT8618_REG_DDC_STATUS,
-			    (unsigned int *)&ddc_status);
-		ddc_idle = test_bit(LT8618_REG_DDC_BUS_DONE_POS,
-				    (unsigned long *)&ddc_status);
+		regmap_read(lt8618->regmap, LT8618_REG_DDC_STATUS, &ddc_status);
+		ddc_idle = !!(ddc_status & (1U << LT8618_REG_DDC_BUS_DONE_POS));
 		if (ddc_idle)
 			break;
 		DRM_DEBUG("FIFO fetch not complete, status=%x\n", ddc_status);
 	}
 
 	for (i = 0; i < len; i++) {
-		regmap_read(lt8618->regmap, LT8618_REG_FIFO_CONTENT,
-			    (unsigned int *)pfifo);
+		regmap_read(lt8618->regmap, LT8618_REG_FIFO_CONTENT, &fifo_content);
+		*pfifo = fifo_content & 0xFF;
+
 		if (DEBUG_MSEEAGE) {
 			fifo_data_count = lt8618_get_fifo_data_count(lt8618);
 			DRM_DEBUG("FIFO[%2d]=%02x, remaining=%2d\n", i, *pfifo,
 				  fifo_data_count);
-			regmap_read(lt8618->regmap, LT8618_REG_FIFO_STATUS,
-				    (unsigned int *)&fifo_status);
-			if (test_bit(LT8618_REG_FIFO_EMPTY_POS,
-			    (unsigned long *)&fifo_status) == FIFO_EMPTY) {
+			regmap_read(lt8618->regmap, LT8618_REG_FIFO_STATUS, &fifo_status);
+			if ((fifo_status & (1U << LT8618_REG_FIFO_EMPTY_POS)) == FIFO_EMPTY) {
 				DRM_DEBUG("FIFO is empty, read back %dB\n", i);
 				break;
 			}
