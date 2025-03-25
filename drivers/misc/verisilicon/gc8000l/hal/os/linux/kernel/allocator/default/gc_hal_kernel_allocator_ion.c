@@ -102,8 +102,49 @@ OnError:
 static gceSTATUS _IonGetSGT(gckALLOCATOR Allocator, PLINUX_MDL Mdl, gctSIZE_T Offset,
 			    gctSIZE_T Bytes, gctPOINTER *SGT)
 {
-	printk("%s not implemented\n", __FUNCTION__);
-	return gcvSTATUS_NOT_SUPPORTED;
+	struct page **pages	     = gcvNULL;
+	struct page *page	     = gcvNULL;
+	struct sg_table *sgt	     = NULL;
+	struct ion_priv *priv	     = Allocator->privateData;
+	struct mdl_ion_priv *mdlPriv = Mdl->priv;
+
+	gceSTATUS status    = gcvSTATUS_OK;
+	gctSIZE_T offset    = Offset & ~PAGE_MASK;  /* Offset to the first page */
+	gctSIZE_T skipPages = Offset >> PAGE_SHIFT; /* skipped pages */
+	gctSIZE_T numPages  = (PAGE_ALIGN(Offset + Bytes) >> PAGE_SHIFT) - skipPages;
+	phys_addr_t phys;
+	size_t len;
+	gctSIZE_T i;
+
+	gcmkASSERT(Offset + Bytes <= Mdl->numPages << PAGE_SHIFT);
+
+	sgt = kmalloc(sizeof(*sgt), GFP_KERNEL | gcdNOWARN);
+	if (!sgt)
+		gcmkONERROR(gcvSTATUS_OUT_OF_MEMORY);
+
+	pages = kmalloc_array(numPages, sizeof(struct page *), GFP_KERNEL | gcdNOWARN);
+	if (!pages)
+		gcmkONERROR(gcvSTATUS_OUT_OF_MEMORY);
+
+	if (ion_phys(priv->client, mdlPriv->ionHandle->id, &phys, &len) < 0)
+		gcmkONERROR(gcvSTATUS_NOT_SUPPORTED);
+
+	page = phys_to_page(phys);
+	for (i = 0; i < numPages; ++i)
+		pages[i] = nth_page(page, i + skipPages);
+
+	if (sg_alloc_table_from_pages(sgt, pages, numPages, offset, Bytes, GFP_KERNEL) < 0)
+		gcmkONERROR(gcvSTATUS_GENERIC_IO);
+
+	*SGT = (gctPOINTER)sgt;
+
+OnError:
+	kfree(pages);
+
+	if (gcmIS_ERROR(status) && sgt)
+		kfree(sgt);
+
+	return status;
 }
 
 static void _IonFree(gckALLOCATOR Allocator, PLINUX_MDL Mdl)
