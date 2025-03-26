@@ -361,7 +361,8 @@
 	status = "okay";
 
 	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_sdio &dsp_gpio0_15 &dsp_gpio0_16 &lsio_gpio0_6>;
+	pinctrl-0 = <&pinctrl_sdio &lsio_gpio0_6>;
+	power-gpios = <&ls_gpio0_porta 6 GPIO_ACTIVE_HIGH>;
 };
 
 &dc8000_nano {
