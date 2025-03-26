@@ -28,9 +28,11 @@
 //wifi antenna Onboard
 &dsp_gpio_porta {
 	pinctrl-names = "default";
-	pinctrl-0 = < &dsp_gpio0_17
-				  &dsp_gpio0_18
-				>;
+	pinctrl-0 = < &dsp_gpio0_15
+				&dsp_gpio0_16
+				&dsp_gpio0_17
+				&dsp_gpio0_18
+			>;
 };
 
 &ls_gpio0_porta {
