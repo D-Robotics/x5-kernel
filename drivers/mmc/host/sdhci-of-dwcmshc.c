@@ -946,7 +946,7 @@ static int dwcmshc_probe(struct platform_device *pdev)
 				dev_warn(dev, "can not parse voltage gpio\n");
 
 			x5_priv->power_gpio = devm_gpiod_get_optional(&pdev->dev, "power", GPIOD_OUT_LOW);
-			if (IS_ERR(x5_priv->voltage_gpio))
+			if (IS_ERR(x5_priv->power_gpio))
 				dev_warn(dev, "can not parse power gpio\n");
 			else
 				/* For warm boot, SD card need to be powered down */
