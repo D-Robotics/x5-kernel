@@ -56,6 +56,20 @@
 			LSIO_UART4_RX	LSIO_PINMUX_3 BIT_OFFSET24	MUX_ALT2	&pconf_output_high
 		>;
 	};
+
+	pinctrl_i2c0: i2c0grp {
+		horizon,pins = <
+			LSIO_I2C0_SCL  LSIO_PINMUX_2 BIT_OFFSET16  MUX_ALT0 &pconf_drv_pu_ds7_3v3
+			LSIO_I2C0_SDA  LSIO_PINMUX_2 BIT_OFFSET18  MUX_ALT0 &pconf_drv_pu_ds7_3v3
+		>;
+	};
+
+	pinctrl_i2c3: i2c3grp {
+		horizon,pins = <
+			LSIO_I2C3_SCL  LSIO_PINMUX_2 BIT_OFFSET28  MUX_ALT0 &pconf_drv_pu_ds7_1v8
+			LSIO_I2C3_SDA  LSIO_PINMUX_2 BIT_OFFSET30  MUX_ALT0 &pconf_drv_pu_ds7_1v8
+		>;
+	};
 };
 
 &dsp_gpio_porta {
