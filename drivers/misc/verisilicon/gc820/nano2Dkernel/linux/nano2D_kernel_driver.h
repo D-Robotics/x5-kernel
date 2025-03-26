@@ -142,7 +142,8 @@ typedef enum n2d_command {
 	/* 0 */ scale,
 	/* 1 */ overlay,
 	/* 2 */ stitch,
-	/* 3 */ csc
+	/* 3 */ csc,
+	/* 4 */ rotate
 } n2d_command_t;
 
 struct n2d_config {
@@ -165,6 +166,7 @@ struct n2d_config {
 	u32 overlay_x;
 	u32 overlay_y;
 	n2d_command_t command;
+	u32 rotation;
 };
 
 struct n2d_subdev {

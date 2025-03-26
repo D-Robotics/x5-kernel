@@ -51,6 +51,7 @@ n2d_error_t gcSetCSCConfig(
     n2d_error_t error;
     n2d_state_t* state = &Hardware->state;
     n2d_csc_config_t* cscCom = &StateConfig->config.csc;
+    n2d_int32_t i = 0;
 
     if (cscCom->cscMode == N2D_CSC_USER_DEFINED || cscCom->cscMode & N2D_CSC_SET_FULL_RANGE)
     {
@@ -60,7 +61,10 @@ n2d_error_t gcSetCSCConfig(
     {
         state->dstCSCMode = cscCom->cscMode;
     }
-
+    for (i = 0; i < gcdMULTI_SOURCE_NUM; i++)
+    {
+        state->multiSrc[i].srcCSCMode = state->dstCSCMode;
+    }
     /* set userdefine's and full range mode csc table */
     if ((cscCom->userCSCMode == N2D_CSC_YUV_TO_RGB
         || cscCom->userCSCMode == N2D_CSC_RGB_TO_YUV)
@@ -68,15 +72,8 @@ n2d_error_t gcSetCSCConfig(
             || (cscCom->cscMode & N2D_CSC_USER_DEFINED_CLAMP)
             || (cscCom->cscMode & N2D_CSC_SET_FULL_RANGE)))
     {
-        n2d_int32_t i = 0;
         n2d_int32_t* cscTable = cscCom->cscTable;
         n2d_int32_t* table = N2D_NULL;
-        n2d_int32_t BT601_FULL_RANGE_CSC[12]
-                    = { 306, 601, 117, -173, -340, 511, 511, -429, -84, 0, 524288, 524288 };
-        n2d_int32_t BT709_FULL_RANGE_CSC[12]
-                    = { 217, 732, 74, -117, -394, 511, 511, 0, 0, 0, 524288, 524288 };
-        n2d_int32_t BT2020_FULL_RANGE_CSC[12]
-                    = { 269, 694, 61, -143, -369, 512, 512, -471, -41, 0, 524288, 524288 };
 
         if (cscCom->userCSCMode == N2D_CSC_YUV_TO_RGB)
         {
@@ -93,26 +90,65 @@ n2d_error_t gcSetCSCConfig(
             switch (cscCom->cscMode & (~N2D_CSC_SET_FULL_RANGE))
             {
             case N2D_CSC_BT601:
-                ;
-                for (i = 0; i < N2D_CSC_PROGRAMMABLE_SIZE; ++i)
+                if (cscCom->userCSCMode == N2D_CSC_RGB_TO_YUV)
                 {
-                    table[i] = BT601_FULL_RANGE_CSC[i];
+                    n2d_int32_t BT601_FULL_RANGE_CSC[12] = { 306, 601, 117, -173, -340, 511, 511, -429, -84, 0, 524288, 524288 };
+
+                    for (i = 0; i < N2D_CSC_PROGRAMMABLE_SIZE; ++i)
+                    {
+                        table[i] = BT601_FULL_RANGE_CSC[i];
+                    }
+                }
+                else
+                {
+                    n2d_int32_t BT601_FULL_RANGE_CSC[12] = { 1192, 0, 1640, 1192, -404, -836, 1192, 2076, 0, -915968, 558592, -1139200 };
+
+                    for (i = 0; i < N2D_CSC_PROGRAMMABLE_SIZE; ++i)
+                    {
+                        table[i] = BT601_FULL_RANGE_CSC[i];
+                    }
                 }
                 break;
 
             case N2D_CSC_BT709:
-                ;
-                for (i = 0; i < N2D_CSC_PROGRAMMABLE_SIZE; ++i)
+                if (cscCom->userCSCMode == N2D_CSC_RGB_TO_YUV)
                 {
-                    table[i] = BT709_FULL_RANGE_CSC[i];
+                    n2d_int32_t BT709_FULL_RANGE_CSC[12] = { 217, 732, 74, -117, -394, 511, 511, -466, -47, 0, 524288, 524288 };
+
+                    for (i = 0; i < N2D_CSC_PROGRAMMABLE_SIZE; ++i)
+                    {
+                        table[i] = BT709_FULL_RANGE_CSC[i];
+                    }
+                }
+                else
+                {
+                    n2d_int32_t BT709_FULL_RANGE_CSC[12] = { 1192, 0, 1844, 1192, -220, -548, 1192, 2172, 0, -1018368, 318976, -1186304 };
+
+                    for (i = 0; i < N2D_CSC_PROGRAMMABLE_SIZE; ++i)
+                    {
+                        table[i] = BT709_FULL_RANGE_CSC[i];
+                    }
                 }
                 break;
 
             case N2D_CSC_BT2020:
-                ;
-                for (i = 0; i < N2D_CSC_PROGRAMMABLE_SIZE; ++i)
+                if (cscCom->userCSCMode == N2D_CSC_RGB_TO_YUV)
                 {
-                    table[i] = BT2020_FULL_RANGE_CSC[i];
+                    n2d_int32_t BT2020_FULL_RANGE_CSC[12] = { 269, 694, 61, -143, -369, 512, 512, -471, -41, 0, 524288, 524288 };
+
+                    for (i = 0; i < N2D_CSC_PROGRAMMABLE_SIZE; ++i)
+                    {
+                        table[i] = BT2020_FULL_RANGE_CSC[i];
+                    }
+                }
+                else
+                {
+                    n2d_int32_t BT2020_FULL_RANGE_CSC[12] = { 1196, 0, 1724, 1196, -192, -668, 1196, 2200, 0, -959232, 363776, -1202944 };
+
+                    for (i = 0; i < N2D_CSC_PROGRAMMABLE_SIZE; ++i)
+                    {
+                        table[i] = BT2020_FULL_RANGE_CSC[i];
+                    }
                 }
                 break;
 

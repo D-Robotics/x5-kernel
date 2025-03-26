@@ -554,7 +554,9 @@ static n2d_uint32_t gcCalCmdbufSize(
         /*palette*/
         + (usePallete ? 258 : 0)
         /* tail*/
-        + ((gcv2D_FILTER_BLT == Command)? 180 : 10);
+        + ((gcv2D_FILTER_BLT == Command)? 180 : 10)
+        /* CSC full range */
+        + 280;
 
 #ifdef N2D_SUPPORT_NORMALIZATION
     size += Hardware->state.dest.normalizationInfo.enable ? 12 : 0;

@@ -69,6 +69,7 @@
 #include <linux/version.h>
 #include <asm/io.h>
 #include <linux/kthread.h>
+#include <linux/atomic.h>
 
 #include "nano2D_types.h"
 #include "nano2D_dispatch.h"
@@ -1180,6 +1181,23 @@ static int n2d_allow_bind(struct vio_subdev *vdev, struct vio_subdev *remote_vde
 	return bind_type;
 }
 
+void n2d_set_csc_sequence(n2d_csc_mode_t standard)
+{
+    // Create CSC configuration object and zero-initialize
+    n2d_state_config_t csc_com = {0};
+    // Set CSC command type
+    csc_com.state = N2D_SET_CSC;
+    // Set range and standard (e.g., BT709)
+    csc_com.config.csc.cscMode = N2D_CSC_SET_FULL_RANGE | standard;
+    // First stage: YUV to RGB
+    csc_com.config.csc.userCSCMode = N2D_CSC_YUV_TO_RGB;
+    n2d_set(&csc_com);
+    // Second stage: RGB to YUV
+    csc_com.config.csc.userCSCMode = N2D_CSC_RGB_TO_YUV;
+    n2d_set(&csc_com);
+}
+
+
 static int do_csc(struct vio_node *vnode, struct n2d_config *config)
 {
 	n2d_buffer_t src = {0}, dst = {0};
@@ -1334,7 +1352,7 @@ static int do_stitch(struct vio_node *vnode, struct n2d_config *config)
 			rectDst.width = hOffset;
 			rectDst.height = vOffset;
 		}
-
+		n2d_set_csc_sequence(N2D_CSC_BT709);
 		N2D_ON_ERROR(n2d_blit(&dst, &rectDst, &src[i], N2D_NULL, N2D_BLEND_NONE));
     }
 
@@ -1409,7 +1427,7 @@ static int do_overlay(struct vio_node *vnode, struct n2d_config *config)
 	rect.y = config->overlay_y;
 	rect.width = src1.width;
 	rect.height = src1.height;
-
+	n2d_set_csc_sequence(N2D_CSC_BT709);
 	N2D_ON_ERROR(n2d_blit(&dst, N2D_NULL, &src, N2D_NULL, N2D_BLEND_NONE));
 	N2D_ON_ERROR(n2d_blit(&dst, &rect, &src1, N2D_NULL, N2D_BLEND_NONE));
 	N2D_ON_ERROR(n2d_commit());
@@ -1466,7 +1484,7 @@ static int do_scale(struct vio_node *vnode, struct n2d_config *config)
 		 __func__, __LINE__, dst.width, dst.height, dst.format, dst.handle, dst.stride);
 	N2D_ON_ERROR(n2d_map(&dst));
 	dst.tiling = N2D_LINEAR;
-
+	n2d_set_csc_sequence(N2D_CSC_BT709);
 	N2D_ON_ERROR(n2d_blit(&dst, N2D_NULL, &src, N2D_NULL, N2D_BLEND_NONE));
 	N2D_ON_ERROR(n2d_commit());
 
@@ -1475,6 +1493,103 @@ on_error:
 	n2d_free(&dst);
 	return error;
 }
+
+
+
+static n2d_orientation_t to_gc_rotation(unsigned int rotation)
+{
+	n2d_orientation_t orientation;
+
+	switch (rotation) {
+	case 0:
+		orientation = N2D_0;
+		break;
+	case N2D_270:
+		orientation = N2D_90;
+		break;
+	case N2D_180:
+		orientation = N2D_180;
+		break;
+	case N2D_90:
+		orientation = N2D_270;
+		break;
+	case N2D_FLIP_X:
+		orientation = N2D_FLIP_X;
+		break;
+	case N2D_FLIP_Y:
+		orientation = N2D_FLIP_Y;
+		break;
+
+	default:
+		orientation = N2D_0;
+		break;
+	}
+
+	return orientation;
+}
+
+
+static int do_rotate(struct vio_node *vnode, struct n2d_config *config)
+{
+	n2d_error_t error = N2D_SUCCESS;
+	n2d_buffer_t src = {0}, dst = {0};
+	n2d_uintptr_t handle = 0;
+
+	// Wrap and map the source NV12 buffer from user memory.
+	{
+		n2d_user_memory_desc_t memDesc = {0};
+		memDesc.flag = N2D_WRAP_FROM_USERMEMORY;
+		memDesc.physical = config->in_buffer_addr[0][0];  // assume contiguous
+		memDesc.size	 =  config->input_stride[0] * config->input_height[0] * 3 / 2; // NV12 size
+		vio_dbg("%s(%d): src physical = %llx, size = %llx.\n",
+					__func__, __LINE__, memDesc.physical, memDesc.size);
+		N2D_ON_ERROR(n2d_wrap(&memDesc, &handle));
+
+		src.width = config->input_width[0];
+		src.height = config->input_height[0];
+		src.stride = config->input_stride[0];
+		src.format = N2D_NV12;
+		src.handle = handle;
+		src.alignedh = config->input_height[0];
+		src.alignedw = config->input_stride[0];
+		src.orientation = to_gc_rotation(config->rotation);
+		N2D_ON_ERROR(n2d_map(&src));
+		src.tiling = N2D_LINEAR;
+	}
+
+	// Wrap and map the destination NV12 buffer from user memory.
+	{
+		n2d_user_memory_desc_t memDesc = {0};
+		memDesc.flag = N2D_WRAP_FROM_USERMEMORY;
+		memDesc.physical = config->out_buffer_addr[0];
+		memDesc.size = config->output_stride * config->output_height * 3 / 2;
+		vio_dbg("%s(%d): dst physical = %llx, size = %llx.\n",
+					__func__, __LINE__, memDesc.physical, memDesc.size);
+		N2D_ON_ERROR(n2d_wrap(&memDesc, &handle));
+
+		dst.width = config->output_width;
+		dst.height = config->output_height;
+		dst.stride = config->output_stride;
+		dst.format = N2D_NV12;
+		dst.handle = handle;
+		dst.alignedh = config->output_height;
+		dst.alignedw = config->output_stride;
+		dst.orientation = N2D_0;
+		N2D_ON_ERROR(n2d_map(&dst));
+		dst.tiling = N2D_LINEAR;
+	}
+
+	n2d_set_csc_sequence(N2D_CSC_BT709);
+	N2D_ON_ERROR(n2d_blit(&dst, NULL, &src, NULL, N2D_BLEND_NONE));
+	N2D_ON_ERROR(n2d_commit());
+
+on_error:
+	n2d_free(&src);
+	n2d_free(&dst);
+
+	return error;
+}
+
 
 static int n2d_process(struct vio_node *vnode, struct n2d_config *config)
 {
@@ -1500,6 +1615,9 @@ static int n2d_process(struct vio_node *vnode, struct n2d_config *config)
 	case csc:
 		N2D_ON_ERROR(do_csc(vnode, config));
 		break;
+	case rotate:
+        N2D_ON_ERROR(do_rotate(vnode, config));
+        break;
 	default:
 		vio_err("Not supported command: %d\n", config->command);
 		break;
@@ -1522,15 +1640,15 @@ static void n2d_judge_trigger_worker(struct vio_subdev *vdev, struct vio_frame *
 	struct n2d_subdev *subdev = container_of(vdev, struct n2d_subdev, vdev);
 	struct n2d_subnode *n2d_sub;
 
-	vio_info("%s: vdev->id = %d.\n", __func__, vdev->id);
+	vio_dbg("%s: vdev->id = %d.\n", __func__, vdev->id);
 	n2d_sub = container_of(subdev, struct n2d_subnode, subdev[vdev->id]);
 
-	vio_info("%s: n2d_sub->frame_state = %ld\n", __func__, n2d_sub->frame_state);
+	vio_dbg("%s: n2d_sub->frame_state = %ld\n", __func__, n2d_sub->frame_state);
 	if (n2d_sub->frame_state == 0UL) {
 		n2d_sub->cur_timestamp = frame->frameinfo.frameid.timestamps;
 		set_bit((s32)vdev->id, &n2d_sub->frame_state);
 		n2d_sub->synced_src_frames[vdev->id] = frame;
-		vio_info("%s: curtimestamp from %d.\n", __func__, frame->frameinfo.frameid.frame_id);
+		vio_dbg("%s: curtimestamp from %d.\n", __func__, frame->frameinfo.frameid.frame_id);
 	} else {
 		timestamp_gap = n2d_sub->cur_timestamp - frame->frameinfo.frameid.timestamps;
 		if (timestamp_gap > TS_MAX_GAP) {
@@ -1556,14 +1674,14 @@ static void n2d_judge_trigger_worker(struct vio_subdev *vdev, struct vio_frame *
 		}
 	}
 
-	vio_info("%s: frame_state = %ld, ninputs = %d.\n", __func__, n2d_sub->frame_state, subdev->config.ninputs);
+	vio_dbg("%s: frame_state = %ld, ninputs = %d.\n", __func__, n2d_sub->frame_state, subdev->config.ninputs);
 	if (((n2d_sub->frame_state == 0xF) && (subdev->config.ninputs == 4)) || (
 		(n2d_sub->frame_state == 0x3) && (subdev->config.ninputs == 2)) || (
 		(n2d_sub->frame_state == 0x1) && (subdev->config.ninputs == 1))) {
 		// ret = n2d_push_work(n2d_sub);
 		n2d_sub->frame_state = 0;
 		if (ret == 0) {
-			vio_info("%s: trigger frame work.\n", __func__);
+			vio_dbg("%s: trigger frame work.\n", __func__);
 			vio_group_start_trigger(vnode, frame);
 		}
 	}
@@ -1589,7 +1707,7 @@ static void n2d_frame_work(struct vio_node *vnode)
 	config	     = &n2d_sub->config;
 	vio_dbg("[S%d][C%d] %s start, rcount %d\n", vnode->flow_id, vnode->ctx_id, __func__, atomic_read(&vnode->rcount));/*PRQA S 0685,1294*/
 
-	vio_info("%s: config->command = %d.\n", __func__, config->command);
+	vio_dbg("%s: config->command = %d.\n", __func__, config->command);
 
 	for (i = 0; i < n2d_sub->config.ninputs; i++) {
 		vdev = vnode->ich_subdev[i];
@@ -1611,7 +1729,7 @@ static void n2d_frame_work(struct vio_node *vnode)
 			vio_fps_calculate(&vdev->fdebug, &vnode->frameid);
 			memcpy(&vnode->frameid, &frame->frameinfo.frameid, sizeof(struct frame_id_desc));
 
-			vio_info("[S%d][C%d] in  0x%llx, 0x%llx.\n", vnode->flow_id,
+			vio_dbg("[S%d][C%d] in  0x%llx, 0x%llx.\n", vnode->flow_id,
 			vnode->ctx_id, config->in_buffer_addr[i][0], config->in_buffer_addr[i][1]);
 		} else {
 			framemgr_print_queues(framemgr);
@@ -1630,7 +1748,7 @@ static void n2d_frame_work(struct vio_node *vnode)
 		trans_frame(out_framemgr, out_frame, FS_PROCESS);
 		vio_x_barrier_irqr(out_framemgr, flags);
 
-		vio_info("[S%d][C%d] out 0x%llx, 0x%llx\n", vnode->flow_id, vnode->ctx_id,
+		vio_dbg("[S%d][C%d] out 0x%llx, 0x%llx\n", vnode->flow_id, vnode->ctx_id,
 			config->out_buffer_addr[0], config->out_buffer_addr[1]);
 
 		vio_set_stat_info(vnode->flow_id, N2D_MODULE, STAT_FS, 0);
@@ -1656,7 +1774,7 @@ static void n2d_frame_work(struct vio_node *vnode)
 
 	vdev = vnode->ich_subdev[0];
 	if (!osal_test_bit((s32)VIO_SUBDEV_BIND_DONE, &vdev->state) && !osal_test_bit((s32)VIO_SUBDEV_BIND_DONE, &och_vdev->state)) {
-		vio_info("[S%d][C%d] %s feedback mode.\n", vnode->flow_id, vnode->ctx_id, __func__);
+		vio_dbg("[S%d][C%d] %s feedback mode.\n", vnode->flow_id, vnode->ctx_id, __func__);
 		for (j = 0; j < i; j++) { /* transfer frame to used */
 			vdev = vnode->ich_subdev[j];
 			framemgr = &vdev->framemgr;
@@ -1967,7 +2085,7 @@ static int __devinit gpu_probe(struct platform_device *pdev)
 	n2d_uint32_t ret;
 	global_device = NULL;
 	struct device *dev_p = &(pdev->dev);
-	struct vs_n2d_aux *aux;
+	struct vs_n2d_aux *aux = NULL;
 	pm_message_t state = {0};
 
 	platform->device = pdev;
@@ -2095,7 +2213,7 @@ static int __devexit gpu_remove(struct platform_device *pdev)
 	struct horizon_n2d_dev *n2d = global_n2d;
 
 	struct device *dev_p = &(pdev->dev);
-	struct vs_n2d_aux *aux;
+	struct vs_n2d_aux *aux = NULL;
 	if (platform->ops->set_power) {
 		platform->ops->set_power(platform, 1, N2D_TRUE);
 	}
