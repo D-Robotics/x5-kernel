@@ -866,6 +866,26 @@
 			status = "okay";
 		};
 
+		vpu_v4l2: vpu_v4l2@3B000000 {
+			compatible = "d-robotics,x5-wave521cl";
+			reg = <0x3b000000 0x10000>;
+			interrupt-parent = <&gic>;
+			interrupts =
+				<GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>;
+			clocks = <&hpsclks X5_VIDEO_CODEC_PCLK>,
+					<&hpsclks X5_VIDEO_CODEC_ACLK>,
+					<&hpsclks X5_VIDEO_CODEC_CCLK>,
+					<&hpsclks X5_VIDEO_CODEC_BCLK>;
+			clock-names = "vpu_pclk", "vpu_aclk", "vpu_cclk", "vpu_bclk";
+
+			// NOTICE: iommu depends on power-domain, if no-power, it will hung.
+			power-domains = <&power X5_VIDEO>;
+			iommus = <&vpu_iommu>;
+			resets = <&socrst VIDEO_CODEC_RESET>;
+
+			status = "disabled";
+		};
+
 		jpu_iommu: jpu_iommu@3b020018 {
 			compatible = "d-robotics,lite_mmu";
 			reg = <0x3b020018 0x14>;

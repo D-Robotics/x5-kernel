@@ -378,8 +378,15 @@ static const struct wave5_match_data ti_wave521c_data = {
 	.sram_size = (64 * 1024),
 };
 
+static const struct wave5_match_data drobot_wave521cl_data = {
+	.flags = WAVE5_IS_ENC | WAVE5_IS_DEC,
+	.fw_name = "cnm/wave521cl_x5_codec_fw.bin",
+	.sram_size = (64 * 1024),
+};
+
 static const struct of_device_id wave5_dt_ids[] = {
 	{ .compatible = "ti,j721s2-wave521c", .data = &ti_wave521c_data },
+	{ .compatible = "d-robotics,x5-wave521cl", .data = &drobot_wave521cl_data },
 	{ /* sentinel */ }
 };
 MODULE_DEVICE_TABLE(of, wave5_dt_ids);
