@@ -1287,10 +1287,19 @@ static void wave5_vpu_dec_buf_queue(struct vb2_buffer *vb)
 		__func__, vb->type, vb->index, vb2_plane_size(&vbuf->vb2_buf, 0),
 		vb2_plane_size(&vbuf->vb2_buf, 1), vb2_plane_size(&vbuf->vb2_buf, 2));
 
+	/*
+	 * Queue buffer needs do runtime resume for vpu, as it will access vpu's register...
+	 * Otherwise, ARM64 SError exception might happen...
+	 */
+	pm_runtime_resume_and_get(inst->dev->dev);
+
 	if (vb->type == V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE)
 		wave5_vpu_dec_buf_queue_src(vb);
 	else if (vb->type == V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE)
 		wave5_vpu_dec_buf_queue_dst(vb);
+
+	pm_runtime_mark_last_busy(inst->dev->dev);
+	pm_runtime_put_autosuspend(inst->dev->dev);
 }
 
 static int wave5_vpu_dec_allocate_ring_buffer(struct vpu_instance *inst)
