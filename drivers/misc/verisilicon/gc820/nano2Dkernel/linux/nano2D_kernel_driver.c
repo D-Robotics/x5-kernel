@@ -1190,18 +1190,29 @@ static int n2d_allow_bind(struct vio_subdev *vdev, struct vio_subdev *remote_vde
 
 void n2d_set_csc_sequence(n2d_csc_mode_t standard)
 {
-    // Create CSC configuration object and zero-initialize
-    n2d_state_config_t csc_com = {0};
-    // Set CSC command type
-    csc_com.state = N2D_SET_CSC;
-    // Set range and standard (e.g., BT709)
-    csc_com.config.csc.cscMode = N2D_CSC_SET_FULL_RANGE | standard;
-    // First stage: YUV to RGB
-    csc_com.config.csc.userCSCMode = N2D_CSC_YUV_TO_RGB;
-    n2d_set(&csc_com);
-    // Second stage: RGB to YUV
-    csc_com.config.csc.userCSCMode = N2D_CSC_RGB_TO_YUV;
-    n2d_set(&csc_com);
+	n2d_state_config_t csc_com;
+	memset(&csc_com, 0, sizeof(n2d_state_config_t));
+	csc_com.state = N2D_SET_CSC;
+
+	if (standard == N2D_CSC_USER_DEFINED)
+	{
+		n2d_int32_t identity_csc[12] = {
+			1024, 0, 0,
+			0, 1024, 0,
+			0, 0, 1024,
+			0, 0, 0
+		};
+		csc_com.config.csc.cscMode = N2D_CSC_USER_DEFINED;
+		memcpy(csc_com.config.csc.cscTable, identity_csc, sizeof(identity_csc));
+	}
+	else
+	{
+		csc_com.config.csc.cscMode = N2D_CSC_SET_FULL_RANGE | standard;
+	}
+	csc_com.config.csc.userCSCMode = N2D_CSC_YUV_TO_RGB;
+	n2d_set(&csc_com);
+	csc_com.config.csc.userCSCMode = N2D_CSC_RGB_TO_YUV;
+	n2d_set(&csc_com);
 }
 
 
@@ -1586,7 +1597,7 @@ static int do_rotate(struct vio_node *vnode, struct n2d_config *config)
 		dst.tiling = N2D_LINEAR;
 	}
 
-	n2d_set_csc_sequence(N2D_CSC_BT709);
+	n2d_set_csc_sequence(N2D_CSC_USER_DEFINED);
 	N2D_ON_ERROR(n2d_blit(&dst, NULL, &src, NULL, N2D_BLEND_NONE));
 	N2D_ON_ERROR(n2d_commit());
 
