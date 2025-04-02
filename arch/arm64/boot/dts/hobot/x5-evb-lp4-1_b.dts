@@ -12,3 +12,33 @@
 / {
 	model = "D-Robotics X5 EVB LP4 1_B board";
 };
+
+/* ANT_CTRL1 */
+&hsio_iomuxc {
+	hsio_gpio0_23: hsio_gpio0_23 {
+		horizon,pins = <
+			HSIO_SDIO_WP	HSIO_PINMUX_2	BIT_OFFSET8		MUX_ALT2	&pconf_output_high
+		>;
+	};
+
+	pinctrl_sdio: sdiogrp {
+		horizon,pins = <
+			HSIO_SDIO_CLK	HSIO_PINMUX_0	BIT_OFFSET30	MUX_ALT0	&pconf_sd_sdio_pu_ds5_ipctrl
+			HSIO_SDIO_CMD	HSIO_PINMUX_0	BIT_OFFSET28	MUX_ALT0	&pconf_sd_sdio_pu_ds3_ipctrl
+			HSIO_SDIO_DATA0	HSIO_PINMUX_1	BIT_OFFSET0		MUX_ALT0	&pconf_sd_sdio_pu_ds3_ipctrl
+			HSIO_SDIO_DATA1	HSIO_PINMUX_2	BIT_OFFSET30	MUX_ALT0	&pconf_sd_sdio_pu_ds3_ipctrl
+			HSIO_SDIO_DATA2	HSIO_PINMUX_2	BIT_OFFSET28	MUX_ALT0	&pconf_sd_sdio_pu_ds3_ipctrl
+			HSIO_SDIO_DATA3	HSIO_PINMUX_2	BIT_OFFSET26	MUX_ALT0	&pconf_sd_sdio_pu_ds3_ipctrl
+		>;
+	};
+};
+
+/* SDIO */
+&sdio_1 {
+	status = "okay";
+
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_sdio &hsio_gpio0_23>;
+	power-gpios = <&hs_gpio0_porta 23 GPIO_ACTIVE_HIGH>;
+	toggle_interval_us = <100000>;
+};
