@@ -323,6 +323,18 @@ static int dw_i2s_hw_params(struct snd_pcm_substream *substream,
 	struct i2s_clk_config_data *config = &dev->config;
 	int ret;
 	u32 mclk;
+	struct dma_chan *chan;
+
+	if (!dev->use_pio) {
+		chan = snd_dmaengine_pcm_get_chan(substream);
+		if (IS_ERR(chan)) {
+			dev_err(dev->dev, "No dma channel found!");
+			return -EINVAL;
+		}
+		dev->dma_private.is_block_tfr = true;
+		dev->dma_private.is_period_callback = true;
+		chan->private = (void *)&dev->dma_private;
+	}
 
 	switch (params_rate(params)) {
 	case 8000:

@@ -116,6 +116,7 @@ struct dw_i2s_dev {
 	union dw_i2s_snd_dma_data capture_dma_data;
 	struct i2s_clk_config_data config;
 	int (*i2s_clk_cfg)(struct i2s_clk_config_data *config);
+	struct dma_private_flag dma_private;
 
 	/* data related to PIO transfers */
 	bool use_pio;
