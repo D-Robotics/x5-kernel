@@ -48,6 +48,13 @@
 			DSP_PDM_IN3  DSP_PINMUX_1  BIT_OFFSET0  MUX_ALT1  &pconf_output_low
 		>;
 	};
+
+	pinctrl_dsp_uart0: uart0grp {
+		horizon,pins = <
+			DSP_UART0_RXD  DSP_PINMUX_1  BIT_OFFSET10  MUX_ALT0 &pconf_drv_pu_ds7_1v8
+			DSP_UART0_TXD  DSP_PINMUX_1  BIT_OFFSET12  MUX_ALT0 &pconf_drv_pu_ds7_1v8
+		>;
+	};
 };
 
 &lsio_iomuxc {
