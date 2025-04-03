@@ -1144,8 +1144,14 @@ out:
 
 static void axi_chan_block_tfr_complete(struct axi_dma_chan *chan)
 {
+	struct dma_private_flag *private_flag;
+	int count = atomic_read(&chan->descs_allocated);
 	struct virt_dma_desc *vd;
 	unsigned long flags;
+	struct axi_dma_hw_desc *hw_desc;
+	struct axi_dma_desc *desc;
+	u64 llp;
+	int i, completei;
 
 	spin_lock_irqsave(&chan->vc.lock, flags);
 
@@ -1158,7 +1164,33 @@ static void axi_chan_block_tfr_complete(struct axi_dma_chan *chan)
 	}
 
 	if (chan->cyclic) {
-		vchan_cyclic_callback(vd);
+		private_flag = chan->private; //TODO: Need to optimize cyclic transfer handling
+		if (private_flag && private_flag->is_period_callback) {
+			desc = vd_to_axi_desc(vd);
+			if (desc) {
+				llp = lo_hi_readq(chan->chan_regs + CH_LLP);
+				for (i = 0; i < count; i++) {
+					hw_desc = &desc->hw_desc[i];
+					if (hw_desc->llp == llp) {
+						/* find previous llp, current llp is still in progress */
+						completei = i - 1;
+						if (completei < 0) {
+						       completei += count;
+						}
+
+						hw_desc = &desc->hw_desc[completei];
+						axi_chan_irq_clear(chan, hw_desc->lli->status_lo);
+						hw_desc->lli->ctl_hi |= CH_CTL_H_LLI_VALID;
+						desc->completed_blocks = completei;
+						if (((hw_desc->len * (completei + 1)) % desc->period_len) == 0)
+						       vchan_cyclic_callback(vd);
+						break;
+					}
+				}
+			}
+		} else {
+			vchan_cyclic_callback(vd);
+		}
 	}
 
 out:

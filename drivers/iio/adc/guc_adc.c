@@ -738,6 +738,7 @@ static int guc_adc_dma_start(struct iio_dev *indio_dev)
 
 	period_len		    = info->rx_block_sz;
 	info->dma_flag.is_block_tfr = true;
+	info->dma_flag.is_period_callback = false;
 	/* Prepare a DMA cyclic transaction */
 	desc = dmaengine_prep_dma_cyclic(info->dma_chan, info->rx_dma_buf, info->rx_buf_sz,
 					 period_len, DMA_DEV_TO_MEM, DMA_PREP_INTERRUPT);

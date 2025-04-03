@@ -453,10 +453,14 @@ struct dma_slave_config {
 
 /**
  * struct dma_private_flag - dma private flag to limit dma action
-* @is_block_tfr: whether the DMA shall care about block_tfr or not
+ * @is_block_tfr: whether the DMA shall care about block_tfr or not
+ * @is_period_callback: Indicates whether the DMA callback is triggered by
+ *   a period elapsed event or block event.
+ * TODO: Need to optimize decison criteria for block transfer done handling.
 */
 struct dma_private_flag {
 	bool is_block_tfr;
+	bool is_period_callback;
 };
 
 /**
