@@ -4623,6 +4623,7 @@
 		uart2 = <&uart2>,"status";
 		uart3 = <&uart3>,"status";
 		uart6 = <&uart6>,"status";
+		uart7 = <&uart7>,"status";
 		spi1 = <&spi1>,"status";
 		spi2 = <&spi2>,"status";
 		i2c0 = <&i2c0>,"status";

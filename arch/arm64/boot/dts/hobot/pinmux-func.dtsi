@@ -455,6 +455,11 @@
 		horizon,pins = <
 			LSIO_UART7_RX	LSIO_PINMUX_3	BIT_OFFSET4		MUX_ALT0 &pconf_drv_pu_ds2_3v3
 			LSIO_UART7_TX	LSIO_PINMUX_3	BIT_OFFSET6		MUX_ALT0 &pconf_drv_pu_ds2_3v3
+		>;
+	};
+
+	pinctrl_uart7_hfc: uart7hfcgrp {
+		horizon,pins = <
 			LSIO_UART7_CTS	LSIO_PINMUX_3	BIT_OFFSET8		MUX_ALT0 &pconf_drv_pu_ds2_3v3
 			LSIO_UART7_RTS	LSIO_PINMUX_3	BIT_OFFSET10	MUX_ALT0 &pconf_drv_pu_ds2_3v3
 		>;
