@@ -43,6 +43,7 @@
 	(TCAN4X5X_MCAN_INT | TCAN4X5X_BUS_FAULT | \
 	 TCAN4X5X_CANBUS_ERR_INT_EN | TCAN4X5X_CANINT_INT_EN)
 
+#define TCAN4X5X_MCAN_INT_EN 0x1054
 /* MCAN Interrupt bits */
 #define TCAN4X5X_MCAN_IR_ARA BIT(29)
 #define TCAN4X5X_MCAN_IR_PED BIT(28)
@@ -221,6 +222,11 @@ static int tcan4x5x_init(struct m_can_classdev *cdev)
 
 	ret = tcan4x5x_write_tcan_reg(cdev, TCAN4X5X_INT_EN,
 				      TCAN4X5X_ENABLE_TCAN_INT);
+	if (ret)
+		return ret;
+	//disable TSWE 16bit Timestamp Wraparound Interrupt Enable
+	ret = tcan4x5x_write_tcan_reg(cdev, TCAN4X5X_MCAN_INT_EN,
+		0x27feffff);
 	if (ret)
 		return ret;
 
