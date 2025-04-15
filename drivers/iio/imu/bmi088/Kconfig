@@ -1,0 +1,21 @@
+#
+# Makefile for Bosch sensors driver.
+#
+config BOSCH_DRIVER_LOG_FUNC
+	tristate "Bosch BMI08X Sensortec driver smart log function support"
+	depends on (I2C || SPI_MASTER) && SYSFS
+	help
+	  If you say yes here, you get support for smart log function in Bosch Sensortec driver.
+
+config BMI08X_SUPPORT_I2C_BUS
+	tristate "Bosch BMI08X I2C Driver"
+	depends on I2C && SYSFS
+	help
+	  Build I2C driver for BMI08X combo sensor (accel + gyro in one driver).
+
+config BMI08X_SUPPORT_SPI_BUS
+	tristate "Bosch BMI08X SPI Drivers"
+	depends on SPI_MASTER && SYSFS
+	help
+	  Select this to build SPI drivers for BMI08X series.
+	  This will build both the accelerometer and gyroscope drivers.
