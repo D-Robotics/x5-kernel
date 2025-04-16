@@ -97,14 +97,16 @@
 	status = "okay";
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_spi5 &lsio_gpio0_7 &lsio_gpio0_13>;
+	dma-names = "tx", "rx";
+	dmas = <&axi_dmac 31>, <&axi_dmac 30>;
 
 	tcan4x5x: tcan4x5x@0 {
 		compatible = "ti,tcan4x5x";
 		reg = <0>;
 		#address-cells = <1>;
 		#size-cells = <1>;
-		spi-max-frequency = <10000000>;
-		bosch,mram-cfg = <0x0 0 0 16 0 0 1 1>;
+		spi-max-frequency = <18000000>;
+		bosch,mram-cfg = <0x0 0 0 10 0 0 10 10>;
 		interrupt-parent = <&ls_gpio0_porta>;
 		interrupts = <13 IRQ_TYPE_EDGE_FALLING>;
 		reset-gpios = <&ls_gpio0_porta 7 GPIO_ACTIVE_HIGH>;
