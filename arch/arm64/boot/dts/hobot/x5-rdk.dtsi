@@ -91,6 +91,15 @@
 
 };
 
+&hsio_iomuxc {
+	
+	hsio_gpio0_26: hsio_gpio0_26 {
+		horizon,pins = <
+			HSIO_SDIO_CDN	HSIO_PINMUX_0	BIT_OFFSET26	MUX_ALT2	&pconf_drv_pu_ds12_1v8
+		>;
+	};
+};
+
 &cpu_0 {
 	cpu-supply = <&vdd08_cpu_reg>;
 };

@@ -622,7 +622,7 @@
 
 	hsio_gpio0_26: hsio_gpio0_26 {
 		horizon,pins = <
-			HSIO_SDIO_CDN	HSIO_PINMUX_0	BIT_OFFSET26	MUX_ALT2	&pconf_output_low
+			HSIO_SDIO_CDN	HSIO_PINMUX_0	BIT_OFFSET26	MUX_ALT2	&pconf_input_en_1v8
 		>;
 	};
 
