@@ -85,7 +85,7 @@
 	pconf_drv_pu_ds2_1v8: pconf-dev-pu-ds2-1v8 {
 		bias-pull-up;
 		power-source = <HORIZON_IO_PAD_VOLTAGE_1V8>;
-		drive-strength = <2>;
+		drive-strength = <5>;
 	};
 
 	pconf_drv_pu_ds12_1v8: pconf-dev-pu-ds12-1v8 {
