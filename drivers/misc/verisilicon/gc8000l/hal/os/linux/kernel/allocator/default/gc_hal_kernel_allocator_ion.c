@@ -165,9 +165,15 @@ static gceSTATUS _IonMmap(gckALLOCATOR Allocator, PLINUX_MDL Mdl, gctBOOL Cachea
 			  gctSIZE_T skipPages, gctSIZE_T numPages, struct vm_area_struct *vma)
 {
 	struct mdl_ion_priv *mdlPriv = Mdl->priv;
+	int ret;
 
-	ion_mmap(mdlPriv->ionHandle->buffer, vma);
+	ret = ion_mmap(mdlPriv->ionHandle->buffer, vma);
 
+	if (ret)
+	{
+		pr_err("ion_mmap failed: ret=%d, handle=%p\n", ret, mdlPriv->ionHandle);
+		return gcvSTATUS_GENERIC_IO;
+	}
 	return gcvSTATUS_OK;
 }
 
@@ -266,9 +272,26 @@ static gceSTATUS _IonMapKernel(gckALLOCATOR Allocator, PLINUX_MDL Mdl, gctSIZE_T
 {
 	struct ion_priv *priv	     = Allocator->privateData;
 	struct mdl_ion_priv *mdlPriv = Mdl->priv;
+	void *vaddr;
 
-	*Logical = (uint8_t *)ion_map_kernel(priv->client, mdlPriv->ionHandle) + Offset;
+	vaddr = ion_map_kernel(priv->client, mdlPriv->ionHandle);
+	if (IS_ERR(vaddr)) {
+		long err = PTR_ERR(vaddr);
 
+		pr_err("ion_map_kernel failed: handle=%p, err=%ld\n",
+		       mdlPriv->ionHandle, err);
+
+		switch (err) {
+		case -EINVAL:
+			return gcvSTATUS_INVALID_ARGUMENT;
+		case -ENODEV:
+			return gcvSTATUS_NOT_FOUND;
+		default:
+			return gcvSTATUS_GENERIC_IO;
+		}
+	}
+
+	*Logical = (uint8_t *)vaddr + Offset;
 	return gcvSTATUS_OK;
 }
 
@@ -289,7 +312,14 @@ static gceSTATUS _IonCache(gckALLOCATOR Allocator, PLINUX_MDL Mdl, gctSIZE_T Off
 	struct mdl_ion_priv *mdlPriv = Mdl->priv;
 	phys_addr_t paddr;
 	size_t len;
-	ion_phys(priv->client, mdlPriv->ionHandle->id, &paddr, &len);
+	int ret;
+
+	ret = ion_phys(priv->client, mdlPriv->ionHandle->id, &paddr, &len);
+	if (ret) {
+		pr_err("ion_phys failed in _IonCache: handle=%d, ret=%d\n",
+		       mdlPriv->ionHandle->id, ret);
+		return gcvSTATUS_NOT_FOUND;
+	}
 
 	switch (Operation) {
 	case gcvCACHE_CLEAN:
@@ -312,9 +342,14 @@ static gceSTATUS _IonPhysical(gckALLOCATOR Allocator, PLINUX_MDL Mdl, unsigned l
 	struct ion_priv *priv	     = Allocator->privateData;
 	struct mdl_ion_priv *mdlPriv = Mdl->priv;
 	size_t len;
+	int ret = 0;
 
-	ion_phys(priv->client, mdlPriv->ionHandle->id, Physical, &len);
+	ret = ion_phys(priv->client, mdlPriv->ionHandle->id, Physical, &len);
 
+	if (ret) {
+		pr_err("ion_phys failed: id=%d, ret=%d\n", mdlPriv->ionHandle->id, ret);
+		return gcvSTATUS_NOT_FOUND;
+	}
 	*Physical += Offset;
 
 	return gcvSTATUS_OK;
