@@ -767,7 +767,7 @@
 		socinfo: socinfo{
 			compatible = "hobot,boardinfo";
 			soc_gen = "X5";
-			soc_name = "X5M";
+			soc_name = "UKNOWN";
 			hw_name = "0000000000000000"; /* 16Btyes */
 			board_version = "0000000000000000"; /* 16Btyes */
 			hw_info = "00000000000000000000000000000000";  /* 32Btyes */
