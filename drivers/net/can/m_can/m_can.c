@@ -1475,9 +1475,10 @@ static int m_can_dev_setup(struct m_can_classdev *cdev)
 	m_can_version = m_can_check_core_release(cdev);
 	/* return if unsupported version */
 	if (!m_can_version) {
-		dev_err(cdev->dev, "Unsupported version number: %2d",
+		dev_info(cdev->dev, "Unsupported version number: %2d",
 			m_can_version);
-		return -EINVAL;
+		m_can_version = 32;
+		//return -EINVAL;
 	}
 
 	if (!cdev->is_peripheral)
