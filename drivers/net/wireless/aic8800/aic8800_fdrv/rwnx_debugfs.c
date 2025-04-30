@@ -2304,8 +2304,8 @@ error_after_dir:
 	debugfs_remove_recursive(rwnx_debugfs->dir_sta[sta_idx]);
 	rwnx_debugfs->dir_sta[sta->sta_idx] = NULL;
 error:
-	dev_err(rwnx_hw->dev,
-			"Error while (un)registering debug entry for sta %d\n", sta_idx);
+	//dev_err(rwnx_hw->dev,
+			//"Error while (un)registering debug entry for sta %d\n", sta_idx);
 }
 
 void _rwnx_dbgfs_rc_stat_write(struct rwnx_debugfs *rwnx_debugfs, uint8_t sta_idx)
