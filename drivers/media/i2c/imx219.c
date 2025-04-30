@@ -807,17 +807,14 @@ static int imx219_set_ctrl(struct v4l2_ctrl *ctrl)
 
 	switch (ctrl->id) {
 	case V4L2_CID_ANALOGUE_GAIN:
-	printk("######################## V4L2_CID_ANALOGUE_GAIN %s %s %d %d\n",__FILE__, __FUNCTION__, __LINE__,ctrl->val);
 		ret = imx219_write_reg(imx219, IMX219_REG_ANALOG_GAIN,
 				       IMX219_REG_VALUE_08BIT, imx219_again_lut[ctrl->val]);
 		break;
 	case V4L2_CID_EXPOSURE:
-		printk("######################## V4L2_CID_EXPOSURE %s %s %d %d\n",__FILE__, __FUNCTION__, __LINE__,ctrl->val);
 		ret = imx219_write_reg(imx219, IMX219_REG_EXPOSURE,
 				       IMX219_REG_VALUE_16BIT, ctrl->val);
 		break;
 	case V4L2_CID_DIGITAL_GAIN:
-		printk("######################## V4L2_CID_DIGITAL_GAIN %s %s %d %d\n",__FILE__, __FUNCTION__, __LINE__,ctrl->val);
 		//ret = imx219_write_reg(imx219, IMX219_REG_DIGITAL_GAIN,
 				       //IMX219_REG_VALUE_16BIT, ctrl->val);
 		ret = 0;
@@ -1071,9 +1068,6 @@ static int imx219_set_stream(struct v4l2_subdev *sd, int enable)
 	struct imx219 *imx219 = to_imx219(sd);
 	int ret = 0;
 
-	
-	printk("######################## %s %s %d enable %d\n",__FILE__, __FUNCTION__, __LINE__,enable);
-
 	mutex_lock(&imx219->mutex);
 	if (imx219->streaming == enable) {
 		mutex_unlock(&imx219->mutex);
@@ -1111,8 +1105,6 @@ static int imx219_power_on(struct device *dev)
 	struct imx219 *imx219 = to_imx219(sd);
 	int ret;
 
-	printk("######################## %s %s %d\n",__FILE__, __FUNCTION__, __LINE__);
-
 	ret = regulator_bulk_enable(IMX219_NUM_SUPPLIES,
 				    imx219->supplies);
 	if (ret) {
@@ -1144,8 +1136,6 @@ static int imx219_power_off(struct device *dev)
 {
 	struct v4l2_subdev *sd = dev_get_drvdata(dev);
 	struct imx219 *imx219 = to_imx219(sd);
-
-	printk("######################## %s %s %d\n",__FILE__, __FUNCTION__, __LINE__);
 
 	gpiod_set_value_cansleep(imx219->reset_gpio, 0);
 	regulator_bulk_disable(IMX219_NUM_SUPPLIES, imx219->supplies);
