@@ -15,7 +15,7 @@
 #define DRV_AUTHOR            "AICSemi"
 #define DRV_VERS_MOD          "1.0"
 
-int aicwf_dbg_level_bsp = LOGERROR|LOGINFO|LOGDEBUG|LOGTRACE;
+int aicwf_dbg_level_bsp = LOGERROR;
 
 struct semaphore aicbsp_probe_semaphore;
 
