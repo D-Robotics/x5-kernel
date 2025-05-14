@@ -2519,6 +2519,11 @@ static int es7210_probe(struct snd_soc_component *component)
 	es7210_multi_chips_write(ES7210_ADC12_MUTE_REG15, 0x3c);
 	es7210_multi_chips_write(ES7210_ALC_COM_CFG1_REG17, 0x10);
 
+	es7210_multi_chips_write(ES7210_ALC1_MAX_GAIN_REG1E, 202);
+	es7210_multi_chips_write(ES7210_ALC2_MAX_GAIN_REG1D, 193);
+	es7210_multi_chips_write(ES7210_ALC3_MAX_GAIN_REG1C, 179);
+	es7210_multi_chips_write(ES7210_ALC4_MAX_GAIN_REG1B, 169);
+
 	/* Schedule a delay work-quenue to avoid pop noise */
 	INIT_DELAYED_WORK(&es7210->pcm_pop_work, pcm_pop_work_events);
 
