@@ -816,7 +816,7 @@ err_kalloc:
 static s32 get_platform_resources(struct platform_device *pdev, struct mac_resource *mac_res)
 {
 	s32 ret = -ENODEV;
-	struct resource *res;
+	struct resource *res, *res_sub;
 	mac_res->irq = platform_get_irq(pdev, 0);
 	if (mac_res->irq <= 0) {
 		dev_err(&pdev->dev, "get irq resouce failed\n");
@@ -836,11 +836,25 @@ static s32 get_platform_resources(struct platform_device *pdev, struct mac_resou
 	mac_res->addr = devm_ioremap_resource(&pdev->dev, res);
 	if (IS_ERR(mac_res->addr)) {
 		ret = (s32)PTR_ERR(mac_res->addr);
-		dev_err(&pdev->dev, "error ioremap\n");
+		dev_err(&pdev->dev, "error ioremap for resouce\n");
 		goto err_get_res;
 	}
 
+	res_sub = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+	if (NULL == res_sub) {
+		dev_err(&pdev->dev, "get plat resouce sub failed\n");
+		goto err_get_res_sub;
+	}
+
+	mac_res->addr_sub = devm_ioremap(&pdev->dev, res_sub->start, resource_size(res_sub));
+	if (IS_ERR(mac_res->addr_sub)) {
+		ret = (s32)PTR_ERR(mac_res->addr_sub);
+		dev_err(&pdev->dev, "error ioremap for sub resource\n");
+		goto err_get_res_sub;
+	}
+
 	return 0;
+err_get_res_sub:
 err_get_res:
 	return ret;
 }
@@ -6823,8 +6837,9 @@ static const struct phylink_mac_ops eth_phylink_mac_ops = {
 static int eth_phy_setup(struct hobot_priv *priv)
 {
 	struct fwnode_handle *fwnode = of_fwnode_handle(priv->plat->phylink_node);
-	int mode = priv->plat->interface;
+	phy_interface_t iface = priv->plat->interface;
 	struct phylink *phylink;
+	u32 val;
 
 	priv->phylink_config.dev = &priv->ndev->dev;
 	priv->phylink_config.type = PHYLINK_NETDEV;
@@ -6832,11 +6847,25 @@ static int eth_phy_setup(struct hobot_priv *priv)
 	/* Indicate that the MAC is responsible for PHY PM */
 	priv->phylink_config.mac_managed_pm = true;
 
+	if (iface == PHY_INTERFACE_MODE_RMII) {
+		/* set to rmii interface and turn on clock */
+		val = ioread32(priv->ioaddr_sub);
+		val &= 0xFFFFFFF0;
+		val |= 0xC;
+		iowrite32(val, priv->ioaddr_sub);
+	} else {
+		/* set to rgmii interface and turn on clock */
+		val = ioread32(priv->ioaddr_sub);
+		val &= 0xFFFFFFF0;
+		val |= 0x9;
+		iowrite32(val, priv->ioaddr_sub);
+	}
+
 	if (!fwnode)
 		fwnode = dev_fwnode(priv->device);
 
 	phylink = phylink_create(&priv->phylink_config, fwnode,
-				 mode, &eth_phylink_mac_ops);/*PRQA S 4432*/
+				 iface, &eth_phylink_mac_ops);/*PRQA S 4432*/
 	if (IS_ERR(phylink)) {
 		netdev_err(priv->ndev, "phylink_create fail\n");
 		return PTR_ERR(phylink);/*PRQA S 4460*/
@@ -7185,6 +7214,7 @@ static s32 eth_drv_probe(struct device *device, struct plat_config_data *plat_da
 	ndev->ethtool_ops = &ethtool_ops;
 	priv->plat = plat_dat;
 	priv->ioaddr = mac_res->addr;
+	priv->ioaddr_sub = mac_res->addr_sub;
 	priv->ndev->base_addr = (unsigned long)mac_res->addr;
 	priv->ndev->irq = mac_res->irq;
 	priv->wol_irq = mac_res->wol_irq;
@@ -7400,6 +7430,7 @@ err_probe:
 	plat_dat = NULL;
 
 	devm_iounmap(&pdev->dev, mac_res.addr);
+	devm_iounmap(&pdev->dev, mac_res.addr_sub);
 err_dt:
 	return ret;
 }

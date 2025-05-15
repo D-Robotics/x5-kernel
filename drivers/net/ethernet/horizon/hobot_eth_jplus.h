@@ -258,6 +258,7 @@ struct dma_features {
 
 struct mac_resource {
 	void __iomem *addr;
+	void __iomem *addr_sub;
 	const char *mac;
 	s32 irq;
 	s32 wol_irq;
@@ -507,6 +508,7 @@ struct conf_regs_st {
 
 struct hobot_priv {
 	void __iomem *ioaddr;
+	void __iomem *ioaddr_sub;
 
 	struct net_device *ndev;
 	struct device *device;
