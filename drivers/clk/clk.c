@@ -897,9 +897,11 @@ static void clk_core_unprepare(struct clk_core *core)
 	if (!core)
 		return;
 
-	if (WARN(core->prepare_count == 0,
-	    "%s already unprepared\n", core->name))
+	if (core->prepare_count == 0)
+	{
+		pr_warn("%s already unprepared\n", core->name);
 		return;
+	}
 
 	if (WARN(core->prepare_count == 1 && core->flags & CLK_IS_CRITICAL,
 	    "Unpreparing critical %s\n", core->name))
@@ -1037,9 +1039,12 @@ static void clk_core_disable(struct clk_core *core)
 
 	if (!core)
 		return;
-
-	if (WARN(core->enable_count == 0, "%s already disabled\n", core->name))
+		
+	if (core->enable_count == 0)
+	{
+		pr_warn("%s already disabled\n", core->name);
 		return;
+	}
 
 	if (WARN(core->enable_count == 1 && core->flags & CLK_IS_CRITICAL,
 	    "Disabling critical %s\n", core->name))
