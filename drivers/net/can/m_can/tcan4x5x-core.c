@@ -4,7 +4,7 @@
 
 #include "tcan4x5x.h"
 
-#define TCAN4X5X_EXT_CLK_DEF 40000000
+#define TCAN4X5X_EXT_CLK_DEF 20000000
 
 #define TCAN4X5X_DEV_ID0 0x00
 #define TCAN4X5X_DEV_ID1 0x04
@@ -43,6 +43,7 @@
 	(TCAN4X5X_MCAN_INT | TCAN4X5X_BUS_FAULT | \
 	 TCAN4X5X_CANBUS_ERR_INT_EN | TCAN4X5X_CANINT_INT_EN)
 
+#define TCAN4X5X_MCAN_INT_EN 0x1054
 /* MCAN Interrupt bits */
 #define TCAN4X5X_MCAN_IR_ARA BIT(29)
 #define TCAN4X5X_MCAN_IR_PED BIT(28)
@@ -223,6 +224,11 @@ static int tcan4x5x_init(struct m_can_classdev *cdev)
 				      TCAN4X5X_ENABLE_TCAN_INT);
 	if (ret)
 		return ret;
+	//disable TSWE 16bit Timestamp Wraparound Interrupt Enable
+	ret = tcan4x5x_write_tcan_reg(cdev, TCAN4X5X_MCAN_INT_EN,
+		0x27feffff);
+	if (ret)
+		return ret;
 
 	ret = tcan4x5x_write_tcan_reg(cdev, TCAN4X5X_ERROR_STATUS_MASK,
 				      TCAN4X5X_CLEAR_ALL_INT);
@@ -319,7 +325,7 @@ static int tcan4x5x_can_probe(struct spi_device *spi)
 
 	m_can_class_get_clocks(mcan_class);
 	if (IS_ERR(mcan_class->cclk)) {
-		dev_err(&spi->dev, "no CAN clock source defined\n");
+		dev_info(&spi->dev, "no CAN clock source defined\n");
 		freq = TCAN4X5X_EXT_CLK_DEF;
 	} else {
 		freq = clk_get_rate(mcan_class->cclk);
