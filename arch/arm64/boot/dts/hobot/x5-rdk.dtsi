@@ -299,19 +299,27 @@
 &i2c5 {
 	status = "okay";
 
-	bmi08xa:bmi08xa@19 {
-		compatible = "bmi08xa";
-		reg = <0x19>;
-		pinctrl-0 = <&dsp_gpio0_12>;
-		accel_irq_gpio = <&dsp_gpio_porta 12 GPIO_ACTIVE_HIGH>;
-		status = "disabled";
+	es7210_0: es7210_0@40 {
+		compatible = "MicArray_0";
+		reg = <0x40>;
+		#sound-dai-cells = <1>;
+		channels = <8>;
+		adc_dev_num = <2>;
+		status = "okay";
 	};
-	bmi08xg:bmi08xg@69{
-		compatible = "bmi08xg";
-		reg = <0x69>;
-		pinctrl-0 = <&lsio_gpio0_2>;
-		gyro_irq_gpio = <&ls_gpio1_porta 2 GPIO_ACTIVE_HIGH>;
-		status = "disabled";
+
+	es7210_1@42 {
+		compatible = "MicArray_2";
+		reg = <0x42>;
+		channels = <8>;
+		adc_dev_num = <2>;
+	};
+
+	es8156: es8156@8 {
+		compatible = "everest,es8156";
+		reg = <0x8>;
+		#sound-dai-cells = <0>;
+		status = "okay";
 	};
 };
 
@@ -494,6 +502,11 @@
 };
 
 &dw_i2s0 {
+	status = "okay";
+	dwc-master = <1>;
+};
+
+&dw_i2s1 {
 	status = "okay";
 	dwc-master = <1>;
 };
@@ -783,6 +796,42 @@ the following ports need to be deleted */
 		};
 		codec {
 			sound-dai = <&es8326>;
+		};
+	};
+};
+
+&hobot_sound_machine {
+	status = "okay";
+	#address-cells = <1>;
+	#size-cells = <0>;
+	simple-audio-card,name = "duplex-audio-i2s1";
+
+	simple-audio-card,dai-link@0 {
+		link-name = "dai-link0";
+		reg = <1>;
+		format = "dsp_a";
+		mclk-fs = <64>;
+		bitclock-master = <&snd1_mm>;
+		frame-master = <&snd1_mm>;
+		snd1_mm: cpu {
+			sound-dai = <&dw_i2s1 1>;
+		};
+		codec {
+			sound-dai = <&es8156>;
+		};
+	};
+	simple-audio-card,dai-link@1 {
+		link-name = "dai-link1";
+		reg = <1>;
+		format = "dsp_a";
+		mclk-fs = <64>;
+		bitclock-master = <&snd1_m>;
+		frame-master = <&snd1_m>;
+		snd1_m: cpu {
+			sound-dai = <&dw_i2s1 1>;
+		};
+		codec {
+			sound-dai = <&es7210_0 0>;
 		};
 	};
 };
