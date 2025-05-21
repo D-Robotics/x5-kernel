@@ -331,6 +331,9 @@ static enum drm_mode_status sii902x_mode_valid(struct drm_connector *connector,
 {
 	/* TODO: check mode */
 
+	if(mode->clock > 165000)
+		return MODE_BAD;
+
 	return MODE_OK;
 }
 
@@ -1140,6 +1143,8 @@ static int sii902x_resume(struct device *dev)
 	int ret;
 	unsigned int status = 0;
 
+	enable_irq(sii902x->i2c->irq);
+	sii902x_reset(sii902x);
 	ret = regmap_write(sii902x->regmap, SII902X_REG_TPI_RQB, 0x0);
 	if (ret)
 		return ret;
@@ -1155,7 +1160,7 @@ static int sii902x_suspend(struct device *dev)
 {
 	struct sii902x *sii902x = dev_get_drvdata(dev);
 
-	sii902x_reset(sii902x);
+	disable_irq(sii902x->i2c->irq);
 	return 0;
 }
 
