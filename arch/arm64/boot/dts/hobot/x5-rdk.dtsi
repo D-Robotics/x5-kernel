@@ -67,7 +67,7 @@
 		compatible = "gua,sound-card";
 		model = "gua-audio";
 		cpu-dai = <&sound_cpu>;
-		status = "okay";
+		status = "disabled";
 	};
 
 	vdd08_gpu_reg: vdd08_gpu_reg@3 {
