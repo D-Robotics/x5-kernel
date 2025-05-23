@@ -21,6 +21,7 @@
 #include <linux/rtc.h>
 #include <linux/bcd.h>
 #include <linux/delay.h>
+#include <linux/of_irq.h>
 
 /* PMIC HPU3501 RTC/ALARM rigisters */
 #define HPU3501_RTC_ISR 0X30
@@ -41,14 +42,18 @@
 #define HPU3501_ALARM_MIN 0X39
 #define HPU3501_ALARM_SEC 0X3A
 
-static int CENTURY = 1900;
+#define HPU3501_REG_SC		0x05
+#define HPU3501_REG_MN		0x04
+#define HPU3501_REG_HR		0x03
+#define HPU3501_REG_DM		0x02
+#define HPU3501_REG_MO		0x01
+#define HPU3501_REG_YR		0x00
 
 struct hpu3501_rtc {
 	struct device *dev;
 	struct rtc_device *rtc;
 	unsigned long long epoch_start;
 	u32 opsel;
-	u32 pin_alarm_n;
 	int irq;
 	struct work_struct irq_work;
 };
@@ -61,7 +66,6 @@ static inline struct device *to_hpu3501_dev(struct device *dev)
 static int hpu3501_rtc_read_time(struct device *dev, struct rtc_time *tm)
 {
 	struct device *pa_dev = to_hpu3501_dev(dev);
-	unsigned long seconds;
 	u8 buff[6];
 	int ret;
 
@@ -71,11 +75,30 @@ static int hpu3501_rtc_read_time(struct device *dev, struct rtc_time *tm)
 		goto err;
 	}
 
-	seconds = mktime64(CENTURY + bcd2bin(buff[0]), bcd2bin(buff[1]) + 1,
-			   bcd2bin(buff[2]), bcd2bin(buff[3]), bcd2bin(buff[4]),
-			   bcd2bin(buff[5]));
+	dev_dbg(dev,
+		"%s: raw data is year=%02x, mon=%02x, mday=%02x, hr=%02x, min=%02x, sec=%02x\n",
+		__func__,
+		buff[0], buff[1], buff[2], buff[3],
+		buff[4], buff[5]);
 
-	rtc_time64_to_tm(seconds, tm);
+
+	tm->tm_sec = bcd2bin(buff[HPU3501_REG_SC] & 0x7F);
+	tm->tm_min = bcd2bin(buff[HPU3501_REG_MN] & 0x7F);
+	tm->tm_hour = bcd2bin(buff[HPU3501_REG_HR] & 0x3F); /* rtc hr 0-23 */
+	tm->tm_mday = bcd2bin(buff[HPU3501_REG_DM] & 0x3F);
+	tm->tm_mon = bcd2bin(buff[HPU3501_REG_MO] & 0x1F) - 1; /* rtc mn 1-12 */
+	tm->tm_year = bcd2bin(buff[HPU3501_REG_YR]);
+	/* Let's do it heuristically, assuming we are live in 1970...2069. */
+	/* Handle the years from 2000 to 2069 */
+	if (tm->tm_year <= 69) {
+		tm->tm_year += 100;
+	}
+
+	dev_dbg(dev, "%s: tm is secs=%d, mins=%d, hours=%d, "
+		"mday=%d, mon=%d, year=%dn",
+		__func__,
+		tm->tm_sec, tm->tm_min, tm->tm_hour,
+		tm->tm_mday, tm->tm_mon, tm->tm_year);
 
 	return rtc_valid_tm(tm);
 
@@ -85,36 +108,34 @@ err:
 
 static int hpu3501_rtc_set_time(struct device *dev, struct rtc_time *tm)
 {
-	struct hpu3501_rtc *rtc = dev_get_drvdata(dev);
 	struct device *pa_dev = to_hpu3501_dev(dev);
-	unsigned long seconds;
-	unsigned int year;
 	int try_times = 5;
 	u8 status;
 	u8 buff[6];
 	int ret;
 
-	seconds = rtc_tm_to_time64(tm);
-	if (seconds < rtc->epoch_start) {
-		dev_err(dev, "requested time unsupported\n");
-		return -EINVAL;
+	dev_dbg(dev, "%s: secs=%d, mins=%d, hours=%d, "
+		"mday=%d, mon=%d, year=%d, wday=%d\n",
+		__func__,
+		tm->tm_sec, tm->tm_min, tm->tm_hour,
+		tm->tm_mday, tm->tm_mon, tm->tm_year, tm->tm_wday);
+
+	/* Let's do it heuristically, assuming we are live in 1970...2069. */
+	if (tm->tm_year >= 100) {
+		tm->tm_year -= 100;
 	}
+	buff[HPU3501_REG_YR] = bin2bcd(tm->tm_year);
+	buff[HPU3501_REG_MO] = bin2bcd(tm->tm_mon + 1);  /* month, 1 - 12 */
+	buff[HPU3501_REG_DM] = bin2bcd(tm->tm_mday);
+	buff[HPU3501_REG_HR] = bin2bcd(tm->tm_hour);
+	buff[HPU3501_REG_MN] = bin2bcd(tm->tm_min);
+	buff[HPU3501_REG_SC] = bin2bcd(tm->tm_sec);
 
-	rtc_time64_to_tm(seconds, tm);
-
-	/*
-	 * hpu3501 year register 0x31 has 8 bits, so
-	 * only two-digit decimal number could be set in.
-	 */
-	year = tm->tm_year % 100;
-	CENTURY = (tm->tm_year + 1900) / 100 * 100;
-
-	buff[0] = bin2bcd(year);
-	buff[1] = bin2bcd(tm->tm_mon);
-	buff[2] = bin2bcd(tm->tm_mday);
-	buff[3] = bin2bcd(tm->tm_hour);
-	buff[4] = bin2bcd(tm->tm_min);
-	buff[5] = bin2bcd(tm->tm_sec);
+	dev_dbg(dev,
+		"%s: raw data is year=%02x, mon=%02x, mday=%02x, hr=%02x, min=%02x, sec=%02x\n",
+		__func__,
+		buff[0], buff[1], buff[2], buff[3],
+		buff[4], buff[5]);
 
 	/* Set RTC into initialization mode */
 	ret = hpu3501_set_bits(pa_dev, HPU3501_RTC_ISR, HPU3501_RTC_INIT);
@@ -321,9 +342,11 @@ static int hpu3501_rtc_probe(struct platform_device *pdev)
 			goto fail_rtc_register;
 		}
 
-		if (of_property_read_u32(np, "pin_alarm_n",
-					 &rtc->pin_alarm_n)) {
-			dev_info(rtc->dev, "no pin_alarm_n in DT\n");
+		rtc->irq = irq_of_parse_and_map(np, 0);
+		if (rtc->irq <= 0) {
+			dev_err(pa_dev,
+				"gpio hpu3501 irq request failed,"
+				" no interrupts in DT, ret %d\n", ret);
 			ret = -EINVAL;
 			goto fail_rtc_register;
 		}
@@ -348,30 +371,10 @@ static int hpu3501_rtc_probe(struct platform_device *pdev)
 
 	device_init_wakeup(&pdev->dev, 1);
 
-	ret = devm_gpio_request(&pdev->dev, rtc->pin_alarm_n,
-				"hpu3501_alarm_pin");
-	if (ret) {
-		dev_err(&pdev->dev, "gpio hpu3501_alarm_n request failed\n");
-		goto fail_rtc_register;
-	}
-
-	ret = gpio_direction_input(rtc->pin_alarm_n);
-	if (ret) {
-		dev_err(&pdev->dev, "hpu3501_alarm_n set failed\n");
-		goto fail_rtc_register;
-	}
-
-	rtc->irq = gpio_to_irq(rtc->pin_alarm_n);
-	if (rtc->irq < 0) {
-		dev_err(&pdev->dev, "hpu3501_alarm_n get irq failed\n");
-		ret = rtc->irq;
-		goto fail_rtc_register;
-	}
-
 	ret = devm_request_irq(&pdev->dev, rtc->irq, hpu3501_alarm_irq_handler,
 			       IRQF_TRIGGER_FALLING, "hpu3501_alarm_irq", rtc);
 	if (ret) {
-		dev_err(&pdev->dev, "irq request failde\n");
+		dev_err(&pdev->dev, "irq request failed\n");
 		goto fail_rtc_register;
 	}
 	INIT_WORK(&rtc->irq_work, hpu3501_alarm_work);
