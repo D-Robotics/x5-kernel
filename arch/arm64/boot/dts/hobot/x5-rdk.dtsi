@@ -52,7 +52,7 @@
 										>;
 		msg-wrapper = <&ipc_wrapper>;
 		gua-ipc = <&ipc_instance0>;
-		status = "disabled";
+		status = "okay";
 	};
 
 	sound_cpu:cpu-dai {
@@ -67,7 +67,7 @@
 		compatible = "gua,sound-card";
 		model = "gua-audio";
 		cpu-dai = <&sound_cpu>;
-		status = "disabled";
+		status = "okay";
 	};
 
 	vdd08_gpu_reg: vdd08_gpu_reg@3 {
@@ -545,12 +545,16 @@
 	status = "okay";
 };
 
-&hifi5_qos {
-	status = "disabled";
+&remoteproc_hifi5 {
+	status = "okay";
+	hifi5-rpmsg-channel-mapping = <0x00>, <0x00>;
+	msg-wrapper = <&ipc_wrapper>;
+	remoteproc-ipc = <&ipc_instance1>;
 };
 
-&remoteproc_hifi5 {
-	status = "disabled";
+&ipc_hal {
+	status = "okay";
+	ipc-hal = <&ipc_instance2>;
 };
 
 &hpsclks {
@@ -842,6 +846,6 @@ the following ports need to be deleted */
 	pinctrl-0 = <&aon_gpio_7>;
 };
 
-&dsp0{
-		status = "disabled";
+&hobot_pps {
+	status = "okay";
 };
