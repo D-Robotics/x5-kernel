@@ -72,6 +72,7 @@ struct es8156_priv {
 	bool spk_active_level;
 
 	int pwr_count;
+	u8 tdm_flag;
 };
 
 /*
@@ -177,6 +178,7 @@ static int es8156_set_dai_fmt(struct snd_soc_dai *codec_dai,
 				  unsigned int fmt)
 {
 	struct snd_soc_component *codec = codec_dai->component;
+	struct es8156_priv *es8156 = snd_soc_component_get_drvdata(codec);
 	/* set master/slave audio interface */
 	switch (fmt & SND_SOC_DAIFMT_MASTER_MASK) {
 	case SND_SOC_DAIFMT_CBS_CFS: //es8156 slave
@@ -196,17 +198,21 @@ static int es8156_set_dai_fmt(struct snd_soc_dai *codec_dai,
 
 	switch (fmt & SND_SOC_DAIFMT_FORMAT_MASK) {
 	case SND_SOC_DAIFMT_I2S:
+		es8156->tdm_flag = 0;
 		snd_soc_component_update_bits(codec, ES8156_DAC_SDP_REG11, 0x07,0x00);
 		break;
 	case SND_SOC_DAIFMT_RIGHT_J:
 		return -EINVAL;
 	case SND_SOC_DAIFMT_LEFT_J:
+		es8156->tdm_flag = 0;
 		snd_soc_component_update_bits(codec, ES8156_DAC_SDP_REG11, 0x07,0x01);
 		break;
 	case SND_SOC_DAIFMT_DSP_A:
+		es8156->tdm_flag = 1;
 		snd_soc_component_update_bits(codec, ES8156_DAC_SDP_REG11, 0x07,0x03);
 		break;
 	case SND_SOC_DAIFMT_DSP_B:
+		es8156->tdm_flag = 1;
 		snd_soc_component_update_bits(codec, ES8156_DAC_SDP_REG11, 0x07,0x07);
 		break;
 	default:
@@ -239,6 +245,7 @@ static int es8156_pcm_hw_params(struct snd_pcm_substream *substream,
 				struct snd_soc_dai *dai)
 {
 	struct snd_soc_component *codec = dai->component;
+	struct es8156_priv *es8156 = snd_soc_component_get_drvdata(codec);
 	switch (params_format(params)) {
 	case SNDRV_PCM_FORMAT_S16_LE:
 		snd_soc_component_update_bits(codec, ES8156_DAC_SDP_REG11, 0x70,0x30);
@@ -252,6 +259,10 @@ static int es8156_pcm_hw_params(struct snd_pcm_substream *substream,
 	case SNDRV_PCM_FORMAT_S32_LE:
 		snd_soc_component_update_bits(codec, ES8156_DAC_SDP_REG11, 0x70,0x40);
 		break;
+	}
+
+	if (es8156->tdm_flag) {
+		snd_soc_component_update_bits(codec, ES8156_DAC_SDP_REG11, 0x70, 0x40);
 	}
 	return 0;
 }

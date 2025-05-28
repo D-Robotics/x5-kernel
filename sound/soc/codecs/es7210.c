@@ -1817,11 +1817,13 @@ static int es7210_set_dai_fmt(struct snd_soc_dai *dai, unsigned int fmt)
 		/* interface format */
 		switch (fmt & SND_SOC_DAIFMT_FORMAT_MASK) {
 		case SND_SOC_DAIFMT_I2S:
+			es7210->tdm_mode = ES7210_TDM_1LRCK_I2S;
 			adciface &= 0xFC;
 			break;
 		case SND_SOC_DAIFMT_RIGHT_J:
 			return -EINVAL;
 		case SND_SOC_DAIFMT_LEFT_J:
+			es7210->tdm_mode = ES7210_TDM_1LRCK_LJ;
 			adciface &= 0xFC;
 			adciface |= 0x01;
 			break;
@@ -1992,10 +1994,10 @@ static int es7210_pcm_hw_params(struct snd_pcm_substream *substream,
 		return coeff;
 	}
 
-	if((es7210->tdm_mode  != ES7210_TDM_NLRCK_DSPA) &&
-			(es7210->tdm_mode  != ES7210_TDM_NLRCK_DSPB) &&
-			(es7210->tdm_mode  != ES7210_TDM_NLRCK_I2S) &&
-			(es7210->tdm_mode  != ES7210_TDM_NLRCK_LJ)) {
+	if((es7210->tdm_mode != ES7210_TDM_NLRCK_DSPA) &&
+			(es7210->tdm_mode != ES7210_TDM_NLRCK_DSPB) &&
+			(es7210->tdm_mode != ES7210_TDM_NLRCK_I2S) &&
+			(es7210->tdm_mode != ES7210_TDM_NLRCK_LJ)) {
 
 		regv = coeff_div[coeff].ss_ds << 1;
 		es7210_multi_chips_update_bits(ES7210_MODE_CFG_REG08,
@@ -2035,6 +2037,14 @@ static int es7210_pcm_hw_params(struct snd_pcm_substream *substream,
 		es7210_multi_chips_update_bits(ES7210_SDP_CFG1_REG11,
 				0xe0, 0x60);
 		break;
+	}
+
+	if (es7210->tdm_mode == ES7210_TDM_1LRCK_DSPA ||
+			es7210->tdm_mode == ES7210_TDM_1LRCK_DSPB ||
+			es7210->tdm_mode == ES7210_TDM_NLRCK_DSPA ||
+			es7210->tdm_mode == ES7210_TDM_NLRCK_DSPB) {
+		es7210_multi_chips_update_bits(ES7210_SDP_CFG1_REG11,
+			0xe0, 0x80);
 	}
 
 	for (i = 0; i < es7210->adc_dev; i++) {
