@@ -206,13 +206,18 @@ static void i2s_start(struct dw_i2s_dev *dev,
 		val |= BIT(15);
 	}
 
-	if (config->chan_nr > 2)
-		val |= BIT(5);
-
-	if (config->chan_nr > 2)
+	switch (dev->tdm_mode) {
+	case SND_SOC_DAIFMT_DSP_A:
+		val |= BIT(1) | BIT(5);
+		break;
+	case SND_SOC_DAIFMT_DSP_B:
 		val |= BIT(1);
-	i2s_write_reg(dev->i2s_base, IER, val);
+		break;
+	case SND_SOC_DAIFMT_I2S:
+		break;
+	}
 
+	i2s_write_reg(dev->i2s_base, IER, val);
 	val |= BIT(0);
 
 	i2s_write_reg(dev->i2s_base, IER, val);
@@ -226,9 +231,6 @@ static void i2s_start(struct dw_i2s_dev *dev,
 
 	if (!dev->use_pio)
 		i2s_dma_block_enable(dev, substream->stream);
-
-	if ((config->chan_nr > 2) && (config->data_width == 16))
-		i2s_write_reg(dev->i2s_base, CCR, 0x12);
 
 	if (dev->capability & DW_I2S_MASTER)
 		i2s_write_reg(dev->i2s_base, CER, 1);
@@ -415,6 +417,10 @@ static int dw_i2s_hw_params(struct snd_pcm_substream *substream,
 
 	config->sample_rate = params_rate(params);
 
+	if (dev->tdm_mode == SND_SOC_DAIFMT_DSP_B || dev->tdm_mode == SND_SOC_DAIFMT_DSP_A) {
+		config->data_width = 32;
+	}
+
 	if (dev->capability & DW_I2S_MASTER) {
 		if (dev->i2s_clk_cfg) {
 			ret = dev->i2s_clk_cfg(config);
@@ -425,9 +431,6 @@ static int dw_i2s_hw_params(struct snd_pcm_substream *substream,
 		} else {
 			u32 bitclk = config->sample_rate *
 					config->data_width * config->chan_nr;
-
-			if (config->chan_nr > 2 && config->data_width == 16)
-				bitclk = bitclk * 2;
 
 			ret = change_clk(dev, dev->sclk, bitclk);
 			if (ret) {
@@ -506,6 +509,21 @@ static int dw_i2s_set_fmt(struct snd_soc_dai *cpu_dai, unsigned int fmt)
 		dev_dbg(dev->dev, "dwc : Invalid clock provider format\n");
 		ret = -EINVAL;
 		break;
+	}
+
+	switch (fmt & SND_SOC_DAIFMT_FORMAT_MASK) {
+	case SND_SOC_DAIFMT_DSP_A:
+		dev->tdm_mode = SND_SOC_DAIFMT_DSP_A;
+		break;
+	case SND_SOC_DAIFMT_DSP_B:
+		dev->tdm_mode = SND_SOC_DAIFMT_DSP_B;
+		break;
+	case SND_SOC_DAIFMT_I2S:
+		dev->tdm_mode = SND_SOC_DAIFMT_I2S;
+		break;
+	default:
+		dev_err(dev->dev, "dwc: Invalid fmt %d\n", fmt);
+		return -EINVAL;
 	}
 	return ret;
 }
