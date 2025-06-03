@@ -2178,4 +2178,9 @@ config SND_SOC_ES8156
 config SND_SOC_ES8311
 	tristate "ES8311 Audio Codec"
 
+config SND_SOC_HIWONDER_GOOGLEVOICEHAT_SOUNDCARD
+	tristate "Support for Google voiceHAT soundcard"
+	help
+          Say Y or M if you want to add support for voiceHAT soundcard.
+
 endmenu
