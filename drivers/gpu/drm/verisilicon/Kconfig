@@ -103,3 +103,15 @@ config VERISILICON_DEV_LINK_CNT
 	  display controller, mipi dsi host, etc. In this way, specific
 	  suspend/resume order can be promised. Because suspending vs_drm device
 	  before other related devices is always desired.
+
+config DROBOT_DW_CSI_TX
+	bool "DROBOT CSI TX driver support"
+	depends on DRM_VERISILICON
+	select GENERIC_PHY
+	select GENERIC_PHY_MIPI_DPHY
+	select VERISILICON_SIMPLE_ENCODER
+	help
+	  This driver supports Synopsys DW MIPI CSI TX controller.
+	  Synopsys DW MIPI CSI TX controller takes input from IPI/IDI
+	  interface and output data via MIPI CSI interface.
+	  Say Y if you need this feature.

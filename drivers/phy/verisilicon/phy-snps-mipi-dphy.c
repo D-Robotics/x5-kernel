@@ -42,6 +42,7 @@
 #include <linux/mfd/syscon.h>
 
 #include "phy-snps-mipi-dphy.h"
+#include "dphy-debugfs.h"
 
 #define KHZ	      1000
 #define MHZ	      (1000 * 1000UL)
@@ -79,6 +80,26 @@
 #define SLEW_RATE_DDL_LOOP_CONF_CTRL	  0xA3
 #define LP_RX_BIAS_CTRL			  0x4A
 
+#define TESTCLR_BIT    BIT(0)
+#define TESTCLK_BIT    BIT(1)
+#define TESTEN_BIT     BIT(16)
+#define TESTDIN_MASK   GENMASK(7, 0)
+#define TESTDOUT_MASK  GENMASK(15, 8)
+#define TESTDOUT_SHIFT 8
+
+#define HS_TX_CLK_TLP_CODE     0x60
+#define HS_TX_CLK_PREPARE_CODE 0x61
+#define HS_TX_CLK_ZERO_CODE    0x62
+#define HS_TX_CLK_TRAIL_CODE   0x63
+#define HS_TX_CLK_EXIT_CODE    0x64
+#define HS_TX_CLK_POST_CODE    0x65
+
+#define HS_TX_DAT_TLP_CODE     0x70
+#define HS_TX_DAT_PREPARE_CODE 0x71
+#define HS_TX_DAT_ZERO_CODE    0x72
+#define HS_TX_DAT_TRAIL_CODE   0x73
+#define HS_TX_DAT_EXIT_CODE    0x74
+
 #define diff_abs(a, b) (((a) > (b)) ? ((a) - (b)) : ((b) - (a)))
 
 struct range_table {
@@ -86,6 +107,21 @@ struct range_table {
 	unsigned int max;
 	u8 value;
 };
+
+static inline unsigned int ps_to_ui(unsigned long hs_clk_rate, unsigned int ps)
+{
+	/* ui_ps = ceil(1e12 / HS-CLK)  */
+	unsigned long long ui_ps = ALIGN(PSEC_PER_SEC, hs_clk_rate);
+	do_div(ui_ps, hs_clk_rate);
+
+	/* ui_cnt = ceil(ps / ui_ps) */
+	unsigned long long cnt	= ps;
+	unsigned long long frac = do_div(cnt, ui_ps);
+	if (frac)
+		cnt++;
+	pr_info("ps_to_ui: hs_clk_rate=%lu ps=%u ui_cnt=%llu\n", hs_clk_rate, ps, cnt);
+	return (unsigned int)cnt;
+}
 
 /* Get lane byte clock cycles from picosecond */
 static inline unsigned int ps_to_lbcc(unsigned long hs_clk_rate, unsigned int ps)
@@ -99,6 +135,7 @@ static inline unsigned int ps_to_lbcc(unsigned long hs_clk_rate, unsigned int ps
 	frac = do_div(lbcc, ui);
 	if (frac)
 		lbcc++;
+	pr_info("ps_to_lbcc: hs_clk_rate=%lu ps=%u lbcc=%llu\n", hs_clk_rate, ps, lbcc);
 
 	return lbcc;
 }
@@ -123,6 +160,7 @@ static void dphy_write_control_1(struct snps_dphy *dphy, u8 code, u8 val)
 	phy_write(dphy, DISP_PHY_TST_CTRL1, val);
 	phy_write(dphy, DISP_PHY_TST_CTRL0, BIT(1));
 	phy_write(dphy, DISP_PHY_TST_CTRL0, 0);
+	udelay(10);
 }
 
 static void dphy_write_control_2(struct snps_dphy *dphy, u32 code, u32 val0, u32 val1)
@@ -132,6 +170,45 @@ static void dphy_write_control_2(struct snps_dphy *dphy, u32 code, u32 val0, u32
 	phy_write(dphy, DISP_PHY_TST_CTRL1, val1);
 	phy_write(dphy, DISP_PHY_TST_CTRL0, BIT(1));
 	phy_write(dphy, DISP_PHY_TST_CTRL0, 0);
+}
+
+static void dphy_test_reset(struct snps_dphy *dphy)
+{
+	/* Apply test reset pulse: testclr = 1, then 0 */
+	phy_write(dphy, DISP_PHY_TST_CTRL0, 1);
+	phy_write(dphy, DISP_PHY_TST_CTRL0, 0);
+}
+
+/* Read TESTDOUT for a given test-code (datasheet-compliant sequence) */
+static u8 dphy_test_read_code(struct snps_dphy *dphy, u8 code)
+{
+	u32 val = 0U;
+
+	/* Step 1: preload TESTDIN with code and set testen = 1 (BIT(16))   */
+	val = TESTEN_BIT | (code & TESTDIN_MASK);
+	phy_write(dphy, DISP_PHY_TST_CTRL1, val);
+	udelay(1);
+
+	/* Step 2: raise testclk; rising edge happens while testen = 1      */
+	phy_write(dphy, DISP_PHY_TST_CTRL0, TESTCLK_BIT);
+	udelay(1);
+
+	/* Step 3: pull testclk low to latch the test-code                   */
+	phy_write(dphy, DISP_PHY_TST_CTRL0, 0U);
+	udelay(1);
+
+	/* Step 4: clear testen by writing code only                         */
+	val = code & TESTDIN_MASK;
+	phy_write(dphy, DISP_PHY_TST_CTRL1, val);
+	udelay(1);
+
+	/* Step 5: wait for TESTDOUT to settle                               */
+	udelay(500);
+
+	/* Step 6: read TESTDOUT[15:8]                                       */
+	val = phy_read(dphy, DISP_PHY_TST_CTRL1);
+
+	return (u8)((val & TESTDOUT_MASK) >> TESTDOUT_SHIFT);
 }
 
 static void find_best_rate(struct pll_info *info)
@@ -544,9 +621,19 @@ static inline u8 get_cfgfreqrange(unsigned int ref_clk)
 
 static void config_pll(struct snps_dphy *dphy, struct pll_info *info)
 {
+	static const u8 read_codes[] = {
+		HS_TX_CLK_TLP_CODE,   HS_TX_CLK_PREPARE_CODE, HS_TX_CLK_ZERO_CODE,
+		HS_TX_CLK_TRAIL_CODE, HS_TX_CLK_EXIT_CODE,    HS_TX_CLK_POST_CODE,
+		HS_TX_DAT_TLP_CODE,   HS_TX_DAT_PREPARE_CODE, HS_TX_DAT_ZERO_CODE,
+		HS_TX_DAT_TRAIL_CODE, HS_TX_DAT_EXIT_CODE,
+	};
+	u8 code	 = 0;
+	u8 val	 = 0;
+	size_t i = 0;
+	u32 cnt	 = 0;
+
 	// Clear test interface
-	phy_write(dphy, DISP_PHY_TST_CTRL0, 1);
-	phy_write(dphy, DISP_PHY_TST_CTRL0, 0);
+	dphy_test_reset(dphy);
 
 	phy_write(dphy, DISP_DPHY_CFG_0,
 		  (get_hsfreqrange(info->fout, hsfreqrange, ARRAY_SIZE(hsfreqrange)) << 8) |
@@ -580,6 +667,111 @@ static void config_pll(struct snps_dphy *dphy, struct pll_info *info)
 
 	dphy_write_control_1(dphy, PLL_PROP_CHARGE_PUMP_CTRL,
 			     (info->fout > 1150 * KHZ) ? 0xe : 0xd);
+
+	if (dphy->dbg_write_en) {
+		/* HS clock TLP */
+		cnt = ps_to_lbcc(dphy->cfg.hs_clk_rate, dphy->cfg.lpx);
+		pr_info("write HS_TX_CLK_TLP_CODE: code=0x%02x clk_rate=%lu ps=lpx(%u) cnt=%u "
+			"val=0x%02x\n",
+			HS_TX_CLK_TLP_CODE, dphy->cfg.hs_clk_rate, dphy->cfg.lpx, cnt, cnt);
+		dphy_write_control_1(dphy, HS_TX_CLK_TLP_CODE, cnt);
+
+		/* HS clock PREPARE */
+		cnt = ps_to_lbcc(dphy->cfg.hs_clk_rate, dphy->cfg.clk_prepare);
+		val = BIT(6) | cnt;
+		pr_info("write HS_TX_CLK_PREPARE_CODE: code=0x%02x clk_rate=%lu ps=clk_prepare(%u) "
+			" cnt=%uval=0x%02x\n",
+			HS_TX_CLK_PREPARE_CODE, dphy->cfg.hs_clk_rate, dphy->cfg.clk_prepare, cnt,
+			val);
+		dphy_write_control_1(dphy, HS_TX_CLK_PREPARE_CODE, val);
+
+		/* HS clock ZERO */
+		cnt = ps_to_lbcc(dphy->cfg.hs_clk_rate, dphy->cfg.clk_zero);
+		val = BIT(7) | cnt;
+		pr_info("write HS_TX_CLK_ZERO_CODE: code=0x%02x clk_rate=%lu ps=clk_zero(%u) "
+			"cnt=%u "
+			"val=0x%02x\n",
+			HS_TX_CLK_ZERO_CODE, dphy->cfg.hs_clk_rate, dphy->cfg.clk_zero, cnt, val);
+		dphy_write_control_1(dphy, HS_TX_CLK_ZERO_CODE, val);
+
+		/* HS clock TRAIL */
+		cnt = ps_to_lbcc(dphy->cfg.hs_clk_rate, dphy->cfg.clk_trail);
+		val = BIT(6) | cnt;
+		pr_info("write HS_TX_CLK_TRAIL_CODE: code=0x%02x clk_rate=%lu ps=clk_trail(%u) "
+			"cnt=%u "
+			"val=0x%02x\n",
+			HS_TX_CLK_TRAIL_CODE, dphy->cfg.hs_clk_rate, dphy->cfg.clk_trail, cnt, val);
+		dphy_write_control_1(dphy, HS_TX_CLK_TRAIL_CODE, val);
+
+		/* HS clock EXIT */
+		cnt = ps_to_lbcc(dphy->cfg.hs_clk_rate, dphy->cfg.hs_exit);
+		val = BIT(7) | BIT(6) | cnt;
+		pr_info("write HS_TX_CLK_EXIT_CODE: code=0x%02x clk_rate=%lu ps=hs_exit(%u) cnt=%u "
+			"val=0x%02x\n",
+			HS_TX_CLK_EXIT_CODE, dphy->cfg.hs_clk_rate, dphy->cfg.hs_exit, cnt, val);
+		dphy_write_control_1(dphy, HS_TX_CLK_EXIT_CODE, val);
+
+		/* HS clock POST */
+		cnt = ps_to_lbcc(dphy->cfg.hs_clk_rate, dphy->cfg.clk_post);
+		val = BIT(6) | cnt;
+		pr_info("write HS_TX_CLK_POST_CODE: code=0x%02x clk_rate=%lu ps=clk_post(%u) "
+			"cnt=%u "
+			"val=0x%02x\n",
+			HS_TX_CLK_POST_CODE, dphy->cfg.hs_clk_rate, dphy->cfg.clk_post, cnt, val);
+		dphy_write_control_1(dphy, HS_TX_CLK_POST_CODE, val);
+
+		/* HS data TLP */
+		cnt = ps_to_lbcc(dphy->cfg.hs_clk_rate, dphy->cfg.lpx);
+		pr_info("write HS_TX_DAT_TLP_CODE: code=0x%02x clk_rate=%lu ps=lpx(%u) cnt=%u "
+			"val=0x%02x\n",
+			HS_TX_DAT_TLP_CODE, dphy->cfg.hs_clk_rate, dphy->cfg.lpx, cnt, cnt);
+		dphy_write_control_1(dphy, HS_TX_DAT_TLP_CODE, cnt);
+
+		/* HS data PREPARE */
+		cnt = ps_to_lbcc(dphy->cfg.hs_clk_rate, dphy->cfg.hs_prepare);
+		val = BIT(6) | cnt;
+		pr_info("write HS_TX_DAT_PREPARE_CODE: code=0x%02x clk_rate=%lu ps=hs_prepare(%u) "
+			"cnt=%u "
+			"val=0x%02x\n",
+			HS_TX_DAT_PREPARE_CODE, dphy->cfg.hs_clk_rate, dphy->cfg.hs_prepare, cnt,
+			val);
+		dphy_write_control_1(dphy, HS_TX_DAT_PREPARE_CODE, val);
+
+		/* HS data ZERO */
+		cnt = ps_to_lbcc(dphy->cfg.hs_clk_rate, dphy->cfg.hs_zero);
+		val = BIT(7) | cnt;
+		pr_info("write HS_TX_DAT_ZERO_CODE: code=0x%02x clk_rate=%lu ps=hs_zero(%u) cnt=%u "
+			"val=0x%02x\n",
+			HS_TX_DAT_ZERO_CODE, dphy->cfg.hs_clk_rate, dphy->cfg.hs_zero, cnt, val);
+		dphy_write_control_1(dphy, HS_TX_DAT_ZERO_CODE, val);
+
+		/* HS data TRAIL */
+		cnt = ps_to_lbcc(dphy->cfg.hs_clk_rate, dphy->cfg.hs_trail);
+		val = BIT(6) | cnt;
+		pr_info("write HS_TX_DAT_TRAIL_CODE: code=0x%02x clk_rate=%lu ps=hs_trail(%u) "
+			"cnt=%u "
+			"val=0x%02x\n",
+			HS_TX_DAT_TRAIL_CODE, dphy->cfg.hs_clk_rate, dphy->cfg.hs_trail, cnt, val);
+		dphy_write_control_1(dphy, HS_TX_DAT_TRAIL_CODE, val);
+
+		/* HS data EXIT */
+		cnt = ps_to_lbcc(dphy->cfg.hs_clk_rate, dphy->cfg.hs_exit);
+		val = BIT(7) | BIT(6) | cnt;
+		pr_info("write HS_TX_DAT_EXIT_CODE: code=0x%02x clk_rate=%lu ps=hs_exit(%u) cnt=%u "
+			"val=0x%02x\n",
+			HS_TX_DAT_EXIT_CODE, dphy->cfg.hs_clk_rate, dphy->cfg.hs_exit, cnt, val);
+		dphy_write_control_1(dphy, HS_TX_DAT_EXIT_CODE, val);
+	}
+	// udelay(50);
+	// dphy_test_reset(dphy);
+	if (dphy->dbg_read_en) {
+		for (i = 0; i < ARRAY_SIZE(read_codes); i++) {
+			code = read_codes[i];
+			val  = dphy_test_read_code(dphy, code);
+			pr_info("%s: test code 0x%02x -> 0x%02x\n", __func__, code, val);
+			udelay(1);
+		}
+	}
 }
 
 static int snps_dphy_configure(struct phy *phy, union phy_configure_opts *opts)
@@ -608,9 +800,13 @@ static int snps_dphy_validate(struct phy *phy, enum phy_mode mode, int submode,
 	const struct snps_dphy *dphy		      = phy_get_drvdata(phy);
 	unsigned long long ui;
 	struct pll_info info;
+	int ret = 0;
 
-	if (dphy_cfg->hs_clk_rate / 2 > MAX_LINK_RATE || dphy_cfg->hs_clk_rate / 2 < MIN_LINK_RATE)
+	if (dphy_cfg->hs_clk_rate / 2 > MAX_LINK_RATE ||
+	    dphy_cfg->hs_clk_rate / 2 < MIN_LINK_RATE) {
+		pr_err("snps_dphy_validate: hs_clk_rate=%lu out of range\n", dphy_cfg->hs_clk_rate);
 		return -EINVAL;
+	}
 
 	info.input = dphy->ref_clk_rate;
 	info.fout  = dphy_cfg->hs_clk_rate / KHZ / 2;
@@ -618,19 +814,23 @@ static int snps_dphy_validate(struct phy *phy, enum phy_mode mode, int submode,
 
 	dphy_cfg->hs_clk_rate = info.fout * KHZ * 2;
 
-	if (dphy_cfg->hs_clk_rate / 2 > MAX_LINK_RATE || dphy_cfg->hs_clk_rate / 2 < MIN_LINK_RATE)
+	if (dphy_cfg->hs_clk_rate / 2 > MAX_LINK_RATE ||
+	    dphy_cfg->hs_clk_rate / 2 < MIN_LINK_RATE) {
+		pr_err("snps_dphy_validate: adjusted hs_clk_rate=%lu out of range\n",
+		       dphy_cfg->hs_clk_rate);
 		return -EINVAL;
+	}
 
 	ui = ALIGN(PSEC_PER_SEC, dphy_cfg->hs_clk_rate);
 	do_div(ui, dphy_cfg->hs_clk_rate);
 
-	dphy_cfg->hs_prepare = 6 * ui + 40000;
-	dphy_cfg->hs_zero    = 154 * ui + 46000;
-	dphy_cfg->hs_trail   = 80 * ui + 400000;
+	dphy_cfg->hs_trail = max(1 * 8 * ui, 60000 + 1 * 4 * ui);
 
-	dphy_cfg->clk_prepare = 38000;
-	dphy_cfg->clk_zero    = 56 * ui + 622000;
-	dphy_cfg->clk_trail   = 200 * ui + 560000;
+	ret = phy_mipi_dphy_config_validate(dphy_cfg);
+	if (ret) {
+		pr_err("snps_dphy_validate: phy_mipi_dphy_config_validate fail! ret = %d\n", ret);
+		return ret;
+	}
 
 	return 0;
 }
@@ -694,6 +894,7 @@ static int snps_dphy_probe(struct platform_device *pdev)
 		dev_err(dev, "failed to prepare/enable cfg_clk\n");
 		goto err_disable_ref_clk;
 	}
+	snps_dphy_debugfs_init(dphy);
 
 	dphy->phy = devm_phy_create(dev, NULL, &snps_dphy_ops);
 	if (IS_ERR(dphy->phy)) {
@@ -726,6 +927,7 @@ static int snps_dphy_remove(struct platform_device *pdev)
 	struct snps_dphy *dphy;
 
 	dphy = dev_get_drvdata(dev);
+	snps_dphy_debugfs_exit(dphy);
 
 	clk_disable_unprepare(dphy->cfg_clk);
 

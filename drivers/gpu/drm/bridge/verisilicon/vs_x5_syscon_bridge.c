@@ -74,6 +74,9 @@
 #define DISP_DC2BT1120_EN 0x14
 #define DC2BT1120_EN	  BIT(0)
 
+#define DISP_BT1120_2_CSITX_EN 0x18
+#define BT1120_2_CSITX_EN      BIT(0)
+
 #define DISP_BT1120_PIN_MUX_CTRL0 0x9c
 #define SELECT_BT1120_DATA	  0x55555555
 
@@ -139,11 +142,11 @@ static const struct syscon_data dsi_subsys = {
 
 static const struct dss_data csi_data[] = {
 	{
-		.offsets	  = (u32[]){DISP_DC2CSI_DSI_EN, DISP_CSITX_IDI_EN},
-		.masks		  = (u32[]){DISP_DC2CSI_DSI_EN_MASK, CSITX_IDI_EN},
-		.values		  = (u32[]){DC2CSI_EN, 0},
-		.rst_values	  = (u32[]){DC2CSI_EN, CSITX_IDI_EN},
-		.cnt		  = 2,
+		.offsets = (u32[]){DISP_DC2CSI_DSI_EN, DISP_CSITX_IDI_EN, DISP_BT1120_2_CSITX_EN},
+		.masks	 = (u32[]){DISP_DC2CSI_DSI_EN_MASK, CSITX_IDI_EN, BT1120_2_CSITX_EN},
+		.values	 = (u32[]){0, 0, BT1120_2_CSITX_EN},
+		.rst_values = (u32[]){0, 0, 0},
+		.cnt	    = 3,
 		.use_post_disable = false,
 	},
 };
@@ -176,6 +179,9 @@ static enum dpi_bus_format bus_fmt_to_dpi_fmt(u32 bus_fmt)
 		fmt = BUS_FMT_RGB888;
 		break;
 	case MEDIA_BUS_FMT_UYVY8_1X16:
+	case MEDIA_BUS_FMT_VYUY8_1X16:
+	case MEDIA_BUS_FMT_YUYV8_1X16:
+	case MEDIA_BUS_FMT_YVYU8_1X16:
 		fmt = BUS_FMT_YUV422;
 		break;
 	default:
@@ -189,22 +195,56 @@ static enum dpi_bus_format bus_fmt_to_dpi_fmt(u32 bus_fmt)
 static void csi_mode_set(struct syscon_bridge *sbridge, u32 bus_fmt)
 {
 	const struct drm_display_mode *mode = &sbridge->mode;
-	bool v_sync_polarity, h_sync_polarity;
+	bool v_sync_polarity = !(mode->flags & DRM_MODE_FLAG_PVSYNC);
+	bool h_sync_polarity = !(mode->flags & DRM_MODE_FLAG_PHSYNC);
+	struct drm_bridge *bridge = &sbridge->bridge;
+	struct drm_encoder *encoder = bridge->encoder;
+	struct drm_crtc *crtc = encoder ? encoder->crtc : NULL;
+	const char *crtc_name = crtc ? crtc->name : "unknown";
 
-	v_sync_polarity = !(mode->flags & DRM_MODE_FLAG_PVSYNC);
-	h_sync_polarity = !(mode->flags & DRM_MODE_FLAG_PHSYNC);
+	DRM_INFO("csi_mode_set: crtc=%s, bus_fmt=0x%x, default vsync=%u, hsync=%u\n",
+	         crtc_name, bus_fmt, v_sync_polarity, h_sync_polarity);
 
-	regmap_update_bits(sbridge->dss_regmap, DISP_CSITX_DPI_CFG, CSI_DPI_DATA_FORMAT,
-			   bus_fmt_to_dpi_fmt(bus_fmt));
+	/* DATA FORMAT */
+	regmap_update_bits(sbridge->dss_regmap,
+	                   DISP_CSITX_DPI_CFG,
+	                   CSI_DPI_DATA_FORMAT,
+	                   bus_fmt_to_dpi_fmt(bus_fmt));
+	DRM_INFO("  -> CSI_DPI_DATA_FORMAT set to %u\n",
+	         bus_fmt_to_dpi_fmt(bus_fmt));
 
-	regmap_update_bits(sbridge->dss_regmap, DISP_CSITX_DPI_CFG, CSI_DPI_VSYNC_POLARITY,
-			   v_sync_polarity << CSI_DPI_VSYNC_POLARITY_SHIFT);
+	/* VSYNC/HSYNC POLARITY override for bt1120 */
+	if (!strcmp(crtc_name, "crtc-bt1120")) {
+		DRM_INFO("  bt1120 path: forcing VSYNC=0, HSYNC=0\n");
+		regmap_update_bits(sbridge->dss_regmap,
+		                   DISP_CSITX_DPI_CFG,
+		                   CSI_DPI_VSYNC_POLARITY,
+		                   0 << CSI_DPI_VSYNC_POLARITY_SHIFT);
+		regmap_update_bits(sbridge->dss_regmap,
+		                   DISP_CSITX_DPI_CFG,
+		                   CSI_DPI_HSYNC_POLARITY,
+		                   0 << CSI_DPI_HSYNC_POLARITY_SHIFT);
+	} else {
+		DRM_INFO("  normal path: VSYNC=%u, HSYNC=%u\n",
+		         v_sync_polarity, h_sync_polarity);
+		regmap_update_bits(sbridge->dss_regmap,
+		                   DISP_CSITX_DPI_CFG,
+		                   CSI_DPI_VSYNC_POLARITY,
+		                   v_sync_polarity << CSI_DPI_VSYNC_POLARITY_SHIFT);
+		regmap_update_bits(sbridge->dss_regmap,
+		                   DISP_CSITX_DPI_CFG,
+		                   CSI_DPI_HSYNC_POLARITY,
+		                   h_sync_polarity << CSI_DPI_HSYNC_POLARITY_SHIFT);
+	}
 
-	regmap_update_bits(sbridge->dss_regmap, DISP_CSITX_DPI_CFG, CSI_DPI_HSYNC_POLARITY,
-			   h_sync_polarity << CSI_DPI_HSYNC_POLARITY_SHIFT);
-
-	regmap_update_bits(sbridge->dss_regmap, DISP_CSITX_DPI_CFG, CSI_DPI_DE_POLARITY, 0);
+	/* DATA ENABLE POLARITY: always zero */
+	regmap_update_bits(sbridge->dss_regmap,
+	                   DISP_CSITX_DPI_CFG,
+	                   CSI_DPI_DE_POLARITY,
+	                   0);
+	DRM_INFO("  -> CSI_DPI_DE_POLARITY set to 0\n");
 }
+
 
 static const struct syscon_bridge_funcs csi_bridge_funcs = {
 	.mode_set = csi_mode_set,

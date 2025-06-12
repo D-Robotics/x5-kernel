@@ -59,6 +59,9 @@
 #include "vs_bt1120.h"
 #include "bt1120_bridge.h"
 #endif
+#ifdef CONFIG_DROBOT_DW_CSI_TX
+#include "dw_mipi_csi.h"
+#endif
 
 #define DRV_NAME  "vs-drm"
 #define DRV_DESC  "VeriSilicon DRM driver"
@@ -302,6 +305,10 @@ static struct platform_driver *drm_sub_drivers[] = {
 
 #ifdef CONFIG_VERISILICON_DW_MIPI_DSI
 	&dw_mipi_dsi_driver,
+#endif
+
+#ifdef CONFIG_DROBOT_DW_CSI_TX
+	&dw_mipi_csi_driver,
 #endif
 
 #ifdef CONFIG_VERISILICON_SIMPLE_ENCODER

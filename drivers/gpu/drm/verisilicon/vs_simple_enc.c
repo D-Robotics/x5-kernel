@@ -44,6 +44,8 @@ static const struct simple_encoder_priv hdmi_priv = {.encoder_type = DRM_MODE_EN
 
 static const struct simple_encoder_priv dsi_priv = {.encoder_type = DRM_MODE_ENCODER_DSI};
 
+static const struct simple_encoder_priv csi_priv = {.encoder_type = DRM_MODE_ENCODER_VIRTUAL};
+
 static const struct simple_encoder_priv virtual_priv = {.encoder_type = DRM_MODE_ENCODER_VIRTUAL};
 
 static const struct simple_encoder_priv dpi_priv = {.encoder_type = DRM_MODE_ENCODER_DPI};
@@ -105,6 +107,7 @@ static const struct of_device_id simple_encoder_dt_match[] = {
 	{.compatible = "verisilicon,hdmi-encoder", .data = &hdmi_priv},
 	{.compatible = "verisilicon,dp-encoder", .data = &hdmi_priv},
 	{.compatible = "verisilicon,dsi-encoder", .data = &dsi_priv},
+	{ .compatible = "verisilicon,csi-encoder", .data = &csi_priv},
 	{.compatible = "verisilicon,virtual-encoder", .data = &virtual_priv},
 	{.compatible = "verisilicon,dpi-encoder", .data = &dpi_priv},
 	{},

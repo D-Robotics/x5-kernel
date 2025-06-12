@@ -49,6 +49,10 @@ struct snps_dphy {
 
 	struct phy *phy;
 	struct phy_configure_opts_mipi_dphy cfg;
+	/* debugfs */
+	struct dentry *dbgfs_dir;
+	u8 dbg_write_en;
+	u8 dbg_read_en;
 };
 
 #endif // DRIVERS_PHY_VERISILICON_PHY_SNPS_MIPI_DPHY_H_

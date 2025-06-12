@@ -33,6 +33,8 @@ ccflags-$(CONFIG_VERISILICON_GC_PROC_SUPPORT) += \
 		-I$(IOMMU_PATH) \
 		-DUSE_LINUX_PCIE=0 \
 
+ccflags-$(CONFIG_DROBOT_DW_CSI_TX) += -I$(VS_PATH)/mipi_csi_tx
+
 vs_drm-objs := \
 		dc/dc_hw/dc_hw.o \
 		dc/dc_proc/dc_proc.o \
@@ -58,6 +60,12 @@ vs_drm-$(CONFIG_VERISILICON_WRITEBACK_SIF) += dc/dc_proc/sif_proc.o \
 					      dc/vs_sif/vs_sif.o
 
 vs_drm-$(CONFIG_VERISILICON_DW_MIPI_DSI) += dw_mipi_dsi.o
+
+vs_drm-$(CONFIG_DROBOT_DW_CSI_TX) += \
+	mipi_csi_tx/dw_mipi_csi_dev.o \
+	mipi_csi_tx/dw_mipi_csi_drm.o \
+	mipi_csi_tx/dw_mipi_csi_hal.o \
+	mipi_csi_tx/dw_mipi_csi_debugfs.o
 
 obj-$(CONFIG_DRM_VERISILICON) += vs_drm.o
 
