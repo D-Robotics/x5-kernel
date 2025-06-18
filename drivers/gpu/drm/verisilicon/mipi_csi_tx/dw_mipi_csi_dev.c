@@ -10,11 +10,13 @@
 #include <linux/component.h>
 #include <linux/clk.h>
 #include <linux/phy/phy.h>
+#include <linux/mfd/syscon.h>
 
 #include "dw_mipi_csi.h"
 #include "dw_mipi_csi_hal.h"
 #include "dw_mipi_csi_drm.h"
 #include "dw_mipi_csi_debugfs.h"
+#include "dw_mipi_csi_ioctl.h"
 
 static int dw_mipi_csi_bind(struct device *dev, struct device *master, void *data)
 {
@@ -144,6 +146,21 @@ static int dw_mipi_csi_probe(struct platform_device *pdev)
 
 	dw_mipi_csi_drm_register(csi);
 
+	csi->syscon = syscon_regmap_lookup_by_phandle(dev->of_node, "verisilicon,syscon");
+	if (IS_ERR(csi->syscon)) {
+		dev_err(dev, "failed to get disp_sys_con\n");
+		ret = PTR_ERR(csi->syscon);
+		goto err_pm_disable;
+	}
+
+#ifdef CONFIG_DROBOT_DW_CSI_IOCTL
+	ret = dw_csi_ioctl_create(csi);
+	if (ret) {
+		dev_err(dev, "ioctl create failed %d\n", ret);
+		goto err_pm_disable;
+	}
+#endif
+
 	dw_mipi_csi_hal_irq_enable(csi);
 
 	return 0;
@@ -157,6 +174,10 @@ static int dw_mipi_csi_remove(struct platform_device *pdev)
 {
 	struct dw_mipi_csi *csi = platform_get_drvdata(pdev);
 	struct device *dev	= &pdev->dev;
+
+#ifdef CONFIG_DROBOT_DW_CSI_IOCTL
+	dw_csi_ioctl_destroy(csi);
+#endif
 
 	component_del(dev, &dw_mipi_csi_component_ops);
 	dw_mipi_csi_drm_unregister(csi);

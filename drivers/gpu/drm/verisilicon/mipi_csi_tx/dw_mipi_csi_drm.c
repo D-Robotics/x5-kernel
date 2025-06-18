@@ -150,11 +150,45 @@ static void csi_bridge_mode_set(struct drm_bridge *bridge, const struct drm_disp
 	dw_mipi_csi_hal_set_mode(csi, &csi->mode);
 }
 
-static void csi_bridge_post_disable(struct drm_bridge *bridge)
+static void csi_bridge_atomic_enable(struct drm_bridge *bridge, struct drm_bridge_state *old_state)
 {
 	struct dw_mipi_csi *csi = bridge_to_csi(bridge);
+	int ret			= 0;
+
+	if (!csi) {
+		pr_err("dw_mipi_csi: null csi ptr in atomic_enable\n");
+		return;
+	}
+
+	/* try to own CSI TX: IDLE -> DRM; abort if already in use          */
+	if (!atomic_try_cmpxchg(&g_csi_usage, &(int){CSI_USAGE_IDLE}, CSI_USAGE_DRM)) {
+		DRM_DEV_ERROR(csi->dev, "atomic_enable: busy (usage=%u)\n",
+			      atomic_read(&g_csi_usage));
+		return;
+	}
+
+	ret = dw_mipi_csi_hal_power_on(csi);
+	if (ret) {
+		DRM_DEV_ERROR(csi->dev, "atomic_enable: power_on failed (%d)\n", ret);
+		atomic_set(&g_csi_usage, CSI_USAGE_IDLE);
+		return;
+	}
+}
+
+static void csi_bridge_atomic_disable(struct drm_bridge *bridge, struct drm_bridge_state *old_state)
+{
+	struct dw_mipi_csi *csi = bridge_to_csi(bridge);
+	int prev		= CSI_USAGE_IDLE;
+
+	if (!csi)
+		return;
 
 	dw_mipi_csi_hal_disable(csi);
+	dw_mipi_csi_hal_power_off(csi);
+
+	/* release ownership: DRM -> IDLE */
+	prev = atomic_xchg(&g_csi_usage, CSI_USAGE_IDLE);
+	WARN_ON(prev != CSI_USAGE_DRM);
 }
 
 static int csi_bridge_attach(struct drm_bridge *bridge, enum drm_bridge_attach_flags flags)
@@ -183,10 +217,12 @@ static const struct drm_bridge_funcs csi_bridge_funcs = {
 	.atomic_get_input_bus_fmts = csi_bridge_atomic_get_input_bus_fmts,
 	.atomic_check		   = csi_bridge_atomic_check,
 
-	.attach	      = csi_bridge_attach,
-	.detach	      = csi_bridge_detach,
-	.mode_set     = csi_bridge_mode_set,
-	.post_disable = csi_bridge_post_disable,
+	.attach		= csi_bridge_attach,
+	.detach		= csi_bridge_detach,
+	.mode_set	= csi_bridge_mode_set,
+	.atomic_enable	= csi_bridge_atomic_enable,
+	.atomic_disable = csi_bridge_atomic_disable,
+
 };
 
 int dw_mipi_csi_drm_register(struct dw_mipi_csi *csi)

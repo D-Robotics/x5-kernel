@@ -9,6 +9,14 @@
 #include <linux/types.h>
 #include <drm/drm_modes.h>
 #include "dw_mipi_csi.h"
+#include <linux/atomic.h>
+
+#define CSI_USAGE_IDLE   0U
+#define CSI_USAGE_DRM    1U
+#define CSI_USAGE_IOCTL  2U
+
+extern atomic_t g_csi_usage;
+
 #define CSI_IRQ_MASK_ALL_BITS 0xFFFFFFFF
 #define KHZ		      1000
 #define CSI_DEFAULT_STOP_WAIT 0x20

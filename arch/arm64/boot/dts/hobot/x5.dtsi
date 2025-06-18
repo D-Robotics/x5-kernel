@@ -2709,6 +2709,7 @@
 			mipi_csi0: mipi_csi0@3e020000 {
 					compatible = "verisilicon,dw-mipi-csi";
 					status = "disabled";
+					verisilicon,syscon = <&disp_sys_con>;
 					reg = <0x3e020000 0x20000>;
 					interrupt-parent = <&gic>;
 					interrupts = <GIC_SPI 55 IRQ_TYPE_LEVEL_HIGH>;

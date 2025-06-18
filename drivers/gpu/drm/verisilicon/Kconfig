@@ -115,3 +115,8 @@ config DROBOT_DW_CSI_TX
 	  Synopsys DW MIPI CSI TX controller takes input from IPI/IDI
 	  interface and output data via MIPI CSI interface.
 	  Say Y if you need this feature.
+
+config DROBOT_DW_CSI_IOCTL
+	bool "DW MIPI CSI-TX ioctl support"
+	depends on DRM_VERISILICON
+	default y

@@ -67,6 +67,8 @@ vs_drm-$(CONFIG_DROBOT_DW_CSI_TX) += \
 	mipi_csi_tx/dw_mipi_csi_hal.o \
 	mipi_csi_tx/dw_mipi_csi_debugfs.o
 
+vs_drm-$(CONFIG_DROBOT_DW_CSI_IOCTL) += mipi_csi_tx/dw_mipi_csi_ioctl.o
+
 obj-$(CONFIG_DRM_VERISILICON) += vs_drm.o
 
 GCOV_PROFILE := $(CONFIG_GCOV_KERNEL)

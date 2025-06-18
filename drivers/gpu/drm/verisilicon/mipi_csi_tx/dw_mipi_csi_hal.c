@@ -15,6 +15,9 @@
 #define CSI_IPI_FIFO_DEPTH	2048
 #define CSI_IPI_FIFO_ENTRY_BITS 64
 
+/*Global atomic*/
+atomic_t g_csi_usage = ATOMIC_INIT(CSI_USAGE_IDLE);
+
 /* Interrupt mask descriptor */
 struct csi_irq_mask_desc {
 	const char *name;
@@ -1269,3 +1272,10 @@ void dw_mipi_csi_hal_irq_handle(struct dw_mipi_csi *csi)
 					   ARRAY_SIZE(mt_ipi_irq_fields));
 	}
 }
+
+EXPORT_SYMBOL_GPL(dw_mipi_csi_hal_init);
+EXPORT_SYMBOL_GPL(dw_mipi_csi_hal_set_mode);
+EXPORT_SYMBOL_GPL(dw_mipi_csi_hal_power_on);
+EXPORT_SYMBOL_GPL(dw_mipi_csi_hal_disable);
+EXPORT_SYMBOL_GPL(dw_mipi_csi_hal_power_off);
+EXPORT_SYMBOL_GPL(g_csi_usage);

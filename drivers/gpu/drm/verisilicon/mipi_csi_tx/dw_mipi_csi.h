@@ -165,6 +165,8 @@ struct dw_mipi_csi {
 	struct dentry *lanes_file;
 	struct dentry *info_file;
 #endif
+	struct regmap       *syscon;
+	void                *ioctl_priv;
 };
 
 /**
