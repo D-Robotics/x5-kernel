@@ -730,7 +730,10 @@ static int dwcmshc_x5_get_cd(struct mmc_host *mmc)
 		return 1;
 
 	/* Host native card detect */
-	ret = !!(sdhci_readl(host, SDHCI_PRESENT_STATE) & SDHCI_CARD_PRESENT);
+	if (mmc->caps2 & MMC_CAP2_CD_ACTIVE_HIGH)
+		ret = !!!(sdhci_readl(host, SDHCI_PRESENT_STATE) & SDHCI_CARD_PRESENT);
+	else
+		ret = !!(sdhci_readl(host, SDHCI_PRESENT_STATE) & SDHCI_CARD_PRESENT);
 
 	/* !(host->ier & ((SDHCI_INT_CARD_INSERT | SDHCI_INT_CARD_REMOVE))) means just after sdhci init
 	 * sdhci init will clear all ier and just add some default ier which without card insert and card remove
@@ -738,7 +741,10 @@ static int dwcmshc_x5_get_cd(struct mmc_host *mmc)
 	 * so after do sdhci init delay some time then get present reg again */
 	if (!ret && !(host->ier & ((SDHCI_INT_CARD_INSERT | SDHCI_INT_CARD_REMOVE)))) {
 		udelay(100);
-		ret = !!(sdhci_readl(host, SDHCI_PRESENT_STATE) & SDHCI_CARD_PRESENT);
+		if (mmc->caps2 & MMC_CAP2_CD_ACTIVE_HIGH)
+			ret = !!!(sdhci_readl(host, SDHCI_PRESENT_STATE) & SDHCI_CARD_PRESENT);
+		else
+			ret = !!(sdhci_readl(host, SDHCI_PRESENT_STATE) & SDHCI_CARD_PRESENT);
 	}
 
 	return ret;
