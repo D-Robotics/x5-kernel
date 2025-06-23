@@ -94,8 +94,9 @@ EXPORT_SYMBOL_GPL(hpu3501_clr_bits);
 static int hpu3501_i2c_probe(struct i2c_client *i2c,
 			     const struct i2c_device_id *id)
 {
-	int ret;
+	int ret = -1;
 
+	struct device_node *child_np;
 	struct hpu3501_dev *hpu3501;
 
 	hpu3501 =
@@ -114,9 +115,25 @@ static int hpu3501_i2c_probe(struct i2c_client *i2c,
 		return ret;
 	}
 
-	ret = devm_mfd_add_devices(hpu3501->dev, PLATFORM_DEVID_AUTO,
-				   hpu3501_devs, ARRAY_SIZE(hpu3501_devs), NULL,
-				   0, NULL);
+	child_np = of_get_child_by_name(i2c->dev.of_node, "hpu3501-regulator");
+	if (child_np) {
+		dev_info(&i2c->dev, "Found hpu3501-regulator node, register regulator\n");
+		ret = devm_mfd_add_devices(hpu3501->dev, PLATFORM_DEVID_AUTO,
+					&hpu3501_devs[0], 1, NULL,
+					0, NULL);
+	} else {
+    		dev_info(&i2c->dev, "No hpu3501-regulator node, skip registration\n");
+	}
+
+	child_np = of_get_child_by_name(i2c->dev.of_node, "hpu3501-rtc");
+	if (child_np) {
+		dev_info(&i2c->dev, "Found hpu3501-rtc node, register rtc\n");
+		ret = devm_mfd_add_devices(hpu3501->dev, PLATFORM_DEVID_AUTO,
+					&hpu3501_devs[1], 1, NULL,
+					0, NULL);
+	} else {
+    		dev_info(&i2c->dev, "No hpu3501-rtc node, skip registration\n");
+	}
 
 	return ret;
 }
