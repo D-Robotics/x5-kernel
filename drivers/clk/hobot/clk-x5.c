@@ -57,9 +57,11 @@
 static struct pll_rate_table x5_pll_rates[] = {
 	/* _rate, _prediv, _mint, _mfrac, _p, _divvcop, _r, _divvcor */
 	X5_PLL_RATE(1800000000, 1, 0x96, 0x0, 1, 2, 1, 2),
+	X5_PLL_RATE(1631872000, 1, 0x87, 0xFD45, 1, 2, 1, 2),
 	X5_PLL_RATE(1622250000, 1, 0x87, 0x3000, 1, 2, 3, 2),
 	X5_PLL_RATE(1620000000, 1, 0x87, 0, 1, 2, 3, 2),
 	X5_PLL_RATE(1500000000, 1, 0x7D, 0, 1, 2, 2, 2),
+	X5_PLL_RATE(1483500000, 1, 0x7B, 0xA000, 1, 2, 1, 2),
 	X5_PLL_RATE(1347750000, 1, 0x70, 0x5000, 1, 2, 1, 2),
 	X5_PLL_RATE(1200000000, 1, 0xC8, 0, 1, 4, 1, 4),
 	X5_PLL_RATE(1050000000, 1, 0xAF, 0, 1, 4, 1, 4),
