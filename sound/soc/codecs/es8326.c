@@ -1204,15 +1204,25 @@ static const struct snd_soc_component_driver soc_component_dev_es8326 = {
 
 static int32_t es8326_i2c_suspend(struct device *dev)
 {
+	struct es8326_priv *es8326;
 	int32_t ret = 0;
+
+	es8326 = dev_get_drvdata(dev);
 	dev_info(dev, "%s\n", __func__);
+	disable_irq(es8326->irq);
+
 	return ret;
 }
 
 static int32_t es8326_i2c_resume(struct device *dev)
 {
+	struct es8326_priv *es8326;
 	int32_t ret = 0;
+
+	es8326 = dev_get_drvdata(dev);
 	dev_info(dev, "%s\n", __func__);
+	enable_irq(es8326->irq);
+
 	return ret;
 }
 
