@@ -82,6 +82,10 @@ static int gpu3DMinClock = 1;
 static int contiguousRequested;
 static ulong bankSize;
 
+static bool suppoort_drm = 0;
+module_param_named(drm, suppoort_drm, bool, 0);
+MODULE_PARM_DESC(drm, "Support DRM for Xorg - (default=0)");
+
 static void _InitModuleParam(gcsMODULE_PARAMETERS *ModuleParam)
 {
 	gctUINT i, j;
@@ -1160,7 +1164,8 @@ static int __devinit viv_dev_probe(struct platform_device *pdev)
 		platform_set_drvdata(pdev, galDevice);
 
 #if gcdENABLE_DRM
-		ret = viv_drm_probe(&pdev->dev);
+		if(suppoort_drm != 0)
+			ret = viv_drm_probe(&pdev->dev);
 #endif
 	}
 
@@ -1195,7 +1200,8 @@ static int __devexit viv_dev_remove(struct platform_device *pdev)
 	gcmkHEADER();
 
 #if gcdENABLE_DRM
-	viv_drm_remove(&pdev->dev);
+	if(suppoort_drm != 0)
+		viv_drm_remove(&pdev->dev);
 #endif
 
 	drv_exit();
