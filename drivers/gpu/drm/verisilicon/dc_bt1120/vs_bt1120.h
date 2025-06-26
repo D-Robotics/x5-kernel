@@ -100,7 +100,7 @@ struct bt1120_scan {
 	/** hfp range. */
 	bool hfp_range;
 
-	/** scan format. */
+	/** is_interlaced */
 	bool is_interlaced;
 };
 
@@ -259,6 +259,9 @@ struct vs_bt1120 {
 
 	/** odd or even field */
 	bool is_odd_field;
+
+	/** is_interlaced */
+	bool is_interlaced;
 
 	/** aux device list. */
 	struct list_head aux_list;

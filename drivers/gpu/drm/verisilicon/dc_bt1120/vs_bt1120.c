@@ -360,9 +360,10 @@ static void bt1120_plane_update(struct vs_plane *vs_plane, struct drm_plane_stat
 	struct drm_framebuffer *drm_fb	    = state->fb;
 	dma_addr_t dma_addr[MAX_NUM_PLANES] = {};
 
-	u32 format	= drm_fb->format->format;
-	u32 img_vsize	= drm_fb->height;
-	u32 line_offset = src->y1 >> 16;
+	u32 format                          = drm_fb->format->format;
+	u32 img_vsize                       = drm_fb->height;
+	u32 line_offset                     = src->y1 >> 16;
+	u32 scan_mode;
 
 	get_buffer_addr(drm_fb, dma_addr);
 	update_format(bt1120_plane, format);
@@ -370,10 +371,20 @@ static void bt1120_plane_update(struct vs_plane *vs_plane, struct drm_plane_stat
 	bt1120_write(bt1120_plane->bt1120, REG_BT1120_IMG_IN_BADDR_Y_CTL, dma_addr[0]);
 	bt1120_write(bt1120_plane->bt1120, REG_BT1120_IMG_IN_BADDR_UV_CTL, dma_addr[1]);
 
-	bt1120_write(bt1120_plane->bt1120, REG_BT1120_IMG_PIX_HSTRIDE_CTL,
-		     drm_fb->pitches[0] / HSTRIDE_UNIT_SIZE);
+	/* scan mode. 0: interlaced, 1: progressive */
+	scan_mode = bt1120_read(bt1120_plane->bt1120, REG_BT1120_SCAN_FORMAT_CTL);
+	if (scan_mode == INTERLACED_MODE) {
+			bt1120_write(bt1120_plane->bt1120, REG_BT1120_IMG_PIX_HSTRIDE_CTL,
+						drm_fb->pitches[0] / HSTRIDE_UNIT_SIZE * 2);
+			bt1120_write(bt1120_plane->bt1120, REG_BT1120_IMG_PIX_VSIZE_CTL, img_vsize / 2);
+			bt1120_plane->bt1120->is_interlaced = true;
+	} else {
+			bt1120_write(bt1120_plane->bt1120, REG_BT1120_IMG_PIX_HSTRIDE_CTL,
+						drm_fb->pitches[0] / HSTRIDE_UNIT_SIZE);
+			bt1120_write(bt1120_plane->bt1120, REG_BT1120_IMG_PIX_VSIZE_CTL, img_vsize);
+			bt1120_plane->bt1120->is_interlaced = false;
+	}
 
-	bt1120_write(bt1120_plane->bt1120, REG_BT1120_IMG_PIX_VSIZE_CTL, img_vsize);
 	bt1120_write(bt1120_plane->bt1120, REG_BT1120_IMG_PIX_HSIZE_CTL, drm_fb->width);
 
 	bt1120_write(bt1120_plane->bt1120, REG_BT1120_LINE_OFFSET_CTL, line_offset);
@@ -569,6 +580,18 @@ static void bt1120_disp_update_scan(struct bt1120_disp *bt1120_disp, struct bt11
 		scan->v_total	     = mode->vtotal;
 		scan->v_active_start = scan->v_sync_stop + (mode->vtotal - mode->vsync_end);
 		scan->v_active_stop  = scan->v_active_start + mode->vdisplay - 1;
+
+		/* check if the real interlaced mode matches with the current interlaced settings*/
+		if (scan->is_interlaced != bt1120_disp->bt1120->is_interlaced) {
+				reg_value =
+						bt1120_read(bt1120_disp->bt1120, REG_BT1120_IMG_PIX_HSTRIDE_CTL);
+				bt1120_write(bt1120_disp->bt1120, REG_BT1120_IMG_PIX_HSTRIDE_CTL,
+							reg_value / 2);
+				reg_value = bt1120_read(bt1120_disp->bt1120, REG_BT1120_IMG_PIX_VSIZE_CTL);
+				bt1120_write(bt1120_disp->bt1120, REG_BT1120_IMG_PIX_VSIZE_CTL,
+							reg_value * 2);
+				bt1120_disp->bt1120->is_interlaced = scan->is_interlaced;
+		}
 	} else {
 		scan->v_sync_start = 1;
 		scan->v_sync_stop =
@@ -576,10 +599,17 @@ static void bt1120_disp_update_scan(struct bt1120_disp *bt1120_disp, struct bt11
 		scan->v_total	     = mode->vtotal / 2 + 1;
 		scan->v_active_start = scan->v_sync_stop + (mode->vtotal - mode->vsync_end) / 2;
 		scan->v_active_stop  = scan->v_active_start + mode->vdisplay / 2 - 1;
-		reg_value = bt1120_read(bt1120_disp->bt1120, REG_BT1120_IMG_PIX_HSTRIDE_CTL);
-		bt1120_write(bt1120_disp->bt1120, REG_BT1120_IMG_PIX_HSTRIDE_CTL, reg_value * 2);
-		reg_value = bt1120_read(bt1120_disp->bt1120, REG_BT1120_IMG_PIX_VSIZE_CTL);
-		bt1120_write(bt1120_disp->bt1120, REG_BT1120_IMG_PIX_VSIZE_CTL, reg_value / 2);
+		/* check if the real interlaced mode matches with the current interlaced settings*/
+		if (scan->is_interlaced != bt1120_disp->bt1120->is_interlaced) {
+				reg_value =
+						bt1120_read(bt1120_disp->bt1120, REG_BT1120_IMG_PIX_HSTRIDE_CTL);
+				bt1120_write(bt1120_disp->bt1120, REG_BT1120_IMG_PIX_HSTRIDE_CTL,
+							reg_value * 2);
+				reg_value = bt1120_read(bt1120_disp->bt1120, REG_BT1120_IMG_PIX_VSIZE_CTL);
+				bt1120_write(bt1120_disp->bt1120, REG_BT1120_IMG_PIX_VSIZE_CTL,
+							reg_value / 2);
+				bt1120_disp->bt1120->is_interlaced = scan->is_interlaced;
+		}
 	}
 	if (scan->h_total - scan->h_active_stop + 1 >= BT1120_EAV_SIZE)
 		scan->hfp_range = 1;
@@ -611,7 +641,7 @@ static void bt1120_disp_enable(struct vs_crtc *vs_crtc)
 	struct drm_display_mode *mode	= &vs_crtc->base.state->adjusted_mode;
 	struct bt1120_scan scan;
 	u32 pix_clk_rate;
-	int ret;
+	int ret = 0;
 
 	if (mode->flags & DRM_MODE_FLAG_INTERLACE)
 		scan.is_interlaced = true;
@@ -1111,7 +1141,8 @@ static int bt1120_probe(struct platform_device *pdev)
 		goto err_disable_axi_clk;
 	}
 
-	bt1120->info = &g_bt1120_info;
+	bt1120->info          = &g_bt1120_info;
+	bt1120->is_interlaced = false;
 
 	ret = component_add(dev, &bt1120_component_ops);
 	if (!ret)
