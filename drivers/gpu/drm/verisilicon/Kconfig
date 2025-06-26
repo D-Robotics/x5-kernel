@@ -119,4 +119,5 @@ config DROBOT_DW_CSI_TX
 config DROBOT_DW_CSI_IOCTL
 	bool "DW MIPI CSI-TX ioctl support"
 	depends on DRM_VERISILICON
+	select DROBOT_DW_CSI_TX
 	default y
