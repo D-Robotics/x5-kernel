@@ -980,7 +980,7 @@ static int dwcmshc_probe(struct platform_device *pdev)
 				dev_warn(dev, "can not parse voltage gpio\n");
 
 			if (of_property_read_u32(pdev->dev.of_node, "toggle_interval_us", &toggle_interval_us)) {
-				dev_warn(dev, "Failed to read toggle_interval_us, using default\n");
+				dev_info(dev, "toggle_interval_us using default\n");
 				toggle_interval_us = 1000;
 			}
 
