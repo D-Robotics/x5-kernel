@@ -85,6 +85,12 @@
 	pconf_drv_pu_ds2_1v8: pconf-dev-pu-ds2-1v8 {
 		bias-pull-up;
 		power-source = <HORIZON_IO_PAD_VOLTAGE_1V8>;
+		drive-strength = <2>;
+	};
+
+	pconf_drv_pu_ds5_1v8: pconf-dev-pu-ds5-1v8 {
+		bias-pull-up;
+		power-source = <HORIZON_IO_PAD_VOLTAGE_1V8>;
 		drive-strength = <5>;
 	};
 
@@ -237,8 +243,8 @@
 &dsp_iomuxc {
 	pinctrl_dsp_i2c7: dsp_i2c7grp {
 		horizon,pins = <
-			DSP_I2C7_SDA  DSP_PINMUX_0  BIT_OFFSET0  MUX_ALT0 &pconf_drv_pu_ds2_1v8
-			DSP_I2C7_SCL  DSP_PINMUX_0  BIT_OFFSET2  MUX_ALT0 &pconf_drv_pu_ds2_1v8
+			DSP_I2C7_SDA  DSP_PINMUX_0  BIT_OFFSET0  MUX_ALT0 &pconf_drv_pu_ds5_1v8
+			DSP_I2C7_SCL  DSP_PINMUX_0  BIT_OFFSET2  MUX_ALT0 &pconf_drv_pu_ds5_1v8
 		>;
 	};
 
@@ -402,8 +408,8 @@
 
 	pinctrl_i2c2: i2c2grp {
 		horizon,pins = <
-			LSIO_I2C2_SCL  LSIO_PINMUX_2 BIT_OFFSET24  MUX_ALT0 &pconf_drv_pu_ds2_1v8
-			LSIO_I2C2_SDA  LSIO_PINMUX_2 BIT_OFFSET26  MUX_ALT0 &pconf_drv_pu_ds2_1v8
+			LSIO_I2C2_SCL  LSIO_PINMUX_2 BIT_OFFSET24  MUX_ALT0 &pconf_drv_pu_ds5_1v8
+			LSIO_I2C2_SDA  LSIO_PINMUX_2 BIT_OFFSET26  MUX_ALT0 &pconf_drv_pu_ds5_1v8
 		>;
 	};
 
@@ -416,8 +422,8 @@
 
 	pinctrl_i2c4: i2c4grp {
 		horizon,pins = <
-			LSIO_I2C4_SCL  LSIO_PINMUX_3 BIT_OFFSET0  MUX_ALT0 &pconf_drv_pu_ds2_1v8
-			LSIO_I2C4_SDA  LSIO_PINMUX_3 BIT_OFFSET2  MUX_ALT0 &pconf_drv_pu_ds2_1v8
+			LSIO_I2C4_SCL  LSIO_PINMUX_3 BIT_OFFSET0  MUX_ALT0 &pconf_drv_pu_ds5_1v8
+			LSIO_I2C4_SDA  LSIO_PINMUX_3 BIT_OFFSET2  MUX_ALT0 &pconf_drv_pu_ds5_1v8
 		>;
 	};
 
@@ -556,25 +562,25 @@
 
 	pinctrl_sensor0_mclk: pinctrl_sensor0_mclk {
 		horizon,pins = <
-			LSIO_SPI3_SCLK LSIO_PINMUX_1 BIT_OFFSET24  MUX_ALT3 &pconf_drv_pu_ds2_1v8
+			LSIO_SPI3_SCLK LSIO_PINMUX_1 BIT_OFFSET24  MUX_ALT3 &pconf_drv_pu_ds5_1v8
 		>;
 	};
 
 	pinctrl_sensor1_mclk: pinctrl_sensor1_mclk {
 		horizon,pins = <
-			LSIO_SPI3_SSN LSIO_PINMUX_1 BIT_OFFSET26  MUX_ALT3 &pconf_drv_pu_ds2_1v8
+			LSIO_SPI3_SSN LSIO_PINMUX_1 BIT_OFFSET26  MUX_ALT3 &pconf_drv_pu_ds5_1v8
 		>;
 	};
 
 	pinctrl_sensor2_mclk: pinctrl_sensor2_mclk {
 		horizon,pins = <
-			LSIO_SPI3_MISO LSIO_PINMUX_1 BIT_OFFSET28  MUX_ALT3 &pconf_drv_pu_ds2_1v8
+			LSIO_SPI3_MISO LSIO_PINMUX_1 BIT_OFFSET28  MUX_ALT3 &pconf_drv_pu_ds5_1v8
 		>;
 	};
 
 	pinctrl_sensor3_mclk: pinctrl_sensor3_mclk {
 		horizon,pins = <
-			LSIO_SPI3_MOSI LSIO_PINMUX_1 BIT_OFFSET30  MUX_ALT3 &pconf_drv_pu_ds2_1v8
+			LSIO_SPI3_MOSI LSIO_PINMUX_1 BIT_OFFSET30  MUX_ALT3 &pconf_drv_pu_ds5_1v8
 		>;
 	};
 };
