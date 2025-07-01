@@ -22,6 +22,7 @@
 #include <linux/bcd.h>
 #include <linux/delay.h>
 #include <linux/of_irq.h>
+#include <linux/pm_wakeup.h>
 
 /* PMIC HPU3501 RTC/ALARM rigisters */
 #define HPU3501_RTC_ISR 0X30
@@ -286,6 +287,8 @@ static irqreturn_t hpu3501_alarm_irq_handler(int irq, void *data)
 {
 	struct hpu3501_rtc *rtc = data;
 
+	pm_wakeup_event(rtc->dev, 0);
+
 	schedule_work(&rtc->irq_work);
 
 	return IRQ_HANDLED;
@@ -412,9 +415,26 @@ static int hpu3501_rtc_remove(struct platform_device *pdev)
 	return 0;
 }
 
+static int __maybe_unused rtc_suspend(struct device *dev)
+{
+	struct hpu3501_rtc *rtc = dev_get_drvdata(dev);
+
+	return enable_irq_wake(rtc->irq);
+}
+
+static int __maybe_unused rtc_resume(struct device *dev)
+{
+	struct hpu3501_rtc *rtc = dev_get_drvdata(dev);
+
+	return disable_irq_wake(rtc->irq);
+}
+
+static SIMPLE_DEV_PM_OPS(rtc_pm_ops, rtc_suspend, rtc_resume);
+
 static struct platform_driver hpu3501_rtc_driver = {
 	.driver = {
 		.name = "hpu3501-rtc",
+		.pm = &rtc_pm_ops,
 	},
 	.probe = hpu3501_rtc_probe,
 	.remove = hpu3501_rtc_remove,
