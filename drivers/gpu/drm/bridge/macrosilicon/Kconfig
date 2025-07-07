@@ -1,0 +1,11 @@
+
+config DRM_MS7210
+	tristate "MS7210 BT1120/HDMI bridge"
+	depends on OF
+	select DRM_KMS_HELPER
+	select REGMAP_I2C
+	select I2C_MUX
+	select SND_SOC_HDMI_CODEC if SND_SOC
+	help
+	  Driver for MS7210 BT1120 to HDMI bridge
+	  chip driver.

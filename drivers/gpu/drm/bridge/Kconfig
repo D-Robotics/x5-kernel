@@ -413,4 +413,6 @@ source "drivers/gpu/drm/bridge/synopsys/Kconfig"
 
 source "drivers/gpu/drm/bridge/verisilicon/Kconfig"
 
+source "drivers/gpu/drm/bridge/macrosilicon/Kconfig"
+
 endmenu

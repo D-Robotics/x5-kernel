@@ -41,3 +41,5 @@ obj-y += cadence/
 obj-y += imx/
 obj-y += synopsys/
 obj-y += verisilicon/
+obj-y += macrosilicon/
+
