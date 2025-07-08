@@ -2103,6 +2103,60 @@ static struct edid *edid_filter_invalid_blocks(struct edid *edid,
  *
  * Return: 0 on success or -1 on failure.
  */
+
+static int
+drm_do_probe_ddc_edid_fallback(void *data, u8 *buf, unsigned int block, size_t len)
+{
+	struct i2c_adapter *adapter = data;
+	unsigned char start = 0;
+	unsigned char xfers = 2;
+	int ret, retries = 5;
+	u8 tmp_buf[512]={0};
+	size_t read_len = (block + 1) * EDID_LENGTH;
+
+	/*
+	 * The core I2C driver will automatically retry the transfer if the
+	 * adapter reports EAGAIN. However, we find that bit-banging transfers
+	 * are susceptible to errors under a heavily loaded machine and
+	 * generate spurious NAKs and timeouts. Retrying the transfer
+	 * of the individual block a few times seems to overcome this.
+	 */
+	do {
+		struct i2c_msg msgs[] = {
+			{
+				.addr	= DDC_ADDR,
+				.flags	= 0,
+				.len	= 1,
+				.buf	= &start,
+			}, {
+				.addr	= DDC_ADDR,
+				.flags	= I2C_M_RD,
+				.len	= read_len,
+				.buf	= tmp_buf,
+			}
+		};
+
+		/*
+		 * Avoid sending the segment addr to not upset non-compliant
+		 * DDC monitors.
+		 */
+		ret = i2c_transfer(adapter, &msgs[0], xfers);
+
+		if (ret == -ENXIO) {
+			DRM_DEBUG_KMS("drm: skipping non-existent adapter %s\n",
+					adapter->name);
+			break;
+		}
+	} while (ret != xfers && --retries);
+
+	if(ret == xfers)
+	{
+		memcpy(buf, tmp_buf + block * EDID_LENGTH, len);
+	}
+
+	return ret == xfers ? 0 : -1;
+}
+
 static int
 drm_do_probe_ddc_edid(void *data, u8 *buf, unsigned int block, size_t len)
 {
@@ -2151,6 +2205,12 @@ drm_do_probe_ddc_edid(void *data, u8 *buf, unsigned int block, size_t len)
 			break;
 		}
 	} while (ret != xfers && --retries);
+
+	if(ret != xfers && retries <= 0)
+	{
+		ret = drm_do_probe_ddc_edid_fallback(data, buf, block, len);
+		return ret;
+	}
 
 	return ret == xfers ? 0 : -1;
 }
