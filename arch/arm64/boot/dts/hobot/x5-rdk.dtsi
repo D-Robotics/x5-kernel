@@ -622,15 +622,12 @@
 &lpwm1 {
 	status = "okay";
 	pinctrl-names = "default";
-	//pinctrl-0 = <&pinctrl_lpwm1_0 &pinctrl_lpwm1_1>;
+	pinctrl-0 = <&pinctrl_lpwm1_0 &pinctrl_lpwm1_1>;
 };
 
 &mipi_host0 {
 	status = "okay";
-	pinctrl-names = "enable", "disable";
-	pinctrl-0 = <&pinctrl_sensor0_mclk>; //mclk0
-	pinctrl-1 = <&pinctrl_lpwm1_0>;
-	snrclk-idx = <0>;  //mclk index
+	// in RDK X5, MCLK uses an external active crystal oscillator
 };
 
 &mipi_host1 {
@@ -640,10 +637,7 @@
 
 &mipi_host2 {
 	status = "okay";
-	pinctrl-names = "enable", "disable";
-	pinctrl-0 = <&pinctrl_sensor1_mclk>; //mclk1
-	pinctrl-1 = <&pinctrl_lpwm1_1>;
-	snrclk-idx = <1>;  //mclk index
+	// in RDK X5, MCLK uses an external active crystal oscillator
 };
 
 &mipi_host3 {
