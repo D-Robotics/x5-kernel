@@ -105,6 +105,18 @@
 	};
 };
 
+&dsp_iomuxc {
+	pinctrl_dsp_i2s1: i2s1grp {
+		horizon,pins = <
+			DSP_I2S1_DI  DSP_PINMUX_0  BIT_OFFSET14  MUX_ALT0 &pconf_drv_pd_ds2_3v3
+			DSP_I2S1_DO  DSP_PINMUX_0  BIT_OFFSET16  MUX_ALT0 &pconf_drv_pd_ds2_3v3
+			DSP_I2S1_MCLK  DSP_PINMUX_0  BIT_OFFSET18  MUX_ALT0 &pconf_drv_pu_ds2_3v3
+			DSP_I2S1_SCLK  DSP_PINMUX_0  BIT_OFFSET20  MUX_ALT0 &pconf_drv_pu_ds2_3v3
+			DSP_I2S1_WS  DSP_PINMUX_0  BIT_OFFSET22  MUX_ALT0 &pconf_drv_pu_ds2_3v3
+		>;
+	};
+};
+
 &lsio_iomuxc {
 	pinctrl_uart1: uart1grp {
 		horizon,pins = <

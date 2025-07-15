@@ -76,6 +76,12 @@
 		drive-strength = <2>;
 	};
 
+	pconf_drv_pd_ds2_3v3: pconf-dev-pd-ds2-3v3 {
+		bias-pull-down;
+		power-source = <HORIZON_IO_PAD_VOLTAGE_3V3>;
+		drive-strength = <2>;
+	};
+
 	pconf_drv_pu_ds7_1v8: pconf-dev-pu-ds7-1v8 {
 		bias-pull-up;
 		power-source = <HORIZON_IO_PAD_VOLTAGE_1V8>;
