@@ -343,9 +343,12 @@ static int rtl8211f_config_init(struct phy_device *phydev)
 	int ret;
 
 	//LED
-	rtl821x_write_page(phydev, 0xd04);
-	phy_write(phydev, 0x10, 0x6d60);
-	phy_write(phydev, 0x11, 0x80);
+	if(phydev->phy_id == 0x001cc916)
+	{
+		rtl821x_write_page(phydev, 0xd04);
+		phy_write(phydev, 0x10, 0x6d6b);
+		phy_write(phydev, 0x11, 0x9);
+	}
 
 	ret = phy_modify_paged_changed(phydev, 0xa43, RTL8211F_PHYCR1,
 				       RTL8211F_ALDPS_PLL_OFF | RTL8211F_ALDPS_ENABLE | RTL8211F_ALDPS_XTAL_OFF,
