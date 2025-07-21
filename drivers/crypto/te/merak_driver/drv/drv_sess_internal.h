@@ -195,6 +195,7 @@ typedef struct te_sess_ctx {
     te_sess_slot_cat_t cat;             /**< session slot category */
     int32_t slotid;                     /**< slot id of this session */
     void *hwctx;                        /**< HW context */
+    volatile uint32_t flags;            /**< flags */
 } te_sess_ctx_t;
 
 /**

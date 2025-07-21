@@ -9,6 +9,12 @@
 #include "drv_sess.h"
 #include "drv_sess_internal.h"
 
+/* Session context used flag */
+#define SESS_CTX_FLAG_USED     1U
+
+/* Session wait step in ms */
+#define SESS_WAIT_STEP_MS      10U
+
 /**
  *  Global session governor
  *  shared with SCA & HASH
@@ -568,9 +574,29 @@ err1:
 
 static void te_sess_ctx_destroy( te_sess_ctx_t *sctx )
 {
-    if ( sctx == NULL ) {
-        return;
+#ifdef CFG_TE_IRQ_EN
+    uint32_t last = osal_read_timestamp_ms();
+
+    /**
+     * Wait until the sctx gets released if applicable.
+     * The intent is to sync with the following callbacks that is called in the
+     * interrupt service routine when the CFG_TE_IRQ_EN is enabled.
+     * - te_sess_sync_srb_done()
+     * - te_sess_async_srb_done()
+     *
+     * Just cannot destroy the sctx when it is still in use!
+     * Note the sctx pointer is checked in te_sess_ctx_put(). So it is ok to use
+     * the sctx pointer directly here.
+     */
+    while ( (sctx->flags & SESS_CTX_FLAG_USED) != 0U ) {
+        osal_sleep_ms( SESS_WAIT_STEP_MS );
+        if ( (osal_read_timestamp_ms() - last) > 1000U ) {
+            OSAL_LOG_WARN( "Wait for sess(%d) done ...\n", sctx->sid );
+            last = osal_read_timestamp_ms();
+        }
     }
+    osal_rmb(); /* read barrier#3 */
+#endif /* CFG_TE_IRQ_EN */
 
     osal_mutex_destroy( sctx->mutex );
     osal_spin_lock_destroy( &sctx->lock );
@@ -589,11 +615,16 @@ static void te_sess_ctx_destroy( te_sess_ctx_t *sctx )
 static void te_sess_sync_srb_done( te_sess_cb_para_t *para, int32_t err )
 {
     te_sess_srb_t *srb = (te_sess_srb_t *)para->priv;
+    struct te_sess_ctx *sctx = srb->sctx;
 
+    osal_wmb(); /* write barrier#1 */
+    sctx->flags |= SESS_CTX_FLAG_USED;  /* Set the used flag */
     srb->stat = err;
+    osal_wmb(); /* write barrier#2 */
     para->status = err;
-    osal_wmb();
+    osal_wmb(); /* write barrier#3 */
     SESS_CMD_WAKE_UP( &srb->done );
+    sctx->flags &= ~SESS_CTX_FLAG_USED; /* Clear the used flag */
 
     return;
 }
@@ -607,12 +638,13 @@ static bool te_sess_wait_sync_srb_done( te_sess_module_ctx_t *mctx,
     te_sess_ea_dispatch_event( ea );
 #endif
 
-    osal_rmb();
+    osal_rmb(); /* read barrier#1 */
     if ( para->status != (int32_t)TE_ERROR_BUSY ) {
         result = true;
     } else {
         result = false;
     }
+    osal_rmb(); /* read barrier#2 */
 
     return result;
 }
@@ -729,6 +761,8 @@ static void te_sess_async_srb_done( te_sess_cb_para_t *para, int32_t err )
     te_sess_ar_t *ar = NULL;
 
     srb->stat = err;
+    sctx->flags |= SESS_CTX_FLAG_USED; /* Set the used flag */
+    osal_wmb();
     switch (srb->stat) {
     case TE_SUCCESS:
         if ( CMDID(srb->cmdptr) == CLEAR_CMD &&
@@ -776,6 +810,7 @@ static void te_sess_async_srb_done( te_sess_cb_para_t *para, int32_t err )
     ar = srb->ar;
     ar->err = srb->stat;
     te_sess_ctx_put_srb( sctx, srb );
+    sctx->flags &= ~SESS_CTX_FLAG_USED; /* Clear the used flag */
 
     osal_wmb();
     ar->cb( ar );
