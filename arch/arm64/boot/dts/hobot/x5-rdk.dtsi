@@ -150,23 +150,23 @@
 };
 
 &hsio_iomuxc {
-	pinctrl_enet_rmii: enetrmiigrp {
+	pinctrl_enet: enetgrp {
 		horizon,pins = <
-			HSIO_ENET_MDC           HSIO_PINMUX_1   BIT_OFFSET30    MUX_ALT0        &pconf_bias_disabled_ds2_3v3
-			HSIO_ENET_MDIO          HSIO_PINMUX_1   BIT_OFFSET28    MUX_ALT0        &pconf_bias_disabled_ds2_3v3
-			HSIO_ENET_TXD_0         HSIO_PINMUX_1   BIT_OFFSET26    MUX_ALT0        &pconf_bias_disabled_ds3_3v3
-			HSIO_ENET_TXD_1         HSIO_PINMUX_1   BIT_OFFSET24    MUX_ALT0        &pconf_bias_disabled_ds3_3v3
-			HSIO_ENET_TXD_2         HSIO_PINMUX_1   BIT_OFFSET22    MUX_ALT0        &pconf_bias_disabled_ds3_3v3
-			HSIO_ENET_TXD_3         HSIO_PINMUX_1   BIT_OFFSET20    MUX_ALT0        &pconf_bias_disabled_ds3_3v3
-			HSIO_ENET_TXEN          HSIO_PINMUX_1   BIT_OFFSET18    MUX_ALT0        &pconf_bias_disabled_ds2_3v3
-			HSIO_ENET_TX_CLK        HSIO_PINMUX_1   BIT_OFFSET16    MUX_ALT1        &pconf_bias_disabled_ds6_3v3
-			HSIO_ENET_RX_CLK        HSIO_PINMUX_1   BIT_OFFSET14    MUX_ALT0        &pconf_bias_disabled_ds2_3v3
-			HSIO_ENET_RXD_0         HSIO_PINMUX_1   BIT_OFFSET12    MUX_ALT0        &pconf_bias_disabled_ds2_3v3
-			HSIO_ENET_RXD_1         HSIO_PINMUX_1   BIT_OFFSET10    MUX_ALT0        &pconf_bias_disabled_ds2_3v3
-			HSIO_ENET_RXD_2         HSIO_PINMUX_1   BIT_OFFSET8             MUX_ALT0        &pconf_bias_disabled_ds2_3v3
-			HSIO_ENET_RXD_3         HSIO_PINMUX_1   BIT_OFFSET6             MUX_ALT0        &pconf_bias_disabled_ds2_3v3
-			HSIO_ENET_RXDV          HSIO_PINMUX_1   BIT_OFFSET4             MUX_ALT0        &pconf_bias_disabled_ds2_3v3
-			HSIO_ENET_PHY_CLK       HSIO_PINMUX_1   BIT_OFFSET2             MUX_ALT0        &pconf_bias_disabled_ds2_3v3
+			HSIO_ENET_MDC		HSIO_PINMUX_1	BIT_OFFSET30	MUX_ALT0	&pconf_bias_disabled_ds2_1v8
+			HSIO_ENET_MDIO		HSIO_PINMUX_1	BIT_OFFSET28	MUX_ALT0	&pconf_bias_disabled_ds2_1v8
+			HSIO_ENET_TXD_0		HSIO_PINMUX_1	BIT_OFFSET26	MUX_ALT0	&pconf_bias_disabled_ds3_1v8
+			HSIO_ENET_TXD_1		HSIO_PINMUX_1	BIT_OFFSET24	MUX_ALT0	&pconf_bias_disabled_ds3_1v8
+			HSIO_ENET_TXD_2		HSIO_PINMUX_1	BIT_OFFSET22	MUX_ALT0	&pconf_bias_disabled_ds3_1v8
+			HSIO_ENET_TXD_3		HSIO_PINMUX_1	BIT_OFFSET20	MUX_ALT0	&pconf_bias_disabled_ds3_1v8
+			HSIO_ENET_TXEN		HSIO_PINMUX_1	BIT_OFFSET18	MUX_ALT0	&pconf_bias_disabled_ds2_1v8
+			HSIO_ENET_TX_CLK	HSIO_PINMUX_1	BIT_OFFSET16	MUX_ALT0	&pconf_bias_disabled_ds6_1v8
+			HSIO_ENET_RX_CLK	HSIO_PINMUX_1	BIT_OFFSET14	MUX_ALT0	&pconf_bias_disabled_ds2_1v8
+			HSIO_ENET_RXD_0		HSIO_PINMUX_1	BIT_OFFSET12	MUX_ALT0	&pconf_bias_disabled_ds2_1v8
+			HSIO_ENET_RXD_1		HSIO_PINMUX_1	BIT_OFFSET10	MUX_ALT0	&pconf_bias_disabled_ds2_1v8
+			HSIO_ENET_RXD_2		HSIO_PINMUX_1	BIT_OFFSET8		MUX_ALT0	&pconf_bias_disabled_ds2_1v8
+			HSIO_ENET_RXD_3		HSIO_PINMUX_1	BIT_OFFSET6		MUX_ALT0	&pconf_bias_disabled_ds2_1v8
+			HSIO_ENET_RXDV		HSIO_PINMUX_1	BIT_OFFSET4		MUX_ALT0	&pconf_bias_disabled_ds2_1v8
+			HSIO_ENET_PHY_CLK	HSIO_PINMUX_1	BIT_OFFSET2		MUX_ALT0	&pconf_bias_disabled_ds2_1v8
 		>;
 	};
 

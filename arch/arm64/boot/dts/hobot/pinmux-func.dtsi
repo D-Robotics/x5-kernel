@@ -28,6 +28,18 @@
 		drive-strength = <2>;
 	};
 
+	pconf_bias_disabled_ds3_1v8: pconf-bias-disabled-ds3-1v8 {
+		bias-disable;
+		power-source = <HORIZON_IO_PAD_VOLTAGE_1V8>;
+		drive-strength = <3>;
+	};
+
+	pconf_bias_disabled_ds6_1v8: pconf-bias-disabled-ds6-1v8 {
+		bias-disable;
+		power-source = <HORIZON_IO_PAD_VOLTAGE_1V8>;
+		drive-strength = <6>;
+	};
+
 	pconf_bias_disabled_ds7_1v8: pconf-bias-disabled-ds7-1v8 {
 		bias-disable;
 		power-source = <HORIZON_IO_PAD_VOLTAGE_1V8>;
