@@ -1608,6 +1608,68 @@ on_error:
 	return error;
 }
 
+static int do_crop(struct vio_node *vnode, struct n2d_config *config)
+{
+    n2d_buffer_t src = {0}, dst = {0};
+    n2d_uintptr_t handle = 0;
+    n2d_user_memory_desc_t memDesc = {0};
+    n2d_error_t error = N2D_SUCCESS;
+    n2d_rectangle_t src_rect;
+
+    // 1. wrap source buffer
+    memDesc.flag = N2D_WRAP_FROM_USERMEMORY;
+    memDesc.physical = config->in_buffer_addr[0][0];
+    memDesc.size = config->input_stride[0] * config->input_height[0] * 3 / 2; // assume NV12
+	vio_info("%s(%d): physical = %llx, size = %llx.\n", __func__, __LINE__, memDesc.physical, memDesc.size);
+    N2D_ON_ERROR(n2d_wrap(&memDesc, &handle));
+
+    src.width = config->input_width[0];
+    src.height = config->input_height[0];
+    src.stride = config->input_stride[0];
+    src.format = N2D_NV12;
+    src.handle = handle;
+    src.alignedh = config->input_height[0];
+    src.alignedw = config->input_stride[0];
+    src.tiling = N2D_LINEAR;
+	vio_info("%s(%d): width = %d, height = %d, format = %d, handle = %lld, stride = %d.\n",
+		 __func__, __LINE__, src.width, src.height, src.format, src.handle, src.stride);
+    N2D_ON_ERROR(n2d_map(&src));
+
+    // 2. wrap destination buffer
+    memDesc.flag = N2D_WRAP_FROM_USERMEMORY;
+    memDesc.physical = config->out_buffer_addr[0];
+    memDesc.size = config->output_stride * config->output_height * 3 / 2;
+	vio_info("%s(%d): physical = %llx, size = %llx.\n", __func__, __LINE__, memDesc.physical, memDesc.size);
+    N2D_ON_ERROR(n2d_wrap(&memDesc, &handle));
+
+    dst.width = config->output_width;
+    dst.height = config->output_height;
+    dst.stride = config->output_stride;
+    dst.format = N2D_NV12;
+    dst.handle = handle;
+    dst.alignedh = config->output_height;
+    dst.alignedw = config->output_stride;
+    dst.tiling = N2D_LINEAR;
+    N2D_ON_ERROR(n2d_map(&dst));
+
+    // 3. set source crop region
+    src_rect.x = config->crop_x;
+    src_rect.y = config->crop_y;
+    src_rect.width = config->crop_width;
+	src_rect.height = config->crop_height;
+
+	vio_info("%s(%d): crop rect: x = %d, y = %d, width = %d, height = %d.\n",
+		 __func__, __LINE__, src_rect.x, src_rect.y, src_rect.width, src_rect.height);
+
+    // 4. Blit with cropping (crop from src_rect → to dst)
+    N2D_ON_ERROR(n2d_blit(&dst, N2D_NULL, &src, &src_rect, N2D_BLEND_NONE));
+    N2D_ON_ERROR(n2d_commit());
+
+on_error:
+    n2d_free(&src);
+    n2d_free(&dst);
+    return error;
+}
 
 static int n2d_process(struct vio_node *vnode, struct n2d_config *config)
 {
@@ -1635,6 +1697,9 @@ static int n2d_process(struct vio_node *vnode, struct n2d_config *config)
 		break;
 	case rotate:
         N2D_ON_ERROR(do_rotate(vnode, config));
+        break;
+	case crop:
+        N2D_ON_ERROR(do_crop(vnode, config));
         break;
 	default:
 		vio_err("Not supported command: %d\n", config->command);
