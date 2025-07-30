@@ -25,8 +25,10 @@
 #include "dw_mipi_csi_hal.h"
 #include "dw_mipi_csi_reg.h"
 
+#ifdef CONFIG_DEBUG_FS
 #define CREATE_VPG_FILE(attr) \
 	debugfs_create_file("vpg_" #attr, 0644, csi->debugfs_dir, csi, &debugfs_##attr##_fops)
+#endif  /* CONFIG_DEBUG_FS */
 
 struct csi_display_mode {
 	long htotal;
@@ -783,6 +785,7 @@ static const struct file_operations debugfs_info_fops = {
 	.release = single_release,
 };
 
+#ifdef CONFIG_DEBUG_FS
 void dw_mipi_csi_debugfs_init(struct dw_mipi_csi *csi)
 {
 	char name[32];
@@ -872,3 +875,5 @@ void dw_mipi_csi_debugfs_fini(struct dw_mipi_csi *csi)
 	csi->bus_fmt_file = NULL;
 	csi->info_file	  = NULL;
 }
+
+#endif /* CONFIG_DEBUG_FS */
