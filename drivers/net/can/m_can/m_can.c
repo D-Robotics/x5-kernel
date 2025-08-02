@@ -1048,17 +1048,17 @@ static irqreturn_t m_can_isr(int irq, void *dev_id)
 {
 	struct net_device *dev = (struct net_device *)dev_id;
 	struct m_can_classdev *cdev = netdev_priv(dev);
-	u32 ir;
+	u32 ir = 0, ir_read;
 
 	if (pm_runtime_suspended(cdev->dev))
 		return IRQ_NONE;
-	ir = m_can_read(cdev, M_CAN_IR);
-	if (!ir)
-		return IRQ_NONE;
 
-	/* ACK all irqs */
-	if (ir & IR_ALL_INT)
+	while ((ir_read = m_can_read(cdev, M_CAN_IR)) != 0) {
+		ir |= ir_read;
+
+		/* ACK all irqs */
 		m_can_write(cdev, M_CAN_IR, ir);
+	}
 
 	if (cdev->ops->clear_interrupts)
 		cdev->ops->clear_interrupts(cdev);
