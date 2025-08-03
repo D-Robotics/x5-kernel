@@ -5347,7 +5347,7 @@ OnError:
 	return status;
 }
 
-gceSTATUS _QuerySignal(gckOS Os, gctSIGNAL Signal)
+gctBOOL _QuerySignal(gckOS Os, gctSIGNAL Signal)
 {
 	/*
 	 * This function is called by 'has_signaled' callback of sync_timeline.

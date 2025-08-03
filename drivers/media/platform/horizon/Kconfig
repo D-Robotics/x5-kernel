@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-2.0-only
 
-source "drivers/media/platform/horizon/camsys/Kconfig"
+#source "drivers/media/platform/horizon/camsys/Kconfig"
 
 source "drivers/media/platform/horizon/codec/Kconfig"
