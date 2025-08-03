@@ -86,7 +86,7 @@ void halrf_support_ability(struct rf_info *rf, char input[][16], u32 *_used,
 	u8 i;
 
 	for (i = 0; i < 5; i++)
-		if (input[i + 1])
+		if (((u8 *)input)[(i + 1) * 16] != 0)
 			_os_sscanf(input[i + 1], "%d", &value[i]);
 
 	if (value[0] == 100) {
@@ -204,7 +204,7 @@ void halrf_dbg_trace(struct rf_info *rf, char input[][16], u32 *_used,
 	u8 i;
 
 	for (i = 0; i < 5; i++)
-		if (input[i + 1])
+		if (((u8 *)input)[(i + 1) * 16] != 0)
 			_os_sscanf(input[i + 1], "%d", &value[i]);
 
 	if (value[0] == 100) {
@@ -1859,7 +1859,7 @@ void halrf_test_cmd(struct rf_info *rf, char input[][16], u32 *_used,
 	u8 i;
 
 	for (i = 0; i < 5; i++) {
-		if (input[i + 1])
+		if (((u8 *)input)[(i + 1) * 16] != 0)
 			HALRF_SCAN(input[i + 1], DCMD_DECIMAL, &val[i]);
 	}
 
@@ -2188,7 +2188,7 @@ void halrf_hwtx_dbg_cmd(struct rf_info *rf, char input[][16], u32 *_used,
 	u8 i;
 
 	for (i = 0; i < 4; i++)
-		if (input[i + 1])
+		if (((u8 *)input)[(i + 1) * 16] != 0)
 			_os_sscanf(input[i + 1], "%d", &value[i]);
 
 	if (_os_strcmp(input[1], "-h") == 0) {
