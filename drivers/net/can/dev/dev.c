@@ -219,7 +219,7 @@ void can_setup(struct net_device *dev)
 	dev->mtu = CAN_MTU;
 	dev->hard_header_len = 0;
 	dev->addr_len = 0;
-	dev->tx_queue_len = 10;
+	dev->tx_queue_len = 1024;
 
 	/* New-style flags. */
 	dev->flags = IFF_NOARP;
