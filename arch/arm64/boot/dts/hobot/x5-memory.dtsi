@@ -124,7 +124,7 @@
 			status = "disabled";
 		};
 		
-		ion_carveout_rdk: ion_carveout_rdk@C4100000 {
+		ion_carveout_rdk: ion_carveout_rdk@B8100000 {
 			compatible = "ion-carveout";
 			reg = <0x0 0xB8100000 0x0 0x14000000>; /* 320MiB */
 			status = "disabled";
@@ -134,7 +134,7 @@
 			compatible = "ion-cma";
 			alignment = <0x0 0x2000>;
 			reusable;
-			reg = <0x0 0xCC00000 0x0 0x08000000>; /* 128MiB */
+			reg = <0x0 0xCC100000 0x0 0x08000000>; /* 128MiB */
 			status = "disabled";
 		};
 		
