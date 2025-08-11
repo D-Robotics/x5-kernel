@@ -32,6 +32,13 @@
 		};
 	};
 
+	gpio_keys_hobot {
+		compatible = "hobot,gpio_key";
+		debounce-interval = <200>;
+		gpios = <&ls_gpio0_porta 12 GPIO_ACTIVE_LOW>;
+		pinctrl-names = "default";
+	};
+
 	gua_audio_rpc_wrapper:audio-rpc-wrapper {
 		compatible = "gua,audio-rpc-wrapper";
 		rpmsg-enable;
