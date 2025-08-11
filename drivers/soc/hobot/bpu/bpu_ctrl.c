@@ -21,6 +21,11 @@
 #include <linux/pm_runtime.h>
 #include "bpu_ctrl.h"
 
+static inline bool bpu_core_hw_io_loaded(struct bpu_core *core)
+{
+	return core->hw_io ? true : false;
+}
+
 static int32_t bpu_core_set_clkrate(struct bpu_core *core, uint64_t rate);
 static uint8_t bpu_core_type(struct bpu_core *core)
 {
@@ -1250,6 +1255,38 @@ void bpu_core_dvfs_unregister(struct bpu_core *core)
 	core->dvfs = NULL;
 }
 EXPORT_SYMBOL(bpu_core_dvfs_unregister);/*PRQA S 0779*/ /*PRQA S 0307*/ /* Linux Macro */
+
+/**
+ * bpu_core_dvfs_register_delayed() - register bpu core to linux dvfs mechanism in delayed queue
+ * @core: bpu core, could not be null
+ * @name: governor name, could be null
+ *
+ * Register the bpu core frequency to linux dvfs, set governor to
+ * according name parameter, if name is null, default use performance
+ *
+ * Return:
+ * * =0			- success
+ * * <0			- error code
+ */
+void bpu_core_dvfs_register_delayed(struct work_struct *work)
+{
+	struct delayed_work *dwork = to_delayed_work(work);
+	struct bpu_core *core = container_of(dwork, struct bpu_core, dvfs_init_work);
+	int32_t ret;
+
+	/* if hw io ko is not loaded and try count < 10, delay the work and try again next time */
+	if (!bpu_core_hw_io_loaded(core) && core->dvfs_try_count++ < 10) {
+		schedule_delayed_work(&core->dvfs_init_work, msecs_to_jiffies(500));
+		return;
+	}
+
+	ret = bpu_core_dvfs_register(core, NULL);
+	if (ret != 0)
+		dev_err(core->dev, "BPU core registe dvfs failed\n");
+
+	devfreq_suspend_device(core->dvfs->devfreq);
+}
+EXPORT_SYMBOL(bpu_core_dvfs_register_delayed);/*PRQA S 0779*/ /*PRQA S 0307*/ /* Linux Macro */
 
 /**
  * bpu_core_set_freq_level() - set bpu core work frequency level

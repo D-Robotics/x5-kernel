@@ -156,6 +156,13 @@ struct bpu_core {
 #else
 	void *dvfs;
 #endif
+	/**
+	 * @dvfs_init_work: Used for registering dvfs at a later time.
+	 * To make sure dvfs happen after bpu drivers are installed.
+	 */
+	struct delayed_work	dvfs_init_work;
+	uint32_t dvfs_try_count;
+
 	int32_t running_task_num;
 	struct completion no_task_comp;
 	int32_t power_level;

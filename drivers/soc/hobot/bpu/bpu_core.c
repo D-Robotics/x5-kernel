@@ -1289,12 +1289,15 @@ static int bpu_core_probe(struct platform_device *pdev)
 
 	dev_set_drvdata(&pdev->dev, core);
 
-	ret = bpu_core_dvfs_register(core, NULL);
-	if (ret != 0) {
-		dev_err(&pdev->dev, "BPU core registe dvfs failed\n");
-	}
+	/*
+	 * Init a delayed work for dvfs subsys register,
+	 * as it needs to wait bpu_hw_io_x5.ko be installed...
+	 */
+	core->dvfs_try_count = 0;
+	INIT_DELAYED_WORK(&core->dvfs_init_work, bpu_core_dvfs_register_delayed);
+	schedule_delayed_work(&core->dvfs_init_work, msecs_to_jiffies(500));
 
-	devfreq_suspend_device(core->dvfs->devfreq);
+	/* bpu runtime power control */
 	(void)bpu_core_pm_ctrl(core, 0, 0);
 	return 0;
 }
@@ -1303,6 +1306,7 @@ static int bpu_core_remove(struct platform_device *pdev)
 {
 	struct bpu_core *core = (struct bpu_core *)dev_get_drvdata(&pdev->dev);
 
+	cancel_delayed_work_sync(&core->dvfs_init_work);
 	bpu_core_dvfs_unregister(core);
 	bpu_core_discard_sys(core);
 

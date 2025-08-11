@@ -41,6 +41,7 @@ int32_t bpu_core_pm_ctrl(const struct bpu_core *core, uint16_t init, uint16_t op
 int32_t bpu_core_dvfs_register(struct bpu_core *core, const char *name);
 void bpu_core_dvfs_unregister(struct bpu_core *core);
 int32_t bpu_core_set_freq_level(struct bpu_core *core, int32_t level);
+void bpu_core_dvfs_register_delayed(struct work_struct *work);
 #else
 static inline int32_t bpu_core_dvfs_register(struct bpu_core *core,
 		const char *name)
@@ -58,6 +59,11 @@ static inline int32_t bpu_core_set_freq_level(struct bpu_core *core,
 {
 	pr_err_ratelimited("BPU:Not support change freq level\n");
 	return 0;
+}
+
+static inline void bpu_core_dvfs_register_delayed(struct work_struct *work)
+{
+	return;
 }
 #endif
 
