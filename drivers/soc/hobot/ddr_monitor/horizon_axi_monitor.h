@@ -204,6 +204,10 @@ struct axi_monitor {
 	uint64_t actual_time;
 	uint64_t full_bw;
 	struct notifier_block nb;
+
+	ktime_t session_start_time;
+	ktime_t last_sample_time;
+	ktime_t init_time;
 };
 
 typedef struct _reg_s {

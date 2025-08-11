@@ -44,8 +44,8 @@ uint32_t mon_period = 0;
 module_param(mon_period, uint, 0644);
 
 typedef struct axi_mon_cfg {
-       uint32_t sample_period;
-       uint32_t sample_number;
+	uint32_t sample_period;
+	uint32_t sample_number;
 } axi_mon_cfg;
 
 struct axi_portdata_s {
@@ -212,7 +212,6 @@ static long axi_mon_ioctl(struct file *filep, uint32_t cmd, unsigned long arg)
 {
 	struct axi_monitor *axi_mon;
 	void __iomem *iomem;
-	uint32_t temp = 0;
 	int cur = 0;
 	reg_t reg;
 	unsigned long flags;
@@ -290,12 +289,12 @@ static long axi_mon_ioctl(struct file *filep, uint32_t cmd, unsigned long arg)
 					"sampletime set copy_from_user failed\n");
 			return -EINVAL;
 		}
+		axi_mon->session_time = sample_config.sample_period;
 		/* sample_period's unit is ms */
-		temp = sample_config.sample_period;
 		g_sample_number = sample_config.sample_number;
 		if (g_sample_number > TOTAL_RECORD_NUM)
 			g_sample_number = TOTAL_RECORD_NUM;
-		mon_period = temp;
+		mon_period = axi_mon->session_time;
 		axi_mon_start(axi_mon, 1);
 
 		break;
@@ -334,6 +333,8 @@ static void axi_calculate_statistics(struct axi_monitor *axi_mon)
 	struct list_head *port_entry;
 	struct axi_port *port;
 	unsigned long flags;
+	ktime_t now = ktime_get();
+	uint64_t actual_time_ms = ktime_to_ms(ktime_sub(now, axi_mon->session_start_time));
 
 	/* Poll for register Okay */
 	reg_ok_to = 500000; /* 100ms reg stable time */
@@ -354,8 +355,6 @@ static void axi_calculate_statistics(struct axi_monitor *axi_mon)
 							   time_low);
 	axi_cycles = axi_mon->axi_clk_hz / axi_mon->apb_clk_hz * apb_cycles;
 
-	/* Actual time in millisecs */
-	axi_mon->actual_time = (apb_cycles * 1000) / axi_mon->apb_clk_hz;
 	if (axi_mon->port_status.bits.port_overflow) {
 		dev_dbg(&axi_mon->pdev->dev,
 				 "Performance counter overflowed, timer stopped early\n");
@@ -363,13 +362,13 @@ static void axi_calculate_statistics(struct axi_monitor *axi_mon)
 
 	dev_dbg(&axi_mon->pdev->dev,
 			 "Monitor session ended, total time: %llu millisesc\n",
-			  axi_mon->actual_time);
+			  actual_time_ms);
 	spin_lock_irqsave(&axi_mon->ops_lock, flags);
 	full_bw_raw = AXI_DATA_WIDTH * axi_cycles / 8;
-	axi_mon->full_bw = full_bw_raw / axi_mon->actual_time * 1000;
+	axi_mon->full_bw = full_bw_raw / actual_time_ms * 1000;
 	if (ddr_info != NULL) {
-		ddr_info[cur_idx].curtime = ktime_to_ms(ktime_get());
-		ddr_info[cur_idx].real_period = axi_mon->actual_time;
+		ddr_info[cur_idx].curtime = ktime_to_ms(ktime_sub(now, axi_mon->init_time));
+		ddr_info[cur_idx].real_period = actual_time_ms;
 		ddr_info[cur_idx].rd_cmd_num = full_bw_raw;
 		ddr_info[cur_idx].wr_cmd_num = full_bw_raw;
 	}
@@ -390,8 +389,8 @@ static void axi_calculate_statistics(struct axi_monitor *axi_mon)
 		rd_stop_ost = (axi_mon_readl(axi_mon, PORT_END_OST(port->idx)) >> 16 & 0xffff);
 		wr_stop_ost = (axi_mon_readl(axi_mon, PORT_END_OST(port->idx)) & 0xffff);
 
-		port->rd_bw = rd_bw_raw / axi_mon->actual_time * 1000;
-		port->wr_bw = wr_bw_raw / axi_mon->actual_time * 1000;
+		port->rd_bw = rd_bw_raw / actual_time_ms * 1000;
+		port->wr_bw = wr_bw_raw / actual_time_ms * 1000;
 		port->rd_bw_percent = port->rd_bw * 100 / axi_mon->full_bw;
 		port->wr_bw_percent = port->wr_bw * 100 / axi_mon->full_bw;
 		if (ddr_info != NULL) {
@@ -444,11 +443,13 @@ void axi_mon_start(struct axi_monitor *axi_mon, uint32_t start)
 		dev_dbg(dev, "Session start for %llu millisec\n", axi_mon->session_time);
 		spin_lock_irqsave(&axi_mon->ops_lock, flags);
 		axi_mon->busy = BUSY;
+		axi_mon->session_start_time = ktime_get();
 		spin_unlock_irqrestore(&axi_mon->ops_lock, flags);
-#if IS_ENABLED(CONFIG_HOBOT_AXI_ADVANCED)
-		/* TODO: Add advanced configurations here */
-#endif
-	hrtimer_start(&axi_mon->hrtimer, ktime_set(axi_mon->session_time / 1000, (axi_mon->session_time % 1000) * 1000000),HRTIMER_MODE_REL);
+		dev_dbg(dev, "Session start for %llu millisec\n", axi_mon->session_time);
+		hrtimer_cancel(&axi_mon->hrtimer);
+		hrtimer_start(&axi_mon->hrtimer,
+					 ms_to_ktime(axi_mon->session_time),
+					 HRTIMER_MODE_REL);
 	} else {
 		hrtimer_cancel(&axi_mon->hrtimer);
 		spin_lock_irqsave(&axi_mon->ops_lock, flags);
@@ -470,16 +471,10 @@ static irqreturn_t axi_monitor_isr(int irq, void *data)
 	unsigned long irq_flags;
 
 	spin_lock_irqsave(&axi_mon->irq_lock, irq_flags);
-	/* End axi monitor session */
-	axi_mon_writel(axi_mon, START, 0x0);
 	axi_mon->int_status = axi_mon_readl(axi_mon, INT_STATUS);
 	axi_mon_writel(axi_mon, INT_STATUS, axi_mon->int_status);
-	axi_mon->port_to_status.port_to_status_val = axi_mon_readl(axi_mon, PORT_STATUS1);
-	axi_mon->port_status.port_status_val = axi_mon_readl(axi_mon, PORT_STATUS2);
 	spin_unlock_irqrestore(&axi_mon->irq_lock, irq_flags);
 
-	hrtimer_cancel(&axi_mon->hrtimer);
-	tasklet_schedule(&axi_mon->tasklet);
 	return IRQ_HANDLED;
 }
 static void axi_mon_tasklet(struct tasklet_struct *t)
@@ -492,8 +487,7 @@ static void axi_mon_tasklet(struct tasklet_struct *t)
 static enum hrtimer_restart monitor_session_end_cb(struct hrtimer *hrtimer)
 {
 	struct axi_monitor *axi_mon = container_of(hrtimer, struct axi_monitor, hrtimer);
-	axi_mon_writel(axi_mon, START, 0x0);
-	axi_calculate_statistics(axi_mon);
+	tasklet_schedule(&axi_mon->tasklet);
 	return HRTIMER_NORESTART;
 }
 
@@ -581,6 +575,7 @@ static int axi_monitor_probe(struct platform_device *pdev)
 		dev_err(dev, "Out of memory\n");
 		return -ENOMEM;
 	}
+	axi_mon->session_time  = 0;
 
 	axi_mon->axi_clk_hz = 800000000;
 	dev_info(dev, "AXI-Clk: %lluHz\n", axi_mon->axi_clk_hz);
