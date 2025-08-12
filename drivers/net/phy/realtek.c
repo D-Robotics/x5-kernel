@@ -425,6 +425,12 @@ static int rtl821x_resume(struct phy_device *phydev)
 {
 	int ret;
 
+	/* For RTL8211FS-VS-CG */
+	if(phydev->phy_id == 0x001cc916)
+	{
+		rtl8211f_config_init(phydev);
+	}
+
 	ret = genphy_resume(phydev);
 	if (ret < 0)
 		return ret;
