@@ -50,8 +50,6 @@ static int fts_i2c_read(struct i2c_client *client, char *writebuf,
 			 },
 		};
 		ret = i2c_transfer(client->adapter, msgs, 2);
-		if (ret < 0)
-			LOG_ERR("i2c read error, %d\n", ret);
 	} else {
 		struct i2c_msg msgs[] = {
 			{
@@ -62,8 +60,6 @@ static int fts_i2c_read(struct i2c_client *client, char *writebuf,
 			 },
 		};
 		ret = i2c_transfer(client->adapter, msgs, 1);
-		if (ret < 0)
-			LOG_ERR("i2c read error, %d\n", ret);
 	}
 
 	return ret;
@@ -221,7 +217,7 @@ static void ft5406_work(struct work_struct *work)
 		count--;
 	}
 	if (!count) {
-		LOG_ERR("checking touch ic timeout, %d\n", ret);
+		LOG_INFO("checking touch ic timeout\n");
 		g_ts_data->is_polling = 0;
 		return;
 	}
