@@ -75,7 +75,6 @@ static int send_cmds(struct i2c_client *client, const char *buf) {
   }
 
   if (ret <= 0) {
-    LOG_ERR("send command failed\n");
     return ret != 0 ? ret : -ECOMM;
   }
 
@@ -255,7 +254,6 @@ static int hobot_bl_probe(struct i2c_client *client,
 
   ret = init_cmd_check(controller_data);
   if (ret < 0) {
-    LOG_ERR("init_cmd_check failed, %d\n", ret);
     goto error;
   }
   connected = 1;
@@ -282,7 +280,7 @@ static int hobot_bl_probe(struct i2c_client *client,
   return 0;
 
 error:
-  dev_err(&client->dev,"Failed to load backlight driver!");
+  LOG_INFO("Failed to load backlight driver!");
   // kfree(controller_data);
   return ret;
 }
