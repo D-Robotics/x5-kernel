@@ -57,6 +57,7 @@ struct hpu3501_rtc {
 	u32 opsel;
 	int irq;
 	struct work_struct irq_work;
+	bool suspended;
 };
 
 static inline struct device *to_hpu3501_dev(struct device *dev)
@@ -266,6 +267,11 @@ static void hpu3501_alarm_work(struct work_struct *work)
 	int ret;
 	u8 status;
 
+	if(rtc->suspended == true) {
+		dev_info(rtc->dev, "device still suspended, skip alarm work\n");
+		return;
+	}
+
 	/* check alarm bit status then clear alarm flag */
 	ret = hpu3501_read(pa_dev, HPU3501_RTC_ISR, &status);
 	if (ret < 0)
@@ -372,6 +378,8 @@ static int hpu3501_rtc_probe(struct platform_device *pdev)
 
 	rtc->rtc->ops = &hpu3501_rtc_ops;
 
+	rtc->suspended = false;
+
 	device_init_wakeup(&pdev->dev, 1);
 
 	ret = devm_request_irq(&pdev->dev, rtc->irq, hpu3501_alarm_irq_handler,
@@ -419,6 +427,8 @@ static int __maybe_unused rtc_suspend(struct device *dev)
 {
 	struct hpu3501_rtc *rtc = dev_get_drvdata(dev);
 
+	rtc->suspended = true;
+
 	return enable_irq_wake(rtc->irq);
 }
 
@@ -426,7 +436,13 @@ static int __maybe_unused rtc_resume(struct device *dev)
 {
 	struct hpu3501_rtc *rtc = dev_get_drvdata(dev);
 
-	return disable_irq_wake(rtc->irq);
+	disable_irq_wake(rtc->irq);
+
+	rtc->suspended = false;
+
+	schedule_work(&rtc->irq_work);
+
+	return 0;
 }
 
 static SIMPLE_DEV_PM_OPS(rtc_pm_ops, rtc_suspend, rtc_resume);
