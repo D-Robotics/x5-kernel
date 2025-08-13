@@ -1297,8 +1297,6 @@ static int bpu_core_probe(struct platform_device *pdev)
 	INIT_DELAYED_WORK(&core->dvfs_init_work, bpu_core_dvfs_register_delayed);
 	schedule_delayed_work(&core->dvfs_init_work, msecs_to_jiffies(500));
 
-	/* bpu runtime power control */
-	(void)bpu_core_pm_ctrl(core, 0, 0);
 	return 0;
 }
 

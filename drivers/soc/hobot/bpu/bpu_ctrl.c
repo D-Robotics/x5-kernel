@@ -1285,6 +1285,9 @@ void bpu_core_dvfs_register_delayed(struct work_struct *work)
 		dev_err(core->dev, "BPU core registe dvfs failed\n");
 
 	devfreq_suspend_device(core->dvfs->devfreq);
+
+	/* bpu runtime power control, poweroff after devfreq be register... */
+	(void)bpu_core_pm_ctrl(core, 0, 0);
 }
 EXPORT_SYMBOL(bpu_core_dvfs_register_delayed);/*PRQA S 0779*/ /*PRQA S 0307*/ /* Linux Macro */
 
