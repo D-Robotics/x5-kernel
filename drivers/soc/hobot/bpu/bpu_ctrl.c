@@ -1154,6 +1154,7 @@ int32_t bpu_core_dvfs_register(struct bpu_core *core, const char *name)
 			dev_err(core->dev, "Can't find opp\n");
 			return (int32_t)PTR_ERR(opp);
 		}
+		dev_pm_opp_put(opp);
 	} else {
 		devm_kfree(core->dev, (void *)core->dvfs);
 		core->dvfs = NULL;
