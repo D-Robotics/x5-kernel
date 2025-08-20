@@ -286,6 +286,17 @@
 		>;
 	};
 
+	pinctrl_dsp_i2s1_hiwonder_rasadapter_5b: pinctrl_dsp_i2s1_hiwonder_rasadapter_5b {
+		horizon,pins = <
+			DSP_I2S1_DI  DSP_PINMUX_0  BIT_OFFSET14  MUX_ALT0 &pconf_drv_pd_ds2_1v8
+			DSP_I2S1_DO  DSP_PINMUX_0  BIT_OFFSET16  MUX_ALT0 &pconf_drv_pd_ds2_1v8
+			/*DSP_I2S1_MCLK  DSP_PINMUX_0  BIT_OFFSET18  MUX_ALT0 &pconf_drv_pu_ds2_1v8*/
+			DSP_I2S1_MCLK  DSP_PINMUX_0  BIT_OFFSET18  MUX_ALT1  &pconf_output_high
+			DSP_I2S1_SCLK  DSP_PINMUX_0  BIT_OFFSET20  MUX_ALT0 &pconf_drv_pu_ds2_1v8
+			DSP_I2S1_WS  DSP_PINMUX_0  BIT_OFFSET22  MUX_ALT0 &pconf_drv_pu_ds2_1v8
+		>;
+	};
+
 	pinctrl_dsp_pdm_cko: pdmckogrp {
 		horizon,pins = <
 			DSP_PDM_CKO  DSP_PINMUX_0  BIT_OFFSET24  MUX_ALT0 &pconf_drv_pu_ds2_1v8
