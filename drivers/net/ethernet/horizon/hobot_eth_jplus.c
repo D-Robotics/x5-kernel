@@ -3241,13 +3241,9 @@ static s32 ptp_flex_pps_config(const struct hobot_priv *priv, s32 index, struct 
 		return -EINVAL;
 	}
 	/*index 0 used for pps timesync, rtc(32k) will select eth0 pps0 source*/
-	if (0 != index) {
-		val |= TRGTMODSELx(index, TRGTMODSEL_ONLY_ST);/*PRQA S 4532, 1882, 4534, 0588, 0636, 0478, 4534, 4461, 4501, 1821*/
-		val |= PPSCMDx(index, PPSCMD_START_TRAIN);/*PRQA S 4532, 1882, 4534, 0588, 0636, 0478, 4534, 4461, 4501, 1821*/
-	} else {
-		val |= TRGTMODSELx(index, TRGTMODSEL_INT_ST);/*PRQA S 4532, 1882, 4534, 0588, 0636, 0478, 4534, 4461, 4501, 1821*/
-		val |= PPSCMDx(index, PPSCMD_START_SINGLE);/*PRQA S 4532, 1882, 4534, 0588, 0636, 0478, 4534, 4461, 4501, 1821*/
-	}
+	val |= TRGTMODSELx(index, TRGTMODSEL_ONLY_ST);/*PRQA S 4532, 1882, 4534, 0588, 0636, 0478, 4534, 4461, 4501, 1821*/
+	val |= PPSCMDx(index, PPSCMD_START_TRAIN);/*PRQA S 4532, 1882, 4534, 0588, 0636, 0478, 4534, 4461, 4501, 1821*/
+
 	val |= (u32)PPSEN0;
 	iowritel((u32)(cfg->start.tv_sec), priv->ioaddr, (u32)MAC_PPSx_TARGET_TIME_SEC(index));
 
@@ -3270,11 +3266,8 @@ static s32 ptp_flex_pps_config(const struct hobot_priv *priv, s32 index, struct 
 	} else {
 		iowritel((u32)period - 1U, priv->ioaddr, (u32)MAC_PPSx_INTERVAL(index));
 	}
-	if (0 != index) {
-		period >>= 1;
-	} else {
-		period /= 1000;// 1/1000 duty cycle
-	}
+	period >>= 1;
+
 	if (period <= 1U) {
 		netdev_err(priv->ndev, "%s:%d, input para error\n", __func__, __LINE__);
 		return -EINVAL;
