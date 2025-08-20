@@ -56,6 +56,12 @@
 		spi5 = &spi5;
 		spi6 = &spi6;
 		spi7 = &qspi;
+		pwm0 = &pwm0;
+		pwm1 = &pwm1;
+		pwm2 = &pwm2;
+		pwm3 = &pwm3;
+		i2s0 = &dw_i2s0;
+		i2s1 = &dw_i2s1;
 
 		mmc0 = &emmc;
 		mmc1 = &sdio_0;
@@ -4775,5 +4781,23 @@
 	ipc_hal: ipc_hal {
 		status = "disabled";
 		compatible = "hobot,hobot-ipc-hal";
+	};
+
+	__overrides__ {
+		uart1 = <&uart1>,"status";
+		uart2 = <&uart2>,"status";
+		uart3 = <&uart3>,"status";
+		uart6 = <&uart6>,"status";
+		uart7 = <&uart7>,"status";
+		spi1 = <&spi1>,"status";
+		spi2 = <&spi2>,"status";
+		i2c0 = <&i2c0>,"status";
+		i2c1 = <&i2c1>,"status";
+		i2c5 = <&i2c5>,"status";
+		pwm0 = <&pwm0>,"status";
+		pwm1 = <&pwm1>,"status";
+		pwm2 = <&pwm2>,"status";
+		pwm3 = <&pwm3>,"status";
+		dw_i2s1 = <&dw_i2s1>,"status";
 	};
 };
