@@ -307,15 +307,6 @@
 
 &i2c3 {
 	status = "okay";
-
-	ft5406@38 {
-		compatible = "ft5406";
-		reg = <0x38>;
-	};
-	hb_bl@45 {
-		compatible = "hobot_bl_controller";
-		reg = <0x45>;
-	};
 };
 
 &i2c4 {
@@ -324,29 +315,6 @@
 
 &i2c5 {
 	status = "okay";
-
-	es7210_0: es7210_0@40 {
-		compatible = "MicArray_0";
-		reg = <0x40>;
-		#sound-dai-cells = <1>;
-		channels = <8>;
-		adc_dev_num = <2>;
-		status = "okay";
-	};
-
-	es7210_1@42 {
-		compatible = "MicArray_2";
-		reg = <0x42>;
-		channels = <8>;
-		adc_dev_num = <2>;
-	};
-
-	es8156: es8156@8 {
-		compatible = "everest,es8156";
-		reg = <0x8>;
-		#sound-dai-cells = <0>;
-		status = "okay";
-	};
 };
 
 &i2c6 {
@@ -532,11 +500,6 @@
 	dwc-master = <1>;
 };
 
-&dw_i2s1 {
-	status = "okay";
-	dwc-master = <1>;
-};
-
 &archband_pdm {
 	status = "disabled";
 };
@@ -659,33 +622,6 @@
 
 &bpu {
 	cnn-supply = <&vdd08_bpu_1_reg>;
-};
-
-&mipi_dsi0 {
-
-	status = "okay";
-
-	ports {
-		port@1 {
-			reg = <1>;
-			mipi_dsi_out: endpoint {
-				remote-endpoint = <&panel_in>;
-			};
-		};
-	};
-
-	dsi_panel0@0 {
-		compatible = "wh-cm480";
-		reg = <0>;
-
-		port {
-			panel_in: endpoint {
-				remote-endpoint =
-					<&mipi_dsi_out>;
-			};
-		};
-	};
-
 };
 
 /* For boards that do not need display module,
@@ -820,42 +756,6 @@ the following ports need to be deleted */
 		};
 		codec {
 			sound-dai = <&es8326>;
-		};
-	};
-};
-
-&hobot_sound_machine {
-	status = "okay";
-	#address-cells = <1>;
-	#size-cells = <0>;
-	simple-audio-card,name = "duplex-audio-i2s1";
-
-	simple-audio-card,dai-link@0 {
-		link-name = "dai-link0";
-		reg = <1>;
-		format = "dsp_a";
-		mclk-fs = <64>;
-		bitclock-master = <&snd1_mm>;
-		frame-master = <&snd1_mm>;
-		snd1_mm: cpu {
-			sound-dai = <&dw_i2s1 1>;
-		};
-		codec {
-			sound-dai = <&es8156>;
-		};
-	};
-	simple-audio-card,dai-link@1 {
-		link-name = "dai-link1";
-		reg = <1>;
-		format = "dsp_a";
-		mclk-fs = <64>;
-		bitclock-master = <&snd1_m>;
-		frame-master = <&snd1_m>;
-		snd1_m: cpu {
-			sound-dai = <&dw_i2s1 1>;
-		};
-		codec {
-			sound-dai = <&es7210_0 0>;
 		};
 	};
 };
