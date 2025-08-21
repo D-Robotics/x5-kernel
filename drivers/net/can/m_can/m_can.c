@@ -1361,7 +1361,7 @@ static int m_can_chip_config(struct net_device *dev)
 	 */
 	m_can_write(cdev, M_CAN_TSCC,
 		    FIELD_PREP(TSCC_TCP_MASK, 0xf) |
-		    FIELD_PREP(TSCC_TSS_MASK, TSCC_TSS_INTERNAL));
+		    FIELD_PREP(TSCC_TSS_MASK, TSCC_TSS_EXTERNAL));
 
 	m_can_config_endisable(cdev, false);
 
