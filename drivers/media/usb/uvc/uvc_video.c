@@ -129,6 +129,7 @@ int uvc_query_ctrl(struct uvc_device *dev, u8 query, u8 unit,
 	return -EPIPE;
 }
 
+extern unsigned int uvc_limit_size;
 static void uvc_fixup_video_ctrl(struct uvc_streaming *stream,
 	struct uvc_streaming_control *ctrl)
 {
@@ -189,6 +190,8 @@ static void uvc_fixup_video_ctrl(struct uvc_streaming *stream,
 		ctrl->dwMaxVideoFrameSize =
 			frame->dwMaxVideoFrameBufferSize;
 
+	ctrl->dwMaxVideoFrameSize = ctrl->dwMaxVideoFrameSize  / uvc_limit_size;
+
 	/*
 	 * The "TOSHIBA Web Camera - 5M" Chicony device (04f2:b50b) seems to
 	 * compute the bandwidth on 16 bits and erroneously sign-extend it to
@@ -197,6 +200,8 @@ static void uvc_fixup_video_ctrl(struct uvc_streaming *stream,
 	 */
 	if ((ctrl->dwMaxPayloadTransferSize & 0xffff0000) == 0xffff0000)
 		ctrl->dwMaxPayloadTransferSize &= ~0xffff0000;
+
+	ctrl->dwMaxPayloadTransferSize = ctrl->dwMaxPayloadTransferSize / uvc_limit_size;	
 
 	if (!(format->flags & UVC_FMT_FLAG_COMPRESSED) &&
 	    stream->dev->quirks & UVC_QUIRK_FIX_BANDWIDTH &&
