@@ -585,6 +585,8 @@ struct hobot_priv {
 	struct eth_stl_ops *hobot_eth_stl_ops;
 	struct conf_regs_st backup_reg_array[CONF_REGS_SIZE];
 	struct timer_list txtimer;
+
+	unsigned int index;
 };
 
 

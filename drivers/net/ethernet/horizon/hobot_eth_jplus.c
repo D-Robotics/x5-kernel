@@ -158,6 +158,8 @@
 #define HOBOT_COAL_TIMER(x) (jiffies + usecs_to_jiffies(x))
 #define HOBOT_COAL_TX_TIMER	1000
 static void hobot_init_timer(struct hobot_priv *priv);
+static s32 ptp_flex_pps_config(const struct hobot_priv *priv, s32 index, struct pps_cfg *cfg, bool enable,
+                                        u32 sub_second_inc, u32 systime_flags);
 static struct net_device * pndev = NULL;
 
 /**
@@ -3052,6 +3054,7 @@ static s32 eth_ptp_set_time(struct ptp_clock_info *ptp, const struct timespec64 
 {
 	struct hobot_priv *priv;
 	unsigned long flags;
+	struct pps_cfg *cfg;
 	s32 ret = 0;
 	if (NULL == ptp) {
 		pr_err("%s, ptp_clock_info is null\n", __func__);
@@ -3064,12 +3067,30 @@ static s32 eth_ptp_set_time(struct ptp_clock_info *ptp, const struct timespec64 
 		return -1;
 	}
 
+	cfg = &priv->pps[priv->index];
+	if (!cfg) {
+		netdev_err(priv->ndev, "%s, pps_cfg is NULL\n", __func__);
+		return -EINVAL;
+	}
+
 	raw_spin_lock_irqsave(&priv->ptp_lock, flags);/*PRQA S 2996*/ /*linux macro*/
 	if (ptp_init_systime(priv, (u32)ts->tv_sec, (u32)ts->tv_nsec) < 0) {
 		netdev_err(priv->ndev, "%s, set ptp time err\n", __func__);
 		ret = -EBUSY;
 	}
 	raw_spin_unlock_irqrestore(&priv->ptp_lock, flags);/*PRQA S 2996*/ /*linux macro*/
+
+	if (cfg && cfg->period.tv_sec != 0) {
+		if (ts->tv_nsec > 500000000)
+			cfg->start.tv_sec = ts->tv_sec + 2;
+		else
+			cfg->start.tv_sec = ts->tv_sec + 1;
+		cfg->start.tv_nsec = 0;
+		//disable pps output
+		ptp_flex_pps_config(priv, priv->index, cfg, 0, priv->sub_second_inc, priv->systime_flags);
+		//enable pps output
+		ptp_flex_pps_config(priv, priv->index, cfg, 1, priv->sub_second_inc, priv->systime_flags);
+	}
 
 	return ret;
 }
@@ -3182,6 +3203,8 @@ static s32 eth_ptp_adjust_time(struct ptp_clock_info *ptp, s64 delta)
 	s32 neg_adj = 0;
 	s32 ret;
 	s64 new_delta = delta;
+	struct timespec64 ts;
+	struct pps_cfg *cfg;
 
 	if (NULL == ptp) {
 		pr_err("%s, ptp_clock_info is null\n", __func__);
@@ -3192,6 +3215,11 @@ static s32 eth_ptp_adjust_time(struct ptp_clock_info *ptp, s64 delta)
 	if (!netif_running(priv->ndev)) {
 		(void)netdev_err(priv->ndev, "%s, device has not been brought up\n", __func__);
 		return -1;
+	}
+	cfg = &priv->pps[priv->index];
+	if (!cfg) {
+		netdev_err(priv->ndev, "%s, pps_cfg is NULL\n", __func__);
+		return -EINVAL;
 	}
 
 	if (delta < 0) {
@@ -3206,6 +3234,20 @@ static s32 eth_ptp_adjust_time(struct ptp_clock_info *ptp, s64 delta)
 	raw_spin_lock_irqsave(&priv->ptp_lock, flags); /*PRQA S 2996*/
 	ret = ptp_adjust_systime(priv, sec, nsec, neg_adj);
 	raw_spin_unlock_irqrestore(&priv->ptp_lock, flags);/*PRQA S 2996*/
+
+	if (cfg && cfg->period.tv_sec != 0) {
+		eth_ptp_get_time(ptp, &ts);
+		if (ts.tv_nsec > 500000000)
+			cfg->start.tv_sec = ts.tv_sec + 2;
+		else
+			cfg->start.tv_sec = ts.tv_sec + 1;
+		cfg->start.tv_nsec = 0;
+		//disable pps output
+		ptp_flex_pps_config(priv, priv->index, cfg, 0, priv->sub_second_inc, priv->systime_flags);
+		//enable pps output
+		ptp_flex_pps_config(priv, priv->index, cfg, 1, priv->sub_second_inc, priv->systime_flags);
+	}
+
 	if (ret < 0) {
 		netdev_err(priv->ndev, "adjust ptp time err\n");
 	}
@@ -3350,6 +3392,7 @@ static s32 eth_ptp_enable(struct ptp_clock_info *ptp, struct ptp_clock_request *
 	switch(rq->type) {
 	case PTP_CLK_REQ_PEROUT:
 		cfg = &priv->pps[rq->perout.index];
+		priv->index = rq->perout.index;
 		cfg->start.tv_sec = rq->perout.start.sec;
 		cfg->start.tv_nsec = rq->perout.start.nsec;
 		cfg->period.tv_sec = rq->perout.period.sec;
