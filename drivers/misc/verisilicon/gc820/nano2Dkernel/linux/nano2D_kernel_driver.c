@@ -1078,24 +1078,91 @@ static int n2d_vnode_close(struct vio_video_ctx *vctx)
 static int n2d_vnode_set_attr(struct vio_video_ctx *vctx, unsigned long arg)
 {
 	s32 ret = 0;
-	u64 copy_ret;
+	unsigned long lock_flags;
 	struct n2d_subdev *n2d_sub;
 	struct vio_subdev *vdev;
+	struct n2d_config tmp;
+	struct vio_node *vnode = NULL;
+	struct vio_subdev *ich_vdev = NULL, *och_vdev = NULL;
+	struct n2d_subdev *ich_n2d = NULL, *och_n2d = NULL;
+
+	if (!vctx || !vctx->vdev)
+		return -EINVAL;
 
 	vdev = vctx->vdev;
 	n2d_sub = container_of(vdev, struct n2d_subdev, vdev);
-	copy_ret = copy_from_user((void *)&n2d_sub->config, (void __user *)arg, sizeof(struct n2d_config));
-	if (copy_ret != 0u) {
-		vio_err("%s: failed to copy from user, ret = %lld\n", __func__, copy_ret);
+	/* copy from userspace into a stack temporary to keep locked region short */
+	if (copy_from_user(&tmp, (void __user *)arg, sizeof(tmp))) {
+		vio_err("%s: failed to copy from user\n", __func__);
 		return -EFAULT;
 	}
+	/* Validate user-provided parameters to avoid invalid state or OOB */
+	if (tmp.ninputs > N2D_IN_MAX) {
+		vio_err("%s: invalid ninputs %d\n", __func__, tmp.ninputs);
+		return -EINVAL;
+	}
+	/* update current subdev */
+	spin_lock_irqsave(&n2d_sub->config_lock, lock_flags);
+	memcpy(&n2d_sub->config, &tmp, sizeof(tmp));
+	spin_unlock_irqrestore(&n2d_sub->config_lock, lock_flags);
 
+	vio_dbg("n2d_vnode_set_attr: crop (%d,%d,%d,%d), input (%d,%d) [this subdev]\n",
+		n2d_sub->config.crop_x,
+		n2d_sub->config.crop_y,
+		n2d_sub->config.crop_width,
+		n2d_sub->config.crop_height,
+		n2d_sub->config.input_width[0],
+		n2d_sub->config.input_height[0]);
+
+	/* If possible, also mirror to the paired subdev (ich <-> och) to keep consistency */
+	vnode = vdev->vnode;
+	if (vnode) {
+		ich_vdev = vnode->ich_subdev[0];
+		och_vdev = vnode->och_subdev[0];
+		/* If this call set_attr was for the output subdev, also copy to input subdev */
+		if (ich_vdev && ich_vdev != vdev) {
+			ich_n2d = container_of(ich_vdev, struct n2d_subdev, vdev);
+			spin_lock_irqsave(&ich_n2d->config_lock, lock_flags);
+			memcpy(&ich_n2d->config, &tmp, sizeof(tmp));
+			spin_unlock_irqrestore(&ich_n2d->config_lock, lock_flags);
+
+			vio_dbg("n2d_vnode_set_attr: mirrored to ich subdev %p: crop (%d,%d,%d,%d)\n",
+				ich_n2d,
+				ich_n2d->config.crop_x,
+				ich_n2d->config.crop_y,
+				ich_n2d->config.crop_width,
+				ich_n2d->config.crop_height);
+		}
+
+		/* If this call set_attr was for the input subdev, also copy to output subdev */
+		if (och_vdev && och_vdev != vdev) {
+			och_n2d = container_of(och_vdev, struct n2d_subdev, vdev);
+			spin_lock_irqsave(&och_n2d->config_lock, lock_flags);
+			memcpy(&och_n2d->config, &tmp, sizeof(tmp));
+			spin_unlock_irqrestore(&och_n2d->config_lock, lock_flags);
+
+			vio_dbg("n2d_vnode_set_attr: mirrored to och subdev %p: crop (%d,%d,%d,%d)\n",
+				och_n2d,
+				och_n2d->config.crop_x,
+				och_n2d->config.crop_y,
+				och_n2d->config.crop_width,
+				och_n2d->config.crop_height);
+		}
+	}
 	if (vdev->id == VNODE_ID_SRC)
 		vdev->leader = 1;
 
 	osal_set_bit((s32)VIO_SUBDEV_DMA_OUTPUT, &vdev->state);
 
 	return ret;
+}
+
+static s32 n2d_vnode_set_ochn_attr_ex(struct vio_video_ctx *vctx, unsigned long arg)
+{
+    if (!vctx)
+        return -EINVAL;
+
+    return n2d_vnode_set_attr(vctx, arg);
 }
 
 static int n2d_vnode_get_attr(struct vio_video_ctx *vctx, unsigned long arg)
@@ -1372,7 +1439,7 @@ static int do_stitch(struct vio_node *vnode, struct n2d_config *config)
 		}
 		n2d_set_csc_sequence(N2D_CSC_BT709);
 		N2D_ON_ERROR(n2d_blit(&dst, &rectDst, &src[i], N2D_NULL, N2D_BLEND_NONE));
-    }
+	}
 
 	N2D_ON_ERROR(n2d_commit());
 
@@ -1608,67 +1675,69 @@ on_error:
 	return error;
 }
 
-static int do_crop(struct vio_node *vnode, struct n2d_config *config)
+static int do_scale_crop(struct vio_node *vnode, struct n2d_config *config)
 {
-    n2d_buffer_t src = {0}, dst = {0};
-    n2d_uintptr_t handle = 0;
-    n2d_user_memory_desc_t memDesc = {0};
-    n2d_error_t error = N2D_SUCCESS;
-    n2d_rectangle_t src_rect;
+	n2d_buffer_t src = {0}, dst = {0};
+	n2d_uintptr_t handle = 0;
+	n2d_user_memory_desc_t memDesc = {0};
+	n2d_error_t error = N2D_SUCCESS;
+	n2d_rectangle_t src_rect = {0}, dst_rect = {0};
 
-    // 1. wrap source buffer
-    memDesc.flag = N2D_WRAP_FROM_USERMEMORY;
-    memDesc.physical = config->in_buffer_addr[0][0];
-    memDesc.size = config->input_stride[0] * config->input_height[0] * 3 / 2; // assume NV12
-	vio_info("%s(%d): physical = %llx, size = %llx.\n", __func__, __LINE__, memDesc.physical, memDesc.size);
-    N2D_ON_ERROR(n2d_wrap(&memDesc, &handle));
+	/* 1. wrap source buffer */
+	memDesc.flag     = N2D_WRAP_FROM_USERMEMORY;
+	memDesc.physical = config->in_buffer_addr[0][0];
+	memDesc.size     = config->input_stride[0] * config->input_height[0] * 3 / 2; // NV12
+	N2D_ON_ERROR(n2d_wrap(&memDesc, &handle));
 
-    src.width = config->input_width[0];
-    src.height = config->input_height[0];
-    src.stride = config->input_stride[0];
-    src.format = N2D_NV12;
-    src.handle = handle;
-    src.alignedh = config->input_height[0];
-    src.alignedw = config->input_stride[0];
-    src.tiling = N2D_LINEAR;
-	vio_info("%s(%d): width = %d, height = %d, format = %d, handle = %lld, stride = %d.\n",
-		 __func__, __LINE__, src.width, src.height, src.format, src.handle, src.stride);
-    N2D_ON_ERROR(n2d_map(&src));
+	src.width    = config->input_width[0];
+	src.height   = config->input_height[0];
+	src.stride   = config->input_stride[0];
+	src.format   = N2D_NV12;
+	src.handle   = handle;
+	src.alignedh = config->input_height[0];
+	src.alignedw = config->input_stride[0];
+	src.tiling   = N2D_LINEAR;
+	N2D_ON_ERROR(n2d_map(&src));
 
-    // 2. wrap destination buffer
-    memDesc.flag = N2D_WRAP_FROM_USERMEMORY;
-    memDesc.physical = config->out_buffer_addr[0];
-    memDesc.size = config->output_stride * config->output_height * 3 / 2;
-	vio_info("%s(%d): physical = %llx, size = %llx.\n", __func__, __LINE__, memDesc.physical, memDesc.size);
-    N2D_ON_ERROR(n2d_wrap(&memDesc, &handle));
+	/* 2. wrap destination buffer */
+	memDesc.flag     = N2D_WRAP_FROM_USERMEMORY;
+	memDesc.physical = config->out_buffer_addr[0];
+	memDesc.size     = config->output_stride * config->output_height * 3 / 2;
+	N2D_ON_ERROR(n2d_wrap(&memDesc, &handle));
 
-    dst.width = config->output_width;
-    dst.height = config->output_height;
-    dst.stride = config->output_stride;
-    dst.format = N2D_NV12;
-    dst.handle = handle;
-    dst.alignedh = config->output_height;
-    dst.alignedw = config->output_stride;
-    dst.tiling = N2D_LINEAR;
-    N2D_ON_ERROR(n2d_map(&dst));
+	dst.width    = config->output_width;
+	dst.height   = config->output_height;
+	dst.stride   = config->output_stride;
+	dst.format   = N2D_NV12;
+	dst.handle   = handle;
+	dst.alignedh = config->output_height;
+	dst.alignedw = config->output_stride;
+	dst.tiling   = N2D_LINEAR;
+	N2D_ON_ERROR(n2d_map(&dst));
 
-    // 3. set source crop region
-    src_rect.x = config->crop_x;
-    src_rect.y = config->crop_y;
-    src_rect.width = config->crop_width;
-	src_rect.height = config->crop_height;
+	/* 3. Set crop region */
+	src_rect.x      = config->crop_x;
+	src_rect.y      = config->crop_y;
+	src_rect.width  = (config->crop_width  > 0) ? config->crop_width  : src.width;
+	src_rect.height = (config->crop_height > 0) ? config->crop_height : src.height;
 
-	vio_info("%s(%d): crop rect: x = %d, y = %d, width = %d, height = %d.\n",
-		 __func__, __LINE__, src_rect.x, src_rect.y, src_rect.width, src_rect.height);
+	/* 4. Set target scaling region to output width/height) */
+	dst_rect.x      = 0;
+	dst_rect.y      = 0;
+	dst_rect.width  = config->output_width;
+	dst_rect.height = config->output_height;
 
-    // 4. Blit with cropping (crop from src_rect → to dst)
-    N2D_ON_ERROR(n2d_blit(&dst, N2D_NULL, &src, &src_rect, N2D_BLEND_NONE));
-    N2D_ON_ERROR(n2d_commit());
+	/* 5. Perform a single blit operation to complete both cropping and scaling */
+	N2D_ON_ERROR(n2d_blit(&dst, &dst_rect, &src, &src_rect, N2D_BLEND_NONE));
+	N2D_ON_ERROR(n2d_commit());
+	vio_dbg("%s(%d): crop (%d,%d,%d,%d) -> scale (%d,%d)\n", __func__, __LINE__,
+		 src_rect.x, src_rect.y, src_rect.width, src_rect.height,
+		 dst_rect.width, dst_rect.height);
 
 on_error:
-    n2d_free(&src);
-    n2d_free(&dst);
-    return error;
+	n2d_free(&src);
+	n2d_free(&dst);
+	return error;
 }
 
 static int n2d_process(struct vio_node *vnode, struct n2d_config *config)
@@ -1698,9 +1767,9 @@ static int n2d_process(struct vio_node *vnode, struct n2d_config *config)
 	case rotate:
         N2D_ON_ERROR(do_rotate(vnode, config));
         break;
-	case crop:
-        N2D_ON_ERROR(do_crop(vnode, config));
-        break;
+	case scale_crop:
+		N2D_ON_ERROR(do_scale_crop(vnode, config));
+		break;
 	default:
 		vio_err("Not supported command: %d\n", config->command);
 		break;
@@ -1775,24 +1844,56 @@ static void n2d_frame_work(struct vio_node *vnode)
 {
 	int ret = 0;
 	u64 flags = 0;
+	struct n2d_subdev *cfg_n2d = NULL;
 	struct n2d_subdev *n2d_sub;
 	struct vio_subdev *vdev, *och_vdev;
 	struct vio_framemgr *framemgr, *out_framemgr;
 	struct vio_frame *frame, *out_frame;
+	struct n2d_config local_cfg; /* local copy of config */
 	struct n2d_config *config;
 	int i, j;
+	unsigned long cfg_lock_flags;
 
+	/* basic assignments */
 	vdev = vnode->ich_subdev[0];
 	och_vdev = vnode->och_subdev[0];
-	n2d_sub	 = container_of(vdev, struct n2d_subdev, vdev);
+
+	/* Determine which subdev holds the authoritative config:
+	 * Prefer output subdev's config if present (because set_attr was
+	 * often called on ochn), fall back to input subdev.
+	 */
+	if (och_vdev) {
+		cfg_n2d = container_of(och_vdev, struct n2d_subdev, vdev);
+	} else if (vdev) {
+		cfg_n2d = container_of(vdev, struct n2d_subdev, vdev);
+	} else {
+		vio_err("%s: no subdevs found\n", __func__);
+		return;
+	}
+
+	/* Also keep n2d_sub pointing at input subdev (for frames/framemgr) */
+	n2d_sub = container_of(vdev, struct n2d_subdev, vdev);
+
 	framemgr = &vdev->framemgr;
 	out_framemgr = &och_vdev->framemgr;
-	config	     = &n2d_sub->config;
-	vio_dbg("[S%d][C%d] %s start, rcount %d\n", vnode->flow_id, vnode->ctx_id, __func__, atomic_read(&vnode->rcount));/*PRQA S 0685,1294*/
+
+	/* copy authoritative config to local_cfg under its lock */
+	spin_lock_irqsave(&cfg_n2d->config_lock, cfg_lock_flags);
+	memcpy(&local_cfg, &cfg_n2d->config, sizeof(local_cfg));
+	spin_unlock_irqrestore(&cfg_n2d->config_lock, cfg_lock_flags);
+
+	config = &local_cfg; /* use local copy for entire processing of this frame */
+
+	/* debug: show which subdev we copied config from */
+	vio_dbg("%s: copied config from subdev %p (cfg_n2d=%p). Using config: crop_x=%d, crop_y=%d, crop_w=%d, crop_h=%d\n",
+			__func__, (void *)&cfg_n2d->vdev, (void *)cfg_n2d,
+			config->crop_x, config->crop_y, config->crop_width, config->crop_height);
+
 
 	vio_dbg("%s: config->command = %d.\n", __func__, config->command);
 
-	for (i = 0; i < n2d_sub->config.ninputs; i++) {
+	/* process each input according to config->ninputs (local copy) */
+	for (i = 0; i < config->ninputs; i++) {
 		vdev = vnode->ich_subdev[i];
 		framemgr = &vdev->framemgr;
 		vio_e_barrier_irqs(framemgr, flags);
@@ -1961,6 +2062,7 @@ static struct vio_common_ops n2d_vnode_vops = {
 	.open		    = n2d_vnode_open,
 	.close		    = n2d_vnode_close,
 	.video_set_attr	    = n2d_vnode_set_attr,
+	.video_set_ochn_attr_ex = n2d_vnode_set_ochn_attr_ex, // RUNTIME
 	.video_get_attr = n2d_vnode_get_attr,
 	.video_get_buf_attr = n2d_vnode_get_buf_attr,
 	.video_get_version = n2d_get_version,
@@ -1998,6 +2100,11 @@ static int horizon_n2d_device_node_init(void)
 		vnode[i].allow_bind = n2d_allow_bind;
 		vnode[i].frame_work = n2d_trigger_frame_work;
 		sema_init(&n2d->vsemas[i], 0);
+		for (j = 0; j <= N2D_IN_MAX; j++) {
+			spin_lock_init(&n2d->n2d_sub[i].subdev[j].config_lock);
+			vio_dbg("Initialized config_lock for stream %d, channel %d at %p\n",
+					i, j, &n2d->n2d_sub[i].subdev[j].config_lock);
+		}
 		ret	= start_n2d_frame_work_thread(n2d, i);
 		if (ret != 0)
 			goto err;

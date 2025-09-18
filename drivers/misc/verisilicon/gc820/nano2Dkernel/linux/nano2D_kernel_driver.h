@@ -144,7 +144,7 @@ typedef enum n2d_command {
 	/* 2 */ stitch,
 	/* 3 */ csc,
 	/* 4 */ rotate,
-	/* 5 */ crop
+	/* 5 */ scale_crop
 } n2d_command_t;
 
 struct n2d_config {
@@ -177,6 +177,7 @@ struct n2d_config {
 struct n2d_subdev {
 	struct vio_subdev vdev;
 	struct n2d_config config;
+	spinlock_t config_lock;
 };
 
 struct n2d_subnode {
