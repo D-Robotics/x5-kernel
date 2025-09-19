@@ -42,3 +42,24 @@
 	power-gpios = <&hs_gpio0_porta 23 GPIO_ACTIVE_HIGH>;
 	toggle_interval_us = <100000>;
 };
+
+
+&i2c2 {
+	status = "okay";
+
+	hpu3501@1c {
+		hpu3501-rtc {
+			// In 1_B board, the RTC alarm and wakup gpio are both connected to AON_GPIO_PIN2,
+			// so we don't suggest to use interrupt here, otherwise it will conflict with the wakeup gpio.
+			// We don't suggest to use PMIC RTC function in evb 1_B.
+			// Default status is "disabled".
+			status = "disabled";
+			opsel = <0>;
+			// RTC_ALARM - AON_GPIO_PIN2
+			pinctrl-names = "default";
+			pinctrl-0 = <&aon_gpio_2>;
+			interrupt-parent = <&aon_gpio_porta>;
+			interrupts = <1 IRQ_TYPE_EDGE_RISING>;
+		};
+	};
+};
