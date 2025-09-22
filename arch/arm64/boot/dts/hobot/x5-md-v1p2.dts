@@ -1,0 +1,143 @@
+// SPDX-License-Identifier: GPL-2.0
+/*
+ * dts for Sunrise5 EVB-V2 platform
+ *
+ * Copyright (C) 2024 Horizon Robotics Inc.
+ *
+ */
+
+/dts-v1/;
+#include "x5-rdk.dtsi"
+
+/ {
+	model = "D-Robotics X5 ND V0.1";
+
+	leds {
+		status = "okay";
+		compatible = "gpio-leds";
+
+		act_led: led-act {
+			label = "ACT";
+			gpios = <&dsp_gpio_porta 14 GPIO_ACTIVE_LOW>;
+			linux,default-trigger = "heartbeat";
+		};
+	};
+};
+
+&dsp_iomuxc {
+	dsp_gpio0_15: dsp_gpio0_15 {
+		horizon,pins = <
+			DSP_PDM_IN0  DSP_PINMUX_0  BIT_OFFSET26  MUX_ALT1  &pconf_drv_pu_ds7_1v8
+		>;
+	};
+
+	dsp_gpio0_16: dsp_gpio0_16 {
+		horizon,pins = <
+			DSP_PDM_IN1  DSP_PINMUX_0  BIT_OFFSET28  MUX_ALT1  &pconf_drv_pu_ds7_1v8
+		>;
+	};
+
+	pinctrl_dsp_uart0: uart0grp {
+		horizon,pins = <
+			DSP_UART0_RXD  DSP_PINMUX_1  BIT_OFFSET10  MUX_ALT0 &pconf_drv_pu_ds7_1v8
+			DSP_UART0_TXD  DSP_PINMUX_1  BIT_OFFSET12  MUX_ALT0 &pconf_drv_pu_ds7_1v8
+		>;
+	};
+};
+
+&lsio_iomuxc {
+	lsio_gpio0_12: lsio_gpio0_12 {
+		horizon,pins = <
+			LSIO_UART4_RX	LSIO_PINMUX_3 BIT_OFFSET24	MUX_ALT2	&pconf_output_high
+		>;
+	};
+
+	pinctrl_i2c0: i2c0grp {
+		horizon,pins = <
+			LSIO_I2C0_SCL  LSIO_PINMUX_2 BIT_OFFSET16  MUX_ALT0 &pconf_drv_pu_ds7_3v3
+			LSIO_I2C0_SDA  LSIO_PINMUX_2 BIT_OFFSET18  MUX_ALT0 &pconf_drv_pu_ds7_3v3
+		>;
+	};
+
+	pinctrl_i2c3: i2c3grp {
+		horizon,pins = <
+			LSIO_I2C3_SCL  LSIO_PINMUX_2 BIT_OFFSET28  MUX_ALT0 &pconf_drv_pu_ds7_1v8
+			LSIO_I2C3_SDA  LSIO_PINMUX_2 BIT_OFFSET30  MUX_ALT0 &pconf_drv_pu_ds7_1v8
+		>;
+	};
+};
+
+&dsp_gpio_porta {
+	pinctrl-names = "default";
+	pinctrl-0 = < &dsp_gpio0_15
+					&dsp_gpio0_16
+				>;
+};
+
+&ls_gpio0_porta {
+	pinctrl-names = "default";
+	pinctrl-0 = <&lsio_gpio0_12>;//USB HUB RESET high
+};
+
+&spi5 {
+	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_spi5 &lsio_gpio0_7 &lsio_gpio0_13>;
+	dma-names = "tx", "rx";
+	dmas = <&axi_dmac 31>, <&axi_dmac 30>;
+
+	tcan4x5x: tcan4x5x@0 {
+		compatible = "ti,tcan4x5x";
+		reg = <0>;
+		#address-cells = <1>;
+		#size-cells = <1>;
+		spi-max-frequency = <18000000>;
+		bosch,mram-cfg = <0x0 0 0 10 0 0 10 10>;
+		interrupt-parent = <&ls_gpio0_porta>;
+		interrupts = <13 IRQ_TYPE_EDGE_FALLING>;
+		reset-gpios = <&ls_gpio0_porta 7 GPIO_ACTIVE_HIGH>;
+	};
+};
+
+&vin_vcon0 {
+	status = "okay";
+	/* camera sensor
+	 * reset gpio:	LSIO_GPIO1_PIN6:	353
+	 * lpwm      :  LSIO_SPI3_SCLK  :   pinctrl_lpwm1_0
+	 */
+	pinctrl-names = "default";
+	pinctrl-0 = <&lsio_gpio1_6>;
+	gpio_oth = <353>;   // reset gpio
+	bus = <6>; // i2c bus
+	lpwm_chn = <4>;
+};
+
+&vin_vcon1 {
+	status = "okay";
+	// use same sensor gpio with vcon0 and i2c bus
+	bus = <6>;
+};
+
+&vin_vcon2 {
+	status = "okay";
+	/* camera sensor
+	 * reset gpio:	LSIO_GPIO1_PIN4:	351
+	 * lpwm      :  LSIO_SPI3_SSN  :    pinctrl_lpwm1_1
+	 */
+	pinctrl-names = "default";
+	pinctrl-0 = <&lsio_gpio1_4>;
+	gpio_oth = <351>;   // reset gpio
+	bus = <4>;  // i2c bus
+	lpwm_chn = <5>;
+};
+
+&vin_vcon3 {
+	status = "okay";
+	// use same sensor gpio with vcon2 and i2c bus
+	bus = <4>;
+};
+
+&emmc {
+	status = "okay";
+	fixed-emmc-driver-type = <2>;
+};
