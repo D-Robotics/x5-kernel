@@ -1795,7 +1795,31 @@ ssize_t name##_show(struct device *dev,					\
 static DEVICE_ATTR_RO(name)
 
 static USB_UDC_SPEED_ATTR(current_speed, speed);
-static USB_UDC_SPEED_ATTR(maximum_speed, max_speed);
+
+static ssize_t maximum_speed_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct usb_udc *udc = container_of(dev, struct usb_udc, dev);
+	return scnprintf(buf, PAGE_SIZE, "%s\n",
+			usb_speed_string(udc->gadget->max_speed));
+}
+static ssize_t maximum_speed_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t n)
+{
+	struct usb_udc	*udc = container_of(dev, struct usb_udc, dev);
+
+	if (sysfs_streq(buf, "high-speed"))
+		udc->gadget->max_speed = USB_SPEED_HIGH;
+	else if (sysfs_streq(buf, "super-speed"))
+		udc->gadget->max_speed = USB_SPEED_SUPER;
+	else if (sysfs_streq(buf, "super-speed-plus"))
+		udc->gadget->max_speed = USB_SPEED_SUPER_PLUS;
+	else
+		udc->gadget->max_speed = USB_SPEED_SUPER;
+
+	return n;
+}
+static DEVICE_ATTR_RW(maximum_speed);
 
 #define USB_UDC_ATTR(name)					\
 ssize_t name##_show(struct device *dev,				\
