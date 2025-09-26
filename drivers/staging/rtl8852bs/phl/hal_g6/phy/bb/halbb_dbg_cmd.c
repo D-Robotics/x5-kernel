@@ -281,7 +281,7 @@ void halbb_trace_dbg(struct bb_info *bb, char input[][16], u32 *_used,
 	u8 i = 0;
 
 	for (i = 0; i < 5; i++) {
-		if (input[i + 1])
+		if (((u8 *)input)[(i + 1) * 16] != 0)
 			HALBB_SCAN(input[i + 1], DCMD_DECIMAL, &val[i]);
 	}
 	comp = bb->dbg_component;
@@ -958,7 +958,7 @@ void halbb_fw_dbg(struct bb_info *bb, char input[][16], u32 *_used,
 		goto out;
 	}
 	for (i = 0; i < 5; i++) {
-		if (input[i + 1])
+		if (((u8 *)input)[(i + 1) * 16] != 0)
 			HALBB_SCAN(input[i + 1], DCMD_DECIMAL, &val[i]);
 	}
 	if (val[0] == 1) {

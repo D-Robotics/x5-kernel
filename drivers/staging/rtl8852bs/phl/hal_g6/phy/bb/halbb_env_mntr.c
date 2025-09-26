@@ -1231,7 +1231,7 @@ void halbb_nhm_dbg(struct bb_info *bb, char input[][16], u32 *_used,
 				    "NHM is controlled by FW!\n");
 		}
 		for (i = 1; i < 9; i++) {
-			if (input[i + 1])
+			if (((u8 *)input)[(i + 1) * 16] != 0)
 				HALBB_SCAN(input[i + 1], DCMD_DECIMAL, &var[i]);
 		}
 
@@ -1492,7 +1492,7 @@ void halbb_clm_dbg(struct bb_info *bb, char input[][16], u32 *_used,
 	u8 i = 0;
 
 	for (i = 0; i < 7; i++) {
-		if (input[i + 1])
+		if (((u8 *)input)[(i + 1) * 16] != 0)
 			HALBB_SCAN(input[i + 1], DCMD_DECIMAL, &var[i]);
 	}
 
@@ -2018,7 +2018,7 @@ void halbb_ifs_clm_dbg(struct bb_info *bb, char input[][16], u32 *_used,
 		ifs_clm_num = BE_IFS_CLM_NUM;
 
 	for (i = 0; i < 5; i++) {
-		if (input[i + 1])
+		if (((u8 *)input)[(i + 1) * 16] != 0)
 			HALBB_SCAN(input[i + 1], DCMD_DECIMAL, &var[i]);
 	}
 
@@ -2883,7 +2883,7 @@ void halbb_fahm_dbg(struct bb_info *bb, char input[][16], u32 *_used,
 		env->fahm_manual_ctrl = true;
 
 		for (i = 1; i < 9; i++) {
-			if (input[i + 1])
+			if (((u8 *)input)[(i + 1) * 16] != 0)
 				HALBB_SCAN(input[i + 1], DCMD_DECIMAL, &var[i]);
 		}
 
@@ -3050,7 +3050,7 @@ void halbb_edcca_clm_dbg(struct bb_info *bb, char input[][16], u32 *_used,
 	u8 i = 0;
 
 	for (i = 0; i < 5; i++) {
-		if (input[i + 1])
+		if (((u8 *)input)[(i + 1) * 16] != 0)
 			HALBB_SCAN(input[i + 1], DCMD_DECIMAL, &var[i]);
 	}
 
@@ -4294,7 +4294,7 @@ void halbb_env_mntr_dbg(struct bb_info *bb, char input[][16], u32 *_used,
 	u8 func_sel = 0;
 
 	for (i = 0; i < 3; i++) {
-		if (input[i + 1])
+		if (((u8 *)input)[(i + 1) * 16] != 0)
 			HALBB_SCAN(input[i + 1], DCMD_DECIMAL, &var[i]);
 	}
 

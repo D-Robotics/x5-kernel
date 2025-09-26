@@ -419,7 +419,7 @@ void halbb_psd_dbg(struct bb_info *bb, char input[][16], u32 *_used,
 	} else if (var1[0] == 0) {
 
 		for (i = 1; i <= 10; i++) {
-			if (input[i + 1])
+			if (((u8 *)input)[(i + 1) * 16] != 0)
 				HALBB_SCAN(input[i + 1], DCMD_DECIMAL,
 					   &var1[i]);
 		}

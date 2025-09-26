@@ -1655,7 +1655,7 @@ void rtw_reattach_vht_ies(_adapter *padapter, struct _ADAPTER_LINK *padapter_lin
 
 	RTW_INFO(FUNC_ADPT_FMT"\n", FUNC_ADPT_ARG(padapter));
 
-	if (pnetwork->IEs != NULL) {
+	if (pnetwork) {
 		vht_op_ie = rtw_set_ie(vht_cap_ie, EID_VHTCapability, VHT_CAP_IE_LEN,
 			pvhtpriv->vht_cap_ie_backup, &(pnetwork->IELength));
 

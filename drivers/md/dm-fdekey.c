@@ -111,7 +111,7 @@ static int handle_key(unsigned char *key, char *dr_key)
 	int ret;
 
 	tmp = strstr(key, ":");
-	if (! (tmp + 1)) {
+	if (!tmp) {
 		return -1;
 	}
 	tmp += 1;

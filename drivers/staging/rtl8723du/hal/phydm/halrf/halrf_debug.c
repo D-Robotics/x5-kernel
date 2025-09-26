@@ -151,7 +151,7 @@ void halrf_debug_trace(void *dm_void, char input[][16], u32 *_used,
 	u8 i;
 
 	for (i = 0; i < 5; i++)
-		if (input[i + 1])
+		if (((u8 *)input)[(i + 1) * 16] != 0)
 			PHYDM_SSCANF(input[i + 2], DCMD_DECIMAL, &rf_var[i]);
 
 	if (rf_var[0] == 100) {
@@ -211,7 +211,7 @@ void halrf_dack_debug_cmd(void *dm_void, char input[][16])
 	u8 i;
 
 	for (i = 0; i < 7; i++)
-		if (input[i + 1])
+		if (((u8 *)input)[(i + 1) * 16] != 0)
 			PHYDM_SSCANF(input[i + 2], DCMD_DECIMAL, &dm_value[i]);
 
 	if (dm_value[0] == 1)
@@ -329,7 +329,7 @@ void halrf_cmd_parser(void *dm_void, char input[][16], u32 *_used, char *output,
 		PDM_SNPF(out_len, used, output + used, out_len - used,
 			 "IQK DEBUG!!!!!\n");
 		for (i = 0; i < 5; i++) {
-			if (input[i + 1]) {
+			if (((u8 *)input)[(i + 1) * 16] != 0) {
 				PHYDM_SSCANF(input[i + 2], DCMD_HEX,
 					     &rf_var[i]);
 				input_idx++;
