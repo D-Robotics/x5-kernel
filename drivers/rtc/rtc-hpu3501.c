@@ -344,6 +344,12 @@ static int hpu3501_rtc_probe(struct platform_device *pdev)
 			goto fail_rtc_register;
 		}
 
+		if (!of_device_is_available(np)) {
+			dev_info(rtc->dev, "hpu3501-rtc is disabled in DT, skipping\n");
+			ret = -ENODEV;
+			goto fail_rtc_register;
+		}
+
 		if (rtc->opsel != 0 && rtc->opsel != 1) {
 			dev_info(rtc->dev, "opsel = %d, should be 0 or 1\n",
 				 rtc->opsel);
