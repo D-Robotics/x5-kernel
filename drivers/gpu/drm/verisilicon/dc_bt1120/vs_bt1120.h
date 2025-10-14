@@ -260,6 +260,12 @@ struct vs_bt1120 {
 	/** odd or even field */
 	bool is_odd_field;
 
+	/** Y base address */
+	u32 y_addr;
+
+	/** UV base address */
+	u32 uv_addr;
+
 	/** is_interlaced */
 	bool is_interlaced;
 
