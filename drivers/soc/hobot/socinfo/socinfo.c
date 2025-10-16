@@ -127,7 +127,7 @@ const static struct _DDR_vendor_info ddr_vendor_info[] = {
 
 const char *ddr_freq_array[] = {"unkown", "3200", "3733", "4266"};
 const char *ddr_type_array[] = {"unkown", "LPDDR4", "LPDDR4X"};
-const char *ddr_size_array[] = {"1024MB", "2048MB", "4096MB", "8192MB"};
+const char *ddr_size_array[] = {"1024MB", "2048MB", "4096MB", "8192MB", "6144MB"};
 
 ssize_t soc_gen_show(struct class *class,
 		     struct class_attribute *attr, char *buf)
