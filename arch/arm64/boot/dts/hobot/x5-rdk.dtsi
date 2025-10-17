@@ -311,6 +311,25 @@
 
 &i2c4 {
 	status = "okay";
+
+	invn_icm_i2c4: icm42688@68 {
+		compatible = "invensense,icm42688";
+		reg = <0x68>;
+		/*no interrupt pin*/
+		interrupt-parent = <&gic>;
+		interrupts = <GIC_SPI 109 IRQ_TYPE_LEVEL_HIGH>;
+		axis_map_x = <1>;
+		axis_map_y = <0>;
+		axis_map_z = <2>;
+		negate_x = <1>;
+		negate_y = <0>;
+		negate_z = <0>;
+		inven,secondary_type = "none";
+		inven,aux_type = "none";
+		inven,read_only_slave_type = "none";
+		drive-open-drain = <0>;
+		status = "disabled";
+	};
 };
 
 &i2c5 {
@@ -319,6 +338,25 @@
 
 &i2c6 {
 	status = "okay";
+
+	invn_icm_i2c6: icm42688@68 {
+		compatible = "invensense,icm42688";
+		reg = <0x68>;
+		/*no interrupt pin*/
+		interrupt-parent = <&gic>;
+		interrupts = <GIC_SPI 109 IRQ_TYPE_LEVEL_HIGH>;
+		axis_map_x = <1>;
+		axis_map_y = <0>;
+		axis_map_z = <2>;
+		negate_x = <1>;
+		negate_y = <0>;
+		negate_z = <0>;
+		inven,secondary_type = "none";
+		inven,aux_type = "none";
+		inven,read_only_slave_type = "none";
+		drive-open-drain = <0>;
+		status = "disabled";
+	};
 };
 
 &i2c7 {
