@@ -1861,6 +1861,7 @@ static int32_t hobot_remoteproc_suspend(struct device *dev)
 	struct hobot_rproc_pdata *pdata = (struct hobot_rproc_pdata *)platform_get_drvdata(pdev);
 	int32_t ret;
 	uint32_t mode;
+	pdata->is_dsp_awake = false;
 
 	ret = 0;
 	mode = hb_get_sleep_mode(pdata);
@@ -1969,6 +1970,7 @@ static int32_t hobot_remoteproc_resume(struct device *dev)
 		dev_err(dev, "Unsupported sleep mode(%d) found!\n", mode);
 		ret = -EINVAL;
 	}
+	pdata->is_dsp_awake = true;
 
 out:
 	return ret;
@@ -2301,10 +2303,21 @@ static void hobot_remoteproc_coredump_work(struct work_struct *work) {
 	loff_t pos;
 	uint32_t i;
 	ssize_t wsize;
+	bool dsp_was_sleeping = false;
 
 	while (1) {
 		if (wait_for_completion_interruptible(&pdata->completion_coredump) < 0) {
 			break;
+		}
+
+		while (!pdata->is_dsp_awake) {
+			dsp_was_sleeping = true;
+			msleep(10);
+		}
+
+		if (dsp_was_sleeping) {
+			dsp_was_sleeping = false;
+			msleep(500);
 		}
 
 		ktime_get_real_ts64(&current_time);
@@ -2359,6 +2372,8 @@ static int32_t irq_init(struct platform_device *pdev) {
 		dev_err(&pdev->dev, "create_singlethread_workqueue error\n");
 		return -EINVAL;
 	}
+
+	pdata->is_dsp_awake = true;
 
 	init_completion(&pdata->completion_coredump);
 	INIT_WORK(&(pdata->work_coredump), hobot_remoteproc_coredump_work);

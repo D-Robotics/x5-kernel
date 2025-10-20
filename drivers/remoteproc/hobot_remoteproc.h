@@ -269,6 +269,8 @@ struct hobot_rproc_pdata {
 	struct completion completion_boot;
 
 	struct hobot_rproc_version version;
+
+	bool is_dsp_awake;
 };
 
 static inline void *log_memcpy(void *dest, void *src, unsigned int num)
