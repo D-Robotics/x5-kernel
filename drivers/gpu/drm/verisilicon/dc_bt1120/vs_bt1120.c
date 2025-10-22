@@ -671,10 +671,7 @@ static void bt1120_disp_enable(struct vs_crtc *vs_crtc)
 	bt1120_write(bt1120_disp->bt1120, REG_BT1120_IRQ_STATUS, 0xf);
 
 	/* enable frame_start & underflow interrupts*/
-	if (scan.is_interlaced)
-		bt1120_set_clear(bt1120_disp->bt1120, REG_BT1120_IRQ_EN_CTL, BIT(0) | BIT(2), 0);
-	else
-		bt1120_set_clear(bt1120_disp->bt1120, REG_BT1120_IRQ_EN_CTL, BIT(2), 0);
+	bt1120_set_clear(bt1120_disp->bt1120, REG_BT1120_IRQ_EN_CTL, BIT(0) | BIT(2), 0);
 
 	bt1120_set_clear(bt1120_disp->bt1120, REG_BT1120_CTL, BIT(0), 0);
 }
@@ -968,17 +965,15 @@ static irqreturn_t bt1120_isr(int irq, void *data)
 	struct bt1120_disp_state *bt1120_state = to_bt1120_disp_state(bt1120->drm_crtc->state);
 	u8 irq_status, scan_mode;
 	u32 y_addr, uv_addr, stride;
+	bool vblank_signaled = false;
 
 	irq_status = bt1120_read(bt1120, REG_BT1120_IRQ_STATUS);
 	bt1120_write(bt1120, REG_BT1120_IRQ_STATUS, irq_status);
 
-	if (irq_status & DMA_DONE_IRQ_STATUS_MASK) {
+	if (irq_status & FRAME_START_IRQ_STATUS_MASK) {
 		drm_crtc_handle_vblank(bt1120->drm_crtc);
 		bt1120_wb_handle_vblank(bt1120->drm_crtc);
-	}
-
-	if (irq_status & FRAME_START_IRQ_STATUS_MASK) {
-		/* scan mode. 0: interlaced, 1: progressive */
+		vblank_signaled = true;
 		scan_mode = bt1120_read(bt1120, REG_BT1120_SCAN_FORMAT_CTL);
 		if (scan_mode == INTERLACED_MODE) {
 			stride	= bt1120_read(bt1120, REG_BT1120_IMG_PIX_HSTRIDE_CTL);
@@ -999,6 +994,11 @@ static irqreturn_t bt1120_isr(int irq, void *data)
 				bt1120->is_odd_field = true;
 			}
 		}
+	}
+
+	if ((irq_status & DMA_DONE_IRQ_STATUS_MASK) && !vblank_signaled) {
+		drm_crtc_handle_vblank(bt1120->drm_crtc);
+		bt1120_wb_handle_vblank(bt1120->drm_crtc);
 	}
 
 	if (irq_status & BUF_UNDERFLOW_IRQ_STATUS_MASK)
