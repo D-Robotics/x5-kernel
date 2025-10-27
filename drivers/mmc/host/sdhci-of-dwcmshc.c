@@ -991,6 +991,7 @@ static int dwcmshc_probe(struct platform_device *pdev)
 				/* For warm boot, SD card need to be powered down */
 				dwcmshc_x5_toggle_sd_power(host->mmc,toggle_interval_us);
 
+			host->mmc_host_ops.card_hw_reset = dwcmshc_x5_toggle_sd_power;
 			host->mmc_host_ops.start_signal_voltage_switch = dwcmshc_x5_start_signal_voltage_switch;
 			host->mmc_host_ops.get_cd = dwcmshc_x5_get_cd;
 			x5_priv->reset = devm_reset_control_get_optional(mmc_dev(host->mmc), "sd_rst");
