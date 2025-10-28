@@ -763,6 +763,7 @@ static void dwcmshc_x5_toggle_sd_power(struct mmc_host *mmc,u32 toggle_interval_
 		gpiod_set_value_cansleep(x5_priv->power_gpio, 0);
 		udelay(toggle_interval_us);
 		gpiod_set_value_cansleep(x5_priv->power_gpio, 1);
+		udelay(toggle_interval_us);
 	}
 	return;
 }
