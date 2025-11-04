@@ -768,6 +768,24 @@ static void dwcmshc_x5_toggle_sd_power(struct mmc_host *mmc,u32 toggle_interval_
 	return;
 }
 
+static void dwcmshc_x5_toggle_sd_power_10ms(struct mmc_host *mmc)
+{
+	struct sdhci_host *host = mmc_priv(mmc);
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+	struct dwcmshc_priv *priv = sdhci_pltfm_priv(pltfm_host);
+	struct x5_priv *x5_priv = priv->priv;
+
+	if (!IS_ERR_OR_NULL(x5_priv->power_gpio)) {
+		dev_dbg(mmc_dev(mmc), "Toggling power-gpio with interval %u us\n",
+				10000);
+		gpiod_set_value_cansleep(x5_priv->power_gpio, 0);
+		udelay(10000);
+		gpiod_set_value_cansleep(x5_priv->power_gpio, 1);
+		udelay(10000);
+	}
+	return;
+}
+
 static int dwcmshc_rk35xx_init(struct sdhci_host *host, struct dwcmshc_priv *dwc_priv)
 {
 	int err;
@@ -992,7 +1010,7 @@ static int dwcmshc_probe(struct platform_device *pdev)
 				/* For warm boot, SD card need to be powered down */
 				dwcmshc_x5_toggle_sd_power(host->mmc,toggle_interval_us);
 
-			host->mmc_host_ops.card_hw_reset = dwcmshc_x5_toggle_sd_power;
+			host->mmc_host_ops.card_hw_reset = dwcmshc_x5_toggle_sd_power_10ms;
 			host->mmc_host_ops.start_signal_voltage_switch = dwcmshc_x5_start_signal_voltage_switch;
 			host->mmc_host_ops.get_cd = dwcmshc_x5_get_cd;
 			x5_priv->reset = devm_reset_control_get_optional(mmc_dev(host->mmc), "sd_rst");
