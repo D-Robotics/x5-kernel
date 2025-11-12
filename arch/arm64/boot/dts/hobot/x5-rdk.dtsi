@@ -103,6 +103,13 @@
 		drive-strength = <4>;
 		power-source = <HORIZON_IO_PAD_VOLTAGE_IP_CTRL>;
 	};
+
+	pconf_input_en_1v8_bias_disable: pconf-input-en-1v8-bias-disable {
+		bias-disable;
+		input-enable;
+		power-source = <HORIZON_IO_PAD_VOLTAGE_1V8>;
+		drive-strength = <3>;
+	};
 };
 
 &dsp_iomuxc {
@@ -113,6 +120,12 @@
 			DSP_I2S1_MCLK  DSP_PINMUX_0  BIT_OFFSET18  MUX_ALT0 &pconf_drv_pu_ds2_3v3
 			DSP_I2S1_SCLK  DSP_PINMUX_0  BIT_OFFSET20  MUX_ALT0 &pconf_drv_pu_ds2_3v3
 			DSP_I2S1_WS  DSP_PINMUX_0  BIT_OFFSET22  MUX_ALT0 &pconf_drv_pu_ds2_3v3
+		>;
+	};
+
+	dsp_gpio0_19: dsp_gpio0_19 {
+		horizon,pins = <
+			DSP_SPI6_SCLK  DSP_PINMUX_1  BIT_OFFSET6  MUX_ALT1  &pconf_input_en_1v8_bias_disable
 		>;
 	};
 };
