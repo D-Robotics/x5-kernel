@@ -1078,7 +1078,7 @@
 					<GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>,
 					<GIC_SPI 42 IRQ_TYPE_LEVEL_HIGH>,
 					<GIC_SPI 43 IRQ_TYPE_LEVEL_HIGH>;
-				interrupt-names = "mi", "fe", "isp";
+				interrupt-names = "isp_mi", "isp_fe", "isp";
 				clocks =
 					<&hpsclks X5_CAM_ISP8000_CLK>,
 					<&hpsclks X5_CAM_ISP8000_MCM_CLK>,
