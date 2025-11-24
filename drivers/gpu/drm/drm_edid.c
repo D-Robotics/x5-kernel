@@ -2105,7 +2105,8 @@ static struct edid *edid_filter_invalid_blocks(struct edid *edid,
  */
 
 static int
-drm_do_probe_ddc_edid_fallback(void *data, u8 *buf, unsigned int block, size_t len)
+// drm_do_probe_ddc_edid_fallback(void *data, u8 *buf, unsigned int block, size_t len)
+drm_do_probe_ddc_edid(void *data, u8 *buf, unsigned int block, size_t len)
 {
 	struct i2c_adapter *adapter = data;
 	unsigned char start = 0;
@@ -2157,63 +2158,63 @@ drm_do_probe_ddc_edid_fallback(void *data, u8 *buf, unsigned int block, size_t l
 	return ret == xfers ? 0 : -1;
 }
 
-static int
-drm_do_probe_ddc_edid(void *data, u8 *buf, unsigned int block, size_t len)
-{
-	struct i2c_adapter *adapter = data;
-	unsigned char start = block * EDID_LENGTH;
-	unsigned char segment = block >> 1;
-	unsigned char xfers = segment ? 3 : 2;
-	int ret, retries = 5;
+// static int
+// drm_do_probe_ddc_edid(void *data, u8 *buf, unsigned int block, size_t len)
+// {
+// 	struct i2c_adapter *adapter = data;
+// 	unsigned char start = block * EDID_LENGTH;
+// 	unsigned char segment = block >> 1;
+// 	unsigned char xfers = segment ? 3 : 2;
+// 	int ret, retries = 5;
 
-	/*
-	 * The core I2C driver will automatically retry the transfer if the
-	 * adapter reports EAGAIN. However, we find that bit-banging transfers
-	 * are susceptible to errors under a heavily loaded machine and
-	 * generate spurious NAKs and timeouts. Retrying the transfer
-	 * of the individual block a few times seems to overcome this.
-	 */
-	do {
-		struct i2c_msg msgs[] = {
-			{
-				.addr	= DDC_SEGMENT_ADDR,
-				.flags	= 0,
-				.len	= 1,
-				.buf	= &segment,
-			}, {
-				.addr	= DDC_ADDR,
-				.flags	= 0,
-				.len	= 1,
-				.buf	= &start,
-			}, {
-				.addr	= DDC_ADDR,
-				.flags	= I2C_M_RD,
-				.len	= len,
-				.buf	= buf,
-			}
-		};
+// 	/*
+// 	 * The core I2C driver will automatically retry the transfer if the
+// 	 * adapter reports EAGAIN. However, we find that bit-banging transfers
+// 	 * are susceptible to errors under a heavily loaded machine and
+// 	 * generate spurious NAKs and timeouts. Retrying the transfer
+// 	 * of the individual block a few times seems to overcome this.
+// 	 */
+// 	do {
+// 		struct i2c_msg msgs[] = {
+// 			{
+// 				.addr	= DDC_SEGMENT_ADDR,
+// 				.flags	= 0,
+// 				.len	= 1,
+// 				.buf	= &segment,
+// 			}, {
+// 				.addr	= DDC_ADDR,
+// 				.flags	= 0,
+// 				.len	= 1,
+// 				.buf	= &start,
+// 			}, {
+// 				.addr	= DDC_ADDR,
+// 				.flags	= I2C_M_RD,
+// 				.len	= len,
+// 				.buf	= buf,
+// 			}
+// 		};
 
-		/*
-		 * Avoid sending the segment addr to not upset non-compliant
-		 * DDC monitors.
-		 */
-		ret = i2c_transfer(adapter, &msgs[3 - xfers], xfers);
+// 		/*
+// 		 * Avoid sending the segment addr to not upset non-compliant
+// 		 * DDC monitors.
+// 		 */
+// 		ret = i2c_transfer(adapter, &msgs[3 - xfers], xfers);
 
-		if (ret == -ENXIO) {
-			DRM_DEBUG_KMS("drm: skipping non-existent adapter %s\n",
-					adapter->name);
-			break;
-		}
-	} while (ret != xfers && --retries);
+// 		if (ret == -ENXIO) {
+// 			DRM_DEBUG_KMS("drm: skipping non-existent adapter %s\n",
+// 					adapter->name);
+// 			break;
+// 		}
+// 	} while (ret != xfers && --retries);
 
-	if(ret != xfers && retries <= 0)
-	{
-		ret = drm_do_probe_ddc_edid_fallback(data, buf, block, len);
-		return ret;
-	}
+// 	if(ret != xfers && retries <= 0)
+// 	{
+// 		ret = drm_do_probe_ddc_edid_fallback(data, buf, block, len);
+// 		return ret;
+// 	}
 
-	return ret == xfers ? 0 : -1;
-}
+// 	return ret == xfers ? 0 : -1;
+// }
 
 static void connector_bad_edid(struct drm_connector *connector,
 			       const struct edid *edid, int num_blocks)
