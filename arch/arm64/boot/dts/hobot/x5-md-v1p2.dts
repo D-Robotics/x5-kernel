@@ -10,7 +10,7 @@
 #include "x5-rdk.dtsi"
 
 / {
-	model = "D-Robotics X5 ND V1.2";
+	model = "D-Robotics X5 MD V1.2";
 
 	leds {
 		status = "okay";
