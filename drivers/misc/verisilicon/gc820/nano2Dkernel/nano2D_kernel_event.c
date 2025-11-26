@@ -389,16 +389,29 @@ n2d_error_t n2d_kernel_event_submit(n2d_event_center_t *event_center, n2d_uint32
 		logical	      = (n2d_uint32_t *)((n2d_uint8_t *)cmd_buf->logical + cmd_buf->offset);
 		event_address = cmd_buf->address + cmd_buf->offset;
 		ONERROR(n2d_kernel_hardware_event(hardware, logical, id, N2D_NULL));
+
+		dcache_clean_poc(
+			(unsigned long)logical,
+			(unsigned long)logical + event_size);
+
 		cmd_buf->offset += event_size;
 
 		logical = (n2d_uint32_t *)((n2d_uint8_t *)cmd_buf->logical + cmd_buf->offset);
 		address = cmd_buf->address + cmd_buf->offset;
 		ONERROR(n2d_kernel_hardware_wait_link(hardware, logical, address, N2D_NULL));
+
+		dcache_clean_poc(
+			(unsigned long)logical,
+			(unsigned long)logical + wait_link_size);
+
 		cmd_buf->offset += wait_link_size;
 
 		ONERROR(n2d_kernel_hardware_link(hardware, cmd_buf->wl_current_logical,
 						 event_address, event_size + wait_link_size,
 						 N2D_NULL));
+		dcache_clean_poc(
+			(unsigned long)cmd_buf->wl_current_logical,
+			(unsigned long)cmd_buf->wl_current_logical + link_size);
 
 		cmd_buf->wl_current_logical = logical;
 		cmd_buf->wl_current_address = address;
