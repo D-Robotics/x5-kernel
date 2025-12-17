@@ -338,15 +338,15 @@ static int dump_trigger_store(const char __user *buf, size_t count, void *data)
 
 static int load_show(struct seq_file *m, void *data)
 {
-	int i = 0, j = 0;
+	int i = 0, j = 0, len = 0;
 	for (i = 0; i < global_device->kernel->dev_num; i++) {
 		for (j = 0; j < global_device->kernel->dev_core_num; j++) {
 			if (global_device->kernel->sub_dev[i]->hardware[j])
-				n2d_kernel_hardware_query_load(
+				len = n2d_kernel_hardware_query_load(m,
 					global_device->kernel->sub_dev[i]->hardware[j]);
 		}
 	}
-	return 0;
+	return len;
 }
 
 static n2d_debug_info_t info_list[] = {
