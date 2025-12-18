@@ -347,6 +347,21 @@
 
 &i2c5 {
 	status = "okay";
+	bmi08a:bmi08a@19 {
+		compatible = "bmi08xa";
+		reg = <0x19>;
+		interrupt-parent = <&ls_gpio1_porta>;
+		interrupts = <4 IRQ_TYPE_EDGE_RISING>;
+		status = "disabled";
+	};
+
+	bmi08g:bmi08g@69 {
+		compatible = "bmi08xg";
+		reg = <0x69>;
+		interrupt-parent = <&ls_gpio1_porta>;
+		interrupts = <6 IRQ_TYPE_EDGE_RISING>;
+		status = "disabled";
+	};
 };
 
 &i2c6 {
@@ -431,6 +446,24 @@
 		compatible = "dr,x5-spidev";
 		spi-max-frequency = <32000000>;
 		reg = <1>;
+	};
+
+	bmi08g@0 {
+		compatible = "bmi088_gyro";
+		reg = <0>;
+		spi-max-frequency = <5000000>;
+		interrupt-parent = <&ls_gpio1_porta>;
+		interrupts = <6 IRQ_TYPE_EDGE_RISING>;
+		status = "disabled";
+	};
+
+	bmi08a@1 {
+		compatible = "bmi08a";
+		reg = <1>;
+		spi-max-frequency = <5000000>;
+		interrupt-parent = <&ls_gpio1_porta>;
+		interrupts = <4 IRQ_TYPE_EDGE_RISING>;
+		status = "disabled";
 	};
 };
 
