@@ -582,6 +582,8 @@ struct uart_port {
 	struct serial_iso7816   iso7816;
 	bool 			cyclic;
 	void			*private_data;		/* generic platform data pointer */
+	bool			dma_enable;
+	struct uart_8250_dma	*dma;
 };
 
 /**

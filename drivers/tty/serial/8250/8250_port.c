@@ -2450,9 +2450,10 @@ dont_test_tx_en:
 	/*
 	 * Request DMA channels for both RX and TX.
 	 */
-	if (up->dma) {
+	if (port->dma_enable) {
 		const char *msg = NULL;
 
+		up->dma = port->dma;
 		if (uart_console(port))
 			msg = "forbid DMA for kernel console";
 		else if (serial8250_request_dma(up))
@@ -2461,6 +2462,8 @@ dont_test_tx_en:
 			dev_warn_ratelimited(port->dev, "%s\n", msg);
 			up->dma = NULL;
 		}
+	} else {
+		up->dma = NULL;
 	}
 
 	/*
@@ -3225,6 +3228,9 @@ static void serial8250_config_port(struct uart_port *port, int flags)
 	struct uart_8250_port *up = up_to_u8250p(port);
 	int ret;
 
+	port->dma = kmemdup(up->dma, sizeof(struct uart_8250_dma), GFP_KERNEL);
+	if (!port->dma)
+		return;
 	/*
 	 * Find the region that we can probe for.  This in turn
 	 * tells us whether we can probe for the type of port.
