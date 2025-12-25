@@ -3375,6 +3375,7 @@
 				no-mmc;
 				cap-sdio-irq;
 				cap-sd-highspeed;
+				keep-power-in-suspend;
 				sd-uhs-sdr50;
 				sd-uhs-sdr104;
 				mmc-fixed-voltage = <1800>;
