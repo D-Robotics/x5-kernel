@@ -103,6 +103,13 @@
 		drive-strength = <4>;
 		power-source = <HORIZON_IO_PAD_VOLTAGE_IP_CTRL>;
 	};
+
+	pconf_input_en_1v8_bias_disable: pconf-input-en-1v8-bias-disable {
+		bias-disable;
+		input-enable;
+		power-source = <HORIZON_IO_PAD_VOLTAGE_1V8>;
+		drive-strength = <3>;
+	};
 };
 
 &dsp_iomuxc {
@@ -113,6 +120,12 @@
 			DSP_I2S1_MCLK  DSP_PINMUX_0  BIT_OFFSET18  MUX_ALT0 &pconf_drv_pu_ds2_3v3
 			DSP_I2S1_SCLK  DSP_PINMUX_0  BIT_OFFSET20  MUX_ALT0 &pconf_drv_pu_ds2_3v3
 			DSP_I2S1_WS  DSP_PINMUX_0  BIT_OFFSET22  MUX_ALT0 &pconf_drv_pu_ds2_3v3
+		>;
+	};
+
+	dsp_gpio0_19: dsp_gpio0_19 {
+		horizon,pins = <
+			DSP_SPI6_SCLK  DSP_PINMUX_1  BIT_OFFSET6  MUX_ALT1  &pconf_input_en_1v8_bias_disable
 		>;
 	};
 };
@@ -307,50 +320,71 @@
 
 &i2c3 {
 	status = "okay";
-
-	ft5406@38 {
-		compatible = "ft5406";
-		reg = <0x38>;
-	};
-	hb_bl@45 {
-		compatible = "hobot_bl_controller";
-		reg = <0x45>;
-	};
 };
 
 &i2c4 {
 	status = "okay";
+
+	invn_icm_i2c4: icm42688@68 {
+		compatible = "invensense,icm42688";
+		reg = <0x68>;
+		/*no interrupt pin*/
+		interrupt-parent = <&gic>;
+		interrupts = <GIC_SPI 109 IRQ_TYPE_LEVEL_HIGH>;
+		axis_map_x = <1>;
+		axis_map_y = <0>;
+		axis_map_z = <2>;
+		negate_x = <1>;
+		negate_y = <0>;
+		negate_z = <0>;
+		inven,secondary_type = "none";
+		inven,aux_type = "none";
+		inven,read_only_slave_type = "none";
+		drive-open-drain = <0>;
+		status = "disabled";
+	};
 };
 
 &i2c5 {
 	status = "okay";
-
-	es7210_0: es7210_0@40 {
-		compatible = "MicArray_0";
-		reg = <0x40>;
-		#sound-dai-cells = <1>;
-		channels = <8>;
-		adc_dev_num = <2>;
-		status = "okay";
+	bmi08a:bmi08a@19 {
+		compatible = "bmi08xa";
+		reg = <0x19>;
+		interrupt-parent = <&ls_gpio1_porta>;
+		interrupts = <4 IRQ_TYPE_EDGE_RISING>;
+		status = "disabled";
 	};
 
-	es7210_1@42 {
-		compatible = "MicArray_2";
-		reg = <0x42>;
-		channels = <8>;
-		adc_dev_num = <2>;
-	};
-
-	es8156: es8156@8 {
-		compatible = "everest,es8156";
-		reg = <0x8>;
-		#sound-dai-cells = <0>;
-		status = "okay";
+	bmi08g:bmi08g@69 {
+		compatible = "bmi08xg";
+		reg = <0x69>;
+		interrupt-parent = <&ls_gpio1_porta>;
+		interrupts = <6 IRQ_TYPE_EDGE_RISING>;
+		status = "disabled";
 	};
 };
 
 &i2c6 {
 	status = "okay";
+
+	invn_icm_i2c6: icm42688@68 {
+		compatible = "invensense,icm42688";
+		reg = <0x68>;
+		/*no interrupt pin*/
+		interrupt-parent = <&gic>;
+		interrupts = <GIC_SPI 109 IRQ_TYPE_LEVEL_HIGH>;
+		axis_map_x = <1>;
+		axis_map_y = <0>;
+		axis_map_z = <2>;
+		negate_x = <1>;
+		negate_y = <0>;
+		negate_z = <0>;
+		inven,secondary_type = "none";
+		inven,aux_type = "none";
+		inven,read_only_slave_type = "none";
+		drive-open-drain = <0>;
+		status = "disabled";
+	};
 };
 
 &i2c7 {
@@ -413,6 +447,24 @@
 		spi-max-frequency = <32000000>;
 		reg = <1>;
 	};
+
+	bmi08g@0 {
+		compatible = "bmi088_gyro";
+		reg = <0>;
+		spi-max-frequency = <5000000>;
+		interrupt-parent = <&ls_gpio1_porta>;
+		interrupts = <6 IRQ_TYPE_EDGE_RISING>;
+		status = "disabled";
+	};
+
+	bmi08a@1 {
+		compatible = "bmi08a";
+		reg = <1>;
+		spi-max-frequency = <5000000>;
+		interrupt-parent = <&ls_gpio1_porta>;
+		interrupts = <4 IRQ_TYPE_EDGE_RISING>;
+		status = "disabled";
+	};
 };
 
 &spi2 {
@@ -452,6 +504,7 @@
 &sdio_0 {
 	status = "okay";
 	cd-inverted;
+	cap-mmc-hw-reset;
 
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_sd &hsio_gpio0_26 &hsio_gpio1_1>;
@@ -528,11 +581,6 @@
 };
 
 &dw_i2s0 {
-	status = "okay";
-	dwc-master = <1>;
-};
-
-&dw_i2s1 {
 	status = "okay";
 	dwc-master = <1>;
 };
@@ -659,33 +707,6 @@
 
 &bpu {
 	cnn-supply = <&vdd08_bpu_1_reg>;
-};
-
-&mipi_dsi0 {
-
-	status = "okay";
-
-	ports {
-		port@1 {
-			reg = <1>;
-			mipi_dsi_out: endpoint {
-				remote-endpoint = <&panel_in>;
-			};
-		};
-	};
-
-	dsi_panel0@0 {
-		compatible = "wh-cm480";
-		reg = <0>;
-
-		port {
-			panel_in: endpoint {
-				remote-endpoint =
-					<&mipi_dsi_out>;
-			};
-		};
-	};
-
 };
 
 /* For boards that do not need display module,
@@ -820,42 +841,6 @@ the following ports need to be deleted */
 		};
 		codec {
 			sound-dai = <&es8326>;
-		};
-	};
-};
-
-&hobot_sound_machine {
-	status = "okay";
-	#address-cells = <1>;
-	#size-cells = <0>;
-	simple-audio-card,name = "duplex-audio-i2s1";
-
-	simple-audio-card,dai-link@0 {
-		link-name = "dai-link0";
-		reg = <1>;
-		format = "dsp_a";
-		mclk-fs = <64>;
-		bitclock-master = <&snd1_mm>;
-		frame-master = <&snd1_mm>;
-		snd1_mm: cpu {
-			sound-dai = <&dw_i2s1 1>;
-		};
-		codec {
-			sound-dai = <&es8156>;
-		};
-	};
-	simple-audio-card,dai-link@1 {
-		link-name = "dai-link1";
-		reg = <1>;
-		format = "dsp_a";
-		mclk-fs = <64>;
-		bitclock-master = <&snd1_m>;
-		frame-master = <&snd1_m>;
-		snd1_m: cpu {
-			sound-dai = <&dw_i2s1 1>;
-		};
-		codec {
-			sound-dai = <&es7210_0 0>;
 		};
 	};
 };
