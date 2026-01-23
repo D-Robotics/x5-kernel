@@ -227,6 +227,7 @@ static inline struct axi_dma_chan *dchan_to_axi_dma_chan(struct dma_chan *dchan)
 /* DMAC CHAN BLOCKS */
 #define DMAC_CHAN_BLOCK_SHIFT		32
 #define DMAC_CHAN_16			16
+#define DMAC_CHAN_8			8
 
 /* DMAC_CHSUSP */
 #define DMAC_CHAN_SUSP2_SHIFT		0
