@@ -854,3 +854,7 @@ the following ports need to be deleted */
 &hobot_pps {
 	status = "okay";
 };
+
+&vpu_v4l2 {
+	status = "okay";
+};
