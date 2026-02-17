@@ -350,16 +350,18 @@
 	bmi08a:bmi08a@19 {
 		compatible = "bmi08xa";
 		reg = <0x19>;
-		interrupt-parent = <&ls_gpio1_porta>;
-		interrupts = <4 IRQ_TYPE_EDGE_RISING>;
+		interrupt-parent = <&ls_gpio0_porta>;
+		interrupts = <2 IRQ_TYPE_EDGE_RISING>;
+		accel-irq-gpio = <&ls_gpio0_porta 2 GPIO_ACTIVE_HIGH>;
 		status = "disabled";
 	};
 
 	bmi08g:bmi08g@69 {
 		compatible = "bmi08xg";
 		reg = <0x69>;
-		interrupt-parent = <&ls_gpio1_porta>;
-		interrupts = <6 IRQ_TYPE_EDGE_RISING>;
+		interrupt-parent = <&dsp_gpio_porta>;
+		interrupts = <12 IRQ_TYPE_EDGE_RISING>;
+		gyro-irq-gpio = <&dsp_gpio_porta 12 GPIO_ACTIVE_HIGH>;
 		status = "disabled";
 	};
 };
@@ -452,8 +454,9 @@
 		compatible = "bmi088_gyro";
 		reg = <0>;
 		spi-max-frequency = <5000000>;
-		interrupt-parent = <&ls_gpio1_porta>;
-		interrupts = <6 IRQ_TYPE_EDGE_RISING>;
+		interrupt-parent = <&dsp_gpio_porta>;
+		interrupts = <12 IRQ_TYPE_EDGE_RISING>;
+		gyro-irq-gpio = <&dsp_gpio_porta 12 GPIO_ACTIVE_HIGH>;
 		status = "disabled";
 	};
 
@@ -461,8 +464,9 @@
 		compatible = "bmi08a";
 		reg = <1>;
 		spi-max-frequency = <5000000>;
-		interrupt-parent = <&ls_gpio1_porta>;
-		interrupts = <4 IRQ_TYPE_EDGE_RISING>;
+		interrupt-parent = <&ls_gpio0_porta>;
+		interrupts = <2 IRQ_TYPE_EDGE_RISING>;
+		accel-irq-gpio = <&ls_gpio0_porta 2 GPIO_ACTIVE_HIGH>;
 		status = "disabled";
 	};
 };
