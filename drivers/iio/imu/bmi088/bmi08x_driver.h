@@ -99,6 +99,9 @@ struct bmi08_client_data {
 	struct iio_trigger *bmi_input;
 	struct iio_trigger *feat_input;
 	struct iio_trigger *gyr_feat_input;
+	struct input_dev *bmi_event_input;
+	struct gpio_desc *accel_gpiod;
+	struct gpio_desc *gyro_gpiod;
 	struct regulator *vdd;
 	struct regulator *vddio;
 	struct regmap *regmap;
