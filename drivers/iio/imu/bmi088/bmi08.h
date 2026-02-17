@@ -115,6 +115,8 @@ int8_t bmi08a_write_feature_config(const uint16_t *reg_data, struct bmi08_dev *d
  * @brief Read / Write data from the given register address of accel sensor
  */
 
+ int8_t bmi08a_get_regs(uint8_t reg_addr, uint8_t *reg_data, uint32_t len, struct bmi08_dev *dev);
+
 /*!
  * \ingroup bmi08aApiRegs
  * \page bmi08a_api_bmi08a_get_set_regs bmi08a_get_set_regs

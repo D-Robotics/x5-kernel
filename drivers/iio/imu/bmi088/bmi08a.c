@@ -45,6 +45,11 @@ static int8_t dev_null_ptr_check(const struct bmi08_dev *dev);
 static int8_t generic_null_ptr_check(void *data_parm);
 
 /*!
+ * @brief This API reads the data from the given register address.
+ */
+static int8_t get_regs(uint8_t reg_addr, uint8_t *reg_data, uint32_t len, struct bmi08_dev *dev);
+
+/*!
  *  @brief This API writes or reads the data to/from the given register address.
  *
  *  @param[in] reg_addr  : Register address from where the data to be read or write.
@@ -485,6 +490,31 @@ int8_t bmi08a_write_feature_config(const uint16_t *reg_data, struct bmi08_dev *d
 
             /* Write back updated feature space */
             rslt = bmi08a_get_set_regs(BMI08_REG_ACCEL_FEATURE_CFG, &feature_data[0], read_length, dev, SET_FUNC);
+        }
+    }
+
+    return rslt;
+}
+
+
+int8_t bmi08a_get_regs(uint8_t reg_addr, uint8_t *reg_data, uint32_t len, struct bmi08_dev *dev)
+{
+    int8_t rslt;
+
+    /* Check for null pointer in the device structure*/
+    rslt = dev_null_ptr_check(dev);
+    rslt |= generic_null_ptr_check((void *) reg_data);
+
+    /* Proceed if null check is fine */
+    if (rslt == BMI08_OK)
+    {
+        if (len > 0)
+        {
+            get_regs(reg_addr, reg_data, len, dev);
+        }
+        else
+        {
+            rslt = BMI08_E_RD_WR_LENGTH_INVALID;
         }
     }
 
@@ -1529,6 +1559,43 @@ static int8_t generic_null_ptr_check(void *data_parm)
 
     return rslt;
 }
+
+
+/*!
+ * @brief This API reads the data from the given register address.
+ */
+static int8_t get_regs(uint8_t reg_addr, uint8_t *reg_data, uint32_t len, struct bmi08_dev *dev)
+{
+   int8_t rslt = BMI08_OK;
+   uint16_t index;
+   uint8_t temp_buff[BMI08_MAX_LEN];
+
+   if (dev->intf == BMI08_SPI_INTF)
+   {
+       /* Configuring reg_addr for SPI Interface */
+       reg_addr = reg_addr | BMI08_SPI_RD_MASK;
+   }
+
+   /* Read the data from the register */
+   dev->intf_rslt = dev->read(reg_addr, temp_buff, (len + dev->dummy_byte), dev->intf_ptr_accel);
+
+   if (dev->intf_rslt == BMI08_INTF_RET_SUCCESS)
+   {
+       for (index = 0; index < len; index++)
+       {
+           /* Updating the data buffer */
+           reg_data[index] = temp_buff[index + dev->dummy_byte];
+       }
+   }
+   else
+   {
+       /* Failure case */
+       rslt = BMI08_E_COM_FAIL;
+   }
+
+   return rslt;
+}
+
 
 /*!
  * @brief This API writes or reads the data to/from the given register address.

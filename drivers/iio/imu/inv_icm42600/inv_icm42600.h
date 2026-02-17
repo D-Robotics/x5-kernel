@@ -70,6 +70,8 @@ enum inv_icm42600_accel_fs {
 
 /* ODR suffixed by LN or LP are Low-Noise or Low-Power mode only */
 enum inv_icm42600_odr {
+	INV_ICM42600_ODR_32KHZ_LN = 1,
+	INV_ICM42600_ODR_16KHZ_LN = 2,
 	INV_ICM42600_ODR_8KHZ_LN = 3,
 	INV_ICM42600_ODR_4KHZ_LN,
 	INV_ICM42600_ODR_2KHZ_LN,
@@ -93,6 +95,7 @@ enum inv_icm42600_filter {
 	/* Low-Power mode sensor data filter (averaging) */
 	INV_ICM42600_FILTER_AVG_1X = 1,
 	INV_ICM42600_FILTER_AVG_16X = 6,
+	INV_ICM42600_FILTER_BW_ODR_DIV_40 = 7,
 };
 
 struct inv_icm42600_sensor_conf {
@@ -144,6 +147,7 @@ struct inv_icm42600_state {
 	struct inv_icm42600_suspended suspended;
 	struct iio_dev *indio_gyro;
 	struct iio_dev *indio_accel;
+	struct iio_dev *indio_fsync;
 	uint8_t buffer[2] __aligned(IIO_DMA_MINALIGN);
 	struct inv_icm42600_fifo fifo;
 	struct {
@@ -287,6 +291,11 @@ struct inv_icm42600_state {
 /* FIFO is 2048 bytes, let 12 samples for reading latency */
 #define INV_ICM42600_FIFO_WATERMARK_MAX			(2048 - 12 * 16)
 
+#define INV_ICM42600_REG_FSYNC_CONFIG   		0x0062
+#define INV_ICM42600_FSYNC_UI_SEL 				GENMASK(6,4)
+#define INV_ICM42600_FSYNC_UI_FLAG_CLEAR_SEL		BIT(1)
+#define INV_ICM42600_FSYNC_POLARITY 				BIT(0)
+
 #define INV_ICM42600_REG_INT_CONFIG1			0x0064
 #define INV_ICM42600_INT_CONFIG1_TPULSE_DURATION	BIT(6)
 #define INV_ICM42600_INT_CONFIG1_TDEASSERT_DISABLE	BIT(5)
@@ -326,6 +335,9 @@ struct inv_icm42600_state {
 #define INV_ICM42600_REG_INTF_CONFIG4			0x107A
 #define INV_ICM42600_INTF_CONFIG4_I3C_BUS_ONLY		BIT(6)
 #define INV_ICM42600_INTF_CONFIG4_SPI_AP_4WIRE		BIT(1)
+
+#define INV_ICM42600_REG_INTF_CONFIG5			0x107B
+#define INV_ICM42600_INTF_CONFIG5_PIN9_FUNCTION_MASK GENMASK(2, 1)
 
 #define INV_ICM42600_REG_INTF_CONFIG6			0x107C
 #define INV_ICM42600_INTF_CONFIG6_MASK			GENMASK(4, 0)
@@ -398,5 +410,7 @@ int inv_icm42600_gyro_parse_fifo(struct iio_dev *indio_dev);
 struct iio_dev *inv_icm42600_accel_init(struct inv_icm42600_state *st);
 
 int inv_icm42600_accel_parse_fifo(struct iio_dev *indio_dev);
+
+struct iio_dev *inv_icm42600_fsync_init(struct inv_icm42600_state *st);
 
 #endif
