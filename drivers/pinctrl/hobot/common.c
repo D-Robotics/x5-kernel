@@ -537,7 +537,7 @@ static int horizon_gpio_get_direction(struct pinctrl_dev *pctldev, int pin)
 
 	gpio_range = pinctrl_find_gpio_range_from_pin_nolock(pctldev, pin);
 	if (!gpio_range) {
-		dev_err(ipctl->dev, "pin-%d can not find corresponding gpio id\n", pin);
+		dev_dbg(ipctl->dev, "pin-%d can not find corresponding gpio id\n", pin);
 		return -ENOTSUPP;
 	}
 	gpio_pin = pin - gpio_range->pin_base;
@@ -556,7 +556,7 @@ static int horizon_gpio_set_direction(struct pinctrl_dev *pctldev, int pin, bool
 
 	gpio_range = pinctrl_find_gpio_range_from_pin_nolock(pctldev, pin);
 	if (!gpio_range) {
-		dev_err(ipctl->dev, "pin-%d can not find corresponding gpio id\n", pin);
+		dev_dbg(ipctl->dev, "pin-%d can not find corresponding gpio id\n", pin);
 		return -ENOTSUPP;
 	}
 	gpio_pin = pin - gpio_range->pin_base;
@@ -584,7 +584,7 @@ static int horizon_gpio_get_level(struct pinctrl_dev *pctldev, int pin)
 
 	gpio_range = pinctrl_find_gpio_range_from_pin_nolock(pctldev, pin);
 	if (!gpio_range) {
-		dev_err(ipctl->dev, "pin-%d can not find corresponding gpio id\n", pin);
+		dev_dbg(ipctl->dev, "pin-%d can not find corresponding gpio id\n", pin);
 		return -ENOTSUPP;
 	}
 	gpio_pin = pin - gpio_range->pin_base;
