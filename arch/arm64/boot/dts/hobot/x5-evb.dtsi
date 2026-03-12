@@ -326,7 +326,11 @@
 		reg = <0x3b>;
 		pinctrl-names = "default";
  		//LSIO_GPIO1_PIN13
-		pinctrl-0 = <&lsio_gpio1_13>;
+		pinctrl-0 = <&lsio_gpio1_13 &dsp_gpio0_19>;
+
+		interrupt-parent = <&dsp_gpio_porta>;
+		interrupts = <19 IRQ_TYPE_EDGE_FALLING>;
+
 		reset-gpios = <&ls_gpio1_porta 13 GPIO_ACTIVE_LOW>;
 		ports {
 			#address-cells = <1>;

@@ -1026,6 +1026,17 @@ static int lt8618_hdmi_config(struct lt8618 *lt8618)
 	return 0;
 }
 
+static void lt8618_irq_enable(struct lt8618 *lt8618)
+{
+	regmap_write(lt8618->regmap, 0x8210, 0x00);	//Output low level active;
+	regmap_write(lt8618->regmap, 0x8258, 0x02);	//Det HPD, only enable HPD interrupt
+
+	regmap_write(lt8618->regmap, 0x8203, 0x3f);	//mask3	//tx_det
+
+	regmap_write(lt8618->regmap, 0x8207, 0xff);	//clear3
+	regmap_write(lt8618->regmap, 0x8207, 0x3f);	//clear3
+}
+
 static void lt8618_bridge_enable(struct drm_bridge *bridge)
 {
 	struct lt8618 *lt8618 = bridge_to_lt8618(bridge);
@@ -1080,7 +1091,7 @@ static int lt8618_bridge_attach(struct drm_bridge *bridge,
 	if (lt8618->client->irq > 0)
 		lt8618->connector.polled = DRM_CONNECTOR_POLL_HPD;
 	else
-		lt8618->connector.polled = DRM_CONNECTOR_POLL_CONNECT;
+		lt8618->connector.polled = DRM_CONNECTOR_POLL_CONNECT | DRM_CONNECTOR_POLL_DISCONNECT;
 
 	lt8618->connector.interlace_allowed = true;
 
@@ -1389,8 +1400,47 @@ static int lt8618_sw_init(struct lt8618 *lt8618)
 {
 	lt8618_video_input_cfg(lt8618);
 	lt8618_hdmi_config(lt8618);
-
 	return 0;
+}
+
+static irqreturn_t lt8618_interrupt(int irq, void *data)
+{
+	unsigned int irq_flag;
+	struct lt8618 *lt8618 = (struct lt8618 *)data;
+	pr_debug("lt8618sxb interrupt start.\n");
+
+	mutex_lock(&lt8618->lt8618_mutex);
+
+	regmap_read(lt8618->regmap, 0x820f, &irq_flag);
+
+	if(irq_flag & 0xc0){ //Disconnect:  0x80, Connected: 0x40
+		int val = 0;
+		enum drm_connector_status status = hpd_status_plug_off;
+
+		//read hpd status
+		regmap_write(lt8618->regmap, 0x80ee, 0x01); // enable IIC
+		regmap_read(lt8618->regmap, LT8618_REG_LINK_STATUS, &val);
+		if (val & (1U << LINK_STATUS_OUTPUT_DC_POS)) {
+			status = connector_status_connected;
+			pr_debug("hdmi status is change to connected\n");
+		}else{
+			status = hpd_status_plug_off;
+			pr_debug("hdmi status is change to disconnect\n");
+		}
+		//Notify bridge driver
+		drm_bridge_hpd_notify(&lt8618->bridge, status);
+
+		//Notify the user layer through udev
+		drm_helper_hpd_irq_event(lt8618->bridge.dev);
+		regmap_write(lt8618->regmap, 0x8207, 0xff);   //clear interrupt flag
+		regmap_write(lt8618->regmap, 0x8207, 0x3f);   //clear interrupt flag
+	}else{
+		pr_warn("interrupt is not hpd: %02x, current only support HPD interrupt\n", irq_flag);
+	}
+	mutex_unlock(&lt8618->lt8618_mutex);
+	pr_debug("lt8618sxb interrupt end.\n");
+
+	return IRQ_HANDLED;
 }
 
 static void lt8618_init(struct lt8618 *lt8618)
@@ -1409,8 +1459,21 @@ static void lt8618_init(struct lt8618 *lt8618)
 	lt8618->bridge.timings = &default_lt8618_timings;
 	lt8618->bridge.ops = DRM_BRIDGE_OP_DETECT | DRM_BRIDGE_OP_EDID;
 
-	if (lt8618->client->irq > 0)
+	if (lt8618->client->irq > 0){
+		lt8618_irq_enable(lt8618);	//enable irq
+
 		lt8618->bridge.ops |= DRM_BRIDGE_OP_HPD;
+		ret = devm_request_threaded_irq(dev, lt8618->client->irq, NULL,
+				lt8618_interrupt,
+				IRQF_ONESHOT, dev_name(dev),
+				lt8618);
+		if(ret != 0){
+			pr_err("lt8618sxb request interrupt failed.\n");
+		}
+		pr_info("lt8618sxb enable interrupt, irq id is %d\n", lt8618->client->irq);
+	}else{
+		pr_info("lt8618sxb not use interrupt\n");
+	}
 
 	drm_bridge_add(&lt8618->bridge);
 
