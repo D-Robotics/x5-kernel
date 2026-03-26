@@ -2050,11 +2050,10 @@ int m_can_class_suspend(struct device *dev)
 		netif_device_detach(ndev);
 		m_can_stop(ndev);
 		m_can_clk_stop(cdev);
+		cdev->can.state = CAN_STATE_SLEEPING;
 	}
 
 	pinctrl_pm_select_sleep_state(dev);
-
-	cdev->can.state = CAN_STATE_SLEEPING;
 
 	return 0;
 }
@@ -2066,8 +2065,6 @@ int m_can_class_resume(struct device *dev)
 	struct net_device *ndev = cdev->net;
 
 	pinctrl_pm_select_default_state(dev);
-
-	cdev->can.state = CAN_STATE_ERROR_ACTIVE;
 
 	if (netif_running(ndev)) {
 		int ret;
