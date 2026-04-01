@@ -46,6 +46,8 @@ struct x5_eqos {
 	struct reset_control *rst;
 	struct clk *clk_axi;
 	struct clk *clk_rgmii;
+	struct clk *clk_rmii;
+	const char *clk_direction;
 
 	struct gpio_desc *phyreset;
 };
@@ -431,11 +433,29 @@ static int x5_qos_init(struct platform_device *pdev, void *priv)
 	u32 val;
 
 	if (x5_qos->interface == PHY_INTERFACE_MODE_RMII) {
-		// set enet rmii and clk turn on
-		val = ioread32(x5_qos->sub_addr);
-		val &= 0xFFFFFFF0;
-		val |= 0xC;
-		iowrite32(val, x5_qos->sub_addr);
+		if( device_property_read_string(&pdev->dev, "ref-clock-direction", &x5_qos->clk_direction) == 0){
+			if (strcmp(x5_qos->clk_direction, "rx") == 0) {
+				dev_info(&pdev->dev, "phy clock direction: rx\n");
+				// set enet rmii and clk turn on
+				val = ioread32(x5_qos->sub_addr);
+				val &= 0xFFFFFFF0;
+				val |= 0xC;
+				iowrite32(val, x5_qos->sub_addr);
+			} else if (strcmp(x5_qos->clk_direction, "tx") == 0) {
+				dev_info(&pdev->dev, "phy clock direction: tx\n");
+				// set enet rmii and clk turn on
+				val = ioread32(x5_qos->sub_addr);
+				val &= 0xFFFFEFF0;
+				val |= 0x100C;
+				iowrite32(val, x5_qos->sub_addr);
+			} else {
+				dev_err(&pdev->dev, "unsupported phy clock direction %s\n", x5_qos->clk_direction);
+				return -EINVAL;
+			}
+		} else {
+			dev_err(&pdev->dev, "missing required property 'clock-direction'\n");
+			return -EINVAL;
+		}
 	} else {
 		// set enet rgmii and clk turn on
 		val = ioread32(x5_qos->sub_addr);
@@ -447,7 +467,7 @@ static int x5_qos_init(struct platform_device *pdev, void *priv)
 	clk_prepare_enable(x5_qos->clk_axi);
 	if (!IS_ERR_OR_NULL(x5_qos->phyreset)) {
 		gpiod_set_value(x5_qos->phyreset, 0);
-		msleep(1);
+		msleep(15);
 		gpiod_set_value(x5_qos->phyreset, 1);
 		msleep(32);
 	}
@@ -506,11 +526,31 @@ static int x5_eqos_probe(struct platform_device *pdev,
 	}
 
 	if (x5_eqos->interface == PHY_INTERFACE_MODE_RMII) {
-		// set enet rmii and clk turn on
-		val = ioread32(x5_eqos->sub_addr);
-		val &= 0xFFFFFFF0;
-		val |= 0xC;
-		iowrite32(val, x5_eqos->sub_addr);
+		if (device_property_read_string(&pdev->dev, "ref-clock-direction", &x5_eqos->clk_direction) == 0) {
+			if (strcmp(x5_eqos->clk_direction, "rx") == 0) {
+				dev_info(dev, "phy clock direction: rx\n");
+				// set enet rmii and clk turn on
+				val = ioread32(x5_eqos->sub_addr);
+				val &= 0xFFFFFFF0;
+				val |= 0xC;
+				iowrite32(val, x5_eqos->sub_addr);
+			} else if (strcmp(x5_eqos->clk_direction, "tx") == 0) {
+				dev_info(dev, "phy clock direction: tx\n");
+				// set enet rmii and clk turn on
+				val = ioread32(x5_eqos->sub_addr);
+				val &= 0xFFFFEFF0;
+				val |= 0x100C;
+				iowrite32(val, x5_eqos->sub_addr);
+			} else {
+				dev_err(dev, "unsupported phy clock direction %s\n", x5_eqos->clk_direction);
+				err = -EINVAL;
+				goto error;
+			}
+		} else {
+			dev_err(dev, "missing required property 'ref-clock-direction'\n");
+			err = -EINVAL;
+			goto error;
+		}
 	} else {
 		// set enet rgmii and clk turn on
 		val = ioread32(x5_eqos->sub_addr);
@@ -532,16 +572,43 @@ static int x5_eqos_probe(struct platform_device *pdev,
 		goto error;
 	}
 
-	x5_eqos->clk_rgmii = devm_clk_get(&pdev->dev, "rgmii_clk");
-	if (IS_ERR(x5_eqos->clk_rgmii)) {
-		dev_err(dev, "get rgmii_clk clk failed\n");
-		err = PTR_ERR(x5_eqos->clk_rgmii);
-		goto disable_axi;
-	}
+	if (x5_eqos->interface == PHY_INTERFACE_MODE_RMII) {
+		dev_info(dev, "phy interface: RMII\n");
 
-	err = clk_prepare_enable(x5_eqos->clk_rgmii);
-	if (err < 0) {
-		dev_err(dev, "enable rgmii_clk clk failed\n");
+		x5_eqos->clk_rmii = devm_clk_get(&pdev->dev, "pclk");
+		if (IS_ERR(x5_eqos->clk_rmii)) {
+			dev_err(dev, "get rmii_clk clk failed\n");
+			err = PTR_ERR(x5_eqos->clk_rmii);
+			goto disable_axi;
+		}
+
+		err = clk_prepare_enable(x5_eqos->clk_rmii);
+		if (err < 0) {
+			dev_err(dev, "enable rmii_clk clk failed\n");
+			goto disable_axi;
+		}
+
+		dev_info(dev, "rmii_clk rate: %lu Hz\n", clk_get_rate(x5_eqos->clk_rmii));
+	} else if (x5_eqos->interface == PHY_INTERFACE_MODE_RGMII) {
+		dev_info(dev, "phy interface: RGMII\n");
+
+		x5_eqos->clk_rgmii = devm_clk_get(&pdev->dev, "rgmii_clk");
+		if (IS_ERR(x5_eqos->clk_rgmii)) {
+			dev_err(dev, "get rgmii_clk clk failed\n");
+			err = PTR_ERR(x5_eqos->clk_rgmii);
+			goto disable_axi;
+		}
+
+		err = clk_prepare_enable(x5_eqos->clk_rgmii);
+		if (err < 0) {
+			dev_err(dev, "enable rgmii_clk clk failed\n");
+			goto disable_axi;
+		}
+
+		dev_info(dev, "rgmii_clk rate: %lu Hz\n", clk_get_rate(x5_eqos->clk_rgmii));
+	} else {
+		dev_err(dev, "unsupported phy interface\n");
+		err = -EINVAL;
 		goto disable_axi;
 	}
 
@@ -549,7 +616,7 @@ static int x5_eqos_probe(struct platform_device *pdev,
 	if (!IS_ERR_OR_NULL(x5_eqos->phyreset)) {
 		/* do phy pulse reset, otherwise, ethernet not work.. */
 		gpiod_set_value(x5_eqos->phyreset, 0);
-		msleep(1);
+		msleep(15);
 		gpiod_set_value(x5_eqos->phyreset, 1);
 		msleep(25);
 	}
