@@ -432,10 +432,17 @@ static void sii902x_bridge_mode_set(struct drm_bridge *bridge,
 	} else {
 		/* progressive */
 		buf[0] = SII902X_TPI_EMBEDDED_SYNC;
-		buf[2] = adj->htotal - adj->hsync_end;
-		buf[6] = adj->hsync_end - adj->hsync_start + 1;
-		buf[8] = adj->vtotal - adj->vsync_end;
-		buf[9] = adj->vsync_end - adj->vsync_start + 1;
+		u32 hfp = adj->hsync_start - adj->hdisplay;
+		buf[2] = hfp & 0xFF;
+		buf[3] &= ~0x03;
+		buf[3] |= (hfp >> 8) & 0x03;
+		u32 hsync = adj->hsync_end - adj->hsync_start;
+		buf[6] = hsync & 0xFF;
+		buf[7] &= ~0x03;
+		buf[7] |= (hsync >> 8) & 0x03;
+		buf[8] = adj->vsync_start - adj->vdisplay;
+		buf[9] = adj->vsync_end - adj->vsync_start;
+
 	}
 
 	ret = regmap_bulk_write(regmap, SII902X_TPI_SYNC_GENERATION_CTRL, buf, 10);

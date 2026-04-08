@@ -154,6 +154,7 @@ struct n2d_config {
 	u32 input_width[N2D_IN_MAX];  //n2d input width resolution
 	u32 input_height[N2D_IN_MAX]; //n2d input height resolution
 	u32 input_stride[N2D_IN_MAX];  //n2d input stride (pixel)
+	u32 input_format;  //n2d input format
 	u32 output_width;  //n2d output width resolution
 	u32 output_height; //n2d output height resolution
 	u32 output_stride;  //n2d output stride (pixel)

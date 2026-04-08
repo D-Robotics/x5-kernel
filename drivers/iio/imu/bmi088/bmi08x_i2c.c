@@ -221,13 +221,34 @@ static int bmi08_i2c_probe(struct i2c_client *client,
 	// if (client->addr == BMI08_ACCEL_I2C_ADDR_PRIMARY) {
 	if (client->addr == BMI08_ACCEL_I2C_ADDR_SECONDARY) {
 		acc_client = client;
-		acc_irq_pin = client->irq;
-	}
+		// acc_irq_pin = client->irq;
+		client_data->accel_gpiod = devm_gpiod_get(&client->dev, "accel-irq", GPIOD_IN);
+		// int gpio = desc_to_gpio(client_data->accel_gpiod);
+		// dev_info(&client->dev, "BS accel_irq gpio = %d\n", gpio);
+		if (IS_ERR(client_data->accel_gpiod)) {
+			dev_err(&client->dev, "BS failed to get accel_irq gpio\n");
+			return PTR_ERR(client_data->accel_gpiod);
+		}
+
+		acc_irq_pin = gpiod_to_irq(client_data->accel_gpiod);
+		if (acc_irq_pin < 0)
+			return acc_irq_pin;
+		}
 
 	// if (client->addr == BMI08_GYRO_I2C_ADDR_PRIMARY) {
 	if (client->addr == BMI08_GYRO_I2C_ADDR_SECONDARY) {
 		gyro_client = client;
-		gyr_irq_pin = client->irq;
+		// gyr_irq_pin = client->irq;
+		client_data->gyro_gpiod = devm_gpiod_get(&client->dev, "gyro-irq", GPIOD_IN);
+		if (IS_ERR(client_data->gyro_gpiod)) {
+			dev_err(&client->dev, "failed to get gyro_irq gpio\n");
+			return PTR_ERR(client_data->gyro_gpiod);
+		}
+
+		gyr_irq_pin = gpiod_to_irq(client_data->gyro_gpiod);
+		if (gyr_irq_pin < 0)
+			return gyr_irq_pin;
+
 	}
 	dev_id++;
 	if (dev_id == 2) {

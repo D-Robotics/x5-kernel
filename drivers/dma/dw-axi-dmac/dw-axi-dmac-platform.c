@@ -81,6 +81,13 @@ static inline u32 axi_chan_ioread32(struct axi_dma_chan *chan, u32 reg)
 	return ioread32(chan->chan_regs + reg);
 }
 
+static inline u64 axi_chan_ioread64(struct axi_dma_chan *chan, u32 reg)
+{
+	u32 val_lo = ioread32(chan->chan_regs + reg);
+	u32 val_hi = ioread32(chan->chan_regs + reg + 4);
+	return ((u64)val_hi << 32) | val_lo;
+}
+
 static inline void
 axi_chan_iowrite64(struct axi_dma_chan *chan, u32 reg, u64 val)
 {
@@ -1292,6 +1299,51 @@ static irqreturn_t dw_axi_dma_interrupt(int irq, void *dev_id)
 	return IRQ_HANDLED;
 }
 
+static inline void axi_chan_abort(struct axi_dma_chan *chan)
+{
+	u64 val;
+	struct axi_dma_chip *chip = chan->chip;
+	if (!chan) {
+		pr_err("%s(): chan is NULL\n" , __func__);
+		return;
+	}
+	if (!chip) {
+		pr_err("%s(): chan->chip is NULL\n" , __func__);
+		return;
+	}
+
+	if (chip->dw->hdata->nr_channels > DMAC_CHAN_8) {
+		pr_err("%s(): dma channels > 8 , not support!\n" , __func__);
+		return;
+	} else {
+		/*
+		 * The registers corresponding to abort are arranged according to
+		 * the channel order. To abort the DMA operation of the DSP, the
+		 * following sequence must be followed: first, enable the channel
+		 * register, and then write the abort bit. According to the
+		 * register layout, traversal can be performed using a fixed index,
+		 * grouped in sets of eight.
+		 *
+		 * Register layout:
+		 * - First CHx_EN is at bit 0,
+		 * - First CHx_EN_WE is at bit 8,
+		 * - First CHx_ABORT is at bit 32,
+		 * - First CHx_ABORT_WE is at bit 40.
+		 */
+		val = axi_dma_ioread64(chip, DMAC_CHEN);
+
+		val |= (uint64_t)(BIT(chan->id));
+		val |=  (uint64_t)(BIT(chan->id + 8));
+		axi_dma_iowrite64(chip, DMAC_CHEN, val);
+		val = axi_dma_ioread64(chip, DMAC_CHEN);
+
+		val |= (uint64_t)(BIT(chan->id + 40));
+		val |= (uint64_t)(BIT(chan->id + 32));
+		axi_dma_iowrite64(chip, DMAC_CHEN, val);
+		val = axi_dma_ioread64(chip, DMAC_CHEN);
+	}
+}
+
 static int dma_chan_terminate_all(struct dma_chan *dchan)
 {
 	struct axi_dma_chan *chan = dchan_to_axi_dma_chan(dchan);
@@ -1306,8 +1358,11 @@ static int dma_chan_terminate_all(struct dma_chan *dchan)
 	ret = readl_poll_timeout_atomic(chan->chip->regs + DMAC_CHEN, val,
 					!(val & chan_active), 1000, 50000);
 	if (ret == -ETIMEDOUT)
+	{
 		dev_warn(dchan2dev(dchan),
-			 "%s failed to stop\n", axi_chan_name(chan));
+			 "%s failed to stop , abort it now\n", axi_chan_name(chan));
+		axi_chan_abort(chan);
+	}
 
 	if (chan->direction != DMA_MEM_TO_MEM)
 		dw_axi_dma_set_hw_channel(chan, false);

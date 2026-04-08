@@ -1020,6 +1020,8 @@ int serial8250_register_8250_port(const struct uart_8250_port *up)
 		uart->lsr_save_mask	= up->lsr_save_mask;
 		uart->dma		= up->dma;
 		uart->port.cyclic	= up->port.cyclic;
+		uart->port.dma_enable	= up->port.dma_enable;
+		uart->port.dma		= up->port.dma;
 		/* Take tx_loadsz from fifosize if it wasn't set separately */
 		if (uart->port.fifosize && !uart->tx_loadsz)
 			uart->tx_loadsz = uart->port.fifosize;

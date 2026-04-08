@@ -919,6 +919,10 @@ n2d_error_t n2d_kernel_hardware_commit(n2d_hardware_t *hardware, n2d_uint32_t pr
 						 user_command_address,
 						 user_command_size + link_size, N2D_NULL));
 
+		dcache_clean_poc(
+			(unsigned long)cmd_buf->wl_current_logical,
+			(unsigned long)cmd_buf->wl_current_logical + link_size);
+
 		cmd_buf->wl_current_logical = entry_logical;
 		cmd_buf->wl_current_address = entry_address;
 		cmd_buf->offset += wait_link_size;
@@ -1308,10 +1312,57 @@ n2d_error_t n2d_kernel_hardware_dump_gpu_state(n2d_hardware_t *hardware)
 	return N2D_SUCCESS;
 }
 
+#ifdef CONFIG_DEBUG_FS
+#if defined(CONFIG_CPU_CSKYV2) && LINUX_VERSION_CODE <= KERNEL_VERSION(3, 0, 8)
+static void seq_vprintf(struct seq_file *m, const char *f, va_list args)
+{
+	int len;
+
+	if (m->count < m->size) {
+		len = vsnprintf(m->buf + m->count, m->size - m->count, f, args);
+		if (m->count + len < m->size) {
+			m->count += len;
+			return;
+		}
+	}
+	m->count = m->size;
+}
+#endif
+
+__printf(2, 3) static int debugfs_printf(void *obj, const char *fmt, ...)
+{
+	va_list args;
+
+	va_start(args, fmt);
+	seq_vprintf((struct seq_file *)obj, fmt, args);
+	va_end(args);
+
+	return 0;
+}
+#else
+static int sys_printf(void *obj, const char *fmt, ...)
+{
+	int len = 0;
+	va_list args;
+
+	va_start(args, fmt);
+	len = vsprintf((char *)obj, fmt, args);
+	va_end(args);
+
+	return len;
+}
+#endif
+
+#ifdef CONFIG_DEBUG_FS
+#define fs_printf debugfs_printf
+#else
+#define fs_printf sys_printf
+#endif
+
 #define GCREG_TOTAL_CYCLES_Address 0x00078
 #define GCREG_IDLE_CYCLES_Address 0x0007C
 
-n2d_error_t n2d_kernel_hardware_query_load(n2d_hardware_t *hardware)
+extern int n2d_kernel_hardware_query_load(struct seq_file *m, n2d_hardware_t *hardware)
 {
 	n2d_uint32_t total_cycles = 0,idle_cycles = 0;
 	n2d_uint32_t load = 0;
@@ -1320,6 +1371,13 @@ n2d_error_t n2d_kernel_hardware_query_load(n2d_hardware_t *hardware)
 	n2d_bool_t get_power_mutex = N2D_FALSE;
 	n2d_bool_t  not_a_second = N2D_FALSE;
 	n2d_error_t error	   = N2D_SUCCESS;
+	n2d_uint32_t i = 0, len = 0;
+
+#ifdef CONFIG_DEBUG_FS
+	void *ptr = m;
+#else
+	char *ptr = (char *)m;
+#endif
 
 	ONERROR(n2d_kernel_os_mutex_acquire(hardware->os, hardware->power_mutex, N2D_INFINITE));
 	get_power_mutex = N2D_TRUE;
@@ -1359,12 +1417,15 @@ on_error:
 	if (get_power_mutex)
 		n2d_kernel_os_mutex_release(hardware->os, hardware->power_mutex);
 
-	if (not_a_second)
+	if (not_a_second) {
 		n2d_kernel_os_print("test case shorter than 1s to query load.\n");
-	else
-		n2d_kernel_os_print("core: %d, load = %d\n", core, load);
+	} else {
+		len += fs_printf(ptr, "core      : %d\n", i);
+		len += fs_printf(ptr + len, "load      : %d%%\n", load);
+		len += fs_printf(ptr + len, "\n");
+	}
 
-	return error;
+	return len;
 }
 
 #if NANO2D_MMU_ENABLE

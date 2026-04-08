@@ -58,13 +58,26 @@ void inv_icm42600_timestamp_init(struct inv_icm42600_timestamp *ts,
 
 int inv_icm42600_timestamp_setup(struct inv_icm42600_state *st)
 {
+	int ret;
 	unsigned int val;
 
 	/* enable timestamp register */
 	val = INV_ICM42600_TMST_CONFIG_TMST_TO_REGS_EN |
+		  INV_ICM42600_TMST_CONFIG_TMST_FSYNC_EN |
 	      INV_ICM42600_TMST_CONFIG_TMST_EN;
-	return regmap_update_bits(st->map, INV_ICM42600_REG_TMST_CONFIG,
+	ret = regmap_update_bits(st->map, INV_ICM42600_REG_TMST_CONFIG,
 				  INV_ICM42600_TMST_CONFIG_MASK, val);
+
+	ret |= regmap_update_bits(st->map,
+				  INV_ICM42600_REG_FSYNC_CONFIG,
+				  GENMASK(6,0), 0x12); /* FSYNC from TMST, active high */
+
+	ret |= regmap_update_bits(st->map,
+					INV_ICM42600_REG_INTF_CONFIG5,
+					INV_ICM42600_INTF_CONFIG5_PIN9_FUNCTION_MASK,
+					0x2); /* PIN9 as TMST_FSYNC */
+
+	return ret;
 }
 
 int inv_icm42600_timestamp_update_odr(struct inv_icm42600_timestamp *ts,
