@@ -664,6 +664,7 @@ static int dw8250_probe(struct platform_device *pdev)
 		up->dma = &data->data.dma;
 	}
 
+	up->port.dma_enable = true;
 	data->data.line = serial8250_register_8250_port(up);
 	if (data->data.line < 0)
 		return data->data.line;

@@ -673,6 +673,10 @@ int inv_icm42600_core_probe(struct regmap *regmap, int chip, int irq,
 	if (IS_ERR(st->indio_accel))
 		return PTR_ERR(st->indio_accel);
 
+	st->indio_fsync = inv_icm42600_fsync_init(st);
+	if (IS_ERR(st->indio_fsync))
+		return PTR_ERR(st->indio_fsync);
+
 #if defined(CONFIG_IMU_DATA_READY)
 	dev_info(dev, "timestamp is DATA_RDY_INT time\n");
 #else

@@ -52,6 +52,12 @@
 
 /* Number of Accel frames to be extracted from FIFO */
 #define BMI08_ACC_FIFO_WM_EXTRACTED_DATA_FRAME_COUNT 100
+
+/* custom for TROS*/
+#define BMI088_MSC_DATA    0x04
+static volatile u64 irq_time_stamp = 0;
+static volatile u64 irq_count = 0;
+
 /* varaiable for fifo data frame */
 u8 *fifo_data;
 struct bmi08_sensor_data *bmi08_accel;
@@ -296,6 +302,14 @@ static int acc_feature_config_set(struct bmi08a_client_data *client_data,
 	return rslt;
 }
 
+static inline int64_t get_ktime_timestamp(void)
+{
+	struct timespec64 ts;
+
+	ktime_get_real_ts64(&ts);
+
+	return timespec64_to_ns(&ts);
+}
 /**
  *	bmi08_irq_work_func - Bottom half handler for feature interrupts.
  *	@work : Work data for the workqueue handler.
@@ -354,6 +368,29 @@ static irqreturn_t bmi08_irq_handle(int irq, void *handle)
 {
 	struct bmi08a_client_data *acc_client_data = handle;
 
+    struct bmi08_sensor_data accel_data;
+    struct bmi08_sensor_data gyro_data;
+    uint64_t irq_ts;
+	int8_t rslt;
+
+	irq_count++;
+
+	irq_ts = get_ktime_timestamp();
+	rslt = 	bmi08a_get_data(&accel_data, &acc_client_data->device);
+	rslt = 	bmi08g_get_data(&gyro_data, &acc_client_data->device);
+	if (acc_client_data->bmi_event_input) {
+		input_event(acc_client_data->bmi_event_input, EV_MSC, BMI088_MSC_DATA, (u32)accel_data.x);
+		input_event(acc_client_data->bmi_event_input, EV_MSC, BMI088_MSC_DATA, (u32)accel_data.y);
+		input_event(acc_client_data->bmi_event_input, EV_MSC, BMI088_MSC_DATA, (u32)accel_data.z);
+		input_event(acc_client_data->bmi_event_input, EV_MSC, BMI088_MSC_DATA, (u32)gyro_data.x);
+		input_event(acc_client_data->bmi_event_input, EV_MSC, BMI088_MSC_DATA, (u32)gyro_data.y);
+		input_event(acc_client_data->bmi_event_input, EV_MSC, BMI088_MSC_DATA, (u32)gyro_data.z);
+		input_event(acc_client_data->bmi_event_input, EV_MSC, BMI088_MSC_DATA, (u32)((irq_ts >> 32) & 0xFFFFFFFF));
+		input_event(acc_client_data->bmi_event_input, EV_MSC, BMI088_MSC_DATA, (u32)(irq_ts & 0xFFFFFFFF));
+		input_event(acc_client_data->bmi_event_input, EV_MSC, BMI088_MSC_DATA, (u32)irq_count);
+		input_sync(acc_client_data->bmi_event_input);
+	}
+
 	if (schedule_work(&acc_client_data->irq_work))
 		return IRQ_HANDLED;
 	return IRQ_HANDLED;
@@ -374,9 +411,11 @@ static int acc_bmi08_request_irq(struct bmi08a_client_data *acc_client_data)
 {
 	int rslt = 0;
 
-	rslt = request_irq(acc_client_data->IRQ, bmi08_irq_handle,
-					   IRQF_TRIGGER_RISING,
-					   SENSOR_NAME, acc_client_data);
+	// rslt = request_irq(acc_client_data->IRQ, bmi08_irq_handle,
+	// 				   IRQF_TRIGGER_RISING,
+	// 				   SENSOR_NAME, acc_client_data);
+	rslt = devm_request_threaded_irq(acc_client_data->dev, acc_client_data->IRQ,
+		NULL, bmi08_irq_handle, IRQF_ONESHOT|IRQF_TRIGGER_RISING|IRQF_NO_THREAD, SENSOR_NAME_FEAT, acc_client_data);
 	if (rslt < 0) {
 		PERR("request_irq failed with rslt:%d", rslt);
 		return -EIO;
@@ -718,7 +757,56 @@ static int accel_sensor_init(struct bmi08a_client_data *client_data)
 		return -EIO;
 	}
 	PINFO("Accel power mode set to NORMAL");
-	client_data->data_sync_en = 0;
+
+	/* init val for TROS custom, if not need , could del init val*/
+	// client_data->data_sync_en = 0;
+	client_data->data_sync_en = 1;
+
+	uint8_t gyr_reg_data;
+    gyr_reg_data = 0x80;
+    rslt = bmi08g_set_regs(BMI08_REG_GYRO_INT_CTRL, &gyr_reg_data, 1, &client_data->device);
+	if (rslt == BMI08_OK)
+		bmi08_i2c_delay_us(MS_TO_US(30), &client_data->device.intf_ptr_accel);
+    gyr_reg_data = 0x05;
+    rslt = bmi08g_set_regs(BMI08_REG_GYRO_INT3_INT4_IO_CONF, &gyr_reg_data, 1, &client_data->device);
+	if (rslt == BMI08_OK)
+		bmi08_i2c_delay_us(MS_TO_US(30), &client_data->device.intf_ptr_accel);
+    gyr_reg_data = 0x80;
+    rslt = bmi08g_set_regs(BMI08_REG_GYRO_INT3_INT4_IO_MAP, &gyr_reg_data, 1, &client_data->device);
+	if (rslt == BMI08_OK)
+		bmi08_i2c_delay_us(MS_TO_US(30), &client_data->device.intf_ptr_accel);
+	gyr_reg_data = 0x83;
+    rslt = bmi08g_set_regs(BMI08_REG_GYRO_BANDWIDTH, &gyr_reg_data, 1, &client_data->device);
+	if (rslt == BMI08_OK)
+		bmi08_i2c_delay_us(MS_TO_US(30), &client_data->device.intf_ptr_accel);
+	gyr_reg_data = 0x01;
+	rslt = bmi08g_set_regs(BMI08_REG_GYRO_RANGE, &gyr_reg_data, 1, &client_data->device);
+	if (rslt == BMI08_OK)
+		bmi08_i2c_delay_us(MS_TO_US(30), &client_data->device.intf_ptr_accel);
+
+
+    uint8_t acc_reg_data;
+    acc_reg_data = 0x44;
+    rslt = bmi08a_get_set_regs(BMI08_REG_ACCEL_INT1_INT2_MAP_DATA, &acc_reg_data, 1, &client_data->device, SET_FUNC);
+	if (rslt == BMI08_OK)
+		bmi08_i2c_delay_us(MS_TO_US(30), &client_data->device.intf_ptr_accel);
+    acc_reg_data = 0x09;
+    rslt = bmi08a_get_set_regs(BMI08_REG_ACCEL_INT2_IO_CONF, &acc_reg_data, 1, &client_data->device, SET_FUNC);
+	if (rslt == BMI08_OK)
+		bmi08_i2c_delay_us(MS_TO_US(30), &client_data->device.intf_ptr_accel);
+    acc_reg_data = 0x0A;
+    rslt = bmi08a_get_set_regs(BMI08_REG_ACCEL_INT1_IO_CONF, &acc_reg_data, 1, &client_data->device, SET_FUNC);
+	if (rslt == BMI08_OK)
+		bmi08_i2c_delay_us(MS_TO_US(30), &client_data->device.intf_ptr_accel);
+    acc_reg_data = 0x02;
+    rslt = bmi08a_get_set_regs(BMI08_REG_ACCEL_RANGE, &acc_reg_data, 1, &client_data->device, SET_FUNC);
+	if (rslt == BMI08_OK)
+		bmi08_i2c_delay_us(MS_TO_US(30), &client_data->device.intf_ptr_accel);
+    acc_reg_data = 0x8A;
+    rslt = bmi08a_get_set_regs(BMI08_REG_ACCEL_CONF, &acc_reg_data, 1, &client_data->device, SET_FUNC);
+	if (rslt == BMI08_OK)
+		bmi08_i2c_delay_us(MS_TO_US(30), &client_data->device.intf_ptr_accel);
+
 	return rslt;
 }
 
@@ -1365,11 +1453,43 @@ int bmi08a_probe(struct iio_dev *bmi08x_iio_private)
 	}
 	PINFO("ACC IRQ requested");
 
+	client_data->bmi_event_input = input_allocate_device();
+	if(!client_data->bmi_event_input){
+		PERR("Failed to allocate input deviec\n");
+		rslt = -ENOMEM;
+		goto exit_err_clean;
+	}
+	client_data->bmi_event_input->name = "bmi088-sensor";
+	client_data->bmi_event_input->phys = "bmi088/input0";
+	client_data->bmi_event_input->id.bustype = BUS_I2C;
+	// client_data->bmi_event_input->dev.parent = &bmi08x_iio_private->dev;
+
+	input_set_capability(client_data->bmi_event_input, EV_MSC, BMI088_MSC_DATA);
+	input_set_events_per_packet(client_data->bmi_event_input, 100);
+
+	rslt = input_register_device(client_data->bmi_event_input);
+	if(rslt){
+		PERR("Failed to register input device: %d\n", rslt);
+		input_free_device(client_data->bmi_event_input);
+		client_data->bmi_event_input = NULL;
+		goto exit_err_clean;
+	}
+	PINFO("BMI088 Input device registered successfully\n");
+
 	PINFO("sensor %s probed successfully", SENSOR_NAME);
 	bmi_fifo_init();
 	return 0;
 
 exit_err_clean:
+	if(client_data->bmi_event_input)
+	{
+		if(rslt != -ENOMEM && rslt != -EINVAL)
+		{
+			input_unregister_device(client_data->bmi_event_input);
+		}
+		input_free_device(client_data->bmi_event_input);
+		client_data->bmi_event_input = NULL;
+	}
 	bmi08x_iio_unconfigure_buffer(bmi08x_iio_private);
 	if (bmi08x_iio_private)
 		iio_device_unregister(bmi08x_iio_private);

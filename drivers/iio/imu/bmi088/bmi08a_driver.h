@@ -65,6 +65,8 @@ extern "C"
 /*********************************************************************/
 /** Name of the device driver and accel input device*/
 #define SENSOR_NAME	  "bmi08a"
+#define SENSOR_NAME_FEAT "bmi08_acc_feat"
+#define SENSOR_NAME_GYR_FEAT "bmi08_gyr_feat"
 
 #define REL_HW_STATUS				(2)
 #define REL_FEAT_STATUS				(1)
@@ -93,6 +95,7 @@ struct bmi08a_client_data {
 	struct iio_trigger *bmi_input;
 	struct iio_trigger *feat_input;
 	struct iio_trigger *gyr_feat_input;
+	struct input_dev *bmi_event_input;
 	struct regulator *vdd;
 	struct regulator *vddio;
 	struct regmap *regmap;

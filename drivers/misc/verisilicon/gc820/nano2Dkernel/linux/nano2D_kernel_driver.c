@@ -338,15 +338,15 @@ static int dump_trigger_store(const char __user *buf, size_t count, void *data)
 
 static int load_show(struct seq_file *m, void *data)
 {
-	int i = 0, j = 0;
+	int i = 0, j = 0, len = 0;
 	for (i = 0; i < global_device->kernel->dev_num; i++) {
 		for (j = 0; j < global_device->kernel->dev_core_num; j++) {
 			if (global_device->kernel->sub_dev[i]->hardware[j])
-				n2d_kernel_hardware_query_load(
+				len = n2d_kernel_hardware_query_load(m,
 					global_device->kernel->sub_dev[i]->hardware[j]);
 		}
 	}
-	return 0;
+	return len;
 }
 
 static n2d_debug_info_t info_list[] = {
@@ -1230,7 +1230,8 @@ static int n2d_vnode_get_buf_attr(struct vio_video_ctx *vctx, struct vbuf_group_
 		group_attr->info[0].buf_attr.height	   = config->output_height;
 		group_attr->info[0].buf_attr.wstride	   = config->output_stride;
 		group_attr->info[0].buf_attr.vstride	   = config->output_height;
-		if (config->output_format == MEM_PIX_FMT_ARGB) {
+		if (config->output_format == MEM_PIX_FMT_ARGB || \
+		    config->output_format == MEM_PIX_FMT_YUYV422) {
 			group_attr->info[0].buf_attr.planecount = 1;
 			/* temp set wstride to width make it compatible with libhbmem.so's size calc */
 			// group_attr->info[0].buf_attr.wstride	= config->output_width * 4;
@@ -1291,6 +1292,18 @@ static int do_csc(struct vio_node *vnode, struct n2d_config *config)
 	n2d_error_t error	       = N2D_SUCCESS;
 	n2d_state_config_t csc_com = {0};
 
+	if (config->input_format == MEM_PIX_FMT_YUYV422) {
+		src.format = N2D_YUYV;
+	} else
+		src.format = N2D_NV12;
+
+	if (config->output_format == MEM_PIX_FMT_YUYV422) {
+		dst.format = N2D_YUYV;
+	} else if (config->output_format == MEM_PIX_FMT_NV12) {
+		dst.format = N2D_NV12;
+	} else
+		dst.format = N2D_ARGB8888;
+
 	/* check size based on format/width, height */
 	memDesc.flag = N2D_WRAP_FROM_USERMEMORY;
 	memDesc.physical = config->in_buffer_addr[0][0]; /* assume the buffer is contiguous */
@@ -1300,7 +1313,6 @@ static int do_csc(struct vio_node *vnode, struct n2d_config *config)
 	src.width = config->input_width[0];
 	src.height = config->input_height[0];
 	src.stride = config->input_stride[0]; /*???*/
-	src.format = N2D_NV12;
 	src.handle = handle;
 	src.alignedh = config->input_height[0];
 	src.alignedw = config->input_stride[0];
@@ -1310,13 +1322,20 @@ static int do_csc(struct vio_node *vnode, struct n2d_config *config)
 	memDesc.flag = N2D_WRAP_FROM_USERMEMORY;
 	// memDesc.logical = N2D_NULL;
 	memDesc.physical = config->out_buffer_addr[0];
-	memDesc.size	 = config->output_stride * config->output_height * 4;
+	if (dst.format == N2D_ARGB8888)
+		memDesc.size	 = config->output_stride * config->output_height * 4;
+	else
+		memDesc.size	 = config->output_stride * config->output_height;
+
 	N2D_ON_ERROR(n2d_wrap(&memDesc, &handle));
 
 	dst.width = config->output_width;
 	dst.height = config->output_height;
-	dst.stride = config->output_stride * 4; /*???*/
-	dst.format = N2D_ARGB8888;
+	if (dst.format == N2D_ARGB8888)
+		dst.stride = config->output_stride * 4; /*???*/
+	else
+		dst.stride = config->output_stride; //nv12 yuv422
+
 	dst.handle = handle;
 	dst.alignedh = config->output_height;
 	dst.alignedw = config->output_width;

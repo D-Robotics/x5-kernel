@@ -159,11 +159,24 @@ static int drobot_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
 	u32 prd_prescale = 0; /* prd * prescale */
 	u8 channel = pwm->hwpwm;
 	bool pwm_status = 0;
+	bool was_enabled = false;
 	struct drobot_pwm_chip *drobot = to_drobot_pwm_chip(chip);
 
-	/* Clear FIFO in multichannel mode. */
-	if (!state->enabled)
+	/* Check current PWM status */
+	pwm_status = drobot_pwm_get_status(chip, pwm);
+	was_enabled = pwm_status;
+
+	/* Hardware requires PWM to be disabled before updating period/duty registers.
+	 * The registers are latched and only take effect when PWM is disabled.
+	 */
+	if (was_enabled) {
 		drobot_pwm_disable(chip, pwm);
+	}
+
+	/* If final state is disabled, just disable and return */
+	if (!state->enabled) {
+		return 0;
+	}
 
 	clk = clk_get_rate(drobot->clk);
 
@@ -195,6 +208,7 @@ static int drobot_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
 
 	clk_sel = PWM_CLK_APB;
 
+	/* Configure all registers while PWM is disabled */
 	/* set clk reg */
 	val = clk_sel | (div_reg << 4) | ((prescale - 1) << 8);
 	writel(val, drobot->base + PWM_CCR(channel));
@@ -215,9 +229,10 @@ static int drobot_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
 
 	writel(val, drobot->base + PWM_CTR(channel));
 
-	pwm_status = drobot_pwm_get_status(chip, pwm);
-	if (!pwm_status && state->enabled)
+	/* Enable PWM after configuration is complete */
+	if (state->enabled) {
 		drobot_pwm_enable(chip, pwm);
+	}
 
 	return 0;
 }
