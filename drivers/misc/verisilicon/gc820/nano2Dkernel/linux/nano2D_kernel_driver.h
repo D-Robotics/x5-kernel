@@ -190,6 +190,10 @@ struct n2d_subnode {
 	long cur_timestamp;
 	struct vio_frame *synced_src_frames[N2D_IN_MAX];
 	u8 bin_iommu_map;
+	/* Unbind(feedback) mode: auto-detect sync/async to decide input recycle policy. */
+	u8 unbind_async_mode;
+	/* Debounce for async-mode detection. */
+	u8 unbind_pending_done_streak;
 };
 
 struct horizon_n2d_dev {

@@ -94,6 +94,29 @@ MODULE_LICENSE("GPL");
 MODULE_IMPORT_NS(DMA_BUF);
 #endif
 
+static bool n2d_unbind_done_event_pending(struct vio_subdev *vdev)
+{
+	u32 k;
+	bool has_vctx = false;
+
+	if (vdev == NULL)
+		return true;
+
+	for (k = 0; k < VIO_MAX_SUB_PROCESS; k++) {
+		struct vio_video_ctx *vctx = vdev->vctx[k];
+
+		if (vctx == NULL)
+			continue;
+
+		has_vctx = true;
+		if (vctx->event != 0u)
+			return true;
+	}
+
+	/* No vctx attached: treat as "no consumer", i.e. async-like. */
+	return !has_vctx;
+}
+
 static int device_index[NANO2D_CORE_MAX] = {[0 ... NANO2D_CORE_MAX - 1] = -1};
 module_param_array(device_index, int, NULL, 0644);
 MODULE_PARM_DESC(device_index, "For multi devices, the device id of each core.");
@@ -1865,6 +1888,7 @@ static void n2d_frame_work(struct vio_node *vnode)
 	u64 flags = 0;
 	struct n2d_subdev *cfg_n2d = NULL;
 	struct n2d_subdev *n2d_sub;
+	struct n2d_subnode *n2d_node;
 	struct vio_subdev *vdev, *och_vdev;
 	struct vio_framemgr *framemgr, *out_framemgr;
 	struct vio_frame *frame, *out_frame;
@@ -1892,9 +1916,27 @@ static void n2d_frame_work(struct vio_node *vnode)
 
 	/* Also keep n2d_sub pointing at input subdev (for frames/framemgr) */
 	n2d_sub = container_of(vdev, struct n2d_subdev, vdev);
+	n2d_node = container_of(n2d_sub, struct n2d_subnode, subdev[vdev->id]);
 
 	framemgr = &vdev->framemgr;
 	out_framemgr = &och_vdev->framemgr;
+
+	/*
+	 * Unbind(feedback) mode: decide whether to recycle input COMPLETE->USED.
+	 *
+	 * Heuristic:
+	 * - Sync sendframe consumes DONE quickly (poll/dqbuf path clears vctx->event).
+	 * - Async sendframe leaves DONE pending (no poll/dqbuf).
+	 *
+	 * Debounce: require DONE pending for 2 consecutive frame_work cycles.
+	 */
+	if (n2d_unbind_done_event_pending(vnode->ich_subdev[0])) {
+		if (n2d_node->unbind_pending_done_streak < 255u)
+			n2d_node->unbind_pending_done_streak++;
+	} else {
+		n2d_node->unbind_pending_done_streak = 0u;
+	}
+	n2d_node->unbind_async_mode = (n2d_node->unbind_pending_done_streak >= 2u) ? 1u : 0u;
 
 	/* copy authoritative config to local_cfg under its lock */
 	spin_lock_irqsave(&cfg_n2d->config_lock, cfg_lock_flags);
@@ -1978,13 +2020,27 @@ static void n2d_frame_work(struct vio_node *vnode)
 	vdev = vnode->ich_subdev[0];
 	if (!osal_test_bit((s32)VIO_SUBDEV_BIND_DONE, &vdev->state) && !osal_test_bit((s32)VIO_SUBDEV_BIND_DONE, &och_vdev->state)) {
 		vio_dbg("[S%d][C%d] %s feedback mode.\n", vnode->flow_id, vnode->ctx_id, __func__);
-		for (j = 0; j < i; j++) { /* transfer frame to used */
-			vdev = vnode->ich_subdev[j];
-			framemgr = &vdev->framemgr;
-			vio_e_barrier_irqs(framemgr, flags);
-			frame = peek_frame(framemgr, FS_COMPLETE);
-			trans_frame(framemgr, frame, FS_USED);
-			vio_x_barrier_irqr(framemgr, flags);
+		/*
+		 * Unbind(feedback/non-bind) input buffer policy:
+		 *
+		 * - unbind_async_mode == 1 (async-like): userspace does NOT poll/dqbuf the
+		 *   input channel, so the driver must recycle input buffers here
+		 *   (FS_COMPLETE -> FS_USED) to allow re-qbuf of the same indices.
+		 *
+		 * - unbind_async_mode == 0 (sync): userspace relies on poll()/dqbuf_poll
+		 *   readiness, so we must keep FS_COMPLETE visible (do NOT recycle here),
+		 *   otherwise sync sendframe may timeout (-43).
+		 */
+		if (n2d_node->unbind_async_mode != 0u) {
+			for (j = 0; j < i; j++) { /* transfer frame to used */
+				vdev = vnode->ich_subdev[j];
+				framemgr = &vdev->framemgr;
+				vio_e_barrier_irqs(framemgr, flags);
+				frame = peek_frame(framemgr, FS_COMPLETE);
+				if (frame != NULL)
+					trans_frame(framemgr, frame, FS_USED);
+				vio_x_barrier_irqr(framemgr, flags);
+			}
 		}
 	}
 
@@ -2124,6 +2180,8 @@ static int horizon_n2d_device_node_init(void)
 			vio_dbg("Initialized config_lock for stream %d, channel %d at %p\n",
 					i, j, &n2d->n2d_sub[i].subdev[j].config_lock);
 		}
+		n2d->n2d_sub[i].unbind_async_mode = 0u;
+		n2d->n2d_sub[i].unbind_pending_done_streak = 0u;
 		ret	= start_n2d_frame_work_thread(n2d, i);
 		if (ret != 0)
 			goto err;
