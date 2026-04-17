@@ -680,6 +680,9 @@ static void bt1120_disp_enable(struct vs_crtc *vs_crtc)
 
 	bt1120_disp_update_scan(bt1120_disp, &scan, mode);
 
+	bt1120_write(bt1120_disp->bt1120, REG_BT1120_DMA_BLENGTH_CTL,
+		     g_bt1120_plane_info.dma_burst_len);
+
 	/* clear irq status*/
 	bt1120_write(bt1120_disp->bt1120, REG_BT1120_IRQ_STATUS, 0xf);
 

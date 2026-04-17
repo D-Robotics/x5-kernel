@@ -1041,6 +1041,7 @@ static void lt8618_bridge_enable(struct drm_bridge *bridge)
 {
 	struct lt8618 *lt8618 = bridge_to_lt8618(bridge);
 
+	dev_dbg(&lt8618->client->dev, "bridge_enable\n");
 	lt8618_afe_high(lt8618);
 
 	lt8618_phase_config(lt8618);
@@ -1052,6 +1053,7 @@ static void lt8618_bridge_disable(struct drm_bridge *bridge)
 {
 	struct lt8618 *lt8618 = bridge_to_lt8618(bridge);
 
+	dev_dbg(&lt8618->client->dev, "bridge_disable\n");
 	lt8618_afe_set_tx(lt8618, FALSE);
 }
 
@@ -1355,6 +1357,9 @@ static void lt8618_bridge_mode_set(struct drm_bridge *bridge,
 {
 	int vic;
 	struct lt8618 *lt8618 = bridge_to_lt8618(bridge);
+
+	dev_dbg(&lt8618->client->dev, "bridge_mode_set %dx%d\n",
+		mode->hdisplay, mode->vdisplay);
 	vic = drm_match_cea_mode(mode);
 
 	lt8618->mode_config.input_mode.mode =
@@ -1365,9 +1370,11 @@ static void lt8618_bridge_mode_set(struct drm_bridge *bridge,
 	lt8618_video_output_cfg(lt8618);
 
 	lt8618_hdmi_csc(lt8618);
+	lt8618_hdmi_output_mode(lt8618, HDMI_MODE_NORMAL);
 
 	LT8618SXB_AVI_setting(lt8618);
 	lt8618_video_output_timing(lt8618, mode);
+	lt8618_audio_enable(lt8618);
 }
 
 static const struct drm_bridge_funcs lt8618_bridge_funcs = {
@@ -1558,12 +1565,37 @@ static const struct i2c_device_id lt8618_i2c_ids[] = {
 };
 MODULE_DEVICE_TABLE(i2c, lt8618_i2c_ids);
 
+#ifdef CONFIG_PM_SLEEP
+static int lt8618_suspend(struct device *dev)
+{
+	return 0;
+}
+
+static int lt8618_resume(struct device *dev)
+{
+	struct i2c_client *client = to_i2c_client(dev);
+	struct lt8618 *lt8618 = i2c_get_clientdata(client);
+
+	dev_dbg(dev, "resume\n");
+
+	lt8618_sw_enable(lt8618);
+	lt8618_sw_reset(lt8618);
+
+	return 0;
+}
+#endif
+
+static const struct dev_pm_ops lt8618_pm_ops = {
+	SET_SYSTEM_SLEEP_PM_OPS(lt8618_suspend, lt8618_resume)
+};
+
 static struct i2c_driver lt8618_driver = {
 	.probe = lt8618_probe,
 	.remove = lt8618_remove,
 	.driver = {
 		.name = "lt8618",
 		.of_match_table = lt8618_dt_ids,
+		.pm = &lt8618_pm_ops,
 	},
 	.id_table = lt8618_i2c_ids,
 };
