@@ -39,6 +39,7 @@
  */
 
 #include <drm/drm_fourcc.h>
+#include <linux/mutex.h>
 
 #include "vs_plane.h"
 #include "vs_crtc.h"
@@ -271,6 +272,10 @@ struct vs_bt1120 {
 
 	/** aux device list. */
 	struct list_head aux_list;
+
+	/** disp SYSCON debug ioremap (DTS disp_sys_con); protected by @disp_sysc_lock */
+	struct mutex disp_sysc_lock;
+	void __iomem *disp_sysc_regs;
 };
 
 extern struct platform_driver bt1120_platform_driver;

@@ -30,16 +30,22 @@
 
 #include <linux/component.h>
 #include <linux/clk.h>
+#include <linux/device.h>
+#include <linux/printk.h>
 #include <linux/of_graph.h>
 #include <linux/of_platform.h>
 #include <linux/of_device.h>
 #include <linux/delay.h>
 #include <linux/media-bus-format.h>
+#if IS_ENABLED(CONFIG_X5_SEAMLESS_DISPLAY)
+#include <linux/soc/hobot/x5_seamless_display.h>
+#endif
 
 #include <drm/drm_atomic.h>
 #include <drm/drm_atomic_helper.h>
 #include <drm/drm_vblank.h>
 #include <drm/drm_framebuffer.h>
+#include <drm/drm_modes.h>
 #include <drm/drm_of.h>
 
 #include "vs_drv.h"
@@ -49,6 +55,12 @@
 extern struct device *bt1120_dev;
 
 #define CRTC_NAME "crtc-bt1120"
+
+/*
+ * Clear DRM_MODE_FLAG_[NP]HSYNC / [NP]VSYNC nibble (bits 0–3) so we can force
+ * BT1120-positive sync polarity; see drm_mode.h.
+ */
+#define BT1120_DRM_SYNC_POLARITY_MASK	0xFFFFFFF0u
 
 static inline struct bt1120_bridge *bridge_to_bt1120_bridge(struct drm_bridge *bridge)
 {
@@ -61,8 +73,25 @@ static void bt1120_bridge_atomic_disable(struct drm_bridge *bridge,
 	struct bt1120_bridge *bt1120_bridge = bridge_to_bt1120_bridge(bridge);
 	struct vs_bt1120 *bt1120	    = dev_get_drvdata(bt1120_bridge->parent);
 
+	dev_dbg(bt1120_bridge->parent,
+		"[X5_DISP] bt1120_bridge atomic_disable: is_online=%d parent=%s\n",
+		bt1120->is_online, dev_name(bt1120_bridge->parent));
+
 	if (!bt1120->is_online)
 		return;
+
+#if IS_ENABLED(CONFIG_X5_SEAMLESS_DISPLAY)
+	/* Align with sii902x/vs_drm: simplefb in /chosen implies U-Boot handoff even if
+	 * d-robotics,seamless-display-state is missing. Skip is per-bridge (atomic_t).
+	 */
+	if (x5_seamless_display_active() || x5_chosen_has_simple_framebuffer()) {
+		if (atomic_cmpxchg(&bt1120_bridge->seamless_skip_disable_once, 1, 0) == 1) {
+			dev_info(bt1120_bridge->parent,
+				 "bt1120_bridge: seamless HDMI handoff, skip first atomic_disable\n");
+			return;
+		}
+	}
+#endif
 
 	/* disable bt1120_en*/
 	bt1120_disable(bt1120);
@@ -99,13 +128,24 @@ static struct drm_crtc *drm_encoder_get_crtc(struct drm_encoder *encoder)
 static void bt1120_bridge_atomic_pre_enable(struct drm_bridge *bridge,
 					    struct drm_bridge_state *old_bridge_state)
 {
+	struct bt1120_bridge *bt1120_bridge    = bridge_to_bt1120_bridge(bridge);
 	struct drm_crtc *drm_crtc	       = drm_encoder_get_crtc(bridge->encoder);
 	struct drm_display_mode *adjusted_mode = &drm_crtc->state->adjusted_mode;
 
-	/* bt1120 output sync signals are positive active*/
-	adjusted_mode->flags &= 0xFFFFFFF0;
+	dev_dbg(bt1120_bridge->parent,
+		"[X5_DISP] bt1120_bridge atomic_pre_enable: crtc=%s %ux%u@%u dotclock_khz=%u htot=%u vtot=%u flags_before=0x%x\n",
+		drm_crtc->name, adjusted_mode->hdisplay, adjusted_mode->vdisplay,
+		drm_mode_vrefresh(adjusted_mode), adjusted_mode->clock,
+		adjusted_mode->htotal, adjusted_mode->vtotal, adjusted_mode->flags);
+
+	/* bt1120 output sync signals are positive active */
+	adjusted_mode->flags &= BT1120_DRM_SYNC_POLARITY_MASK;
 	adjusted_mode->flags |= DRM_MODE_FLAG_PHSYNC;
 	adjusted_mode->flags |= DRM_MODE_FLAG_PVSYNC;
+
+	dev_dbg(bt1120_bridge->parent,
+		"[X5_DISP] bt1120_bridge atomic_pre_enable: flags_after=0x%x (PHSYNC|PVSYNC)\n",
+		adjusted_mode->flags);
 }
 
 static int bt1120_bridge_attach(struct drm_bridge *bridge, enum drm_bridge_attach_flags flags)
@@ -129,6 +169,12 @@ static void bt1120_bridge_mode_set(struct drm_bridge *bridge, const struct drm_d
 	struct bt1120_bridge *bt1120_bridge = bridge_to_bt1120_bridge(bridge);
 	struct vs_bt1120 *bt1120	    = dev_get_drvdata(bt1120_bridge->parent);
 
+	dev_dbg(bt1120_bridge->parent,
+		"[X5_DISP] bt1120_bridge mode_set: is_online=%d %ux%u@%u dotclock_khz=%u htot=%u vtot=%u flags=0x%x hsync(%u-%u) vsync(%u-%u)\n",
+		bt1120->is_online, mode->hdisplay, mode->vdisplay, drm_mode_vrefresh(mode),
+		mode->clock, mode->htotal, mode->vtotal, mode->flags,
+		mode->hsync_start, mode->hsync_end, mode->vsync_start, mode->vsync_end);
+
 	bt1120_set_online_configs(bt1120, mode);
 }
 
@@ -147,6 +193,10 @@ static u32 *bt1120_bridge_get_input_bus_fmts(struct drm_bridge *bridge,
 		bt1120->is_online = false;
 	else
 		bt1120->is_online = true;
+
+	dev_dbg(bt1120_bridge->parent,
+		"[X5_DISP] bt1120_bridge get_input_bus_fmts: crtc=%s -> is_online=%d output_fmt=0x%x\n",
+		crtc->name, bt1120->is_online, output_fmt);
 
 	switch (output_fmt) {
 	case MEDIA_BUS_FMT_FIXED:
@@ -217,6 +267,10 @@ static int bt1120_bridge_probe(struct platform_device *pdev)
 
 	bt1120_bridge->dev    = dev;
 	bt1120_bridge->parent = bt1120_dev;
+
+#if IS_ENABLED(CONFIG_X5_SEAMLESS_DISPLAY)
+	atomic_set(&bt1120_bridge->seamless_skip_disable_once, 1);
+#endif
 
 	dev_set_drvdata(dev, bt1120_bridge);
 
