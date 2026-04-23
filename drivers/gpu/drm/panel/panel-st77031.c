@@ -6,9 +6,12 @@
 
 #include <linux/delay.h>
 #include <linux/gpio/consumer.h>
-#include <linux/media-bus-format.h>
 #include <linux/iopoll.h>
+#include <linux/mutex.h>
 #include <linux/module.h>
+#ifdef CONFIG_X5_SEAMLESS_DISPLAY
+#include <linux/soc/hobot/x5_seamless_display.h>
+#endif
 #include <linux/of_platform.h>
 #include <linux/platform_device.h>
 #include <linux/regulator/consumer.h>
@@ -21,6 +24,21 @@
 #include <drm/drm_device.h>
 #include <drm/drm_mipi_dsi.h>
 #include <drm/drm_panel.h>
+
+/*
+ * Panel DRM ops (prepare/unprepare/enable/disable) run from the atomic helper
+ * one mode change at a time for this panel; use @state_lock to serialize
+ * access to prepared / enabled and match reviewer concurrency guidance.
+ */
+
+/*
+ * ST77031 init timing constants (ms).
+ */
+#define ST77031_MSLEEP_RESET_ASSERT	100
+#define ST77031_MSLEEP_RESET_DEASSERT	120
+#define ST77031_MSLEEP_RESET_FINAL	150
+#define ST77031_MSLEEP_AFTER_SLEEP_OUT	250
+#define ST77031_MSLEEP_AFTER_DISPLAY_ON	50
 
 /**
  * @modes: Pointer to array of fixed modes appropriate for this panel.  If
@@ -83,6 +101,8 @@ struct panel_desc {
 
 struct panel_simple {
 	struct drm_panel base;
+	/* See file comment: protects prepared, enabled */
+	struct mutex state_lock;
 	bool prepared;
 	bool enabled;
 
@@ -213,13 +233,17 @@ static int panel_simple_disable(struct drm_panel *panel)
 {
 	struct panel_simple *p = to_panel_simple(panel);
 
-	if (!p->enabled)
+	mutex_lock(&p->state_lock);
+	if (!p->enabled) {
+		mutex_unlock(&p->state_lock);
 		return 0;
+	}
 
 	if (p->desc->delay.disable)
 		msleep(p->desc->delay.disable);
 
 	p->enabled = false;
+	mutex_unlock(&p->state_lock);
 
 	return 0;
 }
@@ -228,70 +252,165 @@ static int panel_simple_unprepare(struct drm_panel *panel)
 {
 	struct panel_simple *p = to_panel_simple(panel);
 
-	if (!p->prepared)
+	mutex_lock(&p->state_lock);
+	if (!p->prepared) {
+		mutex_unlock(&p->state_lock);
 		return 0;
+	}
+
+	gpiod_set_value_cansleep(p->reset_gpio, 0);
 
 	regulator_disable(p->supply);
-	msleep(10);
-	gpiod_set_value_cansleep(p->reset_gpio, 0);
 
 	if (p->desc->delay.unprepare)
 		msleep(p->desc->delay.unprepare);
 
 	p->prepared = false;
+	mutex_unlock(&p->state_lock);
 
 	return 0;
 }
 
-#define dsi_dcs_write_seq(dsi, seq...)                            \
-	do {                                                      \
-		static const u8 d[] = {seq};                      \
-		mipi_dsi_dcs_write_buffer(dsi, d, ARRAY_SIZE(d)); \
-	} while (0)
-
-static int panel_simple_dsi_init(struct mipi_dsi_device *dsi)
+static int st77031_dcs_write_buf(struct mipi_dsi_device *dsi, struct device *dev,
+				 const u8 *buf, size_t len)
 {
-	dsi_dcs_write_seq(dsi, 0xb9, 0xF1, 0x12, 0x83);
-	dsi_dcs_write_seq(dsi, 0xBA, 0x33, 0x81, 0x05, 0xF9, 0x0E, 0x0E, 0x20, 0x00, 0x00, 0x00,
-			  0x00, 0x00, 0x00, 0x00, 0x44, 0x25, 0x00, 0x91, 0x0A, 0x00, 0x00, 0x02,
-			  0x4F, 0xD1, 0x00, 0x00, 0x37);
-	dsi_dcs_write_seq(dsi, 0xB8, 0x26);
-	dsi_dcs_write_seq(dsi, 0xBF, 0x02, 0x10, 0x00);
-	dsi_dcs_write_seq(dsi, 0xB3, 0x07, 0x0B, 0x1E, 0x1E, 0x03, 0xFF, 0x00, 0x00, 0x00, 0x00);
-	dsi_dcs_write_seq(dsi, 0xC0, 0x73, 0x73, 0x50, 0x50, 0x00, 0x00, 0x08, 0x70, 0x00);
-	dsi_dcs_write_seq(dsi, 0xBC, 0x46);
-	dsi_dcs_write_seq(dsi, 0xCC, 0x0B);
-	dsi_dcs_write_seq(dsi, 0xB4, 0x80);
-	dsi_dcs_write_seq(dsi, 0xB2, 0xC8, 0x12, 0xA0);
-	dsi_dcs_write_seq(dsi, 0xE3, 0x07, 0x07, 0x0B, 0x0B, 0x03, 0x0B, 0x00, 0x00, 0x00, 0x00,
-			  0xFF, 0x80, 0xC0, 0x10);
-	dsi_dcs_write_seq(dsi, 0xC1, 0x53, 0x00, 0x32, 0x32, 0x77, 0xF1, 0xFF, 0xFF, 0xCC, 0xCC,
-			  0x77, 0x77);
-	dsi_dcs_write_seq(dsi, 0xB5, 0x09, 0x09);
+	int ret = mipi_dsi_dcs_write_buffer(dsi, buf, len);
 
-	dsi_dcs_write_seq(dsi, 0xB6, 0xB7, 0xB7);
-	dsi_dcs_write_seq(dsi, 0xE9, 0xC2, 0x10, 0x0A, 0x00, 0x00, 0x81, 0x80, 0x12, 0x30, 0x00,
-			  0x37, 0x86, 0x81, 0x80, 0x37, 0x18, 0x00, 0x05, 0x00, 0x00, 0x00, 0x00,
-			  0x00, 0x05, 0x00, 0x00, 0x00, 0x00, 0xF8, 0xBA, 0x46, 0x02, 0x08, 0x28,
-			  0x88, 0x88, 0x88, 0x88, 0x88, 0xF8, 0xBA, 0x57, 0x13, 0x18, 0x38, 0x88,
-			  0x88, 0x88, 0x88, 0x88, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00, 0x00,
-			  0x00, 0x00, 0x00, 0x00, 0x00);
+	if (ret < 0)
+		dev_err(dev, "st77031: DCS write failed %d (cmd 0x%02x, len %zu)\n",
+			ret, len ? buf[0] : 0, len);
+	return ret;
+}
 
-	dsi_dcs_write_seq(dsi, 0xEA, 0x07, 0x12, 0x01, 0x01, 0x02, 0x3C, 0x00, 0x00, 0x00, 0x00,
-			  0x00, 0x00, 0x8F, 0xBA, 0x31, 0x75, 0x38, 0x18, 0x88, 0x88, 0x88, 0x88,
-			  0x88, 0x8F, 0xBA, 0x20, 0x64, 0x28, 0x08, 0x88, 0x88, 0x88, 0x88, 0x88,
-			  0x23, 0x10, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-			  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-			  0x00, 0x00, 0x00);
+static int panel_simple_dsi_init(struct mipi_dsi_device *dsi, struct device *dev)
+{
+	int ret;
 
-	dsi_dcs_write_seq(dsi, 0xE0, 0x00, 0x02, 0x04, 0x1A, 0x23, 0x3F, 0x2C, 0x28, 0x05, 0x09,
-			  0x0B, 0x10, 0x11, 0x10, 0x12, 0x12, 0x19, 0x00, 0x02, 0x04, 0x1A, 0x23,
-			  0x3F, 0x2C, 0x28, 0x05, 0x09, 0x0B, 0x10, 0x11, 0x10, 0x12, 0x12, 0x19);
-
-	dsi_dcs_write_seq(dsi, 0x11);
-	msleep(250);
-	dsi_dcs_write_seq(dsi, 0x29);
-	msleep(50);
+	/* Vendor command mode unlock / controller setup (B9, BF) */
+	ret = st77031_dcs_write_buf(dsi, dev, (const u8[]){ 0xB9, 0xF1, 0x12, 0x83 }, 4);
+	if (ret)
+		return ret;
+	/* Power / VREG timing (B1) */
+	ret = st77031_dcs_write_buf(dsi, dev, (const u8[]){ 0xB1, 0x00, 0x00, 0x00, 0xDA, 0x80 }, 6);
+	if (ret)
+		return ret;
+	/* Panel timing (B2–B4) */
+	ret = st77031_dcs_write_buf(dsi, dev, (const u8[]){ 0xB2, 0xC8, 0x04, 0x30 }, 4);
+	if (ret)
+		return ret;
+	ret = st77031_dcs_write_buf(dsi, dev,
+				    (const u8[]){ 0xB3, 0x10, 0x10, 0x28, 0x28, 0x03, 0xFF, 0x00,
+						  0x00, 0x00, 0x00 },
+				    11);
+	if (ret)
+		return ret;
+	ret = st77031_dcs_write_buf(dsi, dev, (const u8[]){ 0xB4, 0x80 }, 2);
+	if (ret)
+		return ret;
+	/* Source / gate (B5, B6) */
+	ret = st77031_dcs_write_buf(dsi, dev, (const u8[]){ 0xB5, 0x0A, 0x0A }, 3);
+	if (ret)
+		return ret;
+	ret = st77031_dcs_write_buf(dsi, dev, (const u8[]){ 0xB6, 0x9D, 0x9D }, 3);
+	if (ret)
+		return ret;
+	ret = st77031_dcs_write_buf(dsi, dev, (const u8[]){ 0xB8, 0x26, 0x22, 0xF0, 0x13 }, 5);
+	if (ret)
+		return ret;
+	/* Gamma / color-related long block (BA) */
+	ret = st77031_dcs_write_buf(dsi, dev,
+				    (const u8[]){ 0xBA, 0x31, 0x81, 0x05, 0xF9, 0x0E, 0x0E, 0x20,
+						  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x44,
+						  0x25, 0x00, 0x90, 0x0A, 0x00, 0x00, 0x01, 0x4F,
+						  0x01, 0x00, 0x00, 0x37 },
+				    28);
+	if (ret)
+		return ret;
+	ret = st77031_dcs_write_buf(dsi, dev, (const u8[]){ 0xBC, 0x47 }, 2);
+	if (ret)
+		return ret;
+	ret = st77031_dcs_write_buf(dsi, dev, (const u8[]){ 0xBF, 0x02, 0x11, 0x00 }, 4);
+	if (ret)
+		return ret;
+	ret = st77031_dcs_write_buf(dsi, dev,
+				    (const u8[]){ 0xC0, 0x73, 0x73, 0x50, 0x50, 0x00, 0x00, 0x12,
+						  0x70, 0x00 },
+				    10);
+	if (ret)
+		return ret;
+	ret = st77031_dcs_write_buf(dsi, dev,
+				    (const u8[]){ 0xC1, 0x57, 0x00, 0x32, 0x32, 0x77, 0xE1, 0xFF,
+						  0xFF, 0xCC, 0xCC, 0x77, 0x77 },
+				    13);
+	if (ret)
+		return ret;
+	ret = st77031_dcs_write_buf(dsi, dev,
+				    (const u8[]){ 0xC6, 0x82, 0x00, 0xBF, 0xFF, 0x00, 0xFF }, 7);
+	if (ret)
+		return ret;
+	ret = st77031_dcs_write_buf(dsi, dev,
+				    (const u8[]){ 0xC7, 0xB8, 0x00, 0x0A, 0x10, 0x01, 0x09 }, 7);
+	if (ret)
+		return ret;
+	ret = st77031_dcs_write_buf(dsi, dev, (const u8[]){ 0xC8, 0x10, 0x40, 0x1E, 0x02 }, 5);
+	if (ret)
+		return ret;
+	ret = st77031_dcs_write_buf(dsi, dev, (const u8[]){ 0xCC, 0x0B }, 2);
+	if (ret)
+		return ret;
+	/* Gamma curve E0 */
+	ret = st77031_dcs_write_buf(dsi, dev,
+				    (const u8[]){ 0xE0, 0x00, 0x00, 0x00, 0x1B, 0x25, 0x3F, 0x24,
+						  0x1C, 0x05, 0x0A, 0x0C, 0x0E, 0x10, 0x0E, 0x11,
+						  0x11, 0x17, 0x00, 0x00, 0x00, 0x1B, 0x25, 0x3F,
+						  0x24, 0x1C, 0x05, 0x0A, 0x0C, 0x0E, 0x10, 0x0E,
+						  0x11, 0x11, 0x17 },
+				    35);
+	if (ret)
+		return ret;
+	ret = st77031_dcs_write_buf(dsi, dev,
+				    (const u8[]){ 0xE3, 0x07, 0x07, 0x0B, 0x0B, 0x0B, 0x0B, 0x00,
+						  0x00, 0x00, 0x00, 0xFF, 0x00, 0xC0, 0x10 },
+				    15);
+	if (ret)
+		return ret;
+	/* Vendor long sequences E9 / EA */
+	ret = st77031_dcs_write_buf(dsi, dev,
+				    (const u8[]){ 0xE9, 0xC8, 0x10, 0x07, 0x05, 0x02, 0x80, 0x81,
+						  0x12, 0x31, 0x23, 0x4F, 0x86, 0x80, 0x81, 0x47,
+						  0x16, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00, 0x00,
+						  0x00, 0x05, 0x00, 0x00, 0x00, 0x48, 0x18, 0xFA,
+						  0xB3, 0x17, 0x58, 0x88, 0x88, 0x88, 0x88, 0x88,
+						  0x48, 0x08, 0xFA, 0xB2, 0x06, 0x48, 0x88, 0x88,
+						  0x88, 0x88, 0x88, 0x00, 0x00, 0x00, 0x10, 0x00,
+						  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 },
+				    64);
+	if (ret)
+		return ret;
+	ret = st77031_dcs_write_buf(dsi, dev,
+				    (const u8[]){ 0xEA, 0x96, 0x12, 0x01, 0x01, 0x02, 0x96, 0x00,
+						  0x00, 0x00, 0x00, 0x00, 0x00, 0x4F, 0x08, 0x8A,
+						  0xB4, 0x60, 0x28, 0x88, 0x88, 0x88, 0x88, 0x88,
+						  0x4F, 0x18, 0x8A, 0xB5, 0x71, 0x38, 0x88, 0x88,
+						  0x88, 0x88, 0x88, 0x23, 0x00, 0x00, 0x00, 0x6A,
+						  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+						  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x40,
+						  0x80, 0x81, 0x00, 0x00, 0x00, 0x00 },
+				    62);
+	if (ret)
+		return ret;
+	ret = st77031_dcs_write_buf(dsi, dev, (const u8[]){ 0xEF, 0xFF, 0xFF, 0x01 }, 4);
+	if (ret)
+		return ret;
+	/* Sleep out (0x11), wait, display on (0x29) */
+	ret = st77031_dcs_write_buf(dsi, dev, (const u8[]){ 0x11 }, 1);
+	if (ret)
+		return ret;
+	msleep(ST77031_MSLEEP_AFTER_SLEEP_OUT);
+	ret = st77031_dcs_write_buf(dsi, dev, (const u8[]){ 0x29 }, 1);
+	if (ret)
+		return ret;
+	msleep(ST77031_MSLEEP_AFTER_DISPLAY_ON);
 
 	return 0;
 }
@@ -303,28 +422,41 @@ static int panel_simple_prepare(struct drm_panel *panel)
 	unsigned int delay;
 	int err;
 
-	if (p->prepared)
+	mutex_lock(&p->state_lock);
+	if (p->prepared) {
+		mutex_unlock(&p->state_lock);
 		return 0;
+	}
 
 	err = regulator_enable(p->supply);
 	if (err < 0) {
 		dev_err(panel->dev, "failed to enable supply: %d\n", err);
+		mutex_unlock(&p->state_lock);
 		return err;
 	}
 
 	gpiod_set_value_cansleep(p->reset_gpio, 1);
-	msleep(2);
+	msleep(ST77031_MSLEEP_RESET_ASSERT);
 	gpiod_set_value_cansleep(p->reset_gpio, 0);
-	msleep(2);
+	msleep(ST77031_MSLEEP_RESET_DEASSERT);
 	gpiod_set_value_cansleep(p->reset_gpio, 1);
-	msleep(25);
-	panel_simple_dsi_init(dsi);
+	msleep(ST77031_MSLEEP_RESET_FINAL);
+
+	err = panel_simple_dsi_init(dsi, panel->dev);
+	if (err < 0) {
+		dev_err(panel->dev, "st77031 init failed: %d\n", err);
+		gpiod_set_value_cansleep(p->reset_gpio, 0);
+		regulator_disable(p->supply);
+		mutex_unlock(&p->state_lock);
+		return err;
+	}
 
 	delay = p->desc->delay.prepare;
 	if (delay)
 		msleep(delay);
 
 	p->prepared = true;
+	mutex_unlock(&p->state_lock);
 
 	return 0;
 }
@@ -333,13 +465,17 @@ static int panel_simple_enable(struct drm_panel *panel)
 {
 	struct panel_simple *p = to_panel_simple(panel);
 
-	if (p->enabled)
+	mutex_lock(&p->state_lock);
+	if (p->enabled) {
+		mutex_unlock(&p->state_lock);
 		return 0;
+	}
 
 	if (p->desc->delay.enable)
 		msleep(p->desc->delay.enable);
 
 	p->enabled = true;
+	mutex_unlock(&p->state_lock);
 
 	return 0;
 }
@@ -386,6 +522,9 @@ static const struct drm_panel_funcs panel_simple_funcs = {
 static int panel_simple_probe(struct device *dev, const struct panel_desc *desc)
 {
 	struct panel_simple *panel;
+#if IS_ENABLED(CONFIG_X5_SEAMLESS_DISPLAY)
+	bool seamless;
+#endif
 	int connector_type;
 	int err;
 
@@ -393,6 +532,7 @@ static int panel_simple_probe(struct device *dev, const struct panel_desc *desc)
 	if (!panel)
 		return -ENOMEM;
 
+	mutex_init(&panel->state_lock);
 	panel->enabled	= false;
 	panel->prepared = false;
 	panel->desc	= desc;
@@ -401,23 +541,20 @@ static int panel_simple_probe(struct device *dev, const struct panel_desc *desc)
 	if (IS_ERR(panel->supply))
 		return PTR_ERR(panel->supply);
 
-	/*
-	 * Unlike st77031, this driver has no "seamless: panel already active" probe
-	 * shortcut — prepare() always runs the full DCS init. GPIOD_ASIS here can
-	 * leave reset uncontrollable after hand-off, so DRM commits look fine while
-	 * the panel stays black. Always request an output reset for reliable pulses.
-	 */
+#if IS_ENABLED(CONFIG_X5_SEAMLESS_DISPLAY)
+	seamless = x5_seamless_display_active();
+	panel->reset_gpio = devm_gpiod_get_optional(dev, "reset",
+						    seamless ? GPIOD_ASIS : GPIOD_OUT_LOW);
+#else
 	panel->reset_gpio = devm_gpiod_get_optional(dev, "reset", GPIOD_OUT_LOW);
+#endif
+
 	if (IS_ERR(panel->reset_gpio)) {
 		err = PTR_ERR(panel->reset_gpio);
 		if (err != -EPROBE_DEFER)
 			dev_err(dev, "failed to request GPIO: %d\n", err);
 		return err;
 	}
-
-	dev_info(dev, "jc050hd134: reset gpio %s\n",
-		 panel->reset_gpio ? "initialized" : "not present");
-
 	err = of_drm_get_panel_orientation(dev->of_node, &panel->orientation);
 	if (err) {
 		dev_err(dev, "%pOF: failed to get orientation %d\n", dev->of_node, err);
@@ -439,9 +576,29 @@ static int panel_simple_probe(struct device *dev, const struct panel_desc *desc)
 
 	drm_panel_init(&panel->base, dev, &panel_simple_funcs, connector_type);
 
+	/*
+	 * Backlight DT must be parsed before the seamless branch: if this fails,
+	 * we return before any seamless regulator_enable (no supply leak).
+	 */
 	err = drm_panel_of_backlight(&panel->base);
 	if (err)
 		return err;
+
+#if IS_ENABLED(CONFIG_X5_SEAMLESS_DISPLAY)
+	if (seamless && !IS_ERR_OR_NULL(panel->reset_gpio)) {
+		mutex_lock(&panel->state_lock);
+		err = regulator_enable(panel->supply);
+		if (err < 0) {
+			mutex_unlock(&panel->state_lock);
+			dev_err(dev, "failed to enable supply for seamless handoff: %d\n", err);
+			return err;
+		}
+		panel->prepared = true;
+		panel->enabled = true;
+		mutex_unlock(&panel->state_lock);
+		dev_dbg(dev, "seamless_display: panel already active, skipping init\n");
+	}
+#endif
 
 	drm_panel_add(&panel->base);
 
@@ -475,54 +632,41 @@ struct panel_desc_dsi {
 	unsigned int lanes;
 };
 
-/** Another set of available timings:
-static const struct drm_display_mode jc_050hd134_mode = {
-	.clock	     = 63333,
-	.hdisplay    = 720,
-	.hsync_start = 720 + 35,
-	.hsync_end   = 720 + 35 + 5,
-	.htotal	     = 720 + 35 + 5 + 35,
+static const struct drm_display_mode st77031_mode = {
+	/* .clock: pixel clock in kHz (= 66.72 MHz) */
+	.clock	     = 66720,
+	.hdisplay    = 600,
+	.hsync_start = 600 + 110,
+	.hsync_end   = 600 + 110 + 92,
+	.htotal	     = 600 + 110 + 92 + 110,
 	.vdisplay    = 1280,
-	.vsync_start = 1280 + 16,
-	.vsync_end   = 1280 + 16 + 3,
-	.vtotal	     = 1280 + 16 + 3 + 11,
-	.flags	     = DRM_MODE_FLAG_NHSYNC | DRM_MODE_FLAG_NVSYNC,
-};
-**/
-static const struct drm_display_mode jc_050hd134_mode = {
-	.clock	     = 65000,
-	.hdisplay    = 720,
-	.hsync_start = 720 + 32,
-	.hsync_end   = 720 + 32 + 20,
-	.htotal	     = 720 + 32 + 20 + 20,
-	.vdisplay    = 1280,
-	.vsync_start = 1280 + 20,
-	.vsync_end   = 1280 + 20 + 4,
-	.vtotal	     = 1280 + 20 + 4 + 20,
+	.vsync_start = 1280 + 13,
+	.vsync_end   = 1280 + 13 + 6,
+	.vtotal	     = 1280 + 13 + 6 + 13,
 	.flags	     = DRM_MODE_FLAG_NHSYNC | DRM_MODE_FLAG_NVSYNC,
 };
 
-static const struct panel_desc_dsi jc_050hd134 = {
+static const struct panel_desc_dsi st77031 = {
 	.desc =
 		{
-			.modes	   = &jc_050hd134_mode,
+			.modes	   = &st77031_mode,
 			.num_modes = 1,
 			.bpc	   = 8,
 			.size =
 				{
-					.width	= 62,
-					.height = 110,
+					.width	= 60,
+					.height = 128,
 				},
-			.bus_format	= MEDIA_BUS_FMT_RGB888_1X24,
 			.connector_type = DRM_MODE_CONNECTOR_DSI,
 		},
-	.flags	= MIPI_DSI_MODE_VIDEO | MIPI_DSI_MODE_VIDEO_SYNC_PULSE,
+	.flags	= MIPI_DSI_MODE_VIDEO | MIPI_DSI_MODE_VIDEO_SYNC_PULSE | MIPI_DSI_MODE_LPM,
 	.format = MIPI_DSI_FMT_RGB888,
-	.lanes	= 4,
+	.lanes	= 2,
 };
 
 static const struct of_device_id dsi_of_match[] = {
-	{.compatible = "jc-050hd134", .data = &jc_050hd134},
+	{.compatible = "d-robotics,st77031", .data = &st77031},
+	{.compatible = "st77031", .data = &st77031},
 	{
 		/* sentinel */
 	}};
@@ -550,9 +694,7 @@ static int panel_simple_dsi_probe(struct mipi_dsi_device *dsi)
 
 	err = mipi_dsi_attach(dsi);
 	if (err) {
-		struct panel_simple *panel = dev_get_drvdata(&dsi->dev);
-
-		drm_panel_remove(&panel->base);
+		panel_simple_remove(&dsi->dev);
 	}
 
 	return err;
@@ -562,11 +704,9 @@ static void panel_simple_dsi_remove(struct mipi_dsi_device *dsi)
 {
 	int err;
 
-	if (dsi->attached) {
-		err = mipi_dsi_detach(dsi);
-		if (err < 0)
-			dev_err(&dsi->dev, "failed to detach from DSI host: %d\n", err);
-	}
+	err = mipi_dsi_detach(dsi);
+	if (err < 0)
+		dev_err(&dsi->dev, "failed to detach from DSI host: %d\n", err);
 
 	panel_simple_remove(&dsi->dev);
 }
@@ -579,7 +719,7 @@ static void panel_simple_dsi_shutdown(struct mipi_dsi_device *dsi)
 static struct mipi_dsi_driver panel_simple_dsi_driver = {
 	.driver =
 		{
-			.name		= "panel-jc-050hd134",
+			.name		= "panel-st77031",
 			.of_match_table = dsi_of_match,
 		},
 	.probe	  = panel_simple_dsi_probe,
@@ -599,6 +739,5 @@ static void __exit panel_simple_exit(void)
 }
 module_exit(panel_simple_exit);
 
-MODULE_AUTHOR("jiale luo <jiale01.luo@horizon.cc>");
-MODULE_DESCRIPTION("DRM Driver for jc-050hd134 panel");
+MODULE_DESCRIPTION("DRM Driver for st77031 panel");
 MODULE_LICENSE("GPL");

@@ -743,6 +743,17 @@ config DRM_PANEL_JC_050HD134
 	  panel with 720x1280 resolution. This panel support
 	  MIPI DSI interface.
 
+config DRM_PANEL_ST77031
+	tristate "ST77031 panel"
+	depends on OF
+	depends on DRM_MIPI_DSI
+	depends on BACKLIGHT_CLASS_DEVICE
+	select VIDEOMODE_HELPERS
+	help
+	  Say Y here if you want to enable support for ST77031
+	  panel with 600x1280 resolution. This panel support
+	  MIPI DSI interface.
+
 config DRM_PANEL_WH_CM480
 	tristate "WH CM480 panel"
 	depends on OF
