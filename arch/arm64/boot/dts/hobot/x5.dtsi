@@ -4252,6 +4252,8 @@
 			lpwm1: lpwm@34110000 {
 				compatible = "hobot,hobot-lpwm";
 				status = "disabled";
+				/* Seamless boot: preserve controller reset when enabled (see board backlight path). */
+				d-robotics,seamless-preserve-reset;
 				reg = <0x34110000 0x10000>;
 				lpwm-int-status = <&lsio_sys_con 0x4>;
 				interrupt-parent = <&gic>;
@@ -4337,6 +4339,8 @@
 			pwm2: pwm@34160000 {
 				compatible = "d-robotics,pwm";
 				status = "disabled";
+				/* When CONFIG_X5_SEAMLESS_DISPLAY, drivers/pwm/pwm-drobot.c may skip reset assert/deassert. */
+				d-robotics,seamless-preserve-reset;
 				reg = <0x34160000 0x10000>;
 				interrupt-parent = <&gic>;
 				interrupts = <GIC_SPI 97 IRQ_TYPE_LEVEL_HIGH>;

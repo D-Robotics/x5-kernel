@@ -46,6 +46,16 @@
 			no-map;
 		};
 
+		/* Fallback fb carveout when U-Boot does not inject one.
+		 * When seamless succeeds, U-Boot also adds /chosen/framebuffer@<addr>
+		 * (simple-framebuffer) with live width/height/stride from the video device.
+		 */
+		seamless_fb_reserved: framebuffer@A2080000 {
+			reg = <0x0 0xA2080000 0x0 0x02000000>; /* 32MiB */
+			no-map;
+			status = "disabled";
+		};
+
 		ramoops@A4080000 {
 			compatible = "ramoops";
 			reg = <0x0 0xA4080000 0x0 0x00040000>;
