@@ -28,7 +28,10 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <linux/device.h>
 #include <linux/media-bus-format.h>
+
+#include <drm/drm_modes.h>
 
 #include "dc_proc.h"
 #include "vs_plane.h"
@@ -777,6 +780,14 @@ static void dc_crtc_commit(struct vs_crtc *vs_crtc, struct drm_crtc_state *old_c
 	struct drm_plane *drm_plane;
 	struct vs_plane *vs_plane;
 	unsigned int plane_mask;
+	const struct drm_display_mode *m = &new_crtc_state->adjusted_mode;
+
+	dev_dbg(drm_crtc->dev->dev,
+		"[X5_DISP] dc_crtc_commit: crtc=%s enable=%d active=%d mode_changed=%d %ux%u@%u dotclock_khz=%u htot=%u vtot=%u planes_mask=0x%x/0x%x\n",
+		drm_crtc->name, new_crtc_state->enable, new_crtc_state->active,
+		new_crtc_state->mode_changed, m->hdisplay, m->vdisplay,
+		drm_mode_vrefresh(m), m->clock, m->htotal, m->vtotal,
+		old_crtc_state->plane_mask, new_crtc_state->plane_mask);
 
 	plane_mask = old_crtc_state->plane_mask;
 	plane_mask |= new_crtc_state->plane_mask;

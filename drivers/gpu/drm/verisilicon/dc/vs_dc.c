@@ -60,7 +60,7 @@ static int dc_bind(struct device *dev, struct device *master, void *data)
 	struct dc_crtc *dc_crtc, *dc_crtc_tmp;
 
 	int i, ret;
-
+	dev_dbg(dev, "[DC8000] dc_bind: START\n");
 	if (!drm_dev || !dc) {
 		dev_err(dev, "devices are not created.\n");
 		return -ENODEV;
@@ -189,6 +189,7 @@ static int dc_bind(struct device *dev, struct device *master, void *data)
 
 	dc->drm_dev = drm_dev;
 
+	dev_dbg(dev, "[DC8000] dc_bind: DONE\n");
 	return 0;
 
 err_cleanup_wbs:
@@ -209,8 +210,9 @@ err_cleanup_crtcs:
 static void dc_unbind(struct device *dev, struct device *master, void *data)
 {
 	struct drm_device *drm_dev = data;
-
+	dev_dbg(dev, "[DC8000] dc_unbind: START\n");
 	vs_drm_iommu_detach_device(drm_dev, dev);
+	dev_dbg(dev, "[DC8000] dc_unbind: DONE\n");
 }
 
 static const struct component_ops dc_component_ops = {
@@ -263,20 +265,20 @@ static irqreturn_t dc_isr(int irq, void *data)
 
 	list_for_each_entry (dc_crtc, &dc->crtc_list, head)
 		dc_crtc_handle_vblank(dc, &dc_crtc->vs_crtc, irq_status);
-
 	return IRQ_HANDLED;
 }
 
 static struct dc_device *dc_add_device(struct device *dev, const char *name)
 {
 	struct dc_device *dc_dev;
-
+	dev_dbg(dev, "[DC8000] dc_add_device: START\n");
 	dc_dev = devm_kzalloc(dev, sizeof(*dc_dev), GFP_KERNEL);
 	if (!dc_dev)
 		return ERR_PTR(-ENOMEM);
 
 	dc_dev->dev = dev;
 	strncpy(dc_dev->name, name, DC_DEV_NAME_SIZE - 1);
+	dev_dbg(dev, "[DC8000] dc_add_device: DONE\n");
 	return dc_dev;
 }
 
@@ -289,7 +291,7 @@ static int dc_get_all_devices(struct device *dev)
 	const char *aux_name;
 	void *drvdata;
 	int i, ret;
-
+	dev_dbg(dev, "[DC8000] dc_get_all_devices: START\n");
 	dc_dev = dc_add_device(dev, DC_HW_DEV_NAME);
 	if (IS_ERR(dc_dev)) {
 		ret = PTR_ERR(dc_dev);
@@ -328,6 +330,7 @@ static int dc_get_all_devices(struct device *dev)
 		list_add_tail(&dc_dev->head, &dc->aux_list);
 	}
 
+	dev_dbg(dev, "[DC8000] dc_get_all_devices: DONE\n");
 	return 0;
 
 err_clean:
@@ -342,7 +345,7 @@ static void parse_out_bus_list(struct vs_dc *dc)
 {
 	struct device *dev = dc->dev;
 	int ret, i;
-
+	dev_dbg(dev, "[DC8000] parse_out_bus_list: START\n");
 	ret = of_property_count_strings(dev->of_node, "out-bus-list");
 	if (!ret)
 		return;
@@ -353,6 +356,7 @@ static void parse_out_bus_list(struct vs_dc *dc)
 		of_property_read_string_index(dev->of_node, "out-bus-list", i,
 					      &dc->out_bus_list[i]);
 	}
+	dev_dbg(dev, "[DC8000] parse_out_bus_list: DONE\n");
 }
 
 static int dc_probe(struct platform_device *pdev)
@@ -362,7 +366,7 @@ static int dc_probe(struct platform_device *pdev)
 	void __iomem *dc_base;
 	int irq, ret;
 	const struct dc_info *dc_info;
-
+	dev_dbg(dev, "[DC8000] dc_probe: START\n");
 	dc = devm_kzalloc(dev, sizeof(*dc), GFP_KERNEL);
 	if (!dc)
 		return -ENOMEM;
@@ -431,7 +435,7 @@ static int dc_probe(struct platform_device *pdev)
 		goto err_disable_core_clk;
 	}
 
-	dc->hw = dc_hw_create(dc_info->family, dc_base);
+	dc->hw = dc_hw_create(dc_info->family, dc_base, dev);
 	if (IS_ERR(dc->hw)) {
 		dev_err(dev, "failed to create dc hw\n");
 		ret = PTR_ERR(dc->hw);
@@ -450,7 +454,7 @@ static int dc_probe(struct platform_device *pdev)
 	ret = component_add(dev, &dc_component_ops);
 	if (!ret)
 		return ret;
-
+	dev_dbg(dev, "[DC8000] dc_probe: DONE\n");
 err_disable_core_clk:
 	clk_disable_unprepare(dc->core_clk);
 err_disable_axi_clk:
@@ -465,7 +469,7 @@ static int dc_remove(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
 	struct vs_dc *dc   = dev_get_drvdata(dev);
-
+	dev_dbg(dev, "[DC8000] dc_remove: START\n");
 	component_del(dev, &dc_component_ops);
 
 	clk_disable_unprepare(dc->core_clk);
@@ -478,6 +482,7 @@ static int dc_remove(struct platform_device *pdev)
 
 	dev_set_drvdata(dev, NULL);
 
+	dev_dbg(dev, "[DC8000] dc_remove: DONE\n");
 	return 0;
 }
 
@@ -489,7 +494,7 @@ static void dc_suspend_resume(struct device *dev, bool suspend)
 	struct vs_plane *vs_plane;
 	struct drm_crtc *drm_crtc;
 	struct vs_crtc *vs_crtc;
-
+	dev_dbg(dev, "[DC8000] dc_suspend_resume: START\n");
 	drm_for_each_plane (drm_plane, dc->drm_dev) {
 		vs_plane = to_vs_plane(drm_plane);
 		if (vs_plane->dev != dev)
@@ -509,12 +514,13 @@ static void dc_suspend_resume(struct device *dev, bool suspend)
 		else
 			dc_crtc_resume(vs_crtc);
 	}
+	dev_dbg(dev, "[DC8000] dc_suspend_resume: DONE\n");
 }
 
 static int dc_suspend(struct device *dev)
 {
 	struct vs_dc *dc = dev_get_drvdata(dev);
-
+	dev_dbg(dev, "[DC8000] dc_suspend: START\n");
 	dc_suspend_resume(dev, true);
 
 	clk_disable_unprepare(dc->core_clk);
@@ -523,6 +529,7 @@ static int dc_suspend(struct device *dev)
 
 	clk_disable_unprepare(dc->apb_clk);
 
+	dev_dbg(dev, "[DC8000] dc_suspend: DONE\n");
 	return 0;
 }
 
@@ -530,7 +537,7 @@ static int dc_resume(struct device *dev)
 {
 	int ret;
 	struct vs_dc *dc = dev_get_drvdata(dev);
-
+	dev_dbg(dev, "[DC8000] dc_resume: START\n");
 	ret = clk_prepare_enable(dc->apb_clk);
 	if (ret < 0) {
 		dev_err(dev, "Failed to prepare/enable apb_clk\n");
@@ -551,6 +558,7 @@ static int dc_resume(struct device *dev)
 
 	dc_suspend_resume(dev, false);
 
+	dev_dbg(dev, "[DC8000] dc_resume: DONE\n");
 	return 0;
 
 err_disable_axi_clk:

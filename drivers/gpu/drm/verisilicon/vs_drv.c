@@ -28,6 +28,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <linux/of.h>
 #include <linux/of_graph.h>
 #include <linux/component.h>
 #include <linux/iommu.h>
@@ -45,6 +46,11 @@
 #include <drm/drm_fb_helper.h>
 #include <drm/drm_writeback.h>
 #include <drm/drm_atomic_helper.h>
+#include <drm/drm_aperture.h>
+
+#if IS_ENABLED(CONFIG_X5_SEAMLESS_DISPLAY)
+#include <linux/soc/hobot/x5_seamless_display.h>
+#endif
 
 #include "vs_drv.h"
 #include "vs_fb.h"
@@ -75,6 +81,24 @@ extern struct ion_device *hb_ion_dev;
 
 static bool has_iommu = true;
 static struct platform_driver vs_drm_platform_driver;
+
+/*
+ * Remove simplefb/firmware owners of scanout memory before DRM registers.
+ * X5 Ubuntu often boots without /chosen seamless-display-state=1 (U-Boot env
+ * or DT not updated), so do not rely only on x5_seamless_display_active().
+ */
+static bool vs_drm_should_remove_firmware_fb(void)
+{
+#if IS_ENABLED(CONFIG_OF)
+	if (of_machine_is_compatible("D-Robotics, x5"))
+		return true;
+#endif
+#if IS_ENABLED(CONFIG_X5_SEAMLESS_DISPLAY)
+	if (x5_seamless_display_active() || x5_chosen_has_simple_framebuffer())
+		return true;
+#endif
+	return false;
+}
 
 static const struct file_operations fops = {
 	.owner		= THIS_MODULE,
@@ -208,6 +232,17 @@ static int vs_drm_bind(struct device *dev)
 
 	drm_dev = &priv->drm;
 	dev_set_drvdata(dev, drm_dev);
+
+	if (vs_drm_should_remove_firmware_fb()) {
+		ret = drm_aperture_remove_framebuffers(&vs_drm_driver);
+		if (ret) {
+			DRM_DEV_ERROR(dev,
+				      "failed to remove firmware framebuffers: %d\n", ret);
+			return ret;
+		}
+		DRM_DEV_INFO(dev,
+			     "vs-drm: drm_aperture removed firmware framebuffers before register\n");
+	}
 
 	priv->pitch_alignment = 64;
 	priv->dma_dev	      = drm_dev->dev;
