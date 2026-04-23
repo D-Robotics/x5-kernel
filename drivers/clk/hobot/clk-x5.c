@@ -14,6 +14,9 @@
 #include <linux/module.h>
 #include <linux/of_device.h>
 #include <linux/platform_device.h>
+#ifdef CONFIG_X5_SEAMLESS_DISPLAY
+#include <linux/soc/hobot/x5_seamless_display.h>
+#endif
 
 #include "clk-snps-pll.h"
 #include "clk.h"
@@ -371,6 +374,12 @@ static int crm_hps_clk_init(struct platform_device *pdev)
 	int ret, i, val;
 	u32 pll_match = 0;
 	u32 qspi_boot = 0;
+#if IS_ENABLED(CONFIG_X5_SEAMLESS_DISPLAY)
+	bool seamless = false;
+	unsigned long disp_pixel_flags = CLK_SET_RATE_PARENT | CLK_SET_RATE_NO_REPARENT;
+	unsigned long disp_gate_critical = 0;
+	unsigned long bl_gate_critical = 0;
+#endif
 
 	ctx = devm_kzalloc(dev, struct_size(ctx, clk_hw_data.hws, X5_HPS_END_CLK), GFP_KERNEL);
 	if (!ctx)
@@ -383,6 +392,14 @@ static int crm_hps_clk_init(struct platform_device *pdev)
 
 	device_property_read_u32(dev, "pll-table", &pll_match);
 	device_property_read_u32(dev, "qspi-boot", &qspi_boot);
+#if IS_ENABLED(CONFIG_X5_SEAMLESS_DISPLAY)
+	seamless = x5_seamless_display_active();
+	if (seamless) {
+		disp_pixel_flags |= CLK_IS_CRITICAL;
+		disp_gate_critical = CLK_IS_CRITICAL;
+		bl_gate_critical = CLK_IS_CRITICAL;
+	}
+#endif
 
 	ctx->idle = drobot_idle_get_dev(dev->of_node);
 	if (IS_ERR(ctx->idle)) {
@@ -419,12 +436,34 @@ static int crm_hps_clk_init(struct platform_device *pdev)
 	hws[X5_PIXEL_PLL_R] = clk_hw_register_pll("pixel_pll_r", "osc", base + 0x40,
 			base + PIXEL_PLL_INTERNAL, PLL_R_OUT, NULL, 0);
 
-	if(pll_match == 0)
-		for(i = 0; i < ARRAY_SIZE(soc_pll_rates0); i++)
+#if IS_ENABLED(CONFIG_X5_SEAMLESS_DISPLAY)
+	if (pll_match == 0) {
+		for (i = 0; i < ARRAY_SIZE(soc_pll_rates0); i++) {
+			/*
+			 * pll-table 0: dc8000_pixel uses PIXEL_PLL; BT1120 uses DISP_PLL.
+			 * Seamless HDMI handoff: keep DISP_PLL from firmware; still apply
+			 * PIXEL_PLL from table so DSI matches cold boot.
+			 */
+			if (seamless && soc_pll_rates0[i].id == X5_DISP_PLL_P)
+				continue;
 			clk_set_rate(hws[soc_pll_rates0[i].id]->clk, soc_pll_rates0[i].rate);
-	else
-		for(i = 0; i < ARRAY_SIZE(soc_pll_rates1); i++)
+		}
+	} else {
+		for (i = 0; i < ARRAY_SIZE(soc_pll_rates1); i++) {
+			if (seamless && soc_pll_rates1[i].id == X5_DISP_PLL_P)
+				continue;
 			clk_set_rate(hws[soc_pll_rates1[i].id]->clk, soc_pll_rates1[i].rate);
+		}
+	}
+#else
+	if (pll_match == 0) {
+		for (i = 0; i < ARRAY_SIZE(soc_pll_rates0); i++)
+			clk_set_rate(hws[soc_pll_rates0[i].id]->clk, soc_pll_rates0[i].rate);
+	} else {
+		for (i = 0; i < ARRAY_SIZE(soc_pll_rates1); i++)
+			clk_set_rate(hws[soc_pll_rates1[i].id]->clk, soc_pll_rates1[i].rate);
+	}
+#endif
 
 	for(i = X5_CPU_PLL_P; i <= X5_PIXEL_PLL_R; i++)
 		clk_get_rate(hws[i]->clk);
@@ -482,6 +521,63 @@ static int crm_hps_clk_init(struct platform_device *pdev)
 	hws[X5_CAM_SIF_PCLK] = drobot_clk_hw_register_gate_no_idle("sif_pclk", "top_apb_clk", base + CAMERA_CLK_ENB, 17, 0);
 	hws[X5_CAM_DEWARP_HCLK] = drobot_clk_hw_register_gate_no_idle("dewarp_hclk", "top_apb_clk", base + CAMERA_CLK_ENB, 22, 0);
 
+#if IS_ENABLED(CONFIG_X5_SEAMLESS_DISPLAY)
+	if (pll_match == 0) {
+		hws[X5_DISP_BT1120_PIXEL_CLK] = drobot_clk_register_generator("bt1120_pixel_clk", disp_gen_src_sels, ARRAY_SIZE(disp_gen_src_sels),
+			base + HPS_CLK_GEN + 0x4A0, disp_pixel_flags, ctx->idle, ISO_CG_BT1120, false);
+		hws[X5_DISP_DC8000_PIXEL_CLK] = drobot_clk_register_generator("dc8000_pixel_clk", disp_gen_src_sels, ARRAY_SIZE(disp_gen_src_sels),
+			base + HPS_CLK_GEN + 0x4C0, disp_pixel_flags, ctx->idle, ISO_CG_DC8000, false);
+	} else {
+		hws[X5_DISP_BT1120_PIXEL_CLK] = drobot_clk_register_generator("bt1120_pixel_clk", disp_no_pix_gen_src_sels, ARRAY_SIZE(disp_no_pix_gen_src_sels),
+			base + HPS_CLK_GEN + 0x4A0, disp_pixel_flags, ctx->idle, ISO_CG_BT1120, false);
+		hws[X5_DISP_DC8000_PIXEL_CLK] = drobot_clk_register_generator("dc8000_pixel_clk", disp_no_pix_gen_src_sels, ARRAY_SIZE(disp_no_pix_gen_src_sels),
+			base + HPS_CLK_GEN + 0x4C0, disp_pixel_flags, ctx->idle, ISO_CG_DC8000, false);
+	}
+
+	/* DISP_SIF: ISO_CG_DISP_SIF on aclk disable — mark critical when seamless (no early consumer). */
+	hws[X5_DISP_SIF_ACLK] = drobot_clk_register_generator("disp_sif_aclk", soc_gen_src_sels, ARRAY_SIZE(soc_gen_src_sels),
+		base + HPS_CLK_GEN + 0x4E0, disp_gate_critical, ctx->idle, ISO_CG_DISP_SIF, false);
+	/* BT1120: same seamless critical treatment as DC8000 (HDMI handoff has no early consumer). */
+	hws[X5_DISP_BT1120_ACLK] = drobot_clk_register_generator("bt1120_aclk", soc_gen_src_sels, ARRAY_SIZE(soc_gen_src_sels),
+		base + HPS_CLK_GEN + 0x500, disp_gate_critical, ctx->idle, ISO_CG_BT1120, false);
+	hws[X5_DISP_DC8000_ACLK] = drobot_clk_register_generator("dc8000_aclk", soc_gen_src_sels, ARRAY_SIZE(soc_gen_src_sels),
+		base + HPS_CLK_GEN + 0x520, disp_gate_critical, ctx->idle, ISO_CG_DC8000, false);
+
+	/*
+	 * Mux bt1120_pixel / dc8000_pixel even when seamless: skipping this left
+	 * firmware mux state and broke DSI modetest while DRM/PLL handoff paths
+	 * still expected Linux parent layout (BT1120 rate may still follow FW PLL).
+	 *
+	 * [X5_BRINGUP] Exception (Option A): the property "pll-table" doubles as
+	 * a CPU 1.8G OPP gate (set by U-Boot fdt_setup.c::check_cpu_1_8g_support
+	 * based on efuse chip_type and env enable_cpu_18g). On CPU-1.2G chips
+	 * (e.g. X5-M on RDK MD), pll-table=0 forces DC8000_PIXEL parent to
+	 * PIXEL_PLL_P (297 MHz). When a DSI panel drives DC8000 from DISP_PLL
+	 * (e.g. WH-CM480 at ~29 MHz), this reparent makes DC8000 emit 10× too
+	 * fast, breaking the seamless DSI burst between U-Boot and kernel.
+	 * Preserve U-Boot's DC8000_PIXEL mux when /chosen has simple-framebuffer.
+	 */
+	if (pll_match == 0) {
+		clk_set_parent(hws[X5_DISP_BT1120_PIXEL_CLK]->clk, hws[X5_DISP_PLL_P]->clk);
+		if (seamless && x5_chosen_has_simple_framebuffer()) {
+			pr_info("[X5_CLK] seamless DSI handoff (pll_match=0): preserve U-Boot DC8000_PIXEL parent — skip reparent to PIXEL_PLL_P\n");
+		} else {
+			clk_set_parent(hws[X5_DISP_DC8000_PIXEL_CLK]->clk, hws[X5_PIXEL_PLL_P]->clk);
+		}
+	} else {
+		clk_set_parent(hws[X5_DISP_BT1120_PIXEL_CLK]->clk, hws[X5_DISP_PLL_P]->clk);
+		clk_set_parent(hws[X5_DISP_DC8000_PIXEL_CLK]->clk, hws[X5_DISP_PLL_P]->clk);
+	}
+
+	hws[X5_DISP_CSI_PCLK] = drobot_clk_hw_register_gate_no_idle("disp_csi_pclk", "top_apb_clk", base + HPS_MIX_CLK_ENB, 0, 0);
+	hws[X5_DISP_DSI_PCLK] = drobot_clk_hw_register_gate_no_idle("disp_dsi_pclk", "top_apb_clk", base + HPS_MIX_CLK_ENB, 1, disp_gate_critical);
+	hws[X5_DISP_DC8000_PCLK] = drobot_clk_hw_register_gate_no_idle("dc8000_pclk", "top_apb_clk", base + HPS_MIX_CLK_ENB, 2, disp_gate_critical);
+	hws[X5_DISP_BT1120_PCLK] = drobot_clk_hw_register_gate_no_idle("bt1120_pclk", "top_apb_clk", base + HPS_MIX_CLK_ENB, 4, disp_gate_critical);
+	hws[X5_DISP_DPHY_CFG_CLK] = drobot_clk_hw_register_gate_no_idle("dphy_cfg_clk", "osc", base + HPS_MIX_CLK_ENB, 6, disp_gate_critical);
+
+	hws[X5_DISP_SIF_PCLK] = drobot_clk_hw_register_gate_no_idle("disp_sif_pclk", "top_apb_clk", base + HPS_MIX_CLK_ENB, 8,
+								    seamless ? disp_gate_critical : 0);
+#else
 	if (pll_match == 0) {
 		hws[X5_DISP_BT1120_PIXEL_CLK] = drobot_clk_register_generator("bt1120_pixel_clk", disp_gen_src_sels, ARRAY_SIZE(disp_gen_src_sels),
 			base + HPS_CLK_GEN + 0x4A0, CLK_SET_RATE_PARENT | CLK_SET_RATE_NO_REPARENT, ctx->idle, ISO_CG_BT1120, false);
@@ -511,7 +607,9 @@ static int crm_hps_clk_init(struct platform_device *pdev)
 	hws[X5_DISP_DC8000_PCLK] = drobot_clk_hw_register_gate_no_idle("dc8000_pclk", "top_apb_clk", base + HPS_MIX_CLK_ENB, 2, 0);
 	hws[X5_DISP_BT1120_PCLK] = drobot_clk_hw_register_gate_no_idle("bt1120_pclk", "top_apb_clk", base + HPS_MIX_CLK_ENB, 4, 0);
 	hws[X5_DISP_DPHY_CFG_CLK] = drobot_clk_hw_register_gate_no_idle("dphy_cfg_clk", "osc", base + HPS_MIX_CLK_ENB, 6, gate_flags);
+
 	hws[X5_DISP_SIF_PCLK] = drobot_clk_hw_register_gate_no_idle("disp_sif_pclk", "top_apb_clk", base + HPS_MIX_CLK_ENB, 8, 0);
+#endif
 	hws[X5_DISP_GPIO_PCLK] = drobot_clk_hw_register_gate_no_idle("disp_gpio_pclk", "top_apb_clk", base + HPS_MIX_CLK_ENB, 9, 0);
 
 	hws[X5_GPU_GC820_CLK] = drobot_clk_register_gen_no_flags("gc820_clk", soc_gen_src_sels, ARRAY_SIZE(soc_gen_src_sels), base + HPS_CLK_GEN + 0x540, ctx->idle, ISO_CG_GPU2D);
@@ -594,8 +692,18 @@ static int crm_hps_clk_init(struct platform_device *pdev)
 
 	hws[X5_SEC_AXI_CLK] = drobot_clk_register_generator("sec_axi_clk", soc_gen_src_sels, ARRAY_SIZE(soc_gen_src_sels), base + HPS_CLK_GEN + 0x840, CLK_IS_CRITICAL, ctx->idle, ISO_CG_SECURE, false);
 	hws[X5_SEC_APB_CLK] = drobot_clk_register_generator("sec_apb_clk", soc_gen_src_sels, ARRAY_SIZE(soc_gen_src_sels), base + HPS_CLK_GEN + 0x860, CLK_IS_CRITICAL, ctx->idle, ISO_CG_SECURE, false);
+#if IS_ENABLED(CONFIG_X5_SEAMLESS_DISPLAY)
+	if (seamless) {
+		hws[X5_LSIO_LPWM0_CLK] = drobot_clk_register_generator("lpwm0_clk", soc_gen_src_sels, ARRAY_SIZE(soc_gen_src_sels), base + HPS_CLK_GEN + 0x880, bl_gate_critical, NULL, 0xff, false);
+		hws[X5_LSIO_LPWM1_CLK] = drobot_clk_register_generator("lpwm1_clk", soc_gen_src_sels, ARRAY_SIZE(soc_gen_src_sels), base + HPS_CLK_GEN + 0x8A0, bl_gate_critical, NULL, 0xff, false);
+	} else {
+		hws[X5_LSIO_LPWM0_CLK] = drobot_clk_register_generator_no_idle("lpwm0_clk", soc_gen_src_sels, ARRAY_SIZE(soc_gen_src_sels), base + HPS_CLK_GEN + 0x880);
+		hws[X5_LSIO_LPWM1_CLK] = drobot_clk_register_generator_no_idle("lpwm1_clk", soc_gen_src_sels, ARRAY_SIZE(soc_gen_src_sels), base + HPS_CLK_GEN + 0x8A0);
+	}
+#else
 	hws[X5_LSIO_LPWM0_CLK] = drobot_clk_register_generator_no_idle("lpwm0_clk", soc_gen_src_sels, ARRAY_SIZE(soc_gen_src_sels), base + HPS_CLK_GEN + 0x880);
 	hws[X5_LSIO_LPWM1_CLK] = drobot_clk_register_generator_no_idle("lpwm1_clk", soc_gen_src_sels, ARRAY_SIZE(soc_gen_src_sels), base + HPS_CLK_GEN + 0x8A0);
+#endif
 	hws[X5_HPS_DMA_AXI_CLK] = drobot_clk_register_gen_no_flags("hps_dma_axi_clk", soc_gen_src_sels, ARRAY_SIZE(soc_gen_src_sels), base + HPS_CLK_GEN + 0x8C0, ctx->idle, ISO_CG_DMA);
 	hws[X5_TOP_TIMER0_CLK] = drobot_clk_register_generator_no_idle("top_timer0_clk", soc_gen_src_sels, ARRAY_SIZE(soc_gen_src_sels), base + HPS_CLK_GEN + 0x8E0);
 	hws[X5_TOP_TIMER1_CLK] = drobot_clk_register_generator_no_idle("top_timer1_clk", soc_gen_src_sels, ARRAY_SIZE(soc_gen_src_sels), base + HPS_CLK_GEN + 0x900);
@@ -625,8 +733,13 @@ static int crm_hps_clk_init(struct platform_device *pdev)
 	hws[X5_LSIO_SPI4_CLK] = drobot_clk_hw_register_gate_no_idle("spi4_clk", "top_apb_clk", base + LSIO_0_CLK_ENB, 14, 0);
 	hws[X5_LSIO_SPI5_CLK] = drobot_clk_hw_register_gate_no_idle("spi5_clk", "top_apb_clk", base + LSIO_0_CLK_ENB, 15, 0);
 
+#if IS_ENABLED(CONFIG_X5_SEAMLESS_DISPLAY)
+	hws[X5_LSIO_LPWM0_PCLK] = drobot_clk_hw_register_gate_no_idle("lpwm0_pclk", "top_apb_clk", base + LSIO_0_CLK_ENB, 18, bl_gate_critical);
+	hws[X5_LSIO_LPWM1_PCLK] = drobot_clk_hw_register_gate_no_idle("lpwm1_pclk", "top_apb_clk", base + LSIO_0_CLK_ENB, 19, bl_gate_critical);
+#else
 	hws[X5_LSIO_LPWM0_PCLK] = drobot_clk_hw_register_gate_no_idle("lpwm0_pclk", "top_apb_clk", base + LSIO_0_CLK_ENB, 18, 0);
 	hws[X5_LSIO_LPWM1_PCLK] = drobot_clk_hw_register_gate_no_idle("lpwm1_pclk", "top_apb_clk", base + LSIO_0_CLK_ENB, 19, 0);
+#endif
 	hws[X5_LSIO_GPIO0_PCLK] = drobot_clk_hw_register_gate_no_idle("gpio0_pclk", "top_apb_clk", base + LSIO_0_CLK_ENB, 20, 0);
 	hws[X5_LSIO_GPIO1_PCLK] = drobot_clk_hw_register_gate_no_idle("gpio1_pclk", "top_apb_clk", base + LSIO_0_CLK_ENB, 21, 0);
 
@@ -638,7 +751,11 @@ static int crm_hps_clk_init(struct platform_device *pdev)
 
 	hws[X5_LSIO_PWM0_PCLK] = drobot_clk_hw_register_gate_no_idle("pwm0_pclk", "top_apb_clk", base + LSIO_0_CLK_ENB, 27, 0);
 	hws[X5_LSIO_PWM1_PCLK] = drobot_clk_hw_register_gate_no_idle("pwm1_pclk", "top_apb_clk", base + LSIO_0_CLK_ENB, 28, 0);
+#if IS_ENABLED(CONFIG_X5_SEAMLESS_DISPLAY)
+	hws[X5_LSIO_PWM2_PCLK] = drobot_clk_hw_register_gate_no_idle("pwm2_pclk", "top_apb_clk", base + LSIO_0_CLK_ENB, 29, bl_gate_critical);
+#else
 	hws[X5_LSIO_PWM2_PCLK] = drobot_clk_hw_register_gate_no_idle("pwm2_pclk", "top_apb_clk", base + LSIO_0_CLK_ENB, 29, 0);
+#endif
 	hws[X5_LSIO_PWM3_PCLK] = drobot_clk_hw_register_gate_no_idle("pwm3_pclk", "top_apb_clk", base + LSIO_0_CLK_ENB, 30, 0);
 
 	hws[X5_LSIO_PCLK] = drobot_clk_hw_register_gate_no_idle("lsio_pclk", "top_apb_clk", base + LSIO_0_CLK_ENB, 31, CLK_IS_CRITICAL);
@@ -655,17 +772,42 @@ static int crm_hps_clk_init(struct platform_device *pdev)
 		clk_set_rate(hws[X5_HSIO_QSPI_BUS_CLK]->clk, 100000000);
 	} else {
 		val = readl(base + PLL_POSTDIV_OFFSET);
-		val &= ~PLL_POSTDIVR_MASK;
-		val |= DIV_200MHZ;
-		writel(val, base + PLL_POSTDIV_OFFSET);
-		wmb();
+#if IS_ENABLED(CONFIG_X5_SEAMLESS_DISPLAY)
+		if (seamless && (val & PLL_POSTDIVR_MASK) == DIV_200MHZ) {
+			/* Firmware already programmed DIV_200MHZ; skip raw PLL write. */
+		} else {
+			if (seamless)
+				pr_warn("seamless_display: cpu_pll_r postdiv mismatch! current=0x%lx expected=0x%lx, must reprogram\n",
+					(unsigned long)(val & PLL_POSTDIVR_MASK), (unsigned long)DIV_200MHZ);
+#endif
+			val &= ~PLL_POSTDIVR_MASK;
+			val |= DIV_200MHZ;
+			writel(val, base + PLL_POSTDIV_OFFSET);
+			wmb();
+#if IS_ENABLED(CONFIG_X5_SEAMLESS_DISPLAY)
+		}
+#endif
 		clk_get_rate(hws[X5_CPU_PLL_R]->clk);
 		clk_set_rate(hws[X5_TOP_APB_CLK]->clk, 200000000);
 		clk_set_rate(hws[X5_HSIO_QSPI_BUS_CLK]->clk, 200000000);
-	}
+		}
 
+#if IS_ENABLED(CONFIG_X5_SEAMLESS_DISPLAY)
+	for (i = 0; i < ARRAY_SIZE(soc_gen_rates); i++) {
+		/* Preserve U-Boot rates: table pixel row is 27MHz placeholder; skip BT1120/SIF too. */
+		if (seamless &&
+		    (soc_gen_rates[i].id == X5_DISP_DC8000_PIXEL_CLK ||
+		     soc_gen_rates[i].id == X5_DISP_DC8000_ACLK ||
+		     soc_gen_rates[i].id == X5_DISP_BT1120_PIXEL_CLK ||
+		     soc_gen_rates[i].id == X5_DISP_BT1120_ACLK ||
+		     soc_gen_rates[i].id == X5_DISP_SIF_ACLK))
+			continue;
+		clk_set_rate(hws[soc_gen_rates[i].id]->clk, soc_gen_rates[i].rate);
+	}
+#else
 	for(i = 0; i < ARRAY_SIZE(soc_gen_rates); i++)
 		clk_set_rate(hws[soc_gen_rates[i].id]->clk, soc_gen_rates[i].rate);
+#endif
 
 	if (pll_match == 0) {
 		clk_set_rate(hws[X5_CPU_SCLK]->clk, 1200000000);
