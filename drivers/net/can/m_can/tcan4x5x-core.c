@@ -243,6 +243,20 @@ static int tcan4x5x_clear_interrupts(struct m_can_classdev *cdev)
 				       TCAN4X5X_CLEAR_ALL_INT);
 }
 
+static int tcan4x5x_irq_pending(struct m_can_classdev *cdev)
+{
+	struct tcan4x5x_priv *priv = cdev_to_priv(cdev);
+	u32 flags, mcan_int;
+
+	if (regmap_read(priv->regmap, TCAN4X5X_INT_FLAGS, &flags))
+		return 0;
+
+	if (regmap_read(priv->regmap, TCAN4X5X_MCAN_INT_REG, &mcan_int))
+		return 0;
+
+	return flags || mcan_int;
+}
+
 static int tcan4x5x_init(struct m_can_classdev *cdev)
 {
 	struct tcan4x5x_priv *tcan4x5x = cdev_to_priv(cdev);
@@ -396,6 +410,7 @@ static const struct m_can_ops tcan4x5x_ops = {
 	.write_fifo = tcan4x5x_write_fifo,
 	.read_fifo = tcan4x5x_read_fifo,
 	.clear_interrupts = tcan4x5x_clear_interrupts,
+	.irq_pending = tcan4x5x_irq_pending,
 };
 
 static int tcan4x5x_can_probe(struct spi_device *spi)

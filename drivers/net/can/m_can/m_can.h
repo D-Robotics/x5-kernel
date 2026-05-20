@@ -62,6 +62,7 @@ struct m_can_classdev;
 struct m_can_ops {
 	/* Device specific call backs */
 	int (*clear_interrupts)(struct m_can_classdev *cdev);
+	int (*irq_pending)(struct m_can_classdev *cdev);
 	u32 (*read_reg)(struct m_can_classdev *cdev, int reg);
 	int (*write_reg)(struct m_can_classdev *cdev, int reg, int val);
 	int (*read_fifo)(struct m_can_classdev *cdev, int addr_offset, void *val, size_t val_count);
