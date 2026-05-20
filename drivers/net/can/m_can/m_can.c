@@ -1196,6 +1196,63 @@ static int m_can_echo_tx_event(struct net_device *dev)
 	return err;
 }
 
+static u32 m_can_read_and_ack_ir(struct m_can_classdev *cdev)
+{
+	u32 ir = 0, ir_read;
+
+	while ((ir_read = m_can_read(cdev, M_CAN_IR)) != 0) {
+		ir |= ir_read;
+		m_can_write(cdev, M_CAN_IR, ir);
+
+		if (!cdev->irq_edge_triggered)
+			break;
+	}
+
+	return ir;
+}
+
+static bool m_can_wrapper_irq_pending(struct m_can_classdev *cdev)
+{
+	return cdev->ops->irq_pending && cdev->ops->irq_pending(cdev);
+}
+
+static int m_can_handle_irq_events(struct m_can_classdev *cdev, u32 ir)
+{
+	struct net_device *dev = cdev->net;
+	u32 ir_err_all = cdev->version == 30 ? IR_ERR_ALL_30X : IR_ERR_ALL_31X;
+	int ret;
+
+	if (ir & (IR_RF0N | IR_RF0W | ir_err_all)) {
+		cdev->irqstatus = ir;
+		if (!cdev->is_peripheral) {
+			m_can_disable_all_interrupts(cdev);
+			napi_schedule(&cdev->napi);
+		} else {
+			ret = m_can_rx_handler(dev, NAPI_POLL_WEIGHT, ir);
+			if (ret < 0)
+				return ret;
+		}
+	}
+
+	if (cdev->version == 30) {
+		if (ir & IR_TC) {
+			u32 timestamp = 0;
+			unsigned int frame_len;
+
+			if (cdev->is_peripheral)
+				timestamp = m_can_get_timestamp(cdev);
+			frame_len = m_can_tx_update_stats(cdev, 0, timestamp);
+			m_can_finish_tx(cdev, 1, frame_len);
+		}
+	} else if (ir & (IR_TEFN | IR_TEFW)) {
+		ret = m_can_echo_tx_event(dev);
+		if (ret)
+			return ret;
+	}
+
+	return 0;
+}
+
 static void m_can_coalescing_update(struct m_can_classdev *cdev, u32 ir)
 {
 	u32 new_interrupts = cdev->active_interrupts;
@@ -1230,77 +1287,53 @@ static void m_can_coalescing_update(struct m_can_classdev *cdev, u32 ir)
  */
 static int m_can_interrupt_handler(struct m_can_classdev *cdev)
 {
-	struct net_device *dev = cdev->net;
-	u32 ir = 0, ir_read;
-	int ret;
+	u32 ir;
+	int ret = 0;
+	bool handled = false;
 
 	if (pm_runtime_suspended(cdev->dev))
 		return IRQ_NONE;
 
-	/* The m_can controller signals its interrupt status as a level, but
-	 * depending in the integration the CPU may interpret the signal as
-	 * edge-triggered (for example with m_can_pci). For these
-	 * edge-triggered integrations, we must observe that IR is 0 at least
-	 * once to be sure that the next interrupt will generate an edge.
+	/* Drain MCAN IR and process until quiescent.  Do not clear the TCAN
+	 * wrapper interrupts until the end: clearing them before RX/TEF work
+	 * completes can drop nINT while new MCAN_IR bits are already set.
 	 */
-	while ((ir_read = m_can_read(cdev, M_CAN_IR)) != 0) {
-		ir |= ir_read;
+	for (;;) {
+		ir = m_can_read_and_ack_ir(cdev);
 
-		/* ACK all irqs */
-		m_can_write(cdev, M_CAN_IR, ir);
-
-		if (!cdev->irq_edge_triggered)
+		if (!ir) {
+			if (m_can_wrapper_irq_pending(cdev)) {
+				handled = true;
+				break;
+			}
+			if (!handled)
+				return IRQ_NONE;
 			break;
+		}
+
+		handled = true;
+		m_can_coalescing_update(cdev, ir);
+		ret = m_can_handle_irq_events(cdev, ir);
+		if (ret)
+			goto out_clear;
+
+		if (m_can_read(cdev, M_CAN_IR) || m_can_wrapper_irq_pending(cdev))
+			continue;
+
+		break;
 	}
 
-	m_can_coalescing_update(cdev, ir);
-	if (!ir)
-		return IRQ_NONE;
-
-	if (cdev->ops->clear_interrupts)
+out_clear:
+	if (handled && cdev->ops->clear_interrupts)
 		cdev->ops->clear_interrupts(cdev);
 
-	/* schedule NAPI in case of
-	 * - rx IRQ
-	 * - state change IRQ
-	 * - bus error IRQ and bus error reporting
-	 */
-	if (ir & (IR_RF0N | IR_RF0W | IR_ERR_ALL_30X)) {
-		cdev->irqstatus = ir;
-		if (!cdev->is_peripheral) {
-			m_can_disable_all_interrupts(cdev);
-			napi_schedule(&cdev->napi);
-		} else {
-			ret = m_can_rx_handler(dev, NAPI_POLL_WEIGHT, ir);
-			if (ret < 0)
-				return ret;
-		}
-	}
-
-	if (cdev->version == 30) {
-		if (ir & IR_TC) {
-			/* Transmission Complete Interrupt*/
-			u32 timestamp = 0;
-			unsigned int frame_len;
-
-			if (cdev->is_peripheral)
-				timestamp = m_can_get_timestamp(cdev);
-			frame_len = m_can_tx_update_stats(cdev, 0, timestamp);
-			m_can_finish_tx(cdev, 1, frame_len);
-		}
-	} else  {
-		if (ir & (IR_TEFN | IR_TEFW)) {
-			/* New TX FIFO Element arrived */
-			ret = m_can_echo_tx_event(dev);
-			if (ret != 0)
-				return ret;
-		}
-	}
-
-	if (cdev->is_peripheral)
+	if (handled && cdev->is_peripheral)
 		can_rx_offload_threaded_irq_finish(&cdev->offload);
 
-	return IRQ_HANDLED;
+	if (ret < 0)
+		return ret;
+
+	return handled ? IRQ_HANDLED : IRQ_NONE;
 }
 
 static irqreturn_t m_can_isr(int irq, void *dev_id)
