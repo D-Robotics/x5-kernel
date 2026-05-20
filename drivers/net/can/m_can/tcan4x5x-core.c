@@ -243,6 +243,49 @@ static int tcan4x5x_clear_interrupts(struct m_can_classdev *cdev)
 				       TCAN4X5X_CLEAR_ALL_INT);
 }
 
+/*
+ * Re-initialize TCAN hardware after power loss (e.g. system suspend).
+ * Leaves the device in Standby with M_CAN CCCR.INIT set so the generic
+ * m_can_config_enable() path works without changes on the next open/resume.
+ * Do not switch to Normal mode here; that is done by tcan4x5x_init() on open.
+ */
+static int tcan4x5x_hw_recovery(struct tcan4x5x_priv *priv)
+{
+	struct m_can_classdev *cdev = &priv->cdev;
+	int ret;
+
+	ret = tcan4x5x_power_enable(priv->power, 1);
+	if (ret)
+		return ret;
+
+	/* Allow external VSUP and oscillator to settle after power-on */
+	msleep(2);
+
+	ret = tcan4x5x_reset(priv);
+	if (ret)
+		return ret;
+
+	tcan4x5x_check_wake(priv);
+
+	ret = tcan4x5x_write_tcan_reg(cdev, TCAN4X5X_INT_EN, 0);
+	if (ret)
+		return ret;
+
+	ret = tcan4x5x_clear_interrupts(cdev);
+	if (ret)
+		return ret;
+
+	ret = regmap_update_bits(priv->regmap, TCAN4X5X_CONFIG,
+				 TCAN4X5X_MODE_SEL_MASK,
+				 TCAN4X5X_MODE_STANDBY);
+	if (ret)
+		return ret;
+
+	usleep_range(100, 200);
+
+	return 0;
+}
+
 static int tcan4x5x_irq_pending(struct m_can_classdev *cdev)
 {
 	struct tcan4x5x_priv *priv = cdev_to_priv(cdev);
@@ -567,14 +610,31 @@ static int __maybe_unused tcan4x5x_suspend(struct device *dev)
 
 static int __maybe_unused tcan4x5x_resume(struct device *dev)
 {
-	struct m_can_classdev *cdev = dev_get_drvdata(dev);
+	struct tcan4x5x_priv *priv = dev_get_drvdata(dev);
+	struct m_can_classdev *cdev = &priv->cdev;
 	struct spi_device *spi = to_spi_device(dev);
-	int ret = m_can_class_resume(dev);
+	int ret;
+
+	/*
+	 * TCAN4550 may lose power during suspend while can0 is still down.
+	 * m_can_class_resume() skips chip setup when !netif_running, so
+	 * recover hardware here before any subsequent ip link set up.
+	 */
+	ret = tcan4x5x_hw_recovery(priv);
+	if (ret) {
+		dev_err(dev, "hardware recovery after resume failed: %pe\n",
+			ERR_PTR(ret));
+		return ret;
+	}
+
+	ret = m_can_class_resume(dev);
+	if (ret)
+		return ret;
 
 	if (cdev->pm_wake_source)
 		disable_irq_wake(spi->irq);
 
-	return ret;
+	return 0;
 }
 
 static const struct of_device_id tcan4x5x_of_match[] = {
