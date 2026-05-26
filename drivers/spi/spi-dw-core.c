@@ -527,18 +527,88 @@ static int dw_spi_poll_transfer(struct dw_spi *dws,
 	return 0;
 }
 
+static struct dw_spi_cfg dw_spi_xfer_to_cfg(struct spi_transfer *xfer)
+{
+	return (struct dw_spi_cfg) {
+		.tmode = DW_SPI_CTRLR0_TMOD_TR,
+		.dfs = xfer->bits_per_word,
+		.freq = xfer->speed_hz,
+		.mode = SPI_BUS_STANDARD,
+	};
+}
+
+static bool dw_spi_gpio_cfg_matches(struct dw_spi *dws, struct spi_device *spi,
+		struct spi_transfer *xfer)
+{
+	u32 speed = xfer->speed_hz ?: spi->max_speed_hz;
+	u8 bpw = xfer->bits_per_word ?: spi->bits_per_word;
+
+	return dws->gpio_msg_prepared &&
+	       dws->prepared_speed_hz == speed &&
+	       dws->prepared_bits_per_word == bpw;
+}
+
+/*
+ * Pre-configure the controller while CS is still inactive (GPIO CS high).
+ * This shortens the CS-assert-to-clock gap in transfer_one().
+ */
+static int dw_spi_prepare_message(struct spi_controller *master,
+		struct spi_message *msg)
+{
+	struct dw_spi *dws = spi_controller_get_devdata(master);
+	struct spi_transfer *xfer;
+	struct dw_spi_cfg cfg;
+
+	if (!spi_get_csgpiod(msg->spi, 0))
+		return 0;
+
+	dws->gpio_msg_prepared = false;
+
+	if (list_empty(&msg->transfers))
+		return 0;
+
+	xfer = list_first_entry(&msg->transfers, struct spi_transfer,
+			transfer_list);
+	if (!xfer->len && !xfer->tx_buf && !xfer->rx_buf)
+		return 0;
+
+	dw_spi_enable_chip(dws, 0);
+	cfg = dw_spi_xfer_to_cfg(xfer);
+	dw_spi_update_config(dws, msg->spi, &cfg);
+
+	dws->gpio_msg_prepared = true;
+	dws->prepared_speed_hz = xfer->speed_hz ?: msg->spi->max_speed_hz;
+	dws->prepared_bits_per_word = xfer->bits_per_word ?:
+			msg->spi->bits_per_word;
+
+	return 0;
+}
+
+static int dw_spi_unprepare_message(struct spi_controller *master,
+		struct spi_message *msg)
+{
+	struct dw_spi *dws = spi_controller_get_devdata(master);
+
+	if (!spi_get_csgpiod(msg->spi, 0))
+		return 0;
+
+	dw_spi_enable_chip(dws, 0);
+	dw_writel(dws, DW_SPI_SER, 0);
+	dws->gpio_msg_prepared = false;
+
+	return 0;
+}
+
 static int dw_spi_transfer_one(struct spi_controller *master,
 			       struct spi_device *spi,
 			       struct spi_transfer *transfer)
 {
 	struct dw_spi *dws = spi_controller_get_devdata(master);
-	struct dw_spi_cfg cfg = {
-		.tmode = DW_SPI_CTRLR0_TMOD_TR,
-		.dfs = transfer->bits_per_word,
-		.freq = transfer->speed_hz,
-		.mode = SPI_BUS_STANDARD,
-	};
+	struct dw_spi_cfg cfg;
 	int ret;
+	bool gpio_cs = !!spi_get_csgpiod(spi, 0);
+
+	cfg = dw_spi_xfer_to_cfg(transfer);
 
 	dws->dma_mapped = 0;
 	dws->n_bytes =
@@ -568,9 +638,17 @@ static int dw_spi_transfer_one(struct spi_controller *master,
 	/* Ensure the data above is visible for all CPUs */
 	smp_mb();
 
-	dw_spi_enable_chip(dws, 0);
-
-	dw_spi_update_config(dws, spi, &cfg);
+	if (!gpio_cs || !dw_spi_gpio_cfg_matches(dws, spi, transfer)) {
+		dw_spi_enable_chip(dws, 0);
+		dw_spi_update_config(dws, spi, &cfg);
+		if (gpio_cs) {
+			dws->gpio_msg_prepared = true;
+			dws->prepared_speed_hz = transfer->speed_hz ?:
+					spi->max_speed_hz;
+			dws->prepared_bits_per_word = transfer->bits_per_word ?:
+					spi->bits_per_word;
+		}
+	}
 
 	transfer->effective_speed_hz = dws->current_freq;
 
@@ -591,7 +669,21 @@ static int dw_spi_transfer_one(struct spi_controller *master,
 
 	if (dws->dma_mapped)
 		return dws->dma_ops->dma_transfer(dws, transfer);
-	else if (dws->irq == IRQ_NOTCONNECTED)
+
+	/*
+	 * GPIO chip select: SCLK starts when the first word hits DR. The SPI
+	 * core asserts CS before transfer_one(), so push data synchronously
+	 * here instead of waiting for the TXEI IRQ (often several us).
+	 */
+	if (gpio_cs) {
+		if (dws->tx_len <= dws->fifo_len && dws->rx_len <= dws->fifo_len)
+			return dw_spi_poll_transfer(dws, transfer);
+
+		if (dws->tx_len)
+			dws->writer(dws);
+	}
+
+	if (dws->irq == IRQ_NOTCONNECTED)
 		return dw_spi_poll_transfer(dws, transfer);
 
 	dw_spi_irq_setup(dws);
@@ -1382,6 +1474,8 @@ int dw_spi_add_host(struct device *dev, struct dw_spi *dws)
 	master->num_chipselect = dws->num_cs;
 	master->setup = dw_spi_setup;
 	master->cleanup = dw_spi_cleanup;
+	master->prepare_message = dw_spi_prepare_message;
+	master->unprepare_message = dw_spi_unprepare_message;
 	if (dws->set_cs)
 		master->set_cs = dws->set_cs;
 	else

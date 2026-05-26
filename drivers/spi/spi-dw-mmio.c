@@ -88,40 +88,89 @@ static void dw_spi_mscc_set_cs(struct spi_device *spi, bool enable)
 	dw_spi_set_cs(spi, enable);
 }
 
+/*
+ * Return true when this chip select is wired through the standard SPI core
+ * GPIO descriptor table populated from the "cs-gpios" DT property.
+ */
+static bool dw_spi_cs_is_gpio(const struct spi_device *spi)
+{
+	struct spi_controller *ctlr = spi->controller;
+	unsigned int cs = spi_get_chipselect(spi, 0);
+
+	return ctlr->use_gpio_descriptors && ctlr->cs_gpiods &&
+	       cs < ctlr->num_chipselect && ctlr->cs_gpiods[cs];
+}
+
+/*
+ * Assert the DW SPI slave-enable bit while GPIO CS is in use. The SPI core
+ * toggles the actual chip-select GPIO; we only need to enable the controller.
+ */
+static void dw_spi_vs_gpio_hw_cs(struct dw_spi *dws, struct spi_device *spi,
+		bool enable)
+{
+	bool cs_high = !!(spi->mode & SPI_CS_HIGH);
+	bool ser_enable = cs_high ? enable : !enable;
+
+	if (ser_enable)
+		dw_writel(dws, DW_SPI_SER, BIT(0));
+	else
+		dw_writel(dws, DW_SPI_SER, 0);
+}
+
+static void dw_spi_vs_syscon_set_cs(struct dw_spi_vs *dws_vs, u32 cs,
+		bool enable, bool dsp)
+{
+	u32 mask, val;
+
+	if (cs >= 4)
+		return;
+
+	mask = CS_MASK(dws_vs->cs_bit_offset + cs * 2);
+	if (dsp)
+		val = (enable ? 0x0 : 0x2) << (dws_vs->cs_bit_offset + cs * 2);
+	else
+		val = (enable ? 0x3 : 0x1) << (dws_vs->cs_bit_offset + cs * 2);
+
+	regmap_update_bits(dws_vs->syscon, dws_vs->ctrl_reg, mask, val);
+}
+
 static void dw_spi_vs_set_cs(struct spi_device *spi, bool enable)
 {
-	struct dw_spi *dws = spi_master_get_devdata(spi->master);
+	struct dw_spi *dws = spi_controller_get_devdata(spi->controller);
 	struct dw_spi_mmio *dwsmmio =
 		container_of(dws, struct dw_spi_mmio, dws);
 	struct dw_spi_vs *dws_vs = dwsmmio->priv;
-	u32 cs = spi->chip_select;
 
-	if (cs < 4) {
-		regmap_update_bits(dws_vs->syscon, dws_vs->ctrl_reg,
-				   CS_MASK(dws_vs->cs_bit_offset + cs * 2),
-				   (enable ? 0x3 : 0x1) <<
-				   (dws_vs->cs_bit_offset + cs * 2));
-	}
-	dw_spi_set_cs(spi, enable);
+	if (dw_spi_cs_is_gpio(spi))
+		dw_spi_vs_gpio_hw_cs(dws, spi, enable);
+	else
+		dw_spi_vs_syscon_set_cs(dws_vs, spi->chip_select, enable, false);
+
+	if (!dw_spi_cs_is_gpio(spi))
+		dw_spi_set_cs(spi, enable);
 }
 
 static void dw_dsp_spi_vs_set_cs(struct spi_device *spi, bool enable)
 {
-	struct dw_spi *dws = spi_master_get_devdata(spi->master);
+	struct dw_spi *dws = spi_controller_get_devdata(spi->controller);
 	struct dw_spi_mmio *dwsmmio =
 		container_of(dws, struct dw_spi_mmio, dws);
 	struct dw_spi_vs *dws_vs = dwsmmio->priv;
-	u32 cs = spi->chip_select;
-	u32 val;
 
-	if (cs < 4) {
-		val = ((enable ? 0x0 : 0x2) << (dws_vs->cs_bit_offset + cs * 2));
-		regmap_update_bits(dws_vs->syscon, dws_vs->ctrl_reg,
-				   CS_MASK(dws_vs->cs_bit_offset + cs * 2), val);
+	if (dw_spi_cs_is_gpio(spi)) {
+		/*
+		 * GPIO chip selects still need SER bit 0 to enable the DW
+		 * controller, but on DSP SPI that also asserts native CS0 on
+		 * the SSN pad. Keep CS0 deasserted via syscon so only the
+		 * requested GPIO CS line toggles.
+		 */
+		dw_spi_vs_syscon_set_cs(dws_vs, 0, false, true);
+		dw_spi_vs_gpio_hw_cs(dws, spi, enable);
+	} else {
+		dw_spi_vs_syscon_set_cs(dws_vs, spi->chip_select, enable, true);
+		dw_spi_set_cs(spi, enable);
 	}
-	dw_spi_set_cs(spi, enable);
 }
-
 
 static int dw_spi_mscc_init(struct platform_device *pdev,
 			    struct dw_spi_mmio *dwsmmio,
