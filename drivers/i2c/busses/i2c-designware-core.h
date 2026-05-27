@@ -70,6 +70,7 @@
 #define DW_IC_CLR_START_DET	0x64
 #define DW_IC_CLR_GEN_CALL	0x68
 #define DW_IC_ENABLE		0x6c
+#define DW_IC_ENABLE_SAR_EN	BIT(19)
 #define DW_IC_STATUS		0x70
 #define DW_IC_TXFLR		0x74
 #define DW_IC_RXFLR		0x78
@@ -303,6 +304,7 @@ struct dw_i2c_dev {
 
 #define ACCESS_INTR_MASK	BIT(0)
 #define ACCESS_NO_IRQ_SUSPEND	BIT(1)
+#define ACCESS_SLAVE_SAR_EN	BIT(12)
 #define ARBITRATION_SEMAPHORE	BIT(2)
 
 #define MODEL_MSCC_OCELOT	BIT(8)
@@ -339,8 +341,13 @@ void i2c_dw_disable_int(struct dw_i2c_dev *dev);
 
 static inline void __i2c_dw_enable(struct dw_i2c_dev *dev)
 {
+	u32 ena = 1;
+
+	if (dev->flags & ACCESS_SLAVE_SAR_EN)
+		ena |= DW_IC_ENABLE_SAR_EN;
+
 	dev->status |= STATUS_ACTIVE;
-	regmap_write(dev->map, DW_IC_ENABLE, 1);
+	regmap_write(dev->map, DW_IC_ENABLE, ena);
 }
 
 static inline void __i2c_dw_disable_nowait(struct dw_i2c_dev *dev)
