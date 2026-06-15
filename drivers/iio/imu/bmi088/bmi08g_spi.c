@@ -43,6 +43,9 @@
 #include "bmi08g_driver.h"
 #include "bs_log.h"
 
+/* Exported by bmi08a_spi_driver.ko */
+extern void bmi08a_spi_set_gyro_intf(void *gyro_spi);
+
 /*********************************************************************/
 /* Local macro definitions */
 /*********************************************************************/
@@ -216,7 +219,12 @@ static int bmi08g_spi_probe(struct spi_device *client)
 	g_client_data->GYR_IRQ = client->irq;
 	dev_set_drvdata(&client->dev, g_iio_spi_dev);
 
-	return bmi08g_probe(g_iio_spi_dev);
+	err = bmi08g_probe(g_iio_spi_dev);
+	if (err)
+		goto exit_err_clean;
+
+	bmi08a_spi_set_gyro_intf(client);
+	return 0;
 exit_err_clean:
 	if (err)
 		bmi_spi_client = NULL;
