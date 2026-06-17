@@ -16,10 +16,13 @@
 #include <linux/property.h>
 #include <linux/regmap.h>
 #include <linux/iio/iio.h>
+#include <linux/input.h>
 
 #include "inv_icm42600.h"
 #include "inv_icm42600_buffer.h"
 #include "inv_icm42600_timestamp.h"
+
+#define ICM42688_MSC_DATA	0x04
 
 static const struct regmap_range_cfg inv_icm42600_regmap_ranges[] = {
 	{
@@ -69,6 +72,23 @@ static const struct inv_icm42600_conf inv_icm42600_default_conf = {
 	.temp_en = false,
 };
 
+/* ICM42688: 1kHz ODR for input stream (align with BMI088 / sample_imu_input) */
+static const struct inv_icm42600_conf inv_icm42688_default_conf = {
+	.gyro = {
+		.mode = INV_ICM42600_SENSOR_MODE_OFF,
+		.fs = INV_ICM42600_GYRO_FS_2000DPS,
+		.odr = INV_ICM42600_ODR_1KHZ_LN,
+		.filter = INV_ICM42600_FILTER_BW_ODR_DIV_2,
+	},
+	.accel = {
+		.mode = INV_ICM42600_SENSOR_MODE_OFF,
+		.fs = INV_ICM42600_ACCEL_FS_16G,
+		.odr = INV_ICM42600_ODR_1KHZ_LN,
+		.filter = INV_ICM42600_FILTER_BW_ODR_DIV_2,
+	},
+	.temp_en = false,
+};
+
 static const struct inv_icm42600_hw inv_icm42600_hw[INV_CHIP_NB] = {
 	[INV_CHIP_ICM42600] = {
 		.whoami = INV_ICM42600_WHOAMI_ICM42600,
@@ -93,6 +113,7 @@ static const struct inv_icm42600_hw inv_icm42600_hw[INV_CHIP_NB] = {
 	[INV_CHIP_ICM40608] = {
 		.whoami = INV_ICM42600_WHOAMI_ICM40608,
 		.name = "icm40608",
+		// .conf = &inv_icm42688_default_conf,
 		.conf = &inv_icm42600_default_conf,
 	},
 	[INV_CHIP_ICM42688] = {
@@ -431,6 +452,106 @@ static int inv_icm42600_setup(struct inv_icm42600_state *st,
 	return inv_icm42600_set_conf(st, hw->conf);
 }
 
+static void inv_icm42688_input_report(struct inv_icm42600_state *st, u64 irq_ts,
+				      int16_t ax, int16_t ay, int16_t az,
+				      int16_t gx, int16_t gy, int16_t gz)
+{
+	struct input_dev *input = st->input;
+
+	st->irq_count++;
+	input_event(input, EV_MSC, ICM42688_MSC_DATA, (u32)ax);
+	input_event(input, EV_MSC, ICM42688_MSC_DATA, (u32)ay);
+	input_event(input, EV_MSC, ICM42688_MSC_DATA, (u32)az);
+	input_event(input, EV_MSC, ICM42688_MSC_DATA, (u32)gx);
+	input_event(input, EV_MSC, ICM42688_MSC_DATA, (u32)gy);
+	input_event(input, EV_MSC, ICM42688_MSC_DATA, (u32)gz);
+	input_event(input, EV_MSC, ICM42688_MSC_DATA, (u32)((irq_ts >> 32) & 0xFFFFFFFF));
+	input_event(input, EV_MSC, ICM42688_MSC_DATA, (u32)(irq_ts & 0xFFFFFFFF));
+	input_event(input, EV_MSC, ICM42688_MSC_DATA, (u32)st->irq_count);
+	input_sync(input);
+}
+
+static int inv_icm42688_input_drdy(struct inv_icm42600_state *st)
+{
+	__be16 raw[6];
+	u64 irq_ts = st->timestamp.accel;
+	int ret;
+
+	ret = regmap_bulk_read(st->map, INV_ICM42600_REG_ACCEL_DATA_X,
+			       raw, sizeof(raw));
+	if (ret)
+		return ret;
+
+	inv_icm42688_input_report(st, irq_ts,
+				  be16_to_cpu(raw[0]), be16_to_cpu(raw[1]),
+				  be16_to_cpu(raw[2]), be16_to_cpu(raw[3]),
+				  be16_to_cpu(raw[4]), be16_to_cpu(raw[5]));
+	return 0;
+}
+
+static void inv_icm42688_input_unregister(void *data)
+{
+	struct inv_icm42600_state *st = data;
+
+	if (st->input)
+		input_unregister_device(st->input);
+}
+
+static int inv_icm42688_input_init(struct inv_icm42600_state *st)
+{
+	struct device *dev = regmap_get_device(st->map);
+	struct inv_icm42600_sensor_conf conf = INV_ICM42600_SENSOR_CONF_INIT;
+	int ret;
+
+	st->input = devm_input_allocate_device(dev);
+	if (!st->input)
+		return -ENOMEM;
+
+	st->input->name = "icm42688-sensor";
+	st->input->phys = "icm42688/input0";
+	st->input->id.bustype = BUS_I2C;
+	st->input->dev.parent = dev;
+	input_set_capability(st->input, EV_MSC, ICM42688_MSC_DATA);
+	input_set_events_per_packet(st->input, 100);
+
+	ret = input_register_device(st->input);
+	if (ret)
+		return ret;
+
+	pm_runtime_get_sync(dev);
+	mutex_lock(&st->lock);
+
+	conf.mode = INV_ICM42600_SENSOR_MODE_LOW_NOISE;
+	conf.odr = INV_ICM42600_ODR_2KHZ_LN;
+	ret = inv_icm42600_set_gyro_conf(st, &conf, NULL);
+	if (!ret)
+		ret = inv_icm42600_set_accel_conf(st, &conf, NULL);
+	if (!ret) {
+		ret = regmap_update_bits(st->map, INV_ICM42600_REG_INT_SOURCE0,
+					 INV_ICM42600_INT_SOURCE0_UI_DRDY_INT1_EN,
+					 INV_ICM42600_INT_SOURCE0_UI_DRDY_INT1_EN);
+	}
+
+	mutex_unlock(&st->lock);
+	if (ret) {
+		pm_runtime_put_sync(dev);
+		input_unregister_device(st->input);
+		st->input = NULL;
+		return ret;
+	}
+
+	ret = devm_add_action(dev, inv_icm42688_input_unregister, st);
+	if (ret) {
+		pm_runtime_put_sync(dev);
+		input_unregister_device(st->input);
+		st->input = NULL;
+		return ret;
+	}
+
+	dev_info(dev, "icm42688-sensor input ready, DRDY on INT1\n");
+	return 0;
+}
+
 static irqreturn_t inv_icm42600_irq_timestamp(int irq, void *_data)
 {
 	struct inv_icm42600_state *st = _data;
@@ -479,6 +600,13 @@ static irqreturn_t inv_icm42600_irq_handler(int irq, void *_data)
 		ret = inv_icm42600_buffer_fifo_parse(st);
 		if (ret)
 			dev_err(dev, "FIFO parsing error %d\n", ret);
+	}
+
+	/* UI data ready: irq stream via input (same frame as bmi088) */
+	if ((status & INV_ICM42600_INT_STATUS_DATA_RDY) && st->input) {
+		ret = inv_icm42688_input_drdy(st);
+		if (ret)
+			dev_err(dev, "DRDY input report error %d\n", ret);
 	}
 
 out_unlock:
@@ -686,6 +814,12 @@ int inv_icm42600_core_probe(struct regmap *regmap, int chip, int irq,
 	ret = inv_icm42600_irq_init(st, irq, irq_type, open_drain);
 	if (ret)
 		return ret;
+
+	if (chip == INV_CHIP_ICM42688) {
+		ret = inv_icm42688_input_init(st);
+		if (ret)
+			return ret;
+	}
 
 	/* setup runtime power management */
 	ret = pm_runtime_set_active(dev);

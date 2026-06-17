@@ -70,8 +70,6 @@ enum inv_icm42600_accel_fs {
 
 /* ODR suffixed by LN or LP are Low-Noise or Low-Power mode only */
 enum inv_icm42600_odr {
-	INV_ICM42600_ODR_32KHZ_LN = 1,
-	INV_ICM42600_ODR_16KHZ_LN = 2,
 	INV_ICM42600_ODR_8KHZ_LN = 3,
 	INV_ICM42600_ODR_4KHZ_LN,
 	INV_ICM42600_ODR_2KHZ_LN,
@@ -95,7 +93,6 @@ enum inv_icm42600_filter {
 	/* Low-Power mode sensor data filter (averaging) */
 	INV_ICM42600_FILTER_AVG_1X = 1,
 	INV_ICM42600_FILTER_AVG_16X = 6,
-	INV_ICM42600_FILTER_BW_ODR_DIV_40 = 7,
 };
 
 struct inv_icm42600_sensor_conf {
@@ -134,6 +131,8 @@ struct inv_icm42600_suspended {
  *  @buffer:		data transfer buffer aligned for DMA.
  *  @fifo:		FIFO management structure.
  *  @timestamp:		interrupt timestamps.
+ *  @input:		input device for irq streaming (ICM42688).
+ *  @irq_count:		interrupt sample counter for input events.
  */
 struct inv_icm42600_state {
 	struct mutex lock;
@@ -154,6 +153,8 @@ struct inv_icm42600_state {
 		int64_t gyro;
 		int64_t accel;
 	} timestamp;
+	struct input_dev *input;
+	u64 irq_count;
 };
 
 /* Virtual register addresses: @bank on MSB (4 upper bits), @address on LSB */
