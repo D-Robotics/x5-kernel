@@ -99,6 +99,7 @@ struct bmi08a_client_data {
 	struct regulator *vdd;
 	struct regulator *vddio;
 	struct regmap *regmap;
+	struct gpio_desc *accel_gpiod;
 	int IRQ;
 	struct mutex lock;
 	struct work_struct irq_work;
@@ -109,6 +110,7 @@ struct bmi08a_client_data {
 	atomic_t in_suspend;
 	u8 sensor_init;
 	u8 acc_drdy_en;
+	u8 acc_drdy_continuous;
 	u8 acc_fifo_wm_en;
 	u8 acc_fifo_full_en;
 	u16 acc_fifo_wm;

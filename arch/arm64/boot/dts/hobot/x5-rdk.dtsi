@@ -328,9 +328,10 @@
 	invn_icm_i2c4: icm42688@68 {
 		compatible = "invensense,icm42688";
 		reg = <0x68>;
-		/*no interrupt pin*/
-		interrupt-parent = <&gic>;
-		interrupts = <GIC_SPI 109 IRQ_TYPE_LEVEL_HIGH>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&lsio_gpio0_22>;
+		interrupt-parent = <&ls_gpio0_porta>;
+		interrupts = <22 IRQ_TYPE_EDGE_FALLING>;
 		axis_map_x = <1>;
 		axis_map_y = <0>;
 		axis_map_z = <2>;
@@ -340,7 +341,7 @@
 		inven,secondary_type = "none";
 		inven,aux_type = "none";
 		inven,read_only_slave_type = "none";
-		drive-open-drain = <0>;
+		drive-open-drain;
 		status = "disabled";
 	};
 };
@@ -372,9 +373,10 @@
 	invn_icm_i2c6: icm42688@68 {
 		compatible = "invensense,icm42688";
 		reg = <0x68>;
-		/*no interrupt pin*/
-		interrupt-parent = <&gic>;
-		interrupts = <GIC_SPI 109 IRQ_TYPE_LEVEL_HIGH>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&lsio_gpio0_22>;
+		interrupt-parent = <&ls_gpio0_porta>;
+		interrupts = <22 IRQ_TYPE_EDGE_FALLING>;
 		axis_map_x = <1>;
 		axis_map_y = <0>;
 		axis_map_z = <2>;
@@ -384,7 +386,7 @@
 		inven,secondary_type = "none";
 		inven,aux_type = "none";
 		inven,read_only_slave_type = "none";
-		drive-open-drain = <0>;
+		drive-open-drain;
 		status = "disabled";
 	};
 };

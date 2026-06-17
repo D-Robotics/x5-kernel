@@ -28,6 +28,7 @@
 #include <linux/gpio.h>
 #include <linux/of_gpio.h>
 #include <linux/of_irq.h>
+#include <linux/gpio/consumer.h>
 
 /*********************************************************************/
 /* Own header files */
@@ -275,6 +276,8 @@ static int acc_feature_config_set(struct bmi08a_client_data *client_data,
 	case BMI088_ACC_DATA_READY:
 		accel_int_config.int_type = BMI08_ACCEL_INT_DATA_RDY;
 		client_data->acc_drdy_en = enable;
+		if (!enable)
+			client_data->acc_drdy_continuous = 0;
 		break;
 	case BMI088_ACC_FIFO_WM:
 		accel_int_config.int_type = BMI08_ACCEL_INT_FIFO_WM;
@@ -330,15 +333,22 @@ static void bmi08_irq_work_func(struct work_struct *work)
 	if (acc_client_data->acc_int_status != 0) {
 		if ((acc_client_data->acc_int_status & BMI08_ACCEL_DATA_READY_INT) &&
 			(acc_client_data->data_sync_en != 1)) {
-			PINFO("ACC DRDY INT ocurred\n");
+			// PINFO("ACC DRDY INT ocurred\n");
 			mutex_lock(&acc_client_data->lock);
 			rslt = bmi08a_get_data(&accel_data, &acc_client_data->device);
 			mutex_unlock(&acc_client_data->lock);
 			check_error("get acc data", rslt);
-			PINFO("ACC X:%d Y:%d Z:%d\n",
-				  accel_data.x, accel_data.y, accel_data.z);
-			rslt = acc_feature_config_set(acc_client_data,
-					BMI088_ACC_DATA_READY, BMI08_DISABLE);
+			// PINFO("ACC X:%d Y:%d Z:%d\n",
+			// 	  accel_data.x, accel_data.y, accel_data.z);
+			/*
+			 * Legacy sysfs path disables DRDY after one shot.
+			 * Probe sets acc_drdy_continuous to keep interrupts on.
+			 */
+			if (!acc_client_data->acc_drdy_continuous) {
+				rslt = acc_feature_config_set(acc_client_data,
+						BMI088_ACC_DATA_READY,
+						BMI08_DISABLE);
+			}
 		}
 		if ((acc_client_data->acc_int_status & BMI08_ACCEL_FIFO_FULL_INT) &&
 			(acc_client_data->acc_fifo_full_en == BMI08_ENABLE)) {
@@ -358,7 +368,7 @@ static void bmi08_irq_work_func(struct work_struct *work)
 	}
 }
 /**
- * bmi08_irq_handle - IRQ handler function.
+ * bmi08_irq_handle - IRQ handler function (same input path as bmi08x_driver.c I2C).
  * @irq : Number of irq line.
  * @handle : Instance of client data.
  *
@@ -367,17 +377,17 @@ static void bmi08_irq_work_func(struct work_struct *work)
 static irqreturn_t bmi08_irq_handle(int irq, void *handle)
 {
 	struct bmi08a_client_data *acc_client_data = handle;
-
-    struct bmi08_sensor_data accel_data;
-    struct bmi08_sensor_data gyro_data;
-    uint64_t irq_ts;
+	struct bmi08_sensor_data accel_data;
+	struct bmi08_sensor_data gyro_data;
+	uint64_t irq_ts;
 	int8_t rslt;
 
 	irq_count++;
 
 	irq_ts = get_ktime_timestamp();
-	rslt = 	bmi08a_get_data(&accel_data, &acc_client_data->device);
-	rslt = 	bmi08g_get_data(&gyro_data, &acc_client_data->device);
+	rslt = bmi08a_get_data(&accel_data, &acc_client_data->device);
+	rslt = bmi08g_get_data(&gyro_data, &acc_client_data->device);
+	(void)rslt;
 	if (acc_client_data->bmi_event_input) {
 		input_event(acc_client_data->bmi_event_input, EV_MSC, BMI088_MSC_DATA, (u32)accel_data.x);
 		input_event(acc_client_data->bmi_event_input, EV_MSC, BMI088_MSC_DATA, (u32)accel_data.y);
@@ -391,8 +401,6 @@ static irqreturn_t bmi08_irq_handle(int irq, void *handle)
 		input_sync(acc_client_data->bmi_event_input);
 	}
 
-	if (schedule_work(&acc_client_data->irq_work))
-		return IRQ_HANDLED;
 	return IRQ_HANDLED;
 }
 
@@ -409,13 +417,18 @@ static irqreturn_t bmi08_irq_handle(int irq, void *handle)
  */
 static int acc_bmi08_request_irq(struct bmi08a_client_data *acc_client_data)
 {
-	int rslt = 0;
+	int rslt;
+	unsigned long irq_flags;
 
-	// rslt = request_irq(acc_client_data->IRQ, bmi08_irq_handle,
-	// 				   IRQF_TRIGGER_RISING,
-	// 				   SENSOR_NAME, acc_client_data);
+	/* Match bmi08x_i2c.c: threaded registration + hardirq handler (IRQF_NO_THREAD). */
+	irq_flags = irq_get_trigger_type(acc_client_data->IRQ);
+	if (!irq_flags)
+		irq_flags = IRQF_TRIGGER_RISING;
+	irq_flags |= IRQF_ONESHOT | IRQF_NO_THREAD;
+
 	rslt = devm_request_threaded_irq(acc_client_data->dev, acc_client_data->IRQ,
-		NULL, bmi08_irq_handle, IRQF_ONESHOT|IRQF_TRIGGER_RISING|IRQF_NO_THREAD, SENSOR_NAME_FEAT, acc_client_data);
+					 NULL, bmi08_irq_handle, irq_flags,
+					 SENSOR_NAME_FEAT, acc_client_data);
 	if (rslt < 0) {
 		PERR("request_irq failed with rslt:%d", rslt);
 		return -EIO;
@@ -758,9 +771,8 @@ static int accel_sensor_init(struct bmi08a_client_data *client_data)
 	}
 	PINFO("Accel power mode set to NORMAL");
 
-	/* init val for TROS custom, if not need , could del init val*/
-	// client_data->data_sync_en = 0;
-	client_data->data_sync_en = 1;
+	/* DRDY interrupt enabled at probe; keep sync off by default */
+	client_data->data_sync_en = 0;
 
 	uint8_t gyr_reg_data;
     gyr_reg_data = 0x80;
@@ -1446,6 +1458,7 @@ int bmi08a_probe(struct iio_dev *bmi08x_iio_private)
 	}
 	PINFO("Acc chip ID : 0x%x", client_data->device.accel_chip_id);
 	client_data->sensor_init = 1;
+
 	rslt = acc_bmi08_request_irq(client_data);
 	if (rslt < 0) {
 		PERR("ACC Request irq failed");
@@ -1461,10 +1474,12 @@ int bmi08a_probe(struct iio_dev *bmi08x_iio_private)
 	}
 	client_data->bmi_event_input->name = "bmi088-sensor";
 	client_data->bmi_event_input->phys = "bmi088/input0";
-	client_data->bmi_event_input->id.bustype = BUS_I2C;
+	client_data->bmi_event_input->id.bustype =
+		(client_data->device.intf == BMI08_SPI_INTF) ? BUS_SPI : BUS_I2C;
 	// client_data->bmi_event_input->dev.parent = &bmi08x_iio_private->dev;
 
 	input_set_capability(client_data->bmi_event_input, EV_MSC, BMI088_MSC_DATA);
+	/* 9 MSC + SYN per sample; larger hint enlarges evdev ring (see evdev.c). */
 	input_set_events_per_packet(client_data->bmi_event_input, 100);
 
 	rslt = input_register_device(client_data->bmi_event_input);
@@ -1474,7 +1489,18 @@ int bmi08a_probe(struct iio_dev *bmi08x_iio_private)
 		client_data->bmi_event_input = NULL;
 		goto exit_err_clean;
 	}
-	PINFO("BMI088 Input device registered successfully\n");
+	dev_info(client_data->dev, "bmi088-sensor input dev %s, grep Handlers= /proc/bus/input/devices\n",
+		 dev_name(&client_data->bmi_event_input->dev));
+
+	client_data->acc_drdy_continuous = 1;
+	rslt = acc_feature_config_set(client_data, BMI088_ACC_DATA_READY,
+				      BMI08_ENABLE);
+	if (rslt < 0) {
+		PERR("enable accel DRDY interrupt failed: %d", rslt);
+		client_data->acc_drdy_continuous = 0;
+		goto exit_err_clean;
+	}
+	PINFO("Accel DRDY interrupt enabled at probe (continuous)");
 
 	PINFO("sensor %s probed successfully", SENSOR_NAME);
 	bmi_fifo_init();
@@ -1521,7 +1547,6 @@ int bmi08a_remove(struct iio_dev *bmi08x_iio_private)
 		if (bmi08x_iio_private)
 			iio_device_unregister(bmi08x_iio_private);
 		(void)cancel_work_sync(&client_data->irq_work);
-		(void)free_irq(client_data->IRQ, client_data);
 		if (fifo_data != NULL)
 			kfree(fifo_data);
 		if (bmi08_accel != NULL)
