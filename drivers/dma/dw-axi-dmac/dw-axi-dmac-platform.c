@@ -996,6 +996,7 @@ dma_chan_prep_dma_memcpy(struct dma_chan *dchan, dma_addr_t dst_adr,
 	if (unlikely(!desc))
 		goto err_desc_get;
 
+	chan->direction = DMA_MEM_TO_MEM;
 	desc->chan = chan;
 	num = 0;
 	desc->length = 0;
@@ -1373,6 +1374,7 @@ static int dma_chan_terminate_all(struct dma_chan *dchan)
 
 	vchan_get_all_descriptors(&chan->vc, &head);
 
+	chan->direction = DMA_MEM_TO_MEM;
 	chan->cyclic = false;
 	chan->private = NULL;
 	dchan->private = NULL;
