@@ -5347,7 +5347,7 @@ OnError:
 	return status;
 }
 
-gceSTATUS _QuerySignal(gckOS Os, gctSIGNAL Signal)
+gctBOOL _QuerySignal(gckOS Os, gctSIGNAL Signal)
 {
 	/*
 	 * This function is called by 'has_signaled' callback of sync_timeline.
@@ -5356,7 +5356,7 @@ gceSTATUS _QuerySignal(gckOS Os, gctSIGNAL Signal)
 	 * 'gckOS_CreateNativeFence'. Thus its safe to use normal version of
 	 * spinlock for 'Os->signalDB.lock' and 'signal->obj.wait.lock'.
 	 */
-	gceSTATUS status;
+	gctBOOL status;
 	gcsSIGNAL_PTR signal = gcvNULL;
 
 	status = _QueryIntegerId(&Os->signalDB, (gctUINT32)(gctUINTPTR_T)Signal,

@@ -493,7 +493,7 @@ void phydm_pmac_tx_dbg(void *dm_void, char input[][16], u32 *_used,
 			 "[pmac_tx] basic : {1} {rate_idx}(only 1M & 6M) {count}\n");
 	} else {
 		for (i = 1; i < 7; i++) {
-			if (input[i + 1]) {
+			if (input[i + 1][0]) {
 				PHYDM_SSCANF(input[i + 1], DCMD_DECIMAL,
 					     &var[i]);
 			}

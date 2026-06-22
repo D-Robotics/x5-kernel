@@ -432,7 +432,7 @@ void phydm_config_trx_path_v1(void *dm_void, char input[][16], u32 *_used,
 		return;
 
 	for (i = 0; i < 5; i++) {
-		if (input[i + 1]) {
+		if (input[i + 1][0]) {
 			PHYDM_SSCANF(input[i + 1], DCMD_HEX, &val[i]);
 			input_idx++;
 		}
