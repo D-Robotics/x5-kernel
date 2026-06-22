@@ -4151,7 +4151,7 @@ void phydm_enable_big_jump(void *dm_void, char input[][16], u32 *_used,
 		return;
 
 	for (i = 0; i < 5; i++) {
-		if (input[i + 1]) {
+		if (input[i + 1][0]) {
 			PHYDM_SSCANF(input[i + 1], DCMD_HEX, &dm_value[i]);
 			input_idx++;
 		}
@@ -5148,7 +5148,7 @@ void phydm_spur_detect_dbg(void *dm_void, char input[][16], u32 *_used,
 			 "{5: Adjust CSI weight threshold} {0:-,1:+} {th offset}\n");
 	} else {
 		for (i = 0; i < 10; i++) {
-			if (input[i + 1])
+			if (input[i + 1][0])
 				PHYDM_SSCANF(input[i + 1], DCMD_DECIMAL,
 					     &var1[i]);
 		}

@@ -598,7 +598,7 @@ static int goodix_check_cfg_8(struct goodix_ts_data *ts, const u8 *cfg, int len)
 		return -EINVAL;
 	}
 
-	if (!(&ts->client->irq)) {
+	if (ts->client->irq <= 0) {
 		del_timer(&ts->timer);
 		cancel_work_sync(&ts->work_i2c_poll);
 	}

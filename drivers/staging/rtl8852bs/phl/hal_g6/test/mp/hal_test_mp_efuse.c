@@ -192,10 +192,10 @@ enum rtw_hal_status rtw_hal_mp_efuse_shadow2buf(
 	enum rtw_hal_status hal_status = RTW_HAL_STATUS_FAILURE;
 
 	PHL_INFO("%s\n", __FUNCTION__);
-	if (arg->poutbuf != NULL && arg->buf_len != 0)
+	if (arg->buf_len != 0)
 		hal_status = rtw_hal_efuse_shadow2buf(mp->hal, arg->poutbuf, arg->buf_len, true);
 	else
-		PHL_INFO("%s: buf null, buf len = %d\n", __FUNCTION__, arg->buf_len);
+		PHL_INFO("%s: buf len = 0\n", __FUNCTION__);
 
 	PHL_INFO("%s: status = %d\n", __FUNCTION__, hal_status);
 	return hal_status;
@@ -377,10 +377,10 @@ enum rtw_hal_status rtw_hal_mp_efuse_bt_shadow2buf(
 	enum rtw_hal_status hal_status = RTW_HAL_STATUS_FAILURE;
 
 	PHL_INFO("%s\n", __FUNCTION__);
-	if (arg->poutbuf != NULL && arg->buf_len != 0)
+	if (arg->buf_len != 0)
 		hal_status = rtw_hal_efuse_bt_shadow2buf(mp->hal, arg->poutbuf, arg->buf_len);
 	else
-		PHL_INFO("%s: buf null, buf len = %d\n", __FUNCTION__, arg->buf_len);
+		PHL_INFO("%s: buf len = 0\n", __FUNCTION__);
 
 	PHL_INFO("%s: status = %d\n", __FUNCTION__, hal_status);
 	return hal_status;
