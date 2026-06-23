@@ -1330,12 +1330,29 @@ int bmi08g_probe(struct iio_dev *bmi08x_iio_private)
 		g_client_data->sensor_init = 1;
 	}
 
-	rslt = gyr_request_irq(g_client_data);
-	if (rslt < 0) {
-		PERR("GYR Request irq failed");
-		goto exit_err_clean;
+	/*
+	 * Shared-INT boards wire gyro+accel to one host line (usually accel INT2).
+	 * Only the accel SPI node needs interrupts in DT; gyro may omit them.
+	 */
+	if (g_client_data->GYR_IRQ > 0) {
+		rslt = gyr_request_irq(g_client_data);
+		if (rslt < 0) {
+			PERR("GYR Request irq failed");
+			goto exit_err_clean;
+		}
+		PINFO("GYR IRQ requested");
+
+		rslt = feature_config_set(g_client_data, BMI088_GYRO_DATA_READY,
+					  BMI08_ENABLE);
+		if (rslt < 0) {
+			PERR("enable gyro DRDY interrupt failed: %d", rslt);
+			goto exit_err_clean;
+		}
+		PINFO("Gyro DRDY interrupt enabled at probe");
+	} else {
+		PINFO("GYR IRQ not in DT (shared accel INT), skip gyro irq\n");
 	}
-	PINFO("GYR IRQ requested");
+
 	PINFO("sensor %s probed successfully", SENSOR_NAME);
 
 	return 0;
@@ -1382,8 +1399,10 @@ int bmi08g_remove(struct iio_dev *bmi08x_iio_private)
 		bmi08x_iio_unconfigure_buffer(bmi08x_iio_private);
 		if (bmi08x_iio_private)
 			iio_device_unregister(bmi08x_iio_private);
-		(void)cancel_work_sync(&g_client_data->gyr_irq_work);
-		(void)free_irq(g_client_data->GYR_IRQ, g_client_data);
+		if (g_client_data->GYR_IRQ > 0) {
+			(void)cancel_work_sync(&g_client_data->gyr_irq_work);
+			(void)free_irq(g_client_data->GYR_IRQ, g_client_data);
+		}
 
 	}
 

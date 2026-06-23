@@ -2545,7 +2545,7 @@ int m_can_class_suspend(struct device *dev)
 
 	pinctrl_pm_select_sleep_state(dev);
 
-	return ret;
+	return 0;
 }
 EXPORT_SYMBOL_GPL(m_can_class_suspend);
 

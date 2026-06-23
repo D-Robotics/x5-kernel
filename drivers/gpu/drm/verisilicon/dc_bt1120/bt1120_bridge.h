@@ -39,6 +39,8 @@
  */
 
 #include <drm/drm_bridge.h>
+#include <linux/kconfig.h>
+#include <linux/atomic.h>
 
 #include "vs_bt1120.h"
 
@@ -49,6 +51,13 @@ struct bt1120_bridge {
 	struct device *dev;
 
 	struct device *parent;
+#if IS_ENABLED(CONFIG_X5_SEAMLESS_DISPLAY)
+	/*
+	 * 1 = first atomic_disable may be skipped on seamless/simplefb handoff;
+	 * consumed with atomic_cmpxchg (see bt1120_bridge_atomic_disable).
+	 */
+	atomic_t seamless_skip_disable_once;
+#endif
 };
 
 extern struct platform_driver bt1120_bridge_driver;

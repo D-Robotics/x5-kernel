@@ -119,7 +119,7 @@ static inline unsigned int ps_to_ui(unsigned long hs_clk_rate, unsigned int ps)
 	unsigned long long frac = do_div(cnt, ui_ps);
 	if (frac)
 		cnt++;
-	pr_info("ps_to_ui: hs_clk_rate=%lu ps=%u ui_cnt=%llu\n", hs_clk_rate, ps, cnt);
+	pr_debug("ps_to_ui: hs_clk_rate=%lu ps=%u ui_cnt=%llu\n", hs_clk_rate, ps, cnt);
 	return (unsigned int)cnt;
 }
 
@@ -135,7 +135,7 @@ static inline unsigned int ps_to_lbcc(unsigned long hs_clk_rate, unsigned int ps
 	frac = do_div(lbcc, ui);
 	if (frac)
 		lbcc++;
-	pr_info("ps_to_lbcc: hs_clk_rate=%lu ps=%u lbcc=%llu\n", hs_clk_rate, ps, lbcc);
+	pr_debug("ps_to_lbcc: hs_clk_rate=%lu ps=%u lbcc=%llu\n", hs_clk_rate, ps, lbcc);
 
 	return lbcc;
 }
@@ -671,7 +671,7 @@ static void config_pll(struct snps_dphy *dphy, struct pll_info *info)
 	if (dphy->dbg_write_en) {
 		/* HS clock TLP */
 		cnt = ps_to_lbcc(dphy->cfg.hs_clk_rate, dphy->cfg.lpx);
-		pr_info("write HS_TX_CLK_TLP_CODE: code=0x%02x clk_rate=%lu ps=lpx(%u) cnt=%u "
+		pr_debug("write HS_TX_CLK_TLP_CODE: code=0x%02x clk_rate=%lu ps=lpx(%u) cnt=%u "
 			"val=0x%02x\n",
 			HS_TX_CLK_TLP_CODE, dphy->cfg.hs_clk_rate, dphy->cfg.lpx, cnt, cnt);
 		dphy_write_control_1(dphy, HS_TX_CLK_TLP_CODE, cnt);
@@ -679,7 +679,7 @@ static void config_pll(struct snps_dphy *dphy, struct pll_info *info)
 		/* HS clock PREPARE */
 		cnt = ps_to_lbcc(dphy->cfg.hs_clk_rate, dphy->cfg.clk_prepare);
 		val = BIT(6) | cnt;
-		pr_info("write HS_TX_CLK_PREPARE_CODE: code=0x%02x clk_rate=%lu ps=clk_prepare(%u) "
+		pr_debug("write HS_TX_CLK_PREPARE_CODE: code=0x%02x clk_rate=%lu ps=clk_prepare(%u) "
 			" cnt=%uval=0x%02x\n",
 			HS_TX_CLK_PREPARE_CODE, dphy->cfg.hs_clk_rate, dphy->cfg.clk_prepare, cnt,
 			val);
@@ -688,7 +688,7 @@ static void config_pll(struct snps_dphy *dphy, struct pll_info *info)
 		/* HS clock ZERO */
 		cnt = ps_to_lbcc(dphy->cfg.hs_clk_rate, dphy->cfg.clk_zero);
 		val = BIT(7) | cnt;
-		pr_info("write HS_TX_CLK_ZERO_CODE: code=0x%02x clk_rate=%lu ps=clk_zero(%u) "
+		pr_debug("write HS_TX_CLK_ZERO_CODE: code=0x%02x clk_rate=%lu ps=clk_zero(%u) "
 			"cnt=%u "
 			"val=0x%02x\n",
 			HS_TX_CLK_ZERO_CODE, dphy->cfg.hs_clk_rate, dphy->cfg.clk_zero, cnt, val);
@@ -697,7 +697,7 @@ static void config_pll(struct snps_dphy *dphy, struct pll_info *info)
 		/* HS clock TRAIL */
 		cnt = ps_to_lbcc(dphy->cfg.hs_clk_rate, dphy->cfg.clk_trail);
 		val = BIT(6) | cnt;
-		pr_info("write HS_TX_CLK_TRAIL_CODE: code=0x%02x clk_rate=%lu ps=clk_trail(%u) "
+		pr_debug("write HS_TX_CLK_TRAIL_CODE: code=0x%02x clk_rate=%lu ps=clk_trail(%u) "
 			"cnt=%u "
 			"val=0x%02x\n",
 			HS_TX_CLK_TRAIL_CODE, dphy->cfg.hs_clk_rate, dphy->cfg.clk_trail, cnt, val);
@@ -706,7 +706,7 @@ static void config_pll(struct snps_dphy *dphy, struct pll_info *info)
 		/* HS clock EXIT */
 		cnt = ps_to_lbcc(dphy->cfg.hs_clk_rate, dphy->cfg.hs_exit);
 		val = BIT(7) | BIT(6) | cnt;
-		pr_info("write HS_TX_CLK_EXIT_CODE: code=0x%02x clk_rate=%lu ps=hs_exit(%u) cnt=%u "
+		pr_debug("write HS_TX_CLK_EXIT_CODE: code=0x%02x clk_rate=%lu ps=hs_exit(%u) cnt=%u "
 			"val=0x%02x\n",
 			HS_TX_CLK_EXIT_CODE, dphy->cfg.hs_clk_rate, dphy->cfg.hs_exit, cnt, val);
 		dphy_write_control_1(dphy, HS_TX_CLK_EXIT_CODE, val);
@@ -714,7 +714,7 @@ static void config_pll(struct snps_dphy *dphy, struct pll_info *info)
 		/* HS clock POST */
 		cnt = ps_to_lbcc(dphy->cfg.hs_clk_rate, dphy->cfg.clk_post);
 		val = BIT(6) | cnt;
-		pr_info("write HS_TX_CLK_POST_CODE: code=0x%02x clk_rate=%lu ps=clk_post(%u) "
+		pr_debug("write HS_TX_CLK_POST_CODE: code=0x%02x clk_rate=%lu ps=clk_post(%u) "
 			"cnt=%u "
 			"val=0x%02x\n",
 			HS_TX_CLK_POST_CODE, dphy->cfg.hs_clk_rate, dphy->cfg.clk_post, cnt, val);
@@ -722,7 +722,7 @@ static void config_pll(struct snps_dphy *dphy, struct pll_info *info)
 
 		/* HS data TLP */
 		cnt = ps_to_lbcc(dphy->cfg.hs_clk_rate, dphy->cfg.lpx);
-		pr_info("write HS_TX_DAT_TLP_CODE: code=0x%02x clk_rate=%lu ps=lpx(%u) cnt=%u "
+		pr_debug("write HS_TX_DAT_TLP_CODE: code=0x%02x clk_rate=%lu ps=lpx(%u) cnt=%u "
 			"val=0x%02x\n",
 			HS_TX_DAT_TLP_CODE, dphy->cfg.hs_clk_rate, dphy->cfg.lpx, cnt, cnt);
 		dphy_write_control_1(dphy, HS_TX_DAT_TLP_CODE, cnt);
@@ -730,7 +730,7 @@ static void config_pll(struct snps_dphy *dphy, struct pll_info *info)
 		/* HS data PREPARE */
 		cnt = ps_to_lbcc(dphy->cfg.hs_clk_rate, dphy->cfg.hs_prepare);
 		val = BIT(6) | cnt;
-		pr_info("write HS_TX_DAT_PREPARE_CODE: code=0x%02x clk_rate=%lu ps=hs_prepare(%u) "
+		pr_debug("write HS_TX_DAT_PREPARE_CODE: code=0x%02x clk_rate=%lu ps=hs_prepare(%u) "
 			"cnt=%u "
 			"val=0x%02x\n",
 			HS_TX_DAT_PREPARE_CODE, dphy->cfg.hs_clk_rate, dphy->cfg.hs_prepare, cnt,
@@ -740,7 +740,7 @@ static void config_pll(struct snps_dphy *dphy, struct pll_info *info)
 		/* HS data ZERO */
 		cnt = ps_to_lbcc(dphy->cfg.hs_clk_rate, dphy->cfg.hs_zero);
 		val = BIT(7) | cnt;
-		pr_info("write HS_TX_DAT_ZERO_CODE: code=0x%02x clk_rate=%lu ps=hs_zero(%u) cnt=%u "
+		pr_debug("write HS_TX_DAT_ZERO_CODE: code=0x%02x clk_rate=%lu ps=hs_zero(%u) cnt=%u "
 			"val=0x%02x\n",
 			HS_TX_DAT_ZERO_CODE, dphy->cfg.hs_clk_rate, dphy->cfg.hs_zero, cnt, val);
 		dphy_write_control_1(dphy, HS_TX_DAT_ZERO_CODE, val);
@@ -748,7 +748,7 @@ static void config_pll(struct snps_dphy *dphy, struct pll_info *info)
 		/* HS data TRAIL */
 		cnt = ps_to_lbcc(dphy->cfg.hs_clk_rate, dphy->cfg.hs_trail);
 		val = BIT(6) | cnt;
-		pr_info("write HS_TX_DAT_TRAIL_CODE: code=0x%02x clk_rate=%lu ps=hs_trail(%u) "
+		pr_debug("write HS_TX_DAT_TRAIL_CODE: code=0x%02x clk_rate=%lu ps=hs_trail(%u) "
 			"cnt=%u "
 			"val=0x%02x\n",
 			HS_TX_DAT_TRAIL_CODE, dphy->cfg.hs_clk_rate, dphy->cfg.hs_trail, cnt, val);
@@ -757,7 +757,7 @@ static void config_pll(struct snps_dphy *dphy, struct pll_info *info)
 		/* HS data EXIT */
 		cnt = ps_to_lbcc(dphy->cfg.hs_clk_rate, dphy->cfg.hs_exit);
 		val = BIT(7) | BIT(6) | cnt;
-		pr_info("write HS_TX_DAT_EXIT_CODE: code=0x%02x clk_rate=%lu ps=hs_exit(%u) cnt=%u "
+		pr_debug("write HS_TX_DAT_EXIT_CODE: code=0x%02x clk_rate=%lu ps=hs_exit(%u) cnt=%u "
 			"val=0x%02x\n",
 			HS_TX_DAT_EXIT_CODE, dphy->cfg.hs_clk_rate, dphy->cfg.hs_exit, cnt, val);
 		dphy_write_control_1(dphy, HS_TX_DAT_EXIT_CODE, val);
@@ -768,7 +768,7 @@ static void config_pll(struct snps_dphy *dphy, struct pll_info *info)
 		for (i = 0; i < ARRAY_SIZE(read_codes); i++) {
 			code = read_codes[i];
 			val  = dphy_test_read_code(dphy, code);
-			pr_info("%s: test code 0x%02x -> 0x%02x\n", __func__, code, val);
+			pr_debug("%s: test code 0x%02x -> 0x%02x\n", __func__, code, val);
 			udelay(1);
 		}
 	}

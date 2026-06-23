@@ -134,6 +134,8 @@ struct inv_icm42600_suspended {
  *  @buffer:		data transfer buffer aligned for DMA.
  *  @fifo:		FIFO management structure.
  *  @timestamp:		interrupt timestamps.
+ *  @input:		input device for irq streaming (ICM42688).
+ *  @irq_count:		interrupt sample counter for input events.
  */
 struct inv_icm42600_state {
 	struct mutex lock;
@@ -154,6 +156,8 @@ struct inv_icm42600_state {
 		int64_t gyro;
 		int64_t accel;
 	} timestamp;
+	struct input_dev *input;
+	u64 irq_count;
 };
 
 /* Virtual register addresses: @bank on MSB (4 upper bits), @address on LSB */

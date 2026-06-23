@@ -421,7 +421,11 @@ static int pwm_backlight_initial_power_state(const struct pwm_bl_data *pb)
 		active = false;
 
 	if (!pwm_is_enabled(pb->pwm))
+	#if IS_ENABLED(CONFIG_X5_SEAMLESS_DISPLAY)
+		active = true;
+	#else
 		active = false;
+	#endif
 
 	/*
 	 * Synchronize the enable_gpio with the observed state of the
@@ -521,23 +525,44 @@ static int pwm_backlight_probe(struct platform_device *pdev)
 
 	dev_dbg(&pdev->dev, "got pwm for backlight\n");
 
-	/* Sync up PWM state. */
-	pwm_init_state(pb->pwm, &state);
-
 	/*
-	 * The DT case will set the pwm_period_ns field to 0 and store the
-	 * period, parsed from the DT, in the PWM device. For the non-DT case,
-	 * set the period from platform data if it has not already been set
-	 * via the PWM lookup table.
+	 * pwm_init_state() always sets duty_cycle = 0 and usage_power = false.
+	 * A first pwm_apply_state() after that blanks a backlight that firmware
+	 * left on, even when .get_state() reported the correct HW duty.
+	 * pwm_adjust_config() keeps duty (scaled to DT period/polarity) instead.
 	 */
-	if (!state.period && (data->pwm_period_ns > 0))
-		state.period = data->pwm_period_ns;
+	if (node) {
+		ret = pwm_adjust_config(pb->pwm);
+		if (ret < 0) {
+			dev_err(&pdev->dev, "failed to adjust PWM config: %d\n", ret);
+			goto err_alloc;
+		}
+		pwm_get_state(pb->pwm, &state);
+		/*
+		 * Non-DT platform data period fallback (DT normally has period in
+		 * PWM args; pwm_adjust_config already applied pargs.period).
+		 */
+		if (!state.period && (data->pwm_period_ns > 0)) {
+			state.period = data->pwm_period_ns;
+			ret = pwm_apply_state(pb->pwm, &state);
+			if (ret) {
+				dev_err(&pdev->dev,
+					"failed to apply initial PWM state: %d\n", ret);
+				goto err_alloc;
+			}
+		}
+	} else {
+		pwm_init_state(pb->pwm, &state);
 
-	ret = pwm_apply_state(pb->pwm, &state);
-	if (ret) {
-		dev_err(&pdev->dev, "failed to apply initial PWM state: %d\n",
-			ret);
-		goto err_alloc;
+		if (!state.period && (data->pwm_period_ns > 0))
+			state.period = data->pwm_period_ns;
+
+		ret = pwm_apply_state(pb->pwm, &state);
+		if (ret) {
+			dev_err(&pdev->dev, "failed to apply initial PWM state: %d\n",
+				ret);
+			goto err_alloc;
+		}
 	}
 
 	memset(&props, 0, sizeof(struct backlight_properties));

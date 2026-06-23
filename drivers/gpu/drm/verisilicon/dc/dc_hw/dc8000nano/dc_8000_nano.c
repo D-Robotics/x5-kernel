@@ -3,6 +3,7 @@
  * Copyright (C) 2022 VeriSilicon Holdings Co., Ltd.
  */
 
+#include <linux/device.h>
 #include <linux/slab.h>
 
 #include "dc_hw_priv.h"
@@ -108,6 +109,47 @@ static inline void dc_set_clear(struct dc_hw *hw, u32 reg, u32 set, u32 clear)
 	value &= ~clear;
 	value |= set;
 	dc_write(hw, reg, value);
+}
+
+/* U-Boot x5_dc8000.c x5_dc8000_dump_hw_state — keep lines in sync for bring-up diff */
+static void dc8000_nano_dump_hw_state(struct dc_hw *hw, const char *tag)
+{
+	struct device *dev;
+
+	if (!hw || !hw->dev)
+		return;
+
+	dev = hw->dev;
+
+	dev_dbg(dev,
+		"hb_dc8000: dc8000_regs %s: FB cfg=0x%08x addr=0x%08x str=0x%08x sz=0x%08x tile=0x%08x\n",
+		tag, dc_read(hw, GCREG_FRAME_BUFFER_CONFIG_Address),
+		dc_read(hw, GCREG_FRAME_BUFFER_ADDRESS_Address),
+		dc_read(hw, GCREG_FRAME_BUFFER_STRIDE_Address),
+		dc_read(hw, GCREG_FRAME_BUFFER_SIZE_Address),
+		dc_read(hw, GCREG_DC_TILE_IN_CFG_Address));
+	dev_dbg(dev,
+		"hb_dc8000: dc8000_regs %s: HDIS=0x%08x HSYNC=0x%08x VDIS=0x%08x VSYNC=0x%08x cur=0x%08x\n",
+		tag, dc_read(hw, GCREG_HDISPLAY_Address), dc_read(hw, GCREG_HSYNC_Address),
+		dc_read(hw, GCREG_VDISPLAY_Address), dc_read(hw, GCREG_VSYNC_Address),
+		dc_read(hw, GCREG_DISPLAY_CURRENT_LOCATION_Address));
+	dev_dbg(dev,
+		"hb_dc8000: dc8000_regs %s: PANEL cfg=0x%08x ctl=0x%08x fn=0x%08x work=0x%08x state=0x%08x\n",
+		tag, dc_read(hw, GCREG_PANEL_CONFIG_Address),
+		dc_read(hw, GCREG_PANEL_CONTROL_Address),
+		dc_read(hw, GCREG_PANEL_FUNCTION_Address),
+		dc_read(hw, GCREG_PANEL_WORKING_Address),
+		dc_read(hw, GCREG_PANEL_STATE_Address));
+	dev_dbg(dev,
+		"hb_dc8000: dc8000_regs %s: DPI=0x%08x DBI=0x%08x dbg_cnt=0x%08x intr=0x%08x intr_en=0x%08x vid_a=0x%08x blend=0x%08x tl=0x%08x\n",
+		tag, dc_read(hw, GCREG_DPI_CONFIG_Address),
+		dc_read(hw, GCREG_DBI_CONFIG_Address),
+		dc_read(hw, GCREG_DEBUG_COUNTER_VALUE_Address),
+		dc_read(hw, GCREG_DISPLAY_INTR_Address),
+		dc_read(hw, GCREG_DISPLAY_INTR_ENABLE_Address),
+		dc_read(hw, GCREG_VIDEO_GLOBAL_ALPHA_Address),
+		dc_read(hw, GCREG_VIDEO_ALPHA_BLEND_CONFIG_Address),
+		dc_read(hw, GCREG_VIDEO_TL_Address));
 }
 
 static int dc_hw_init_video_plane(struct dc_hw *hw, const struct dc_hw_proc_info *info)
@@ -732,6 +774,9 @@ static void dc_8000_nano_proc_commit(struct dc_hw_processor *processor)
 	const struct dc_hw_proc_info *info = processor->info;
 
 	dc_hw_enable_shadow(hw, info->id, true);
+
+	if (DC_GET_TYPE(info->id) == DC_DISPLAY)
+		dc8000_nano_dump_hw_state(hw, "post_disp_commit");
 }
 
 static void dc_8000_nano_proc_enable_irq(struct dc_hw_processor *processor, u32 irq_bits)

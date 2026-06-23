@@ -40,6 +40,8 @@
 
 #include "dc_hw_type.h"
 
+struct device;
+
 /**
  * @brief destroy dc hw instance
  *
@@ -52,10 +54,11 @@ void dc_hw_destroy(struct dc_hw *hw);
  *
  * @param[in] family display controller family id
  * @param[in] dc display control register base
+ * @param[in] dev owning struct device for logging
  *
  * @return dc_hw pointer on success, error code on failure
  */
-struct dc_hw *dc_hw_create(u8 family, void __iomem *dc);
+struct dc_hw *dc_hw_create(u8 family, void __iomem *dc, struct device *dev);
 
 /**
  * @brief init dc hw processor structure with info, no hw initialize

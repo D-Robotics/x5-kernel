@@ -51,6 +51,10 @@
 
 #include "dw_mipi_dsi.h"
 
+/* HS clock margin for phy_validate (e.g. 10% headroom) */
+#define DPHY_CLK_MARGIN_NUM 11
+#define DPHY_CLK_MARGIN_DEN 10
+
 #define DSI_VERSION 0x00
 
 #define DSI_PWR_UP 0x04
@@ -814,6 +818,8 @@ static bool bridge_mode_fixup(struct drm_bridge *bridge, const struct drm_displa
 	phy_mipi_dphy_get_default_config(adjusted_mode->clock * 1000, bpp, primary->dsi.lanes,
 					 &dphy_cfg);
 
+	dphy_cfg.hs_clk_rate =
+		dphy_cfg.hs_clk_rate * DPHY_CLK_MARGIN_NUM / DPHY_CLK_MARGIN_DEN;
 	ret = phy_validate(primary->dsi.dphy, PHY_MODE_MIPI_DPHY, 0,
 			   (union phy_configure_opts *)&dphy_cfg);
 	if (primary->dsi.dphy && ret)
@@ -1143,7 +1149,11 @@ static int dsi_bind(struct device *dev, struct device *primary, void *data)
 		return ret;
 	}
 
-	/* clean state if enabled in u-boot */
+	/*
+	 * Always reset DSI host after bind (incl. CONFIG_X5_SEAMLESS_DISPLAY).
+	 * Aligns with working path when U-Boot seamless_display=0; avoids bind
+	 * skipping disable while global seamless keeps HDMI/PLL policies.
+	 */
 	dw_mipi_dsi_disable(dsi);
 
 	return 0;

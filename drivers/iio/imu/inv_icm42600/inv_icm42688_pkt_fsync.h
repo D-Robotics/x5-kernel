@@ -1,4 +1,13 @@
-/* SPDX-License-Identifier: GPL-2.0-or-later */
+/*
+ * Copyright (C) 2026 D-Robotics Co., Ltd.
+ * Author: fuhua.wang <fuhua.wang@d-robotics.cc>
+ * Modified by: fuhua.wang <fuhua.wang@d-robotics.cc>
+ *
+ * ICM42688 FSYNC packet sysfs interface.
+ *
+ * Exposes pkt_fsync on a dedicated IIO device for reading a 128-bit
+ * FSYNC-latched accel/gyro snapshot and on-chip timestamp.
+ */
 #ifndef INV_ICM42688_PKT_FSYNC_H_
 #define INV_ICM42688_PKT_FSYNC_H_
 

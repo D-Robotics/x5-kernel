@@ -29,7 +29,11 @@
  */
 
 #include <linux/component.h>
+#include <linux/kernel.h>
+#include <linux/io.h>
+#include <linux/mutex.h>
 #include <linux/clk.h>
+#include <linux/printk.h>
 #include <linux/of_graph.h>
 #include <linux/of_platform.h>
 #include <linux/of_device.h>
@@ -39,6 +43,7 @@
 #include <drm/drm_atomic_helper.h>
 #include <drm/drm_vblank.h>
 #include <drm/drm_framebuffer.h>
+#include <drm/drm_modes.h>
 #include <drm/drm_bridge.h>
 #include <drm/drm_of.h>
 #include <drm/drm_managed.h>
@@ -60,6 +65,17 @@
 #define DC_CRTC_NAME	      "crtc-dc8000"
 #define BT1120_AUX_DEV_NAME   "vs_sif"
 #define BT1120_EAV_SIZE	      4
+
+/* X5 display SYSCON (DTS: disp_sys_con); debug iomux dump only — matches x5.dtsi reg. */
+#define X5_DISP_SYSCON_PHYS_BASE	0x3e0a0000UL
+#define X5_DISP_SYSCON_IMAP_SIZE	0x200UL
+#define X5_DISP_SYSC_DC2BT1120		0x14U
+#define X5_DISP_SYSC_CLKIOR		0x54U
+#define X5_DISP_SYSC_D0IOR		0x58U
+#define X5_DISP_SYSC_MS			0x98U
+#define X5_DISP_SYSC_MUX0		0x9cU
+#define X5_DISP_SYSC_MUX1		0xa0U
+
 struct device *bt1120_dev;
 
 /*
@@ -171,8 +187,124 @@ static void bt1120_set_csc_coeff(struct vs_bt1120 *bt1120)
 
 void bt1120_disable(struct vs_bt1120 *bt1120)
 {
+	dev_dbg(bt1120->dev,
+		"[X5_DISP] bt1120_disable: CTL before=0x%08x (clear bit0)\n",
+		bt1120_read(bt1120, REG_BT1120_CTL));
 	/* disable bt1120_en*/
 	bt1120_set_clear(bt1120, REG_BT1120_CTL, 0, BIT(0));
+}
+
+/* Spec v0.5 §1.10.21–22: IRQ_EN @0x50, IRQ_STATUS @0x54 (bits 0–3). Grep [BT1120_IRQ]. */
+static void bt1120_log_irq_regs(struct vs_bt1120 *bt1120, const char *where)
+{
+	u32 en = bt1120_read(bt1120, REG_BT1120_IRQ_EN_CTL);
+	u32 st = bt1120_read(bt1120, REG_BT1120_IRQ_STATUS);
+
+	dev_dbg(bt1120->dev,
+		 "[BT1120_IRQ] %s: IRQ_EN(0x50)=0x%08x IRQ_STATUS(0x54)=0x%08x | "
+		 "EN[fs,dma,uf,mm]=%u%u%u%u STS[fs,dma,uf,mm]=%u%u%u%u\n",
+		 where, en, st,
+		!!(en & FRAME_START_IRQ_EN_MASK), !!(en & DMA_DONE_IRQ_EN_MASK),
+		!!(en & BUF_UNDERFLOW_IRQ_EN_MASK), !!(en & ONLINE_MISMATCH_IRQ_EN_MASK),
+		!!(st & FRAME_START_IRQ_STATUS_MASK), !!(st & DMA_DONE_IRQ_STATUS_MASK),
+		!!(st & BUF_UNDERFLOW_IRQ_STATUS_MASK), !!(st & ONLINE_MISMATCH_IRQ_STATUS_MASK));
+}
+
+/*
+ * Full BT1120 register snapshot for kernel vs U-Boot vs Horizon X5 BT1120 spec
+ * (vs_bt1120_reg.h: 0x00–0x54, CSC 0x58–0x84, OUTPUT_CRC 0x88–0xa4). Grep [BT1120_REGS].
+ * Implemented MMIO span: 0xa8 bytes (42 x u32); offset 0xa8+ is not for readl (DTS reg is larger).
+ */
+static void bt1120_registers_dump_compare(struct vs_bt1120 *bt1120, const char *where,
+					   const struct drm_display_mode *mode)
+{
+	unsigned int i;
+	char cscbuf[180];
+	char crbuf[160];
+	size_t pos = 0;
+	size_t cpos = 0;
+
+	if (mode)
+		dev_dbg(bt1120->dev,
+			 "[BT1120_REGS] %s: drm %ux%u dotclock_khz=%u flags=0x%x htot=%u vtot=%u\n",
+			 where, mode->hdisplay, mode->vdisplay, mode->clock, mode->flags,
+			 mode->htotal, mode->vtotal);
+	else
+		dev_dbg(bt1120->dev, "[BT1120_REGS] %s\n", where);
+
+	dev_dbg(bt1120->dev,
+		 "[BT1120_REGS] %s: CTL=0x%08x DMA_BL=0x%08x LOFF=0x%08x WOFF=0x%08x\n",
+		 where, bt1120_read(bt1120, REG_BT1120_CTL),
+		 bt1120_read(bt1120, REG_BT1120_DMA_BLENGTH_CTL),
+		 bt1120_read(bt1120, REG_BT1120_LINE_OFFSET_CTL),
+		 bt1120_read(bt1120, REG_BT1120_WORD_OFFSET_CTL));
+
+	dev_dbg(bt1120->dev,
+		 "[BT1120_REGS] %s: BADDR_Y=0x%08x BADDR_UV=0x%08x HSIZE=0x%08x VSIZE=0x%08x HSTRIDE=0x%08x PZONE=0x%08x\n",
+		 where, bt1120_read(bt1120, REG_BT1120_IMG_IN_BADDR_Y_CTL),
+		 bt1120_read(bt1120, REG_BT1120_IMG_IN_BADDR_UV_CTL),
+		 bt1120_read(bt1120, REG_BT1120_IMG_PIX_HSIZE_CTL),
+		 bt1120_read(bt1120, REG_BT1120_IMG_PIX_VSIZE_CTL),
+		 bt1120_read(bt1120, REG_BT1120_IMG_PIX_HSTRIDE_CTL),
+		 bt1120_read(bt1120, REG_BT1120_IMG_PIX_ZONE_CTL));
+
+	dev_dbg(bt1120->dev,
+		 "[BT1120_REGS] %s: HSYNC=0x%08x VSYNC=0x%08x DISP_W=0x%08x DISP_H=0x%08x XZ=0x%08x YZ=0x%08x HFP=0x%08x SCAN=0x%08x INTOFF=0x%08x DDR_FMT=0x%08x\n",
+		 where, bt1120_read(bt1120, REG_BT1120_HSYNC_ZONE_CTL),
+		 bt1120_read(bt1120, REG_BT1120_VSYNC_ZONE_CTL),
+		 bt1120_read(bt1120, REG_BT1120_DISP_WIDTH_CTL),
+		 bt1120_read(bt1120, REG_BT1120_DISP_HEIGHT_CTL),
+		 bt1120_read(bt1120, REG_BT1120_DISP_XZONE_CTL),
+		 bt1120_read(bt1120, REG_BT1120_DISP_YZONE_CTL),
+		 bt1120_read(bt1120, REG_BT1120_HFP_RANGE_CTL),
+		 bt1120_read(bt1120, REG_BT1120_SCAN_FORMAT_CTL),
+		 bt1120_read(bt1120, REG_BT1120_INT_HEIGHT_OFFSET_CTL),
+		 bt1120_read(bt1120, REG_BT1120_DDR_STORE_FORMAT_CTL));
+
+	bt1120_log_irq_regs(bt1120, where);
+
+	for (i = 0; i < BT1120_CSC_COEFF_CNT && pos < sizeof(cscbuf) - 6; i++)
+		pos += scnprintf(cscbuf + pos, sizeof(cscbuf) - pos, "%04x ",
+				 bt1120_read(bt1120, REG_BT1120_CSC_COEFF + i * 4) & 0xffff);
+	dev_dbg(bt1120->dev, "[BT1120_REGS] %s: CSC[12]=%s\n", where, cscbuf);
+
+	for (i = 0; i < REG_BT1120_OUTPUT_CRC_COUNT && cpos < sizeof(crbuf) - 12; i++)
+		cpos += scnprintf(crbuf + cpos, sizeof(crbuf) - cpos, "%08x ",
+				  bt1120_read(bt1120, REG_BT1120_OUTPUT_CRC_FRAME0 + i * 4));
+	dev_dbg(bt1120->dev, "[BT1120_REGS] %s: OUTPUT_CRC[0x88-0xa4 x8]=%s\n", where, crbuf);
+}
+
+/*
+ * One-line dump of disp SYSCON BT1120 pad/mux (base 0x3e0a0000), same layout as U-Boot
+ * x5_disp_iomux_dump_one_line() for cross-boot comparison.
+ */
+static void bt1120_dump_disp_iomux_one_line(struct vs_bt1120 *bt1120, const char *tag)
+{
+	struct device *dev = bt1120->dev;
+	void __iomem *r;
+
+	mutex_lock(&bt1120->disp_sysc_lock);
+	if (!bt1120->disp_sysc_regs) {
+		r = ioremap(X5_DISP_SYSCON_PHYS_BASE, X5_DISP_SYSCON_IMAP_SIZE);
+		if (!r) {
+			dev_err(dev,
+				"[X5_DISP] disp_iomuxc_dump(%s): ioremap %#lx failed (%d)\n",
+				tag, (unsigned long)X5_DISP_SYSCON_PHYS_BASE, -ENOMEM);
+			mutex_unlock(&bt1120->disp_sysc_lock);
+			return;
+		}
+		bt1120->disp_sysc_regs = r;
+	}
+	r = bt1120->disp_sysc_regs;
+	dev_dbg(dev,
+		"[X5_DISP] disp_iomuxc_dump(%s): DC2BT1120@%#x=0x%08x CLKIOR@%#x=0x%08x D0IOR@%#x=0x%08x MS@%#x=0x%08x MUX0@%#x=0x%08x MUX1@%#x=0x%08x\n",
+		tag, X5_DISP_SYSC_DC2BT1120, readl(r + X5_DISP_SYSC_DC2BT1120),
+		X5_DISP_SYSC_CLKIOR, readl(r + X5_DISP_SYSC_CLKIOR),
+		X5_DISP_SYSC_D0IOR, readl(r + X5_DISP_SYSC_D0IOR),
+		X5_DISP_SYSC_MS, readl(r + X5_DISP_SYSC_MS),
+		X5_DISP_SYSC_MUX0, readl(r + X5_DISP_SYSC_MUX0),
+		X5_DISP_SYSC_MUX1, readl(r + X5_DISP_SYSC_MUX1));
+	mutex_unlock(&bt1120->disp_sysc_lock);
 }
 
 void bt1120_set_online_configs(struct vs_bt1120 *bt1120, const struct drm_display_mode *mode)
@@ -184,8 +316,11 @@ void bt1120_set_online_configs(struct vs_bt1120 *bt1120, const struct drm_displa
 	else
 		bt1120_set_clear(bt1120, REG_BT1120_CTL, 0, BIT(3));
 
-	if (!bt1120->is_online)
+	if (!bt1120->is_online) {
+		dev_dbg(bt1120->dev,
+			"[X5_DISP] bt1120_set_online_configs: is_online=0, only toggling CTL bit3, skip timing\n");
 		return;
+	}
 
 	scan.h_sync_start   = 1;
 	scan.h_sync_stop    = scan.h_sync_start + (mode->hsync_end - mode->hsync_start);
@@ -203,6 +338,13 @@ void bt1120_set_online_configs(struct vs_bt1120 *bt1120, const struct drm_displa
 		scan.hfp_range = 1;
 	else
 		scan.hfp_range = 0;
+
+	dev_dbg(bt1120->dev,
+		"[X5_DISP] bt1120_set_online_configs: DC->HDMI online scan h ss=%u se=%u act=%u-%u tot=%u hfp_range=%u | v ss=%u se=%u act=%u-%u tot=%u | mode flags=0x%x\n",
+		scan.h_sync_start, scan.h_sync_stop, scan.h_active_start, scan.h_active_stop,
+		scan.h_total, scan.hfp_range,
+		scan.v_sync_start, scan.v_sync_stop, scan.v_active_start, scan.v_active_stop,
+		scan.v_total, mode->flags);
 
 	bt1120_write(bt1120, REG_BT1120_HSYNC_ZONE_CTL, scan.h_sync_start);
 	bt1120_write(bt1120, REG_BT1120_VSYNC_ZONE_CTL, scan.v_sync_start);
@@ -229,6 +371,9 @@ void bt1120_set_online_configs(struct vs_bt1120 *bt1120, const struct drm_displa
 
 	/* enable bt1120_en*/
 	bt1120_set_clear(bt1120, REG_BT1120_CTL, BIT(0), 0);
+
+	bt1120_registers_dump_compare(bt1120, "set_online_configs", mode);
+	bt1120_dump_disp_iomux_one_line(bt1120, "kernel-set-online-bt1120");
 }
 
 __maybe_unused static void bt1120_set_output_clock_mode(struct vs_bt1120 *bt1120, bool is_sdr)
@@ -648,11 +793,15 @@ static void bt1120_disp_update_scan(struct bt1120_disp *bt1120_disp, struct bt11
 
 	bt1120_write(bt1120, REG_BT1120_SCAN_FORMAT_CTL, !scan->is_interlaced);
 	bt1120_write(bt1120, REG_BT1120_INT_HEIGHT_OFFSET_CTL, 0x0);
+
+	bt1120_registers_dump_compare(bt1120, "disp_update_scan", mode);
 }
 
 static void bt1120_disp_enable(struct vs_crtc *vs_crtc)
 {
 	struct bt1120_disp *bt1120_disp = to_bt1120_disp(vs_crtc);
+	struct vs_bt1120 *bt1120		= bt1120_disp->bt1120;
+	struct device *dev		= bt1120->dev;
 	struct drm_display_mode *mode	= &vs_crtc->base.state->adjusted_mode;
 	struct bt1120_scan scan;
 	u32 pix_clk_rate;
@@ -663,45 +812,59 @@ static void bt1120_disp_enable(struct vs_crtc *vs_crtc)
 	else
 		scan.is_interlaced = false;
 
-	ret = clk_prepare_enable(bt1120_disp->bt1120->pix_clk);
+	ret = clk_prepare_enable(bt1120->pix_clk);
 	if (ret < 0) {
-		pr_err("failed to prepare/enable pix_clk\n");
+		dev_err(dev, "failed to prepare/enable pix_clk: %d\n", ret);
 		return;
 	}
 
 	bt1120_disp->refresh_rate = 30;
-	pix_clk_rate		  = clk_get_rate(bt1120_disp->bt1120->pix_clk) / 1000;
+	pix_clk_rate		  = clk_get_rate(bt1120->pix_clk) / 1000;
 
 	if (pix_clk_rate != mode->clock) {
-		clk_set_rate(bt1120_disp->bt1120->pix_clk, (unsigned long)(mode->clock) * 1000);
+		clk_set_rate(bt1120->pix_clk, (unsigned long)(mode->clock) * 1000);
 		bt1120_disp->refresh_rate =
 			(unsigned long)(mode->clock) * 1000 / (mode->htotal * mode->vtotal);
 	}
 
 	bt1120_disp_update_scan(bt1120_disp, &scan, mode);
 
+	dev_dbg(dev,
+		"[X5_DISP] bt1120_disp_enable: %ux%u@%u dotclock_khz=%u pix_clk_hz=%lu (after set_rate)\n",
+		mode->hdisplay, mode->vdisplay, drm_mode_vrefresh(mode), mode->clock,
+		(unsigned long)clk_get_rate(bt1120->pix_clk));
+
+	bt1120_write(bt1120, REG_BT1120_DMA_BLENGTH_CTL,
+		     g_bt1120_plane_info.dma_burst_len);
+
 	/* clear irq status*/
-	bt1120_write(bt1120_disp->bt1120, REG_BT1120_IRQ_STATUS, 0xf);
+	bt1120_write(bt1120, REG_BT1120_IRQ_STATUS, 0xf);
 
 	/* enable frame_start & underflow interrupts*/
-	bt1120_set_clear(bt1120_disp->bt1120, REG_BT1120_IRQ_EN_CTL, BIT(0) | BIT(2), 0);
+	bt1120_set_clear(bt1120, REG_BT1120_IRQ_EN_CTL, BIT(0) | BIT(2), 0);
 
-	bt1120_set_clear(bt1120_disp->bt1120, REG_BT1120_CTL, BIT(0), 0);
+	bt1120_set_clear(bt1120, REG_BT1120_CTL, BIT(0), 0);
+
+	dev_dbg(dev, "[X5_DISP] bt1120_disp_enable: CTL=0x%08x (bit0 en)\n",
+		bt1120_read(bt1120, REG_BT1120_CTL));
 }
 
 static void bt1120_disp_disable(struct vs_crtc *vs_crtc)
 {
 	struct bt1120_disp *bt1120_disp = to_bt1120_disp(vs_crtc);
+	struct vs_bt1120 *bt1120	= bt1120_disp->bt1120;
 	u8 value;
 
-	/* clear irq */
-	bt1120_write(bt1120_disp->bt1120, REG_BT1120_IRQ_EN_CTL, 0x0);
+	dev_dbg(bt1120->dev, "[X5_DISP] bt1120_disp_disable: crtc-bt1120 path\n");
 
-	value = bt1120_read(bt1120_disp->bt1120, REG_BT1120_IRQ_STATUS);
-	bt1120_write(bt1120_disp->bt1120, REG_BT1120_IRQ_STATUS, value);
+	/* clear irq */
+	bt1120_write(bt1120, REG_BT1120_IRQ_EN_CTL, 0x0);
+
+	value = bt1120_read(bt1120, REG_BT1120_IRQ_STATUS);
+	bt1120_write(bt1120, REG_BT1120_IRQ_STATUS, value);
 
 	/* disable bt1120_en */
-	bt1120_set_clear(bt1120_disp->bt1120, REG_BT1120_CTL, 0, BIT(0));
+	bt1120_set_clear(bt1120, REG_BT1120_CTL, 0, BIT(0));
 
 	/* make sure refresh rate is valid value */
 	if (bt1120_disp->refresh_rate == 0)
@@ -709,10 +872,10 @@ static void bt1120_disp_disable(struct vs_crtc *vs_crtc)
 	/* wait till last framestart irq triggered, so last frame can be fully displayed.*/
 	mdelay(2 * 1000 / bt1120_disp->refresh_rate);
 
-	clk_disable_unprepare(bt1120_disp->bt1120->pix_clk);
+	clk_disable_unprepare(bt1120->pix_clk);
 
 	/* reset is_odd_field flag*/
-	bt1120_disp->bt1120->is_odd_field = true;
+	bt1120->is_odd_field = true;
 }
 
 static bool bt1120_disp_mode_fixup(struct vs_crtc *vs_crtc, const struct drm_display_mode *mode,
@@ -1137,6 +1300,7 @@ static int bt1120_probe(struct platform_device *pdev)
 	}
 
 	INIT_LIST_HEAD(&bt1120->aux_list);
+	mutex_init(&bt1120->disp_sysc_lock);
 
 	ret = bt1120_get_all_devices(dev);
 	if (ret)
@@ -1164,6 +1328,7 @@ static int bt1120_probe(struct platform_device *pdev)
 		return ret;
 
 err_disable_axi_clk:
+	mutex_destroy(&bt1120->disp_sysc_lock);
 	clk_disable_unprepare(bt1120->axi_clk);
 err_disable_apb_clk:
 	clk_disable_unprepare(bt1120->apb_clk);
@@ -1176,6 +1341,14 @@ static int bt1120_remove(struct platform_device *pdev)
 	struct vs_bt1120 *bt1120 = dev_get_drvdata(dev);
 
 	component_del(dev, &bt1120_component_ops);
+
+	mutex_lock(&bt1120->disp_sysc_lock);
+	if (bt1120->disp_sysc_regs) {
+		iounmap(bt1120->disp_sysc_regs);
+		bt1120->disp_sysc_regs = NULL;
+	}
+	mutex_unlock(&bt1120->disp_sysc_lock);
+	mutex_destroy(&bt1120->disp_sysc_lock);
 
 	clk_disable_unprepare(bt1120->axi_clk);
 	clk_disable_unprepare(bt1120->apb_clk);

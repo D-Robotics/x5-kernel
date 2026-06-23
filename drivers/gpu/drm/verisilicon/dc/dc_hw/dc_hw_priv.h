@@ -40,6 +40,7 @@
 
 struct dc_hw;
 struct dc_hw_processor;
+struct device;
 
 /**
  * struct dc_hw_proc_funcs - dc hw processor operations
@@ -85,6 +86,9 @@ struct dc_hw {
 
 	/** pointer of hw operation. */
 	const struct dc_hw_funcs *funcs;
+
+	/** owning device (for dev_dbg etc.); set by dc_hw_create */
+	struct device *dev;
 };
 
 /** @} */

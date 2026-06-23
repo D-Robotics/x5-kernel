@@ -229,6 +229,11 @@ struct dw_spi {
 
 	bool			tx_dma_use_burst;
 
+	/* GPIO CS fast path: hardware configured in prepare_message */
+	bool			gpio_msg_prepared;
+	u32			prepared_speed_hz;
+	u8			prepared_bits_per_word;
+
 	/* Custom memory operations */
 	struct spi_controller_mem_ops mem_ops;
 

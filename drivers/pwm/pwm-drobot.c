@@ -21,12 +21,22 @@
 #include <linux/pm_runtime.h>
 #include <linux/reset.h>
 #include <linux/delay.h>
+#ifdef CONFIG_X5_SEAMLESS_DISPLAY
+#include <linux/soc/hobot/x5_seamless_display.h>
+#endif
 
 struct drobot_pwm_chip {
 	struct pwm_chip chip;
 	struct clk *clk;
 	void __iomem *base;
 	struct reset_control	*reset;
+#if IS_ENABLED(CONFIG_X5_SEAMLESS_DISPLAY)
+	u16 duty_cache[2];
+	bool duty_cache_valid[2];
+	bool seamless_duty_unknown_logged[2];
+	bool seamless_skip_zero_apply_logged[2];
+	bool seamless_preserve_reset;
+#endif
 };
 
 #define PWM_MCR					(0x00)
@@ -92,6 +102,68 @@ static bool drobot_pwm_get_status(struct pwm_chip *chip, struct pwm_device *pwm)
 	}
 	return false;
 }
+
+#if IS_ENABLED(CONFIG_X5_SEAMLESS_DISPLAY)
+static int drobot_pwm_get_state(struct pwm_chip *chip, struct pwm_device *pwm,
+				struct pwm_state *state)
+{
+	struct drobot_pwm_chip *drobot = to_drobot_pwm_chip(chip);
+	u8 channel = pwm->hwpwm;
+	u32 ctr, ccr, prd_reg, duty_reg;
+	u32 raw_pw16;
+	u8 div_reg;
+	u16 prescale;
+	u64 clk_rate;
+	u64 cycles;
+	bool seamless = x5_seamless_display_active();
+
+	memset(state, 0, sizeof(*state));
+
+	state->enabled = drobot_pwm_get_status(chip, pwm);
+
+	ctr = readl(drobot->base + PWM_CTR(channel));
+	ccr = readl(drobot->base + PWM_CCR(channel));
+	prd_reg = readl(drobot->base + PWM_PR(channel));
+	/* PW16AR is FIFO-backed; skip readback during seamless handoff. */
+	raw_pw16 = seamless ? 0 : readl(drobot->base + PWM_PW16AR(channel));
+	duty_reg = 0;
+
+	if (drobot->duty_cache_valid[channel]) {
+		duty_reg = drobot->duty_cache[channel];
+	} else {
+		if (seamless) {
+			if (state->enabled && !drobot->seamless_duty_unknown_logged[channel]) {
+				dev_warn(chip->dev,
+					 "seamless_display: PWM%u duty is unknown before first kernel apply, keep cached duty=0\n",
+					 channel);
+				drobot->seamless_duty_unknown_logged[channel] = true;
+			}
+		} else {
+			duty_reg = readl(drobot->base + PWM_PW16AR(channel));
+		}
+	}
+
+	state->polarity = (ctr & PWM_POLARITY_INVERSED) ?
+		PWM_POLARITY_INVERSED : PWM_POLARITY_NORMAL;
+
+	div_reg = (ccr >> 4) & 0x7;
+	prescale = ((ccr >> 8) & 0xff) + 1;
+	clk_rate = clk_get_rate(drobot->clk);
+	if (!clk_rate)
+		return 0;
+
+	cycles = ((u64)(prd_reg + 1) * prescale) << (div_reg + 1);
+	state->period = div64_u64(cycles * NSEC_PER_SEC, clk_rate);
+
+	cycles = ((u64)duty_reg * prescale) << (div_reg + 1);
+	state->duty_cycle = div64_u64(cycles * NSEC_PER_SEC, clk_rate);
+	if (state->duty_cycle > state->period)
+		state->duty_cycle = state->period;
+
+
+	return 0;
+}
+#endif
 
 static void drobot_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
 {
@@ -161,7 +233,22 @@ static int drobot_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
 	bool pwm_status = 0;
 	bool was_enabled = false;
 	struct drobot_pwm_chip *drobot = to_drobot_pwm_chip(chip);
+#if IS_ENABLED(CONFIG_X5_SEAMLESS_DISPLAY)
+	u16 duty_cache = 0;
+#endif
 
+#if IS_ENABLED(CONFIG_X5_SEAMLESS_DISPLAY)
+	/* Skip the first zero-duty apply during seamless handoff to avoid blink. */
+	if (x5_seamless_display_active() &&
+	    !drobot->seamless_skip_zero_apply_logged[channel] &&
+	    !drobot->duty_cache_valid[channel] &&
+	    state->enabled && !state->duty_cycle &&
+	    drobot_pwm_get_status(chip, pwm)) {
+		drobot->seamless_skip_zero_apply_logged[channel] = true;
+		return 0;
+	}
+
+#endif
 	/* Check current PWM status */
 	pwm_status = drobot_pwm_get_status(chip, pwm);
 	was_enabled = pwm_status;
@@ -211,14 +298,65 @@ static int drobot_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
 	/* Configure all registers while PWM is disabled */
 	/* set clk reg */
 	val = clk_sel | (div_reg << 4) | ((prescale - 1) << 8);
+
+#if IS_ENABLED(CONFIG_X5_SEAMLESS_DISPLAY)
+	/* If computed values match HW, skip rewrites during seamless handoff. */
+	if (x5_seamless_display_active() && !drobot->duty_cache_valid[channel] &&
+	    state->enabled && drobot_pwm_get_status(chip, pwm)) {
+		u32 hw_ccr = readl(drobot->base + PWM_CCR(channel));
+		u32 hw_pr = readl(drobot->base + PWM_PR(channel));
+		u32 hw_ctr = readl(drobot->base + PWM_CTR(channel));
+		u16 computed_duty = 0;
+		bool ccr_match = (hw_ccr == val);
+		bool pr_match = ((u32)hw_pr == (u32)prd);
+		bool ctr_match;
+
+		if (state->duty_cycle) {
+			u32 dc = div64_u64(clk * state->duty_cycle,
+					  (unsigned long long)NSEC_PER_SEC);
+			computed_duty = (dc >> (div_reg + 1)) / prescale;
+		}
+
+		if (state->polarity == PWM_POLARITY_INVERSED)
+			ctr_match = !!(hw_ctr & PWM_POLARITY);
+		else
+			ctr_match = !(hw_ctr & PWM_POLARITY);
+
+		if (ccr_match && pr_match && ctr_match) {
+			/* Registers match; update duty cache only. */
+			duty_cache = computed_duty;
+			drobot->duty_cache[channel] = duty_cache;
+			drobot->duty_cache_valid[channel] = true;
+			return 0;
+		}
+
+		dev_warn(chip->dev,
+			 "seamless_display: first apply PWM%u regs DIFFER from hw, writing (may cause glitch)\n",
+			 channel);
+	}
+#endif
+
 	writel(val, drobot->base + PWM_CCR(channel));
 
 	/* set prd reg */
 	writel(prd, drobot->base + PWM_PR(channel));
 
 	/* set duty reg */
-	if(state->duty_cycle)
+	if (state->duty_cycle)
 		drobot_pwm_duty_set(chip, pwm, state, div_reg, prescale);
+
+#if IS_ENABLED(CONFIG_X5_SEAMLESS_DISPLAY)
+	if (state->duty_cycle) {
+		u32 dc;
+
+		/* Same formula as drobot_pwm_duty_set / match-skip path above. */
+		dc = div64_u64(clk * state->duty_cycle,
+			       (unsigned long long)NSEC_PER_SEC);
+		duty_cache = (dc >> (div_reg + 1)) / prescale;
+	}
+	drobot->duty_cache[channel] = duty_cache;
+	drobot->duty_cache_valid[channel] = true;
+#endif
 
 	/* set polarity, mode and repeat bits */
 	val = readl(drobot->base + PWM_CTR(channel));
@@ -239,6 +377,9 @@ static int drobot_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
 
 static const struct pwm_ops drobot_pwm_ops = {
 	.apply = drobot_pwm_apply,
+#if IS_ENABLED(CONFIG_X5_SEAMLESS_DISPLAY)
+	.get_state = drobot_pwm_get_state,
+#endif
 	.owner = THIS_MODULE,
 };
 
@@ -263,6 +404,9 @@ static int drobot_pwm_probe(struct platform_device *pdev)
 	struct drobot_pwm_chip *drobot_pwm = NULL;
 	struct resource *res = NULL;
 	int ret = 0;
+#if IS_ENABLED(CONFIG_X5_SEAMLESS_DISPLAY)
+	bool seamless = false;
+#endif
 
 	drobot_pwm = devm_kzalloc(&pdev->dev, sizeof(*drobot_pwm), GFP_KERNEL);
 	if (!drobot_pwm)
@@ -290,9 +434,20 @@ static int drobot_pwm_probe(struct platform_device *pdev)
 						       NULL);
 	if (IS_ERR(drobot_pwm->reset))
 		return PTR_ERR(drobot_pwm->reset);
+#if IS_ENABLED(CONFIG_X5_SEAMLESS_DISPLAY)
+	seamless = x5_seamless_display_active();
+	drobot_pwm->seamless_preserve_reset = seamless &&
+		of_property_read_bool(pdev->dev.of_node, "d-robotics,seamless-preserve-reset");
+	if (!drobot_pwm->seamless_preserve_reset) {
+		reset_control_assert(drobot_pwm->reset);
+		usleep_range(1, 2);
+		reset_control_deassert(drobot_pwm->reset);
+	}
+#else
 	reset_control_assert(drobot_pwm->reset);
 	usleep_range(1, 2);
 	reset_control_deassert(drobot_pwm->reset);
+#endif
 
 	drobot_pwm->chip.dev = &pdev->dev;
 	drobot_pwm->chip.ops = &drobot_pwm_ops;

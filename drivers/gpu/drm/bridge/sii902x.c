@@ -21,6 +21,10 @@
 #include <linux/regulator/consumer.h>
 #include <linux/clk.h>
 
+#if IS_ENABLED(CONFIG_X5_SEAMLESS_DISPLAY)
+#include <linux/soc/hobot/x5_seamless_display.h>
+#endif
+
 #include <drm/drm_atomic_helper.h>
 #include <drm/drm_bridge.h>
 #include <drm/drm_drv.h>
@@ -194,6 +198,14 @@ struct sii902x {
 		struct clk *mclk;
 		u32 i2s_fifo_sequence[4];
 	} audio;
+#if IS_ENABLED(CONFIG_X5_SEAMLESS_DISPLAY)
+	/*
+	 * Per-instance: skip first bridge_disable after seamless/simplefb handoff
+	 * (replaces a static global so multiple sii902x chips do not share state).
+	 * Read/modify is only done under @mutex in sii902x_bridge_disable().
+	 */
+	bool seamless_skip_disable_once;
+#endif
 };
 
 static int sii902x_read_unlocked(struct i2c_client *i2c, u8 reg, u8 *val)
@@ -347,6 +359,21 @@ static void sii902x_bridge_disable(struct drm_bridge *bridge)
 	struct sii902x *sii902x = bridge_to_sii902x(bridge);
 
 	mutex_lock(&sii902x->mutex);
+#if IS_ENABLED(CONFIG_X5_SEAMLESS_DISPLAY)
+	/*
+	 * Match vs_drm: handoff may have simplefb without seamless-display-state=1.
+	 * seamless_skip_disable_once and regmap I/O are serialized by @mutex above.
+	 */
+	if (x5_seamless_display_active() || x5_chosen_has_simple_framebuffer()) {
+		if (!sii902x->seamless_skip_disable_once) {
+			sii902x->seamless_skip_disable_once = true;
+			dev_info(&sii902x->i2c->dev,
+				 "seamless HDMI handoff, skip first bridge_disable\n");
+			mutex_unlock(&sii902x->mutex);
+			return;
+		}
+	}
+#endif
 
 	regmap_update_bits(sii902x->regmap, SII902X_SYS_CTRL_DATA,
 			   SII902X_SYS_CTRL_PWR_DWN,
@@ -364,8 +391,14 @@ static void sii902x_bridge_enable(struct drm_bridge *bridge)
 	regmap_update_bits(sii902x->regmap, SII902X_PWR_STATE_CTRL,
 			   SII902X_AVI_POWER_STATE_MSK,
 			   SII902X_AVI_POWER_STATE_D(0));
+	/*
+	 * Clear power-down and HDMI AV mute. U-Boot seamless handoff may leave
+	 * SYS_CTRL AV_MUTE set; TMDS runs but pixels are blanked → backlight
+	 * on, no visible image, until DRM enables the bridge.
+	 */
 	regmap_update_bits(sii902x->regmap, SII902X_SYS_CTRL_DATA,
-			   SII902X_SYS_CTRL_PWR_DWN, 0);
+			   SII902X_SYS_CTRL_PWR_DWN | SII902X_SYS_CTRL_AV_MUTE,
+			   0);
 
 	mutex_unlock(&sii902x->mutex);
 }
@@ -1069,24 +1102,50 @@ static int sii902x_init(struct sii902x *sii902x)
 	unsigned int status = 0;
 	u8 chipid[4];
 	int ret;
+	bool chip_ok = false;
 
-	sii902x_reset(sii902x);
-
-	ret = regmap_write(sii902x->regmap, SII902X_REG_TPI_RQB, 0x0);
-	if (ret)
-		return ret;
-
-	ret = regmap_bulk_read(sii902x->regmap, SII902X_REG_CHIPID(0),
-			       &chipid, 4);
-	if (ret) {
-		dev_err(dev, "regmap_read failed %d\n", ret);
-		return ret;
+	/*
+	 * Unconditional HW reset kills live HDMI from U-Boot (logo goes black)
+	 * until DRM enables the bridge. Match lt8618_init(): on seamless/simplefb
+	 * handoff, try chip ID over I2C first and only pulse reset if verify fails.
+	 */
+#if IS_ENABLED(CONFIG_X5_SEAMLESS_DISPLAY)
+	if (x5_seamless_display_active() || x5_chosen_has_simple_framebuffer()) {
+		ret = regmap_write(sii902x->regmap, SII902X_REG_TPI_RQB, 0x0);
+		if (ret)
+			return ret;
+		ret = regmap_bulk_read(sii902x->regmap, SII902X_REG_CHIPID(0),
+				       &chipid, 4);
+		if (!ret && chipid[0] == 0xb0) {
+			dev_info(dev,
+				 "seamless HDMI handoff, skip sii902x hardware reset in probe\n");
+			chip_ok = true;
+		} else {
+			dev_info(dev,
+				 "seamless handoff: chip verify without reset failed, full reinit\n");
+		}
 	}
+#endif
 
-	if (chipid[0] != 0xb0) {
-		dev_err(dev, "Invalid chipid: %02x (expecting 0xb0)\n",
-			chipid[0]);
-		return -EINVAL;
+	if (!chip_ok) {
+		sii902x_reset(sii902x);
+
+		ret = regmap_write(sii902x->regmap, SII902X_REG_TPI_RQB, 0x0);
+		if (ret)
+			return ret;
+
+		ret = regmap_bulk_read(sii902x->regmap, SII902X_REG_CHIPID(0),
+				       &chipid, 4);
+		if (ret) {
+			dev_err(dev, "regmap_read failed %d\n", ret);
+			return ret;
+		}
+
+		if (chipid[0] != 0xb0) {
+			dev_err(dev, "Invalid chipid: %02x (expecting 0xb0)\n",
+				chipid[0]);
+			return -EINVAL;
+		}
 	}
 
 	/* Clear all pending interrupts */

@@ -51,6 +51,21 @@ config VERISILICON_DW_MIPI_DSI
 	  and panel. Also it is a MIPI DSI host and can work
 	  in dual mode.
 
+config X5_SEAMLESS_DISPLAY
+	bool "Enable X5 seamless display"
+	depends on ARCH_HOBOT_X5 && VERISILICON_DW_MIPI_DSI
+	depends on FB
+	select FB_SIMPLE
+	select FRAMEBUFFER_CONSOLE
+	help
+	  Enable seamless display handoff support from U-Boot to kernel.
+	  When enabled, display-related drivers apply seamless-specific
+	  protection paths when /chosen
+	  d-robotics,seamless-display-state is set by U-Boot.
+	  HDMI (BT1120 + LT8618) uses the same state plus /chosen
+	  x5,display-output = "hdmi" to skip probe resets and the first
+	  bridge disable that would blank a running U-Boot picture.
+
 config VERISILICON_WRITEBACK
 	bool
 	depends on DRM_VERISILICON

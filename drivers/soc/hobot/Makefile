@@ -11,3 +11,4 @@ obj-y                                   += ddr_monitor/
 obj-y                                   += firewall/
 obj-y                                   += camera_power/
 obj-y                                   += dsp/
+obj-$(CONFIG_X5_SEAMLESS_DISPLAY)       += x5_seamless_display.o

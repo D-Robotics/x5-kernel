@@ -28,6 +28,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <linux/device.h>
 #include <linux/slab.h>
 
 #include "dc_hw.h"
@@ -86,7 +87,7 @@ void dc_hw_destroy(struct dc_hw *hw)
 	kfree(hw);
 }
 
-struct dc_hw *dc_hw_create(u8 family, void __iomem *dc)
+struct dc_hw *dc_hw_create(u8 family, void __iomem *dc, struct device *dev)
 {
 	struct dc_hw *hw;
 	int ret;
@@ -99,6 +100,7 @@ struct dc_hw *dc_hw_create(u8 family, void __iomem *dc)
 		return ERR_PTR(-ENOMEM);
 
 	hw->base = dc;
+	hw->dev	 = dev;
 
 	if (family == DC_8000_NANO_FAMILY)
 		hw->funcs = &dc_8000_nano_funcs;

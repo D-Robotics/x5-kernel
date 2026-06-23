@@ -55,6 +55,15 @@
 #define REG_BT1120_INT_HEIGHT_OFFSET_CTL 0x48
 #define REG_BT1120_DDR_STORE_FORMAT_CTL	 0x4C
 
+/*
+ * Interrupt registers — Horizon X5 BT1120 Specification v0.5 §1.10.21 / §1.10.22.
+ *   BT1120_IRQ_EN     offset 0x0050 (fs_irq_en, dma_done_irq_en, buf_underflow_irq_en,
+ *				     online_mismatch_irq_en in bits 0–3).
+ *   BT1120_IRQ_STATUS offset 0x0054 (sticky status; clear by writing 1 to the bit,
+ *				     see vs_bt1120 interrupt handler).
+ * Note: The document TOC lists BT1120_IRQ_* at 0x2c/0x30/0x34 — those offsets clash with
+ * VSYNC_ZONE_CTL (0x2c), DISP_WIDTH (0x30) in the same spec register table; use 0x50/0x54.
+ */
 #define REG_BT1120_IRQ_EN_CTL 0x50
 #define REG_BT1120_IRQ_STATUS 0x54
 
@@ -62,6 +71,8 @@
 #define REG_BT1120_CSC_COEFF_CNT 0xc
 
 #define REG_BT1120_OUTPUT_CRC_FRAME0 0x88
+/** OUTPUT_CRC: spec table 0x0088–0x00A4, eight 32-bit words (frame CRC). */
+#define REG_BT1120_OUTPUT_CRC_COUNT    8
 
 /** REG_BT1120_CTL. Image format in DDR.
  * 00: YUV422 packed mode.
@@ -92,25 +103,21 @@
  */
 #define YSTOP_SHIFT 16
 
-/** REG_BT1120_IRQ_STATUS_CTL. Frame Start interrupt status.
- *  Indicates that when VSYNC is detected.
- */
+/** REG_BT1120_IRQ_EN / REG_BT1120_IRQ_STATUS bit 0 — spec fs_irq_en / fs_irq_status */
 #define FRAME_START_IRQ_STATUS_MASK BIT(0)
+#define FRAME_START_IRQ_EN_MASK		FRAME_START_IRQ_STATUS_MASK
 
-/** REG_BT1120_IRQ_STATUS_CTL. Frame DMA done interrupt status.
- *  Indicates that a frame has read from DDR.
- */
+/** Bit 1 — dma_done_irq_en / dma_done_irq_status */
 #define DMA_DONE_IRQ_STATUS_MASK BIT(1)
+#define DMA_DONE_IRQ_EN_MASK		DMA_DONE_IRQ_STATUS_MASK
 
-/** REG_BT1120_IRQ_STATUS_CTL. Inner buffer underflow interrupt status.
- *  Indicates that the inner pixel buffer is underflow.
- */
+/** Bit 2 — buf_underflow_irq_en / buf_underflow_irq_status */
 #define BUF_UNDERFLOW_IRQ_STATUS_MASK BIT(2)
+#define BUF_UNDERFLOW_IRQ_EN_MASK	BUF_UNDERFLOW_IRQ_STATUS_MASK
 
-/** REG_BT1120_IRQ_STATUS_CTL. In online mode, timing configurations
- *  mismatch with video source.
- */
+/** Bit 3 — online_mismatch_irq_en / online_mismatch_irq_status */
 #define ONLINE_MISMATCH_IRQ_STATUS_MASK BIT(3)
+#define ONLINE_MISMATCH_IRQ_EN_MASK	ONLINE_MISMATCH_IRQ_STATUS_MASK
 
 /** REG_BT1120_DDR_STORE_FORMAT_CTL.
  * The y store format in DDR, used in packed mode.

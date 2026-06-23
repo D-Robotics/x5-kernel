@@ -42,6 +42,7 @@
 #include "nano2D_kernel_driver.h"
 #include "nano2D.h"
 #include "linux/pm_runtime.h"
+#include "drobot-lite-mmu.h"
 
 struct gpu_plane_context {
 	struct drm_framebuffer *fb_display;
@@ -490,7 +491,30 @@ static void gpu_proc_destroy_plane(struct dc_proc *dc_proc)
 	kfree(hw_plane);
 }
 
-static void gpu_proc_resume_plane(struct dc_proc *dc_proc) {}
+/**
+ * gpu_proc_resume_plane - restore gc820 IOMMU after system resume
+ * @dc_proc: display controller process node
+ *
+ * After system suspend/resume, gc820_iommu hardware registers are lost.
+ * lite_mmu_resume may skip the restore when rpm_status is RPM_ACTIVE
+ * (held by device_link from display subsystem). Flush explicitly.
+ */
+static void gpu_proc_resume_plane(struct dc_proc *dc_proc)
+{
+	struct gpu_plane_proc *hw_plane		= to_gpu_plane_proc(dc_proc);
+	const struct gpu_plane_info *plane_info = hw_plane->base.info->info;
+	struct vs_n2d_aux *aux			= hw_plane->aux;
+	struct lite_mmu_iommu *iommu		= NULL;
+
+	if (plane_info->features & GPU_PLANE_OUT)
+		return;
+
+	iommu = dev_iommu_priv_get(aux->dev);
+	if (iommu)
+		lite_mmu_restore_mapping(iommu->dev);
+
+	context.opened = 0;
+}
 
 static void gpu_proc_destroy_plane_state(struct dc_proc_state *dc_state)
 {

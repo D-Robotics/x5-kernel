@@ -89,6 +89,7 @@ void lite_mmu_restore_mapping(struct device *dev)
 
 	return;
 }
+EXPORT_SYMBOL(lite_mmu_restore_mapping);
 
 void lite_mmu_reset_mapping(struct device *dev)
 {

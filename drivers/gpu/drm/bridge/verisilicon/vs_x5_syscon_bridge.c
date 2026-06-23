@@ -143,10 +143,10 @@ static const struct syscon_data dsi_subsys = {
 static const struct dss_data csi_data[] = {
 	{
 		.offsets = (u32[]){DISP_DC2CSI_DSI_EN, DISP_CSITX_IDI_EN, DISP_BT1120_2_CSITX_EN},
-		.masks	 = (u32[]){DISP_DC2CSI_DSI_EN_MASK, CSITX_IDI_EN, BT1120_2_CSITX_EN},
-		.values	 = (u32[]){0, 0, BT1120_2_CSITX_EN},
-		.rst_values = (u32[]){0, 0, 0},
-		.cnt	    = 3,
+		.masks   = (u32[]){DISP_DC2CSI_DSI_EN_MASK, CSITX_IDI_EN, BT1120_2_CSITX_EN},
+		.values  = (u32[]){DC2CSI_EN, 0, BT1120_2_CSITX_EN},
+		.rst_values = (u32[]){DC2CSI_EN, CSITX_IDI_EN, 0},
+		.cnt        = 3,
 		.use_post_disable = false,
 	},
 };

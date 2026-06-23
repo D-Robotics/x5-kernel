@@ -27,6 +27,7 @@
 
 
 #include <linux/gpio.h>
+#include <linux/gpio/consumer.h>
 #include <linux/of.h>
 #include <linux/of_gpio.h>
 #include <linux/platform_device.h>
@@ -66,10 +67,18 @@ struct iio_dev *a_iio_spi_dev;
  * @retval zero success
  * @retval non-zero failed
  */
-static s8 bmi08a_spi_write_block(u8 reg_addr,
-					const u8 *data, u8 len)
+static struct spi_device *bmi08a_spi_client(void *intf_ptr)
 {
-	struct spi_device *client = bmi_spi_client;
+	if (intf_ptr)
+		return (struct spi_device *)intf_ptr;
+
+	return bmi_spi_client;
+}
+
+static s8 bmi08a_spi_write_block(u8 reg_addr, const u8 *data, u8 len,
+				 void *intf_ptr)
+{
+	struct spi_device *client = bmi08a_spi_client(intf_ptr);
 	u8 buffer[BMI_MAX_BUFFER_SIZE + 1];
 	struct spi_transfer xfer = {
 		.tx_buf = buffer,
@@ -99,10 +108,10 @@ static s8 bmi08a_spi_write_block(u8 reg_addr,
  * @retval zero success
  * @retval non-zero failed
  */
-static s8 bmi08a_spi_read_block(u8 reg_addr,
-							u8 *data, uint16_t len)
+static s8 bmi08a_spi_read_block(u8 reg_addr, u8 *data, uint16_t len,
+						 void *intf_ptr)
 {
-	struct spi_device *client = bmi_spi_client;
+	struct spi_device *client = bmi08a_spi_client(intf_ptr);
 	u8 reg = reg_addr | 0x80;/* read: MSB = 1 */
 	struct spi_transfer xfer[2] = {
 		[0] = {
@@ -140,7 +149,10 @@ static s8 bmi08a_spi_write_wrapper(u8 reg_addr, const u8 *data,
 {
 	s8 err;
 
-	err = bmi08a_spi_write_block(reg_addr, data, len);
+	if (!bmi08a_spi_client(intf_ptr))
+		return -ENODEV;
+
+	err = bmi08a_spi_write_block(reg_addr, data, len, intf_ptr);
 	return err;
 }
 
@@ -160,9 +172,24 @@ static s8 bmi08a_spi_read_wrapper(u8 reg_addr, u8 *data,
 {
 	s8 err;
 
-	err = bmi08a_spi_read_block(reg_addr, data, len);
+	if (!bmi08a_spi_client(intf_ptr))
+		return -ENODEV;
+
+	err = bmi08a_spi_read_block(reg_addr, data, len, intf_ptr);
 	return err;
 }
+
+void bmi08a_spi_set_gyro_intf(void *gyro_spi)
+{
+	struct bmi08a_client_data *a_client_data;
+
+	if (!a_iio_spi_dev || !gyro_spi)
+		return;
+
+	a_client_data = iio_priv(a_iio_spi_dev);
+	a_client_data->device.intf_ptr_gyro = gyro_spi;
+}
+EXPORT_SYMBOL_GPL(bmi08a_spi_set_gyro_intf);
 
 /*!
  * @brief sensor probe function via spi bus
@@ -215,8 +242,23 @@ static int bmi08a_spi_probe(struct spi_device *client)
 	a_iio_spi_dev->modes = INDIO_DIRECT_MODE;
 	a_client_data->device.read_write_len = 16;
 	a_client_data->device.intf = BMI08_SPI_INTF;
-	a_client_data->device.intf_ptr_gyro = client;
-	a_client_data->IRQ = client->irq;
+	a_client_data->device.intf_ptr_accel = client;
+	a_client_data->device.intf_ptr_gyro = NULL;
+
+	/* Align with bmi08x_i2c.c: GPIO descriptor + gpiod_to_irq (not spi->irq). */
+	a_client_data->accel_gpiod = devm_gpiod_get(&client->dev, "accel-irq",
+						    GPIOD_IN);
+	if (IS_ERR(a_client_data->accel_gpiod)) {
+		PERR("failed to get accel-irq gpio: %ld\n",
+		     PTR_ERR(a_client_data->accel_gpiod));
+		return PTR_ERR(a_client_data->accel_gpiod);
+	}
+	a_client_data->IRQ = gpiod_to_irq(a_client_data->accel_gpiod);
+	if (a_client_data->IRQ < 0) {
+		PERR("gpiod_to_irq failed: %d\n", a_client_data->IRQ);
+		return a_client_data->IRQ;
+	}
+
 	dev_set_drvdata(&client->dev, a_iio_spi_dev);
 
 	return bmi08a_probe(a_iio_spi_dev);

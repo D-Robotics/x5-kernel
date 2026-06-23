@@ -39,3 +39,13 @@ config VLAN_8021Q_MVRP
 	  supersedes GVRP and is not backwards-compatible.
 
 	  If unsure, say N.
+
+config VLAN_ISOLATION
+	bool "802.1Q VLAN Isolation Support"
+	depends on VLAN_8021Q
+	help
+	  This module adds a Netfilter hook to enforce strict IPv4
+	  isolation. It ensures that source and destination IPs
+	  must stay within the same /24 network for VLAN devices.
+
+	  If unsure, say N.

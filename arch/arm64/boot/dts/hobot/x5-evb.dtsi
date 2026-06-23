@@ -92,6 +92,24 @@
 		startup-delay-us = <3000>;
 		enable-active-high;
 	};
+
+	/*
+	 * pwm-backlight uses devm_regulator_get(..., "power"). Without
+	 * power-supply, a dummy regulator is used and stays disabled at
+	 * probe, so pwm_backlight_initial_power_state() forces POWERDOWN
+	 * (bl_power=4) until userspace UNBLANK. This fixed regulator is
+	 * a logical supply so regulator_is_enabled() is true at probe.
+	 * If the panel/backlight has a real PMIC rail, replace with that phandle
+	 * and match voltage to the schematic.
+	 */
+	dsi_bl_supply: dsi-bl-supply {
+		compatible = "regulator-fixed";
+		regulator-name = "vcc-dsi-bl";
+		regulator-min-microvolt = <3300000>;
+		regulator-max-microvolt = <3300000>;
+		regulator-boot-on;
+		regulator-always-on;
+	};
 };
 
 
@@ -326,7 +344,11 @@
 		reg = <0x3b>;
 		pinctrl-names = "default";
  		//LSIO_GPIO1_PIN13
-		pinctrl-0 = <&lsio_gpio1_13>;
+		pinctrl-0 = <&lsio_gpio1_13 &dsp_gpio0_19>;
+
+		interrupt-parent = <&dsp_gpio_porta>;
+		interrupts = <19 IRQ_TYPE_EDGE_FALLING>;
+
 		reset-gpios = <&ls_gpio1_porta 13 GPIO_ACTIVE_LOW>;
 		ports {
 			#address-cells = <1>;
@@ -807,6 +829,11 @@
 &dsi_backlight {
 	status = "okay";
 	pwms = <&lpwm1 1 1000000>;
+	power-supply = <&dsi_bl_supply>;
+};
+
+&lpwm1 {
+	status = "okay";
 };
 
 &mipi_dsi0 {

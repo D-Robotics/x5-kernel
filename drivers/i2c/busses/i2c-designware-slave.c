@@ -14,6 +14,7 @@
 #include <linux/io.h>
 #include <linux/module.h>
 #include <linux/pm_runtime.h>
+#include <linux/property.h>
 #include <linux/regmap.h>
 
 #include "i2c-designware-core.h"
@@ -236,6 +237,9 @@ void i2c_dw_configure_slave(struct dw_i2c_dev *dev)
 
 	dev->slave_cfg = DW_IC_CON_RX_FIFO_FULL_HLD_CTRL |
 			 DW_IC_CON_RESTART_EN | DW_IC_CON_STOP_DET_IFADDRESSED;
+
+	if (device_property_read_bool(dev->dev, "snps,slave-sar-enable"))
+		dev->flags |= ACCESS_SLAVE_SAR_EN;
 
 	dev->mode = DW_IC_SLAVE;
 }

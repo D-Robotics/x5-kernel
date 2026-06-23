@@ -188,6 +188,18 @@ static const struct drm_display_mode csi_panel_modes[] = {
 		.flags	     = DRM_MODE_FLAG_NHSYNC | DRM_MODE_FLAG_NVSYNC,
 	},
 	{
+		.clock	     = 71500, // 1944 * 1226 * 30 = 71.5 MHz
+		.hdisplay    = 1280,
+		.hsync_start = 1280 + 32, // 1312
+		.hsync_end   = 1280 + 96, // 1376
+		.htotal	     = 1944,	  // 1280 + 32 + 96 + 440
+		.vdisplay    = 1216,
+		.vsync_start = 1216 + 2,
+		.vsync_end   = 1216 + 6,
+		.vtotal	     = 1226, 	  // 10
+		.flags	     = DRM_MODE_FLAG_NHSYNC | DRM_MODE_FLAG_NVSYNC,
+	},
+	{
 		.clock	     = 65280, // 2040 * 1066 * 30 = 65.2 MHz
 		.hdisplay    = 1472,
 		.hsync_start = 1472 + 32, // 1504

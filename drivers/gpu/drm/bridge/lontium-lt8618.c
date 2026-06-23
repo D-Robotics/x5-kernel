@@ -33,6 +33,7 @@
 #include <linux/i2c.h>
 #include <linux/init.h>
 #include <linux/module.h>
+#include <linux/kernel.h>
 #include <linux/slab.h>
 #include <linux/delay.h>
 #include <linux/fs.h>
@@ -54,6 +55,9 @@
 #include <drm/drm_probe_helper.h>
 #include <sound/hdmi-codec.h>
 #include <video/videomode.h>
+#if IS_ENABLED(CONFIG_X5_SEAMLESS_DISPLAY)
+#include <linux/soc/hobot/x5_seamless_display.h>
+#endif
 
 #define MODE_1080P 0x10
 #define DEBUG_MSEEAGE 0
@@ -351,8 +355,12 @@ struct lt8618 {
 	u8 fifo_length;
 	u8 edid_buf[EDID_LENGTH];
 	u8 fifo_buf[DDC_FIFO_SIZE_MAX];
+#if IS_ENABLED(CONFIG_X5_SEAMLESS_DISPLAY)
+	bool seamless_skip_disable_once;
+#endif
 };
 
+static void lt8618_timing_hw_regs_log(struct lt8618 *lt8618, const char *where);
 
 static inline struct lt8618 *bridge_to_lt8618(struct drm_bridge *bridge)
 {
@@ -879,7 +887,7 @@ static int lt8618_phase_config(struct lt8618 *lt8618)
 	}
 
 	if ((Jump_CNT == 0) || (Jump_CNT > 6)) {
-		pr_debug("\r\ncali phase fail ......");
+		dev_dbg(&lt8618->client->dev, "[LT8618] phase_config: cali phase fail\n");
 		return 0;
 	}
 
@@ -1026,51 +1034,88 @@ static int lt8618_hdmi_config(struct lt8618 *lt8618)
 	return 0;
 }
 
+static void lt8618_irq_enable(struct lt8618 *lt8618)
+{
+	regmap_write(lt8618->regmap, 0x8210, 0x00);	//Output low level active;
+	regmap_write(lt8618->regmap, 0x8258, 0x02);	//Det HPD, only enable HPD interrupt
+
+	regmap_write(lt8618->regmap, 0x8203, 0x3f);	//mask3	//tx_det
+
+	regmap_write(lt8618->regmap, 0x8207, 0xff);	//clear3
+	regmap_write(lt8618->regmap, 0x8207, 0x3f);	//clear3
+}
+
 static void lt8618_bridge_enable(struct drm_bridge *bridge)
 {
 	struct lt8618 *lt8618 = bridge_to_lt8618(bridge);
+	struct device *dev = &lt8618->client->dev;
 
+	dev_dbg(dev,
+		"[LT8618] bridge_enable: START (X5_DISP upstream); steps: afe_high -> phase_config -> video_input_timing_check\n");
 	lt8618_afe_high(lt8618);
-
 	lt8618_phase_config(lt8618);
-
 	lt8618_video_input_timing_check(lt8618);
+	lt8618_timing_hw_regs_log(lt8618, "bridge_enable");
+	dev_dbg(dev, "[LT8618] bridge_enable: DONE (X5_DISP)\n");
 }
 
 static void lt8618_bridge_disable(struct drm_bridge *bridge)
 {
 	struct lt8618 *lt8618 = bridge_to_lt8618(bridge);
+	struct device *dev = &lt8618->client->dev;
 
+#if IS_ENABLED(CONFIG_X5_SEAMLESS_DISPLAY)
+	/*
+	 * seamless_skip_disable_once is per lt8618 instance; DRM calls disable
+	 * for this bridge without interleaving another instance on the same struct.
+	 */
+	if (x5_seamless_display_active()) {
+		if (!lt8618->seamless_skip_disable_once) {
+			lt8618->seamless_skip_disable_once = true;
+			dev_dbg(dev, "[LT8618] seamless handoff: skip first bridge_disable\n");
+			return;
+		}
+	}
+#endif
+
+	dev_dbg(dev, "[LT8618] bridge_disable: START (X5_DISP); afe_set_tx off\n");
 	lt8618_afe_set_tx(lt8618, FALSE);
+	dev_dbg(dev, "[LT8618] bridge_disable: DONE (X5_DISP)\n");
 }
 
 static int lt8618_bridge_attach(struct drm_bridge *bridge,
-				 enum drm_bridge_attach_flags flags)
+			 enum drm_bridge_attach_flags flags)
 {
 	struct lt8618 *lt8618 = bridge_to_lt8618(bridge);
 	struct drm_device *drm = bridge->dev;
+	struct device *dev = &lt8618->client->dev;
 	int ret;
-	dev_dbg(&lt8618->client->dev,"attach start 00!\n");
+
+	dev_dbg(dev, "[LT8618] bridge_attach: START (flags=0x%x); next enable IIC (0x80ee)\n", flags);
 	regmap_write(lt8618->regmap, 0x80ee, 0x01); // enable IIC
 
 	if (!bridge->encoder) {
-		pr_err("Parent encoder object not found\n");
+		dev_err(dev, "[LT8618] Parent encoder object not found\n");
 		return -ENODEV;
 	}
 
-	if (flags & DRM_BRIDGE_ATTACH_NO_CONNECTOR)
+	if (flags & DRM_BRIDGE_ATTACH_NO_CONNECTOR) {
+		dev_dbg(dev, "[LT8618] bridge_attach: NO_CONNECTOR mode\n");
 		return drm_bridge_attach(bridge->encoder, NULL,
 					 bridge, flags);
+	}
 
+	dev_dbg(dev, "[LT8618] bridge_attach: connector_helper_add\n");
 	drm_connector_helper_add(&lt8618->connector,
 				 &lt8618_connector_helper_funcs);
 
 	if (!drm_core_check_feature(drm, DRIVER_ATOMIC)) {
 		dev_err(&lt8618->client->dev,
-			"lt8618 driver is only compatible with DRM devices supporting atomic updates\n");
+			"[LT8618] lt8618 driver is only compatible with DRM devices supporting atomic updates\n");
 		return -ENOTSUPP;
 	}
 
+	dev_dbg(dev, "[LT8618] bridge_attach: drm_connector_init\n");
 	ret = drm_connector_init(drm, &lt8618->connector,
 				 &lt8618_connector_funcs,
 				 DRM_MODE_CONNECTOR_HDMIA);
@@ -1080,7 +1125,7 @@ static int lt8618_bridge_attach(struct drm_bridge *bridge,
 	if (lt8618->client->irq > 0)
 		lt8618->connector.polled = DRM_CONNECTOR_POLL_HPD;
 	else
-		lt8618->connector.polled = DRM_CONNECTOR_POLL_CONNECT;
+		lt8618->connector.polled = DRM_CONNECTOR_POLL_CONNECT | DRM_CONNECTOR_POLL_DISCONNECT;
 
 	lt8618->connector.interlace_allowed = true;
 
@@ -1190,7 +1235,7 @@ static int lt8618_video_output_pll_cfg(struct lt8618 *lt8618)
 		cali_done &= 0x80;
 
 		if (lock && cali_done && (cali_val != 0xff))
-			pr_info("TXPLL LOCK.\n");
+			dev_dbg(&lt8618->client->dev, "[LT8618] TXPLL LOCK\n");
 		else {
 			regmap_write(lt8618->regmap, 0x8016, 0xF1);
 			/* txpll _sw_rst_n */
@@ -1205,10 +1250,14 @@ static int lt8618_video_output_pll_cfg(struct lt8618 *lt8618)
 
 static int lt8618_video_output_cfg(struct lt8618 *lt8618)
 {
+	struct device *dev = &lt8618->client->dev;
+
+	dev_dbg(dev,
+		"[LT8618] video_output_cfg: START; analog -> pll_range -> pll_cfg\n");
 	lt8618_video_output_analog(lt8618);
 	lt8618_video_output_pll_range(lt8618);
 	lt8618_video_output_pll_cfg(lt8618);
-
+	dev_dbg(dev, "[LT8618] video_output_cfg: DONE\n");
 	return 0;
 }
 
@@ -1257,6 +1306,90 @@ static void LT8618SXB_AVI_setting(struct lt8618 *lt8618)
 	}
 }
 
+/*
+ * Input-side timing / meter (lt8618_video_input_timing_check uses same banks):
+ * 0x8245-0x8251 BT1120 path, 0x8270-0x8281 measured input timing, 0x821d-0x821f PCLK.
+ */
+static void lt8618_timing_hw_regs_log(struct lt8618 *lt8618, const char *where)
+{
+	struct device *dev = &lt8618->client->dev;
+	unsigned int v45, v47, v48, v4f, v50, v51;
+	u8 in_t[INPUT_VIDEO_TIMING_LEN];
+	u8 fm[FREQ_METER2_LEN];
+	char buf[80];
+	size_t pos = 0;
+	int ret;
+	size_t i;
+
+	regmap_read(lt8618->regmap, LT8618_REG_INPUT_DATA_LANE_SEQ, &v45);
+	regmap_read(lt8618->regmap, LT8618_REG_INPUT_VIDEO_SYNC_GEN, &v47);
+	regmap_read(lt8618->regmap, LT8618_REG_EMBEDDED_SYNC_MODE_INPUT_ENABLE, &v48);
+	regmap_read(lt8618->regmap, LT8618_REG_INPUT_SIGNAL_SAMPLE_TYPE, &v4f);
+	regmap_read(lt8618->regmap, LT8618_REG_INPUT_SRC_SELECT, &v50);
+	regmap_read(lt8618->regmap, LT8618_REG_VIDEO_CHECK_SELECT, &v51);
+	dev_dbg(dev,
+		"[LT8618_TIMING] %s: in_path 8245=%02x 8247=%02x 8248=%02x 824f=%02x 8250=%02x 8251=%02x\n",
+		where, v45 & 0xff, v47 & 0xff, v48 & 0xff, v4f & 0xff, v50 & 0xff, v51 & 0xff);
+
+	ret = regmap_bulk_read(lt8618->regmap, LT8618_REG_INPUT_VIDEO_TIMING_BASE,
+			       in_t, sizeof(in_t));
+	if (ret)
+		dev_dbg(dev, "[LT8618_TIMING] %s: in_hw_timing 0x8270 read failed: %d\n", where, ret);
+	else
+		for (i = 0; i < sizeof(in_t) && pos < sizeof(buf) - 4; i++)
+			pos += scnprintf(buf + pos, sizeof(buf) - pos, "%02x ", in_t[i]);
+	if (!ret)
+		dev_dbg(dev, "[LT8618_TIMING] %s: in_hw_timing 0x8270..0x8281 (%zu B): %s\n",
+			where, sizeof(in_t), buf);
+
+	ret = regmap_bulk_read(lt8618->regmap, LT8618_REG_FREQ_METER2_BASE, fm, sizeof(fm));
+	if (ret)
+		dev_dbg(dev, "[LT8618_TIMING] %s: freq_meter 0x821d read failed: %d\n", where, ret);
+	else
+		dev_dbg(dev, "[LT8618_TIMING] %s: freq_meter 0x821d..0x821f: %02x %02x %02x\n",
+			where, fm[0], fm[1], fm[2]);
+}
+
+/*
+ * HDMI output timing block written to 0x8220..0x823d (30 bytes), interleaved MSB/LSB
+ * per lt8618_video_output_timing(). Log fields + readback for U-Boot / kernel diff.
+ */
+static void lt8618_timing_dump(struct lt8618 *lt8618, const char *where,
+			       const struct drm_display_mode *mode, const u32 timing[15])
+{
+	struct device *dev = &lt8618->client->dev;
+	u8 rb[30];
+	int ret;
+	size_t i;
+	char buf[240];
+	size_t pos = 0;
+
+	dev_dbg(dev,
+		"[LT8618_TIMING] %s: drm %ux%u@%u dotclock_khz=%u htot=%u vtot=%u flags=0x%x\n",
+		where, mode->hdisplay, mode->vdisplay, drm_mode_vrefresh(mode),
+		mode->clock, mode->htotal, mode->vtotal, mode->flags);
+
+	dev_dbg(dev,
+		"[LT8618_TIMING] %s: fields hact=%u hfp=%u hsw=%u rsv=%u,%u,%u htot=%u | hact_b=%u hfp_b=%u hbp=%u hsw_b=%u | vact=%u vfp=%u vbp=%u vsw=%u\n",
+		where,
+		timing[0], timing[1], timing[2], timing[3], timing[4], timing[5], timing[6],
+		timing[7], timing[8], timing[9], timing[10],
+		timing[11], timing[12], timing[13], timing[14]);
+
+	ret = regmap_bulk_read(lt8618->regmap, 0x8220, rb, sizeof(rb));
+	if (ret) {
+		dev_dbg(dev, "[LT8618_TIMING] %s: readback 0x8220.. failed: %d\n", where, ret);
+		return;
+	}
+
+	for (i = 0; i < sizeof(rb) && pos < sizeof(buf) - 4; i++)
+		pos += scnprintf(buf + pos, sizeof(buf) - pos, "%02x ", rb[i]);
+	dev_dbg(dev, "[LT8618_TIMING] %s: out_timing_pack 0x8220..0x823d (%zu B): %s\n",
+		where, sizeof(rb), buf);
+
+	lt8618_timing_hw_regs_log(lt8618, where);
+}
+
 static int lt8618_video_output_timing(struct lt8618 *lt8618,
 				      const struct drm_display_mode *mode)
 {
@@ -1291,6 +1424,8 @@ static int lt8618_video_output_timing(struct lt8618 *lt8618,
 
 	regmap_bulk_write(lt8618->regmap, 0x8220, video_timing_arr,
 			  ARRAY_SIZE(video_timing_arr));
+
+	lt8618_timing_dump(lt8618, "video_output_timing", mode, timing);
 
 	return 0;
 }
@@ -1328,35 +1463,60 @@ static int lt8618_video_input_param(struct lt8618 *lt8618,
 
 static int lt8618_video_input_cfg(struct lt8618 *lt8618)
 {
+	struct device *dev = &lt8618->client->dev;
+
+	dev_dbg(dev, "[LT8618] video_input_cfg: START; input_analog_seq\n");
 	regmap_multi_reg_write(lt8618->regmap, lt8618_input_analog_seq,
 				ARRAY_SIZE(lt8618_input_analog_seq));
 
+	dev_dbg(dev, "[LT8618] video_input_cfg: input_param (BT1120)\n");
 	/* BT1120 input, without sync & de */
 	lt8618_video_input_param(lt8618, RGB_BT1120, DATA_LANE_SEQ_RBG,
 				 SDR_CLK);
 
+	{
+		unsigned int a, t, lane;
+
+		regmap_read(lt8618->regmap, 0x8102, &a);
+		regmap_read(lt8618->regmap, LT8618_REG_INPUT_VIDEO_TYPE, &t);
+		regmap_read(lt8618->regmap, LT8618_REG_INPUT_DATA_LANE_SEQ, &lane);
+		dev_dbg(dev,
+			"[LT8618] video_input_cfg: rd 8102=0x%02x 800a=0x%02x 8245=0x%02x (analog_seq+BT1120/RBG)\n",
+			a & 0xff, t & 0xff, lane & 0xff);
+	}
+
+	dev_dbg(dev, "[LT8618] video_input_cfg: DONE\n");
 	return 0;
 }
 
 static void lt8618_bridge_mode_set(struct drm_bridge *bridge,
-			   const struct drm_display_mode *mode,
-			   const struct drm_display_mode *adj_mode)
+			const struct drm_display_mode *mode,
+			const struct drm_display_mode *adj_mode)
 {
 	int vic;
 	struct lt8618 *lt8618 = bridge_to_lt8618(bridge);
+	struct device *dev = &lt8618->client->dev;
+
+	dev_dbg(dev,
+		"[LT8618] bridge_mode_set: START (X5_DISP) %ux%u@%u dotclock_khz=%u; mode %dx%d@%d\n",
+		mode->hdisplay, mode->vdisplay, drm_mode_vrefresh(mode), mode->clock,
+		mode->hdisplay, mode->vdisplay, drm_mode_vrefresh(mode));
+
 	vic = drm_match_cea_mode(mode);
+	dev_dbg(dev, "[LT8618] bridge_mode_set: VIC=%d; video_input_cfg -> output_cfg -> hdmi_csc -> AVI -> output_timing\n",
+		vic);
 
 	lt8618->mode_config.input_mode.mode =
 		drm_mode_duplicate(bridge->dev, mode);
 
 	lt8618_video_input_cfg(lt8618);
-
 	lt8618_video_output_cfg(lt8618);
-
 	lt8618_hdmi_csc(lt8618);
-
+	lt8618_hdmi_output_mode(lt8618, HDMI_MODE_NORMAL);
 	LT8618SXB_AVI_setting(lt8618);
 	lt8618_video_output_timing(lt8618, mode);
+	lt8618_audio_enable(lt8618);
+	dev_dbg(dev, "[LT8618] bridge_mode_set: DONE (X5_DISP)\n");
 }
 
 static const struct drm_bridge_funcs lt8618_bridge_funcs = {
@@ -1375,49 +1535,143 @@ static const struct drm_bridge_timings default_lt8618_timings = {
 
 static void lt8618_sw_reset(struct lt8618 *lt8618)
 {
+	dev_dbg(&lt8618->client->dev, "[LT8618] sw_reset: write reset sequence\n");
 	regmap_multi_reg_write(lt8618->regmap, lt8618_sw_reset_seq,
 				ARRAY_SIZE(lt8618_sw_reset_seq));
 }
 
 static void lt8618_sw_enable(struct lt8618 *lt8618)
 {
+	dev_dbg(&lt8618->client->dev, "[LT8618] sw_enable: update bits 0x80ee\n");
 	regmap_update_bits(lt8618->regmap, LT8618_REG_ENABLE,
 			   LT8618_REG_CHIP_ENABLE_MSK, ENABLE_REG_BANK);
 }
 
 static int lt8618_sw_init(struct lt8618 *lt8618)
 {
+	struct device *dev = &lt8618->client->dev;
+
+	dev_dbg(dev, "[LT8618] sw_init: START; video_input_cfg -> hdmi_config\n");
 	lt8618_video_input_cfg(lt8618);
 	lt8618_hdmi_config(lt8618);
-
+	dev_dbg(dev, "[LT8618] sw_init: DONE\n");
 	return 0;
+}
+
+static irqreturn_t lt8618_interrupt(int irq, void *data)
+{
+	unsigned int irq_flag;
+	struct lt8618 *lt8618 = (struct lt8618 *)data;
+	struct device *dev = &lt8618->client->dev;
+
+	dev_dbg(dev, "[LT8618] interrupt start\n");
+
+	mutex_lock(&lt8618->lt8618_mutex);
+
+	regmap_read(lt8618->regmap, 0x820f, &irq_flag);
+
+	if(irq_flag & 0xc0){ //Disconnect:  0x80, Connected: 0x40
+		int val = 0;
+		enum drm_connector_status status = hpd_status_plug_off;
+
+		//read hpd status
+		regmap_write(lt8618->regmap, 0x80ee, 0x01); // enable IIC
+		regmap_read(lt8618->regmap, LT8618_REG_LINK_STATUS, &val);
+		if (val & (1U << LINK_STATUS_OUTPUT_DC_POS)) {
+			status = connector_status_connected;
+			dev_dbg(dev, "[LT8618] HDMI status -> connected\n");
+		}else{
+			status = hpd_status_plug_off;
+			dev_dbg(dev, "[LT8618] HDMI status -> disconnect\n");
+		}
+		//Notify bridge driver
+		drm_bridge_hpd_notify(&lt8618->bridge, status);
+
+		//Notify the user layer through udev
+		drm_helper_hpd_irq_event(lt8618->bridge.dev);
+		regmap_write(lt8618->regmap, 0x8207, 0xff);   //clear interrupt flag
+		regmap_write(lt8618->regmap, 0x8207, 0x3f);   //clear interrupt flag
+	}else{
+		dev_warn(dev, "interrupt is not hpd: %02x, current only support HPD interrupt\n", irq_flag);
+	}
+	mutex_unlock(&lt8618->lt8618_mutex);
+	dev_dbg(dev, "[LT8618] interrupt end\n");
+
+	return IRQ_HANDLED;
 }
 
 static void lt8618_init(struct lt8618 *lt8618)
 {
 	struct device *dev = &lt8618->client->dev;
-	u8 ret;
+	int irqret;
 
+	dev_dbg(dev, "[LT8618] lt8618_init: START\n");
+
+#if IS_ENABLED(CONFIG_X5_SEAMLESS_DISPLAY)
+	if (x5_seamless_display_active()) {
+		dev_dbg(dev, "[LT8618] lt8618_init: try seamless handoff (skip HW/SW reset)\n");
+		regmap_write(lt8618->regmap, 0x80ee, 0x01);
+		if (lt8618_chip_id_verify(lt8618)) {
+			lt8618->bridge.funcs = &lt8618_bridge_funcs;
+			lt8618->bridge.of_node = dev->of_node;
+			lt8618->bridge.timings = &default_lt8618_timings;
+			lt8618->bridge.ops = DRM_BRIDGE_OP_DETECT | DRM_BRIDGE_OP_EDID;
+			if (lt8618->client->irq > 0) {
+				lt8618_irq_enable(lt8618);
+				lt8618->bridge.ops |= DRM_BRIDGE_OP_HPD;
+				irqret = devm_request_threaded_irq(dev, lt8618->client->irq, NULL,
+					lt8618_interrupt,
+					IRQF_ONESHOT, dev_name(dev),
+					lt8618);
+				if (irqret)
+					dev_err(dev, "[LT8618] request interrupt failed (%d)\n", irqret);
+				else
+					dev_dbg(dev, "[LT8618] interrupt irq=%d\n", lt8618->client->irq);
+			} else {
+				dev_dbg(dev, "[LT8618] not use interrupt\n");
+			}
+			drm_bridge_add(&lt8618->bridge);
+			dev_dbg(dev, "[LT8618] lt8618_init: seamless path DONE\n");
+			return;
+		}
+		dev_dbg(dev, "[LT8618] seamless handoff: chip verify failed, full reinit\n");
+	}
+#endif
+
+	dev_dbg(dev, "[LT8618] lt8618_init: reset; enable IIC\n");
 	lt8618_reset(lt8618);
-
 	regmap_write(lt8618->regmap, 0x80ee, 0x01); // enable IIC
-
-	ret = lt8618_chip_id_verify(lt8618);
+	if (!lt8618_chip_id_verify(lt8618))
+		dev_warn(dev, "[LT8618] chip_id_verify failed after reset; continuing full init\n");
 
 	lt8618->bridge.funcs = &lt8618_bridge_funcs;
 	lt8618->bridge.of_node = dev->of_node;
 	lt8618->bridge.timings = &default_lt8618_timings;
 	lt8618->bridge.ops = DRM_BRIDGE_OP_DETECT | DRM_BRIDGE_OP_EDID;
 
-	if (lt8618->client->irq > 0)
+	if (lt8618->client->irq > 0) {
+		lt8618_irq_enable(lt8618);
+
 		lt8618->bridge.ops |= DRM_BRIDGE_OP_HPD;
+		irqret = devm_request_threaded_irq(dev, lt8618->client->irq, NULL,
+				lt8618_interrupt,
+				IRQF_ONESHOT, dev_name(dev),
+				lt8618);
+		if (irqret)
+			dev_err(dev, "[LT8618] lt8618sxb request interrupt failed (%d)\n", irqret);
+		else
+			dev_dbg(dev, "[LT8618] lt8618sxb enable interrupt, irq id is %d\n",
+				lt8618->client->irq);
+	} else {
+		dev_dbg(dev, "[LT8618] lt8618sxb not use interrupt\n");
+	}
 
+	dev_dbg(dev, "[LT8618] lt8618_init: drm_bridge_add; sw_enable; sw_reset; sw_init\n");
 	drm_bridge_add(&lt8618->bridge);
-
 	lt8618_sw_enable(lt8618);
 	lt8618_sw_reset(lt8618);
-
 	lt8618_sw_init(lt8618);
+	dev_dbg(dev, "[LT8618] lt8618_init: DONE\n");
 }
 
 static int lt8618_probe(struct i2c_client *client, const struct i2c_device_id *id)
@@ -1427,15 +1681,20 @@ static int lt8618_probe(struct i2c_client *client, const struct i2c_device_id *i
 	int ret = 0;
 	struct lt8618 *lt8618;
 
+	dev_dbg(dev, "[LT8618] probe: START\n");
+
 	if (!i2c_check_functionality(adapter, I2C_FUNC_I2C))
 		return -ENODEV;
 
 	lt8618 = devm_kzalloc(&client->dev, sizeof(struct lt8618),
-					 GFP_KERNEL);
+				 GFP_KERNEL);
 	if (!lt8618)
 		return -ENOMEM;
 	lt8618->client = client;
 	mutex_init(&lt8618->lt8618_mutex);
+#if IS_ENABLED(CONFIG_X5_SEAMLESS_DISPLAY)
+	lt8618->seamless_skip_disable_once = false;
+#endif
 
 	lt8618->regmap = devm_regmap_init_i2c(client, &lt8618_regmap_config);
 	if (IS_ERR(lt8618->regmap))
@@ -1445,13 +1704,13 @@ static int lt8618_probe(struct i2c_client *client, const struct i2c_device_id *i
 	if (IS_ERR(lt8618->reset_gpio))
 	{
 		/* lt8618->reset_gpio GPIO not available */
-		pr_info("optional-gpio not found\n");
+		dev_dbg(dev, "[LT8618] optional-gpio not found\n");
 		goto err;
 	}
 
 	if (ret != 0)
 	{
-		pr_err("not found lt8618sxb device, exit probe!!!\n");
+		dev_err(dev, "[LT8618] not found lt8618sxb device, exit probe!!!\n");
 		goto err;
 	}
 
@@ -1460,8 +1719,9 @@ static int lt8618_probe(struct i2c_client *client, const struct i2c_device_id *i
 
 	client->flags = I2C_CLIENT_SCCB;
 
+	dev_dbg(dev, "[LT8618] probe: calling lt8618_init\n");
 	lt8618_init(lt8618);
-
+	dev_dbg(dev, "[LT8618] probe: DONE\n");
 	return 0;
 
 err:
@@ -1477,6 +1737,9 @@ static void lt8618_remove(struct i2c_client *client)
 {
 	struct lt8618 *lt8618 = i2c_get_clientdata(client);
 	if (lt8618) {
+#if IS_ENABLED(CONFIG_X5_SEAMLESS_DISPLAY)
+		lt8618->seamless_skip_disable_once = false;
+#endif
 		drm_bridge_remove(&lt8618->bridge);
 		devm_kfree(&client->dev, lt8618);
 	}
@@ -1495,12 +1758,37 @@ static const struct i2c_device_id lt8618_i2c_ids[] = {
 };
 MODULE_DEVICE_TABLE(i2c, lt8618_i2c_ids);
 
+#ifdef CONFIG_PM_SLEEP
+static int lt8618_suspend(struct device *dev)
+{
+	return 0;
+}
+
+static int lt8618_resume(struct device *dev)
+{
+	struct i2c_client *client = to_i2c_client(dev);
+	struct lt8618 *lt8618 = i2c_get_clientdata(client);
+
+	dev_dbg(dev, "resume\n");
+
+	lt8618_sw_enable(lt8618);
+	lt8618_sw_reset(lt8618);
+
+	return 0;
+}
+#endif
+
+static const struct dev_pm_ops lt8618_pm_ops = {
+	SET_SYSTEM_SLEEP_PM_OPS(lt8618_suspend, lt8618_resume)
+};
+
 static struct i2c_driver lt8618_driver = {
 	.probe = lt8618_probe,
 	.remove = lt8618_remove,
 	.driver = {
 		.name = "lt8618",
 		.of_match_table = lt8618_dt_ids,
+		.pm = &lt8618_pm_ops,
 	},
 	.id_table = lt8618_i2c_ids,
 };

@@ -1,4 +1,13 @@
-// SPDX-License-Identifier: GPL-2.0-or-later
+/*
+ * Copyright (C) 2026 D-Robotics Co., Ltd.
+ * Author: fuhua.wang <fuhua.wang@d-robotics.cc>
+ * Modified by: fuhua.wang <fuhua.wang@d-robotics.cc>
+ *
+ * ICM42688 FSYNC packet sysfs interface.
+ *
+ * Registers a dedicated IIO device and exposes pkt_fsync sysfs attribute
+ * for reading FSYNC-aligned IMU snapshot without the FIFO buffer path.
+ */
 #include <linux/device.h>
 #include <linux/mutex.h>
 #include <linux/pm_runtime.h>
@@ -24,7 +33,7 @@ static const struct iio_chan_spec inv_icm42600_fsync_channels[] = {
 };
 
 static const struct iio_info inv_icm42600_fsync_info = {
-    .attrs = &inv_icm42688_pkt_fsync_attr_group,  // 挂载原来的属性组
+    .attrs = &inv_icm42688_pkt_fsync_attr_group,
 };
 
 struct iio_dev *inv_icm42600_fsync_init(struct inv_icm42600_state *st)
@@ -38,7 +47,6 @@ struct iio_dev *inv_icm42600_fsync_init(struct inv_icm42600_state *st)
     if (!name)
         return ERR_PTR(-ENOMEM);
 
-    /* 分配 IIO 设备，不需要私有数据，直接使用 st */
     indio_dev = devm_iio_device_alloc(dev, 0);
     if (!indio_dev)
         return ERR_PTR(-ENOMEM);
@@ -142,7 +150,7 @@ ssize_t inv_icm42688_pkt_fsync_show(struct device *dev,
 	     ((u64)pkt.gyro_y << 32) |
 	     ((u64)pkt.gyro_z << 16);
 
-	/* 输出为一个“逻辑 128bit”数 */
+	/* Emit as a logical 128-bit value (hi64 lo64) */
 	return sysfs_emit(buf, "0x%016llx 0x%016llx\n", hi, lo);
 }
 
