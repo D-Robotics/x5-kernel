@@ -6440,7 +6440,7 @@ void phydm_antdiv_debug(void *dm_void, char input[][16], u32 *_used,
 	u8 i, input_idx = 0;
 
 	for (i = 0; i < 5; i++) {
-		if (input[i + 1]) {
+		if (input[i + 1][0]) {
 			PHYDM_SSCANF(input[i + 1], DCMD_HEX, &dm_value[i]);
 			input_idx++;
 		}

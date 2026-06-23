@@ -1500,10 +1500,8 @@ enum rtw_phl_status rtw_phl_cmd_scan_request(void *phl,
 	return RTW_PHL_STATUS_SUCCESS;
 
 error:
-	if(param->sctrl) {
-		_cmd_scan_req_deinit(phl_info, param);
-		param->sctrl_num = 0;
-	}
+	_cmd_scan_req_deinit(phl_info, param);
+	param->sctrl_num = 0;
 
 	return pstatus;
 }

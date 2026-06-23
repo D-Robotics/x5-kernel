@@ -33,6 +33,7 @@ unsigned int uvc_clock_param = CLOCK_MONOTONIC;
 unsigned int uvc_hw_timestamps_param;
 unsigned int uvc_no_drop_param;
 static unsigned int uvc_quirks_param = -1;
+unsigned int uvc_limit_size = 1;
 unsigned int uvc_dbg_param;
 unsigned int uvc_timeout_param = UVC_CTRL_STREAMING_TIMEOUT;
 
@@ -2345,6 +2346,8 @@ module_param_named(trace, uvc_dbg_param, uint, S_IRUGO|S_IWUSR);
 MODULE_PARM_DESC(trace, "Trace level bitmask");
 module_param_named(timeout, uvc_timeout_param, uint, S_IRUGO|S_IWUSR);
 MODULE_PARM_DESC(timeout, "Streaming control requests timeout");
+module_param_named(limitsize, uvc_limit_size, uint, S_IRUGO|S_IWUSR);
+MODULE_PARM_DESC(limitsize, "Limit bandwidth");
 
 /* ------------------------------------------------------------------------
  * Driver initialization and cleanup

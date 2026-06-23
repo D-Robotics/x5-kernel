@@ -56,6 +56,12 @@
 		spi5 = &spi5;
 		spi6 = &spi6;
 		spi7 = &qspi;
+		pwm0 = &pwm0;
+		pwm1 = &pwm1;
+		pwm2 = &pwm2;
+		pwm3 = &pwm3;
+		i2s0 = &dw_i2s0;
+		i2s1 = &dw_i2s1;
 
 		mmc0 = &emmc;
 		mmc1 = &sdio_0;
@@ -775,7 +781,7 @@
 		socinfo: socinfo{
 			compatible = "hobot,boardinfo";
 			soc_gen = "X5";
-			soc_name = "UKNOWN";
+			soc_name = "X5U";
 			hw_name = "0000000000000000"; /* 16Btyes */
 			board_version = "0000000000000000"; /* 16Btyes */
 			hw_info = "00000000000000000000000000000000";  /* 32Btyes */
@@ -3618,11 +3624,8 @@
 				status = "disabled";
 				resets = <&dsprst DSP_I2C_RESET>;
 				i2c-sda-hold-time-ns = <30>;
-				pinctrl-names = "default","recovery";
+				pinctrl-names = "default";
 				pinctrl-0 = <&pinctrl_dsp_i2c7>;
-				pinctrl-1 = <&dsp_gpio0_0 &dsp_gpio0_1>;
-				scl-gpios = <&dsp_gpio_porta 0 GPIO_ACTIVE_HIGH>;
-				sda-gpios = <&dsp_gpio_porta 1 GPIO_ACTIVE_HIGH>;
 			};
 
 			dsp_axi_dma: dma-controller@32080000 {
@@ -4149,11 +4152,8 @@
 				clock-frequency = <100000>;
 				resets = <&socrst LSIO_I2C0_APB_RESET>;
 				i2c-sda-hold-time-ns = <30>;
-				pinctrl-names = "default", "recovery";
+				pinctrl-names = "default";
 				pinctrl-0 = <&pinctrl_i2c0>;
-				pinctrl-1 = <&lsio_gpio1_7 &lsio_gpio1_8>;
-				scl-gpios = <&ls_gpio1_porta 7 GPIO_ACTIVE_HIGH>;
-				sda-gpios = <&ls_gpio1_porta 8 GPIO_ACTIVE_HIGH>;
 			};
 
 			i2c1: i2c@340c0000 {
@@ -4169,11 +4169,8 @@
 				clock-frequency = <100000>;
 				resets = <&socrst LSIO_I2C1_APB_RESET>;
 				i2c-sda-hold-time-ns = <30>;
-				pinctrl-names = "default", "recovery";
+				pinctrl-names = "default";
 				pinctrl-0 = <&pinctrl_i2c1>;
-				pinctrl-1 = <&lsio_gpio1_9 &lsio_gpio1_10>;
-				scl-gpios = <&ls_gpio1_porta 9 GPIO_ACTIVE_HIGH>;
-				sda-gpios = <&ls_gpio1_porta 10 GPIO_ACTIVE_HIGH>;
 			};
 
 			i2c2: i2c@340d0000 {
@@ -4189,11 +4186,8 @@
 				clock-frequency = <100000>;
 				resets = <&socrst LSIO_I2C2_APB_RESET>;
 				i2c-sda-hold-time-ns = <30>;
-				pinctrl-names = "default", "recovery";
+				pinctrl-names = "default";
 				pinctrl-0 = <&pinctrl_i2c2>;
-				pinctrl-1 = <&lsio_gpio1_11 &lsio_gpio1_12>;
-				scl-gpios = <&ls_gpio1_porta 11 GPIO_ACTIVE_HIGH>;
-				sda-gpios = <&ls_gpio1_porta 12 GPIO_ACTIVE_HIGH>;
 			};
 
 			i2c3: i2c@340e0000 {
@@ -4209,11 +4203,8 @@
 				clock-frequency = <100000>;
 				resets = <&socrst LSIO_I2C3_APB_RESET>;
 				i2c-sda-hold-time-ns = <30>;
-				pinctrl-names = "default", "recovery";
+				pinctrl-names = "default";
 				pinctrl-0 = <&pinctrl_i2c3>;
-				pinctrl-1 = <&lsio_gpio1_13 &lsio_gpio1_14>;
-				scl-gpios = <&ls_gpio1_porta 13 GPIO_ACTIVE_HIGH>;
-				sda-gpios = <&ls_gpio1_porta 14 GPIO_ACTIVE_HIGH>;
 			};
 
 			i2c4: i2c@340f0000 {
@@ -4229,11 +4220,8 @@
 				clock-frequency = <100000>;
 				resets = <&socrst LSIO_I2C4_APB_RESET>;
 				i2c-sda-hold-time-ns = <30>;
-				pinctrl-names = "default", "recovery";
+				pinctrl-names = "default";
 				pinctrl-0 = <&pinctrl_i2c4>;
-				pinctrl-1 = <&lsio_gpio1_15 &lsio_gpio1_16>;
-				scl-gpios = <&ls_gpio1_porta 15 GPIO_ACTIVE_HIGH>;
-				sda-gpios = <&ls_gpio1_porta 16 GPIO_ACTIVE_HIGH>;
 			};
 
 			lpwm0: lpwm@34100000 {
@@ -4490,11 +4478,8 @@
 				clock-frequency = <100000>;
 				resets = <&socrst LSIO_I2C5_APB_RESET>;
 				i2c-sda-hold-time-ns = <30>;
-				pinctrl-names = "default", "recovery";
+				pinctrl-names = "default";
 				pinctrl-0 = <&pinctrl_i2c5>;
-				pinctrl-1 = <&lsio_gpio0_10 &lsio_gpio0_11>;
-				scl-gpios = <&ls_gpio0_porta 10 GPIO_ACTIVE_HIGH>;
-				sda-gpios = <&ls_gpio0_porta 11 GPIO_ACTIVE_HIGH>;
 			};
 
 			i2c6: i2c@341d0000 {
@@ -4510,11 +4495,8 @@
 				clock-frequency = <100000>;
 				resets = <&socrst LSIO_I2C6_APB_RESET>;
 				i2c-sda-hold-time-ns = <30>;
-				pinctrl-names = "default", "recovery";
+				pinctrl-names = "default";
 				pinctrl-0 = <&pinctrl_i2c6>;
-				pinctrl-1 = <&lsio_gpio0_30 &lsio_gpio0_31>;
-				scl-gpios = <&ls_gpio0_porta 30 GPIO_ACTIVE_HIGH>;
-				sda-gpios = <&ls_gpio0_porta 31 GPIO_ACTIVE_HIGH>;
 			};
 		};
 
@@ -4780,5 +4762,23 @@
 	ipc_hal: ipc_hal {
 		status = "disabled";
 		compatible = "hobot,hobot-ipc-hal";
+	};
+
+	__overrides__ {
+		uart1 = <&uart1>,"status";
+		uart2 = <&uart2>,"status";
+		uart3 = <&uart3>,"status";
+		uart6 = <&uart6>,"status";
+		uart7 = <&uart7>,"status";
+		spi1 = <&spi1>,"status";
+		spi2 = <&spi2>,"status";
+		i2c0 = <&i2c0>,"status";
+		i2c1 = <&i2c1>,"status";
+		i2c5 = <&i2c5>,"status";
+		pwm0 = <&pwm0>,"status";
+		pwm1 = <&pwm1>,"status";
+		pwm2 = <&pwm2>,"status";
+		pwm3 = <&pwm3>,"status";
+		dw_i2s1 = <&dw_i2s1>,"status";
 	};
 };

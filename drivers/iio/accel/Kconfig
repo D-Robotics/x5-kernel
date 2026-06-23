@@ -272,6 +272,19 @@ config BMI088_ACCEL_SPI
 	tristate
 	select REGMAP_SPI
 
+config BMI08X
+	tristate "Bosch BMI085A Accelerometer Driver"
+	depends on I2C && SYSFS && IIO
+	help
+	  Enable Bosch BMI088 I2C based IMU driver, if enabled as module, it
+	  will be generated as bmi088.ko
+
+config BOSCH_DRIVER_LOG_FUNC
+	tristate "Bosch Sensortec driver smart log function support"
+	depends on (I2C || SPI_MASTER) && SYSFS
+	help
+	 If you say yes here, you get support for smart log function in Bosch Sensortec driver.
+
 config DA280
 	tristate "MiraMEMS DA280 3-axis 14-bit digital accelerometer driver"
 	depends on I2C
