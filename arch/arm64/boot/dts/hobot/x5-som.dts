@@ -57,14 +57,14 @@
 
 	vdd08_gpu_reg: vdd08_gpu_reg@3 {
 		status = "okay";
-		compatible = "regulator-gpio";
+		compatible = "regulator-fixed";
 		pinctrl-names = "default";
 		pinctrl-0 = <&hsio_gpio1_1>;
 		regulator-name = "VCC_GPU";
 		regulator-min-microvolt = <800000>;
 		regulator-max-microvolt = <800000>;
 		regulator-enable-ramp-delay = <3000>;
-		enable-gpio = <&hs_gpio1_porta 1 GPIO_ACTIVE_HIGH>;
+		gpio = <&hs_gpio1_porta 1 GPIO_ACTIVE_HIGH>;
 		states = <800000 0>;
 		startup-delay-us = <3000>;
 		enable-active-high;

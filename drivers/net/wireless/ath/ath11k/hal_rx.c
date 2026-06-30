@@ -371,7 +371,8 @@ int ath11k_hal_wbm_desc_parse_err(struct ath11k_base *ab, void *desc,
 
 	ret_buf_mgr = FIELD_GET(BUFFER_ADDR_INFO1_RET_BUF_MGR,
 				wbm_desc->buf_addr_info.info1);
-	if (ret_buf_mgr != HAL_RX_BUF_RBM_SW3_BM) {
+	if (ret_buf_mgr != HAL_RX_BUF_RBM_SW1_BM &&
+	    ret_buf_mgr != HAL_RX_BUF_RBM_SW3_BM) {
 		ab->soc_stats.invalid_rbm++;
 		return -EINVAL;
 	}
@@ -863,6 +864,12 @@ ath11k_hal_rx_populate_mu_user_info(void *rx_tlv, struct hal_rx_mon_ppdu_info *p
 		ppdu_info->num_mpdu_fcs_err;
 
 	ath11k_hal_rx_populate_byte_count(rx_tlv, ppdu_info, rx_user_status);
+}
+
+static u16 ath11k_hal_rx_mpduinfo_get_peerid(struct ath11k_base *ab,
+					     struct hal_rx_mpdu_info *mpdu_info)
+{
+	return ab->hw_params.hw_ops->mpdu_info_get_peerid(mpdu_info);
 }
 
 static enum hal_rx_mon_status
@@ -1459,11 +1466,10 @@ ath11k_hal_rx_parse_mon_status_tlv(struct ath11k_base *ab,
 		break;
 	}
 	case HAL_RX_MPDU_START: {
-		u16 peer_id;
+		struct hal_rx_mpdu_info *mpdu_info =
+				(struct hal_rx_mpdu_info *)tlv_data;
 
-		peer_id = ab->hw_params.hw_ops->mpdu_info_get_peerid(tlv_data);
-		if (peer_id)
-			ppdu_info->peer_id = peer_id;
+		ppdu_info->peer_id = ath11k_hal_rx_mpduinfo_get_peerid(ab, mpdu_info);
 		break;
 	}
 	case HAL_RXPCU_PPDU_END_INFO: {

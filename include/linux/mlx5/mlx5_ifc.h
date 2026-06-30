@@ -973,7 +973,8 @@ struct mlx5_ifc_qos_cap_bits {
 
 	u8         max_tsar_bw_share[0x20];
 
-	u8         reserved_at_100[0x20];
+	u8         nic_element_type[0x10];
+	u8         nic_tsar_type[0x10];
 
 	u8         reserved_at_120[0x3];
 	u8         log_meter_aso_granularity[0x5];
@@ -3742,10 +3743,11 @@ enum {
 };
 
 enum {
-	ELEMENT_TYPE_CAP_MASK_TASR		= 1 << 0,
+	ELEMENT_TYPE_CAP_MASK_TSAR		= 1 << 0,
 	ELEMENT_TYPE_CAP_MASK_VPORT		= 1 << 1,
 	ELEMENT_TYPE_CAP_MASK_VPORT_TC		= 1 << 2,
 	ELEMENT_TYPE_CAP_MASK_PARA_VPORT_TC	= 1 << 3,
+	ELEMENT_TYPE_CAP_MASK_QUEUE_GROUP	= 1 << 4,
 };
 
 struct mlx5_ifc_scheduling_context_bits {
@@ -4442,6 +4444,12 @@ enum {
 	TSAR_ELEMENT_TSAR_TYPE_DWRR = 0x0,
 	TSAR_ELEMENT_TSAR_TYPE_ROUND_ROBIN = 0x1,
 	TSAR_ELEMENT_TSAR_TYPE_ETS = 0x2,
+};
+
+enum {
+	TSAR_TYPE_CAP_MASK_DWRR		= 1 << 0,
+	TSAR_TYPE_CAP_MASK_ROUND_ROBIN	= 1 << 1,
+	TSAR_TYPE_CAP_MASK_ETS		= 1 << 2,
 };
 
 struct mlx5_ifc_tsar_element_bits {
@@ -10922,6 +10930,67 @@ struct mlx5_ifc_pbmc_reg_bits {
 	u8         reserved_at_2e0[0x80];
 };
 
+struct mlx5_ifc_sbpr_reg_bits {
+	u8         desc[0x1];
+	u8         snap[0x1];
+	u8         reserved_at_2[0x4];
+	u8         dir[0x2];
+	u8         reserved_at_8[0x14];
+	u8         pool[0x4];
+
+	u8         infi_size[0x1];
+	u8         reserved_at_21[0x7];
+	u8         size[0x18];
+
+	u8         reserved_at_40[0x1c];
+	u8         mode[0x4];
+
+	u8         reserved_at_60[0x8];
+	u8         buff_occupancy[0x18];
+
+	u8         clr[0x1];
+	u8         reserved_at_81[0x7];
+	u8         max_buff_occupancy[0x18];
+
+	u8         reserved_at_a0[0x8];
+	u8         ext_buff_occupancy[0x18];
+};
+
+struct mlx5_ifc_sbcm_reg_bits {
+	u8         desc[0x1];
+	u8         snap[0x1];
+	u8         reserved_at_2[0x6];
+	u8         local_port[0x8];
+	u8         pnat[0x2];
+	u8         pg_buff[0x6];
+	u8         reserved_at_18[0x6];
+	u8         dir[0x2];
+
+	u8         reserved_at_20[0x1f];
+	u8         exc[0x1];
+
+	u8         reserved_at_40[0x40];
+
+	u8         reserved_at_80[0x8];
+	u8         buff_occupancy[0x18];
+
+	u8         clr[0x1];
+	u8         reserved_at_a1[0x7];
+	u8         max_buff_occupancy[0x18];
+
+	u8         reserved_at_c0[0x8];
+	u8         min_buff[0x18];
+
+	u8         infi_max[0x1];
+	u8         reserved_at_e1[0x7];
+	u8         max_buff[0x18];
+
+	u8         reserved_at_100[0x20];
+
+	u8         reserved_at_120[0x1c];
+	u8         pool[0x4];
+};
+
 struct mlx5_ifc_qtct_reg_bits {
 	u8         reserved_at_0[0x8];
 	u8         port_number[0x8];
@@ -11427,7 +11496,9 @@ struct mlx5_ifc_mtrc_ctrl_bits {
 
 struct mlx5_ifc_host_params_context_bits {
 	u8         host_number[0x8];
-	u8         reserved_at_8[0x7];
+	u8         reserved_at_8[0x5];
+	u8         host_pf_not_exist[0x1];
+	u8         reserved_at_14[0x1];
 	u8         host_pf_disabled[0x1];
 	u8         host_num_of_vfs[0x10];
 

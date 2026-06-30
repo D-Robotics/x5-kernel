@@ -425,7 +425,7 @@ static int pppoe_rcv(struct sk_buff *skb, struct net_device *dev,
 	if (skb_mac_header_len(skb) < ETH_HLEN)
 		goto drop;
 
-	if (!pskb_may_pull(skb, sizeof(struct pppoe_hdr)))
+	if (!pskb_may_pull(skb, PPPOE_SES_HLEN))
 		goto drop;
 
 	ph = pppoe_hdr(skb);
@@ -433,6 +433,12 @@ static int pppoe_rcv(struct sk_buff *skb, struct net_device *dev,
 
 	skb_pull_rcsum(skb, sizeof(*ph));
 	if (skb->len < len)
+		goto drop;
+
+	/* skb->data points to the PPP protocol header after skb_pull_rcsum.
+	 * Drop PFC frames.
+	 */
+	if (ppp_skb_is_compressed_proto(skb))
 		goto drop;
 
 	if (pskb_trim_rcsum(skb, len))
@@ -1007,26 +1013,21 @@ static int pppoe_recvmsg(struct socket *sock, struct msghdr *m,
 	struct sk_buff *skb;
 	int error = 0;
 
-	if (sk->sk_state & PPPOX_BOUND) {
-		error = -EIO;
-		goto end;
-	}
+	if (sk->sk_state & PPPOX_BOUND)
+		return -EIO;
 
 	skb = skb_recv_datagram(sk, flags, &error);
-	if (error < 0)
-		goto end;
+	if (!skb)
+		return error;
 
-	if (skb) {
-		total_len = min_t(size_t, total_len, skb->len);
-		error = skb_copy_datagram_msg(skb, 0, m, total_len);
-		if (error == 0) {
-			consume_skb(skb);
-			return total_len;
-		}
+	total_len = min_t(size_t, total_len, skb->len);
+	error = skb_copy_datagram_msg(skb, 0, m, total_len);
+	if (error == 0) {
+		consume_skb(skb);
+		return total_len;
 	}
 
 	kfree_skb(skb);
-end:
 	return error;
 }
 

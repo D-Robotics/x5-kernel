@@ -73,11 +73,10 @@ struct ks8851_net_spi {
 /**
  * ks8851_lock_spi - register access lock
  * @ks: The chip state
- * @flags: Spinlock flags
  *
  * Claim chip register access lock
  */
-static void ks8851_lock_spi(struct ks8851_net *ks, unsigned long *flags)
+static void ks8851_lock_spi(struct ks8851_net *ks)
 {
 	struct ks8851_net_spi *kss = to_ks8851_spi(ks);
 
@@ -87,11 +86,10 @@ static void ks8851_lock_spi(struct ks8851_net *ks, unsigned long *flags)
 /**
  * ks8851_unlock_spi - register access unlock
  * @ks: The chip state
- * @flags: Spinlock flags
  *
  * Release chip register access lock
  */
-static void ks8851_unlock_spi(struct ks8851_net *ks, unsigned long *flags)
+static void ks8851_unlock_spi(struct ks8851_net *ks)
 {
 	struct ks8851_net_spi *kss = to_ks8851_spi(ks);
 
@@ -299,16 +297,6 @@ static unsigned int calc_txlen(unsigned int len)
 }
 
 /**
- * ks8851_rx_skb_spi - receive skbuff
- * @ks: The device state
- * @skb: The skbuff
- */
-static void ks8851_rx_skb_spi(struct ks8851_net *ks, struct sk_buff *skb)
-{
-	netif_rx(skb);
-}
-
-/**
  * ks8851_tx_work - process tx packet(s)
  * @work: The work strucutre what was scheduled.
  *
@@ -321,7 +309,6 @@ static void ks8851_tx_work(struct work_struct *work)
 	struct ks8851_net_spi *kss;
 	unsigned short tx_space;
 	struct ks8851_net *ks;
-	unsigned long flags;
 	struct sk_buff *txb;
 	bool last;
 
@@ -329,7 +316,7 @@ static void ks8851_tx_work(struct work_struct *work)
 	ks = &kss->ks8851;
 	last = skb_queue_empty(&ks->txq);
 
-	ks8851_lock_spi(ks, &flags);
+	ks8851_lock_spi(ks);
 
 	while (!last) {
 		txb = skb_dequeue(&ks->txq);
@@ -350,12 +337,12 @@ static void ks8851_tx_work(struct work_struct *work)
 
 	tx_space = ks8851_rdreg16_spi(ks, KS_TXMIR);
 
-	spin_lock(&ks->statelock);
+	spin_lock_bh(&ks->statelock);
 	ks->queued_len -= dequeued_len;
 	ks->tx_space = tx_space;
-	spin_unlock(&ks->statelock);
+	spin_unlock_bh(&ks->statelock);
 
-	ks8851_unlock_spi(ks, &flags);
+	ks8851_unlock_spi(ks);
 }
 
 /**
@@ -435,7 +422,6 @@ static int ks8851_probe_spi(struct spi_device *spi)
 	ks->rdfifo = ks8851_rdfifo_spi;
 	ks->wrfifo = ks8851_wrfifo_spi;
 	ks->start_xmit = ks8851_start_xmit_spi;
-	ks->rx_skb = ks8851_rx_skb_spi;
 	ks->flush_tx_work = ks8851_flush_tx_work_spi;
 
 #define STD_IRQ (IRQ_LCI |	/* Link Change */	\

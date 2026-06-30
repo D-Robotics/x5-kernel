@@ -79,7 +79,7 @@ struct smb2_symlink_err_rsp {
 struct smb2_error_context_rsp {
 	__le32 ErrorDataLength;
 	__le32 ErrorId;
-	__u8  ErrorContextData; /* ErrorDataLength long array */
+	__u8  ErrorContextData[];
 } __packed;
 
 /* ErrorId values */
@@ -339,7 +339,7 @@ struct smb2_file_reparse_point_info {
 } __packed;
 
 struct smb2_file_network_open_info {
-	struct_group(network_open_info,
+	struct_group_attr(network_open_info, __packed,
 		__le64 CreationTime;
 		__le64 LastAccessTime;
 		__le64 LastWriteTime;
@@ -373,7 +373,7 @@ struct smb2_file_id_extd_directory_info {
 	__le32 EaSize; /* EA size */
 	__le32 ReparsePointTag; /* valid if FILE_ATTR_REPARSE_POINT set in FileAttributes */
 	__le64 UniqueId; /* inode num - le since Samba puts ino in low 32 bit */
-	char FileName[1];
+	char FileName[];
 } __packed; /* level 60 */
 
 extern char smb2_padding[7];

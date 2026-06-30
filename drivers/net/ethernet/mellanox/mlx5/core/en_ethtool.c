@@ -136,6 +136,10 @@ void mlx5e_build_ptys2ethtool_map(void)
 				       ETHTOOL_LINK_MODE_100000baseKR4_Full_BIT);
 	MLX5_BUILD_PTYS2ETHTOOL_CONFIG(MLX5E_100GBASE_LR4, legacy,
 				       ETHTOOL_LINK_MODE_100000baseLR4_ER4_Full_BIT);
+	MLX5_BUILD_PTYS2ETHTOOL_CONFIG(MLX5E_100BASE_TX, legacy,
+				       ETHTOOL_LINK_MODE_100baseT_Full_BIT);
+	MLX5_BUILD_PTYS2ETHTOOL_CONFIG(MLX5E_1000BASE_T, legacy,
+				       ETHTOOL_LINK_MODE_1000baseT_Full_BIT);
 	MLX5_BUILD_PTYS2ETHTOOL_CONFIG(MLX5E_10GBASE_T, legacy,
 				       ETHTOOL_LINK_MODE_10000baseT_Full_BIT);
 	MLX5_BUILD_PTYS2ETHTOOL_CONFIG(MLX5E_25GBASE_CR, legacy,
@@ -1223,7 +1227,12 @@ int mlx5e_ethtool_set_link_ksettings(struct mlx5e_priv *priv,
 	if (!an_changes && link_modes == eproto.admin)
 		goto out;
 
-	mlx5_port_set_eth_ptys(mdev, an_disable, link_modes, ext);
+	err = mlx5_port_set_eth_ptys(mdev, an_disable, link_modes, ext);
+	if (err) {
+		netdev_err(priv->netdev, "%s: failed to set ptys reg: %d\n", __func__, err);
+		goto out;
+	}
+
 	mlx5_toggle_port_link(mdev);
 
 out:
@@ -1694,16 +1703,6 @@ static int mlx5e_set_fecparam(struct net_device *netdev,
 	return 0;
 }
 
-static u32 mlx5e_get_msglevel(struct net_device *dev)
-{
-	return ((struct mlx5e_priv *)netdev_priv(dev))->msglevel;
-}
-
-static void mlx5e_set_msglevel(struct net_device *dev, u32 val)
-{
-	((struct mlx5e_priv *)netdev_priv(dev))->msglevel = val;
-}
-
 static int mlx5e_set_phys_id(struct net_device *dev,
 			     enum ethtool_phys_id_state state)
 {
@@ -1957,9 +1956,9 @@ int mlx5e_modify_rx_cqe_compression_locked(struct mlx5e_priv *priv, bool new_val
 	if (err)
 		return err;
 
-	mlx5e_dbg(DRV, priv, "MLX5E: RxCqeCmprss was turned %s\n",
-		  MLX5E_GET_PFLAG(&priv->channels.params,
-				  MLX5E_PFLAG_RX_CQE_COMPRESS) ? "ON" : "OFF");
+	netdev_dbg(priv->netdev, "MLX5E: RxCqeCmprss was turned %s\n",
+		   MLX5E_GET_PFLAG(&priv->channels.params,
+				   MLX5E_PFLAG_RX_CQE_COMPRESS) ? "ON" : "OFF");
 
 	return 0;
 }
@@ -2441,8 +2440,6 @@ const struct ethtool_ops mlx5e_ethtool_ops = {
 	.get_priv_flags    = mlx5e_get_priv_flags,
 	.set_priv_flags    = mlx5e_set_priv_flags,
 	.self_test         = mlx5e_self_test,
-	.get_msglevel      = mlx5e_get_msglevel,
-	.set_msglevel      = mlx5e_set_msglevel,
 	.get_fec_stats     = mlx5e_get_fec_stats,
 	.get_fecparam      = mlx5e_get_fecparam,
 	.set_fecparam      = mlx5e_set_fecparam,

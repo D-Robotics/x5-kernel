@@ -24,7 +24,9 @@
 #include "mbox_os.h"
 #include "hb_mbox.h"
 
+#ifndef MIN
 #define MIN(x,y) ((x)<(y)?(x):(y))
+#endif
 #define NODE_NAME_MAX_LEN (50)
 
 /*mailbox mode information*/
@@ -266,11 +268,11 @@ static int pl320_startup(struct mbox_chan *chan)
 	err = com_set_src(ipcmbase, mchan->send_mbox_id, mchan->local_id);
 	if (err < 0) {
 		mbox_err("taken src register failed: %d\n", err);
-	
+
 		return err;
 	}
 	mbox_dbg("%s src = 0x%x, id = %d, local_id = 0x%lx\n", __FUNCTION__, com_get_src(ipcmbase, mchan->send_mbox_id), mchan->send_mbox_id, BIT(mchan->local_id));
-	
+
 	if ((com_get_src(ipcmbase, mchan->send_mbox_id) & BIT(mchan->local_id)) == 0) {
 		mbox_err("mailbox channel send mbox %d was occupied\n", mchan->send_mbox_id);
 
@@ -501,7 +503,7 @@ static int32_t mbox_enable_src(uint8_t mbox_id)
 	val = res.a0;
 	val |= BIT(mbox_id);
 
-	arm_smccc_smc(HORIZON_SIP_MAILBOX_ENABLE_SET, val, 0, 0, 0, 0, 0, 0, &res);	
+	arm_smccc_smc(HORIZON_SIP_MAILBOX_ENABLE_SET, val, 0, 0, 0, 0, 0, 0, &res);
 	pr_debug("%s write mailbox enable 0x%lx\n", __FUNCTION__, res.a0);
 
 	return 0;

@@ -1411,12 +1411,14 @@ static int subdev_notifier_complete(struct v4l2_async_notifier *notifier)
 	mutex_lock(&fmd->media_dev.graph_mutex);
 
 	ret = fimc_md_create_links(fmd);
-	if (ret < 0)
-		goto unlock;
+	if (ret < 0) {
+		mutex_unlock(&fmd->media_dev.graph_mutex);
+		return ret;
+	}
+
+	mutex_unlock(&fmd->media_dev.graph_mutex);
 
 	ret = v4l2_device_register_subdev_nodes(&fmd->v4l2_dev);
-unlock:
-	mutex_unlock(&fmd->media_dev.graph_mutex);
 	if (ret < 0)
 		return ret;
 
@@ -1471,9 +1473,7 @@ static int fimc_md_probe(struct platform_device *pdev)
 
 	pinctrl = devm_pinctrl_get(dev);
 	if (IS_ERR(pinctrl)) {
-		ret = PTR_ERR(pinctrl);
-		if (ret != -EPROBE_DEFER)
-			dev_err(dev, "Failed to get pinctrl: %d\n", ret);
+		ret = dev_err_probe(dev, PTR_ERR(pinctrl), "Failed to get pinctrl\n");
 		goto err_clk;
 	}
 

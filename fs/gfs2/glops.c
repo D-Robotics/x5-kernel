@@ -11,6 +11,7 @@
 #include <linux/bio.h>
 #include <linux/posix_acl.h>
 #include <linux/security.h>
+#include <linux/log2.h>
 
 #include "gfs2.h"
 #include "incore.h"
@@ -82,6 +83,9 @@ static void __gfs2_ail_flush(struct gfs2_glock *gl, bool fsync,
 	GLOCK_BUG_ON(gl, !fsync && atomic_read(&gl->gl_ail_count));
 	spin_unlock(&sdp->sd_ail_lock);
 	gfs2_log_unlock(sdp);
+
+	if (gfs2_withdrawing(sdp))
+		gfs2_withdraw(sdp);
 }
 
 
@@ -401,10 +405,14 @@ static int gfs2_dinode_in(struct gfs2_inode *ip, const void *buf)
 	struct inode *inode = &ip->i_inode;
 	bool is_new = inode->i_state & I_NEW;
 
-	if (unlikely(ip->i_no_addr != be64_to_cpu(str->di_num.no_addr)))
-		goto corrupt;
-	if (unlikely(!is_new && inode_wrong_type(inode, mode)))
-		goto corrupt;
+	if (unlikely(ip->i_no_addr != be64_to_cpu(str->di_num.no_addr))) {
+		gfs2_consist_inode(ip);
+		return -EIO;
+	}
+	if (unlikely(!is_new && inode_wrong_type(inode, mode))) {
+		gfs2_consist_inode(ip);
+		return -EIO;
+	}
 	ip->i_no_formal_ino = be64_to_cpu(str->di_num.no_formal_ino);
 	inode->i_mode = mode;
 	if (is_new) {
@@ -440,26 +448,33 @@ static int gfs2_dinode_in(struct gfs2_inode *ip, const void *buf)
 	/* i_diskflags and i_eattr must be set before gfs2_set_inode_flags() */
 	gfs2_set_inode_flags(inode);
 	height = be16_to_cpu(str->di_height);
-	if (unlikely(height > sdp->sd_max_height))
-		goto corrupt;
+	if (unlikely(height > sdp->sd_max_height)) {
+		gfs2_consist_inode(ip);
+		return -EIO;
+	}
 	ip->i_height = (u8)height;
 
 	depth = be16_to_cpu(str->di_depth);
-	if (unlikely(depth > GFS2_DIR_MAX_DEPTH))
-		goto corrupt;
+	if (unlikely(depth > GFS2_DIR_MAX_DEPTH)) {
+		gfs2_consist_inode(ip);
+		return -EIO;
+	}
+	if ((ip->i_diskflags & GFS2_DIF_EXHASH) &&
+	    depth < ilog2(sdp->sd_hash_ptrs)) {
+		gfs2_consist_inode(ip);
+		return -EIO;
+	}
 	ip->i_depth = (u8)depth;
 	ip->i_entries = be32_to_cpu(str->di_entries);
 
-	if (gfs2_is_stuffed(ip) && inode->i_size > gfs2_max_stuffed_size(ip))
-		goto corrupt;
-
+	if (gfs2_is_stuffed(ip) && inode->i_size > gfs2_max_stuffed_size(ip)) {
+		gfs2_consist_inode(ip);
+		return -EIO;
+	}
 	if (S_ISREG(inode->i_mode))
 		gfs2_set_aops(inode);
 
 	return 0;
-corrupt:
-	gfs2_consist_inode(ip);
-	return -EIO;
 }
 
 /**
@@ -552,47 +567,34 @@ static void inode_go_dump(struct seq_file *seq, struct gfs2_glock *gl,
 }
 
 /**
- * freeze_go_sync - promote/demote the freeze glock
+ * freeze_go_callback - A cluster node is requesting a freeze
  * @gl: the glock
+ * @remote: true if this came from a different cluster node
  */
 
-static int freeze_go_sync(struct gfs2_glock *gl)
+static void freeze_go_callback(struct gfs2_glock *gl, bool remote)
 {
-	int error = 0;
 	struct gfs2_sbd *sdp = gl->gl_name.ln_sbd;
+	struct super_block *sb = sdp->sd_vfs;
+
+	if (!remote ||
+	    (gl->gl_state != LM_ST_SHARED &&
+	     gl->gl_state != LM_ST_UNLOCKED) ||
+	    gl->gl_demote_state != LM_ST_UNLOCKED)
+		return;
 
 	/*
-	 * We need to check gl_state == LM_ST_SHARED here and not gl_req ==
-	 * LM_ST_EXCLUSIVE. That's because when any node does a freeze,
-	 * all the nodes should have the freeze glock in SH mode and they all
-	 * call do_xmote: One for EX and the others for UN. They ALL must
-	 * freeze locally, and they ALL must queue freeze work. The freeze_work
-	 * calls freeze_func, which tries to reacquire the freeze glock in SH,
-	 * effectively waiting for the thaw on the node who holds it in EX.
-	 * Once thawed, the work func acquires the freeze glock in
-	 * SH and everybody goes back to thawed.
+	 * Try to get an active super block reference to prevent racing with
+	 * unmount (see super_trylock_shared()).  But note that unmount isn't
+	 * the only place where a write lock on s_umount is taken, and we can
+	 * fail here because of things like remount as well.
 	 */
-	if (gl->gl_state == LM_ST_SHARED && !gfs2_withdrawn(sdp) &&
-	    !test_bit(SDF_NORECOVERY, &sdp->sd_flags)) {
-		atomic_set(&sdp->sd_freeze_state, SFS_STARTING_FREEZE);
-		error = freeze_super(sdp->sd_vfs);
-		if (error) {
-			fs_info(sdp, "GFS2: couldn't freeze filesystem: %d\n",
-				error);
-			if (gfs2_withdrawn(sdp)) {
-				atomic_set(&sdp->sd_freeze_state, SFS_UNFROZEN);
-				return 0;
-			}
-			gfs2_assert_withdraw(sdp, 0);
-		}
-		queue_work(gfs2_freeze_wq, &sdp->sd_freeze_work);
-		if (test_bit(SDF_JOURNAL_LIVE, &sdp->sd_flags))
-			gfs2_log_flush(sdp, NULL, GFS2_LOG_HEAD_FLUSH_FREEZE |
-				       GFS2_LFC_FREEZE_GO_SYNC);
-		else /* read-only mounts */
-			atomic_set(&sdp->sd_freeze_state, SFS_FROZEN);
+	if (down_read_trylock(&sb->s_umount)) {
+		atomic_inc(&sb->s_active);
+		up_read(&sb->s_umount);
+		if (!queue_work(gfs2_freeze_wq, &sdp->sd_freeze_work))
+			deactivate_super(sb);
 	}
-	return 0;
 }
 
 /**
@@ -619,18 +621,6 @@ static int freeze_go_xmote_bh(struct gfs2_glock *gl)
 		sdp->sd_log_sequence = head.lh_sequence + 1;
 		gfs2_log_pointers_init(sdp, head.lh_blkno);
 	}
-	return 0;
-}
-
-/**
- * freeze_go_demote_ok
- * @gl: the glock
- *
- * Always returns 0
- */
-
-static int freeze_go_demote_ok(const struct gfs2_glock *gl)
-{
 	return 0;
 }
 
@@ -757,9 +747,8 @@ const struct gfs2_glock_operations gfs2_rgrp_glops = {
 };
 
 const struct gfs2_glock_operations gfs2_freeze_glops = {
-	.go_sync = freeze_go_sync,
 	.go_xmote_bh = freeze_go_xmote_bh,
-	.go_demote_ok = freeze_go_demote_ok,
+	.go_callback = freeze_go_callback,
 	.go_type = LM_TYPE_NONDISK,
 	.go_flags = GLOF_NONDISK,
 };

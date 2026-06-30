@@ -553,6 +553,16 @@ static int snd_timer_start1(struct snd_timer_instance *timeri,
 		goto unlock;
 	}
 
+	/* check the actual time for the start tick;
+	 * bail out as error if it's way too low (< 100us)
+	 */
+	if (start && !(timer->hw.flags & SNDRV_TIMER_HW_SLAVE)) {
+		if ((u64)snd_timer_hw_resolution(timer) * ticks < 100000) {
+			result = -EINVAL;
+			goto unlock;
+		}
+	}
+
 	if (start)
 		timeri->ticks = timeri->cticks = ticks;
 	else if (!timeri->cticks)
@@ -1832,6 +1842,7 @@ static int snd_timer_user_params(struct file *file,
 	struct snd_timer *t;
 	int err;
 
+	guard(mutex)(&register_mutex);
 	tu = file->private_data;
 	if (!tu->timeri)
 		return -EBADFD;

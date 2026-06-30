@@ -132,10 +132,6 @@ static int inv_icm42600_accel_update_scan_mode(struct iio_dev *indio_dev,
 	/* update data FIFO write */
 	inv_icm42600_timestamp_apply_odr(ts, 0, 0, 0);
 	ret = inv_icm42600_buffer_set_fifo_en(st, fifo_en | st->fifo.en);
-	if (ret)
-		goto out_unlock;
-
-	ret = inv_icm42600_buffer_update_watermark(st);
 
 out_unlock:
 	mutex_unlock(&st->lock);
@@ -333,6 +329,8 @@ static int inv_icm42600_accel_write_odr(struct iio_dev *indio_dev,
 		return -EINVAL;
 
 	conf.odr = inv_icm42600_accel_odr_conv[idx / 2];
+	if (conf.odr == st->conf.accel.odr)
+		return 0;
 
 	pm_runtime_get_sync(dev);
 	mutex_lock(&st->lock);
@@ -764,7 +762,8 @@ int inv_icm42600_accel_parse_fifo(struct iio_dev *indio_dev)
 	const int8_t *temp;
 	unsigned int odr;
 	int64_t ts_val;
-	struct inv_icm42600_accel_buffer buffer;
+	/* buffer is copied to userspace, zeroing it to avoid any data leak */
+	struct inv_icm42600_accel_buffer buffer = { };
 #if defined(CONFIG_IMU_DATA_READY)
 	int64_t irq_ts;
 #endif
@@ -791,8 +790,6 @@ int inv_icm42600_accel_parse_fifo(struct iio_dev *indio_dev)
 			printk("%s: %d: kfifo_out accel irq_time error\n", __func__, __LINE__);
 #endif
 
-		/* buffer is copied to userspace, zeroing it to avoid any data leak */
-		memset(&buffer, 0, sizeof(buffer));
 		memcpy(&buffer.accel, accel, sizeof(buffer.accel));
 
 #if defined(USE_IMU_TIMESTAMP) && defined(CONFIG_IMU_DATA_READY)

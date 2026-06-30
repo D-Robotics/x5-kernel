@@ -368,7 +368,6 @@ union ks8851_tx_hdr {
  * @rdfifo: FIFO read callback
  * @wrfifo: FIFO write callback
  * @start_xmit: start_xmit() implementation callback
- * @rx_skb: rx_skb() implementation callback
  * @flush_tx_work: flush_tx_work() implementation callback
  *
  * The @statelock is used to protect information in the structure which may
@@ -409,10 +408,8 @@ struct ks8851_net {
 	struct gpio_desc	*gpio;
 	struct mii_bus		*mii_bus;
 
-	void			(*lock)(struct ks8851_net *ks,
-					unsigned long *flags);
-	void			(*unlock)(struct ks8851_net *ks,
-					  unsigned long *flags);
+	void			(*lock)(struct ks8851_net *ks);
+	void			(*unlock)(struct ks8851_net *ks);
 	unsigned int		(*rdreg16)(struct ks8851_net *ks,
 					   unsigned int reg);
 	void			(*wrreg16)(struct ks8851_net *ks,
@@ -423,8 +420,6 @@ struct ks8851_net {
 					  struct sk_buff *txp, bool irq);
 	netdev_tx_t		(*start_xmit)(struct sk_buff *skb,
 					      struct net_device *dev);
-	void			(*rx_skb)(struct ks8851_net *ks,
-					  struct sk_buff *skb);
 	void			(*flush_tx_work)(struct ks8851_net *ks);
 };
 

@@ -220,14 +220,14 @@ int amdgpu_vce_sw_fini(struct amdgpu_device *adev)
 
 	drm_sched_entity_destroy(&adev->vce.entity);
 
-	amdgpu_bo_free_kernel(&adev->vce.vcpu_bo, &adev->vce.gpu_addr,
-		(void **)&adev->vce.cpu_addr);
-
 	for (i = 0; i < adev->vce.num_rings; i++)
 		amdgpu_ring_fini(&adev->vce.ring[i]);
 
 	release_firmware(adev->vce.fw);
 	mutex_destroy(&adev->vce.idle_mutex);
+
+	amdgpu_bo_free_kernel(&adev->vce.vcpu_bo, &adev->vce.gpu_addr,
+		(void **)&adev->vce.cpu_addr);
 
 	return 0;
 }
@@ -450,8 +450,10 @@ static int amdgpu_vce_get_create_msg(struct amdgpu_ring *ring, uint32_t handle,
 	uint64_t addr;
 	int i, r;
 
-	r = amdgpu_job_alloc_with_ib(ring->adev, ib_size_dw * 4,
-				     AMDGPU_IB_POOL_DIRECT, &job);
+	r = amdgpu_job_alloc_with_ib(ring->adev, &ring->adev->vce.entity,
+				     AMDGPU_FENCE_OWNER_UNDEFINED,
+				     ib_size_dw * 4, AMDGPU_IB_POOL_DIRECT,
+				     &job);
 	if (r)
 		return r;
 
@@ -538,7 +540,9 @@ static int amdgpu_vce_get_destroy_msg(struct amdgpu_ring *ring, uint32_t handle,
 	struct dma_fence *f = NULL;
 	int i, r;
 
-	r = amdgpu_job_alloc_with_ib(ring->adev, ib_size_dw * 4,
+	r = amdgpu_job_alloc_with_ib(ring->adev, &ring->adev->vce.entity,
+				     AMDGPU_FENCE_OWNER_UNDEFINED,
+				     ib_size_dw * 4,
 				     direct ? AMDGPU_IB_POOL_DIRECT :
 				     AMDGPU_IB_POOL_DELAYED, &job);
 	if (r)
@@ -570,8 +574,7 @@ static int amdgpu_vce_get_destroy_msg(struct amdgpu_ring *ring, uint32_t handle,
 	if (direct)
 		r = amdgpu_job_submit_direct(job, ring, &f);
 	else
-		r = amdgpu_job_submit(job, &ring->adev->vce.entity,
-				      AMDGPU_FENCE_OWNER_UNDEFINED, &f);
+		f = amdgpu_job_submit(job);
 	if (r)
 		goto err;
 
@@ -654,6 +657,9 @@ static int amdgpu_vce_cs_reloc(struct amdgpu_cs_parser *p, struct amdgpu_ib *ib,
 	struct amdgpu_bo *bo;
 	uint64_t addr;
 	int r;
+
+	if (lo >= ib->length_dw || hi >= ib->length_dw)
+		return -EINVAL;
 
 	if (index == 0xffffffff)
 		index = 0;
@@ -743,7 +749,8 @@ int amdgpu_vce_ring_parse_cs(struct amdgpu_cs_parser *p,
 	uint32_t created = 0;
 	uint32_t allocated = 0;
 	uint32_t tmp, handle = 0;
-	uint32_t *size = &tmp;
+	uint32_t dummy = 0xffffffff;
+	uint32_t *size = &dummy;
 	unsigned idx;
 	int i, r = 0;
 

@@ -559,7 +559,7 @@ ieee80211_get_sband_iftype_data(const struct ieee80211_supported_band *sband,
 {
 	int i;
 
-	if (WARN_ON(iftype >= NL80211_IFTYPE_MAX))
+	if (WARN_ON(iftype >= NUM_NL80211_IFTYPES))
 		return NULL;
 
 	if (iftype == NL80211_IFTYPE_AP_VLAN)
@@ -828,6 +828,18 @@ struct cfg80211_fils_aad {
 	u8 kek_len;
 	const u8 *snonce;
 	const u8 *anonce;
+};
+
+/**
+ * struct cfg80211_set_hw_timestamp - enable/disable HW timestamping
+ * @macaddr: peer MAC address. NULL to enable/disable HW timestamping for all
+ *	addresses.
+ * @enable: if set, enable HW timestamping for the specified MAC address.
+ *	Otherwise disable HW timestamping for the specified MAC address.
+ */
+struct cfg80211_set_hw_timestamp {
+	const u8 *macaddr;
+	bool enable;
 };
 
 /**
@@ -1176,6 +1188,23 @@ struct cfg80211_mbssid_elems {
 };
 
 /**
+ * struct cfg80211_rnr_elems - Reduced neighbor report (RNR) elements
+ *
+ * @cnt: Number of elements in array %elems.
+ *
+ * @elem: Array of RNR element(s) to be added into Beacon frames.
+ * @elem.data: Data for RNR elements.
+ * @elem.len: Length of data.
+ */
+struct cfg80211_rnr_elems {
+	u8 cnt;
+	struct {
+		const u8 *data;
+		size_t len;
+	} elem[];
+};
+
+/**
  * struct cfg80211_beacon_data - beacon data
  * @link_id: the link ID for the AP MLD link sending this beacon
  * @head: head portion of beacon (before TIM IE)
@@ -1195,6 +1224,7 @@ struct cfg80211_mbssid_elems {
  * @probe_resp_len: length of probe response template (@probe_resp)
  * @probe_resp: probe response template (AP mode only)
  * @mbssid_ies: multiple BSSID elements
+ * @rnr_ies: reduced neighbor report elements
  * @ftm_responder: enable FTM responder functionality; -1 for no change
  *	(which also implies no change in LCI/civic location data)
  * @lci: Measurement Report element content, starting with Measurement Token
@@ -1218,6 +1248,7 @@ struct cfg80211_beacon_data {
 	const u8 *lci;
 	const u8 *civicloc;
 	struct cfg80211_mbssid_elems *mbssid_ies;
+	struct cfg80211_rnr_elems *rnr_ies;
 	s8 ftm_responder;
 
 	size_t head_len, tail_len;
@@ -1325,6 +1356,9 @@ struct cfg80211_unsol_bcast_probe_resp {
  * @fils_discovery: FILS discovery transmission parameters
  * @unsol_bcast_probe_resp: Unsolicited broadcast probe response parameters
  * @mbssid_config: AP settings for multiple bssid
+ * @punct_bitmap: Preamble puncturing bitmap. Each bit represents
+ *	a 20 MHz channel, lowest bit corresponding to the lowest channel.
+ *	Bit set to 1 indicates that the channel is punctured.
  */
 struct cfg80211_ap_settings {
 	struct cfg80211_chan_def chandef;
@@ -1359,6 +1393,7 @@ struct cfg80211_ap_settings {
 	struct cfg80211_fils_discovery fils_discovery;
 	struct cfg80211_unsol_bcast_probe_resp unsol_bcast_probe_resp;
 	struct cfg80211_mbssid_config mbssid_config;
+	u16 punct_bitmap;
 };
 
 /**
@@ -1376,6 +1411,9 @@ struct cfg80211_ap_settings {
  * @radar_required: whether radar detection is required on the new channel
  * @block_tx: whether transmissions should be blocked while changing
  * @count: number of beacons until switch
+ * @punct_bitmap: Preamble puncturing bitmap. Each bit represents
+ *	a 20 MHz channel, lowest bit corresponding to the lowest channel.
+ *	Bit set to 1 indicates that the channel is punctured.
  */
 struct cfg80211_csa_settings {
 	struct cfg80211_chan_def chandef;
@@ -1388,6 +1426,7 @@ struct cfg80211_csa_settings {
 	bool radar_required;
 	bool block_tx;
 	u8 count;
+	u16 punct_bitmap;
 };
 
 /**
@@ -4283,6 +4322,8 @@ struct mgmt_frame_regs {
  * @add_link_station: Add a link to a station.
  * @mod_link_station: Modify a link of a station.
  * @del_link_station: Remove a link of a station.
+ *
+ * @set_hw_timestamp: Enable/disable HW timestamping of TM/FTM frames.
  */
 struct cfg80211_ops {
 	int	(*suspend)(struct wiphy *wiphy, struct cfg80211_wowlan *wow);
@@ -4636,6 +4677,8 @@ struct cfg80211_ops {
 				    struct link_station_parameters *params);
 	int	(*del_link_station)(struct wiphy *wiphy, struct net_device *dev,
 				    struct link_station_del_parameters *params);
+	int	(*set_hw_timestamp)(struct wiphy *wiphy, struct net_device *dev,
+				    struct cfg80211_set_hw_timestamp *hwts);
 };
 
 /*
@@ -5091,6 +5134,8 @@ struct wiphy_iftype_akm_suites {
 	int n_akm_suites;
 };
 
+#define CFG80211_HW_TIMESTAMP_ALL_PEERS	0xffff
+
 /**
  * struct wiphy - wireless hardware description
  * @mtx: mutex for the data (structures) of this device
@@ -5300,6 +5345,13 @@ struct wiphy_iftype_akm_suites {
  *	NL80211_MAX_NR_AKM_SUITES in order to avoid compatibility issues with
  *	legacy userspace and maximum allowed value is
  *	CFG80211_MAX_NUM_AKM_SUITES.
+ *
+ * @hw_timestamp_max_peers: maximum number of peers that the driver supports
+ *	enabling HW timestamping for concurrently. Setting this field to a
+ *	non-zero value indicates that the driver supports HW timestamping.
+ *	A value of %CFG80211_HW_TIMESTAMP_ALL_PEERS indicates the driver
+ *	supports enabling HW timestamping for all peers (i.e. no need to
+ *	specify a mac address).
  */
 struct wiphy {
 	struct mutex mtx;
@@ -5447,6 +5499,8 @@ struct wiphy {
 	u8 mbssid_max_interfaces;
 	u8 ema_max_profile_periodicity;
 	u16 max_num_akm_suites;
+
+	u16 hw_timestamp_max_peers;
 
 	char priv[] __aligned(NETDEV_ALIGN);
 };
@@ -6302,6 +6356,19 @@ static inline int ieee80211_data_to_8023(struct sk_buff *skb, const u8 *addr,
 }
 
 /**
+ * ieee80211_is_valid_amsdu - check if subframe lengths of an A-MSDU are valid
+ *
+ * This is used to detect non-standard A-MSDU frames, e.g. the ones generated
+ * by ath10k and ath11k, where the subframe length includes the length of the
+ * mesh control field.
+ *
+ * @skb: The input A-MSDU frame without any headers.
+ * @mesh_hdr: use standard compliant mesh A-MSDU subframe header
+ * Returns: true if subframe header lengths are valid for the @mesh_hdr mode
+ */
+bool ieee80211_is_valid_amsdu(struct sk_buff *skb, bool mesh_hdr);
+
+/**
  * ieee80211_amsdu_to_8023s - decode an IEEE 802.11n A-MSDU frame
  *
  * Decode an IEEE 802.11 A-MSDU and convert it to a list of 802.3 frames.
@@ -6316,11 +6383,36 @@ static inline int ieee80211_data_to_8023(struct sk_buff *skb, const u8 *addr,
  * @extra_headroom: The hardware extra headroom for SKBs in the @list.
  * @check_da: DA to check in the inner ethernet header, or NULL
  * @check_sa: SA to check in the inner ethernet header, or NULL
+ * @mesh_control: A-MSDU subframe header includes the mesh control field
  */
 void ieee80211_amsdu_to_8023s(struct sk_buff *skb, struct sk_buff_head *list,
 			      const u8 *addr, enum nl80211_iftype iftype,
 			      const unsigned int extra_headroom,
-			      const u8 *check_da, const u8 *check_sa);
+			      const u8 *check_da, const u8 *check_sa,
+			      bool mesh_control);
+
+/**
+ * ieee80211_get_8023_tunnel_proto - get RFC1042 or bridge tunnel encap protocol
+ *
+ * Check for RFC1042 or bridge tunnel header and fetch the encapsulated
+ * protocol.
+ *
+ * @hdr: pointer to the MSDU payload
+ * @proto: destination pointer to store the protocol
+ * Return: true if encapsulation was found
+ */
+bool ieee80211_get_8023_tunnel_proto(const void *hdr, __be16 *proto);
+
+/**
+ * ieee80211_strip_8023_mesh_hdr - strip mesh header from converted 802.3 frames
+ *
+ * Strip the mesh header, which was left in by ieee80211_data_to_8023 as part
+ * of the MSDU data. Also move any source/destination addresses from the mesh
+ * header to the ethernet header (if present).
+ *
+ * @skb: The 802.3 frame with embedded mesh header
+ */
+int ieee80211_strip_8023_mesh_hdr(struct sk_buff *skb);
 
 /**
  * cfg80211_classify8021d - determine the 802.1p/1d tag for a data frame
@@ -7787,6 +7879,8 @@ void cfg80211_roamed(struct net_device *dev, struct cfg80211_roam_info *info,
  *
  * @dev: network device
  * @bssid: the BSSID of the AP
+ * @td_bitmap: transition disable policy
+ * @td_bitmap_len: Length of transition disable policy
  * @gfp: allocation flags
  *
  * This function should be called by a driver that supports 4 way handshake
@@ -7797,7 +7891,7 @@ void cfg80211_roamed(struct net_device *dev, struct cfg80211_roam_info *info,
  * indicate the 802.11 association.
  */
 void cfg80211_port_authorized(struct net_device *dev, const u8 *bssid,
-			      gfp_t gfp);
+			      const u8* td_bitmap, u8 td_bitmap_len, gfp_t gfp);
 
 /**
  * cfg80211_disconnected - notify cfg80211 that connection was dropped
@@ -9015,5 +9109,17 @@ static inline int cfg80211_color_change_notify(struct net_device *dev)
 					 NL80211_CMD_COLOR_CHANGE_COMPLETED,
 					 0, 0);
 }
+
+/**
+ * cfg80211_valid_disable_subchannel_bitmap - validate puncturing bitmap
+ * @bitmap: bitmap to be validated
+ * @chandef: channel definition
+ *
+ * Validate the puncturing bitmap.
+ *
+ * Return: %true if the bitmap is valid. %false otherwise.
+ */
+bool cfg80211_valid_disable_subchannel_bitmap(u16 *bitmap,
+					      const struct cfg80211_chan_def *chandef);
 
 #endif /* __NET_CFG80211_H */

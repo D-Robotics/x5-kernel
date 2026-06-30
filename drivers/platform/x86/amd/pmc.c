@@ -834,6 +834,10 @@ static int __maybe_unused amd_pmc_suspend_handler(struct device *dev)
 {
 	struct amd_pmc_dev *pdev = dev_get_drvdata(dev);
 
+	/*
+	* Must be called only from the same set of dev_pm_ops handlers
+	* as i8042_pm_suspend() is called: currently just from .suspend.
+	*/
 	if (pdev->cpu_id == AMD_CPU_ID_CZN) {
 		int rc = amd_pmc_czn_wa_irq1(pdev);
 
@@ -846,7 +850,9 @@ static int __maybe_unused amd_pmc_suspend_handler(struct device *dev)
 	return 0;
 }
 
-static SIMPLE_DEV_PM_OPS(amd_pmc_pm, amd_pmc_suspend_handler, NULL);
+static const struct dev_pm_ops amd_pmc_pm = {
+	.suspend = amd_pmc_suspend_handler,
+};
 
 #endif
 
@@ -877,6 +883,11 @@ static int amd_pmc_s2d_init(struct amd_pmc_dev *dev)
 	/* Get STB DRAM address */
 	amd_pmc_send_cmd(dev, S2D_PHYS_ADDR_LOW, &phys_addr_low, STB_SPILL_TO_DRAM, 1);
 	amd_pmc_send_cmd(dev, S2D_PHYS_ADDR_HIGH, &phys_addr_hi, STB_SPILL_TO_DRAM, 1);
+
+	if (!phys_addr_hi && !phys_addr_low) {
+		dev_err(dev->dev, "STB is not enabled on the system; disable enable_stb or contact system vendor\n");
+		return -EINVAL;
+	}
 
 	stb_phys_addr = ((u64)phys_addr_hi << 32 | phys_addr_low);
 

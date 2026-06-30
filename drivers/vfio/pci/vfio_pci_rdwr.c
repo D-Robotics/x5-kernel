@@ -16,6 +16,7 @@
 #include <linux/io.h>
 #include <linux/vfio.h>
 #include <linux/vgaarb.h>
+#include <linux/io-64-nonatomic-lo-hi.h>
 
 #include "vfio_pci_priv.h"
 
@@ -470,7 +471,7 @@ int vfio_pci_ioeventfd(struct vfio_pci_core_device *vdev, loff_t offset,
 		goto out_unlock;
 	}
 
-	ioeventfd = kzalloc(sizeof(*ioeventfd), GFP_KERNEL);
+	ioeventfd = kzalloc(sizeof(*ioeventfd), GFP_KERNEL_ACCOUNT);
 	if (!ioeventfd) {
 		ret = -ENOMEM;
 		goto out_unlock;

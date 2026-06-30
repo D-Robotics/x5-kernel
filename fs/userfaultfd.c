@@ -1271,8 +1271,6 @@ static __always_inline int validate_range(struct mm_struct *mm,
 		return -EINVAL;
 	if (!len)
 		return -EINVAL;
-	if (start < mmap_min_addr)
-		return -EINVAL;
 	if (start >= task_size)
 		return -EINVAL;
 	if (len > task_size - start)
@@ -1425,6 +1423,9 @@ static int userfaultfd_register(struct userfaultfd_ctx *ctx,
 	prev = mas_prev(&mas, 0);
 	if (prev != vma)
 		mas_next(&mas, ULONG_MAX);
+
+	if (vma->vm_start < start)
+		prev = vma;
 
 	ret = 0;
 	do {
@@ -1602,6 +1603,9 @@ static int userfaultfd_unregister(struct userfaultfd_ctx *ctx,
 	prev = mas_prev(&mas, 0);
 	if (prev != vma)
 		mas_next(&mas, ULONG_MAX);
+
+	if (vma->vm_start < start)
+		prev = vma;
 
 	ret = 0;
 	do {
@@ -1968,7 +1972,7 @@ static int userfaultfd_api(struct userfaultfd_ctx *ctx,
 		goto out;
 	features = uffdio_api.features;
 	ret = -EINVAL;
-	if (uffdio_api.api != UFFD_API || (features & ~UFFD_API_FEATURES))
+	if (uffdio_api.api != UFFD_API)
 		goto err_out;
 	ret = -EPERM;
 	if ((features & UFFD_FEATURE_EVENT_FORK) && !capable(CAP_SYS_PTRACE))
@@ -1985,6 +1989,11 @@ static int userfaultfd_api(struct userfaultfd_ctx *ctx,
 #ifndef CONFIG_PTE_MARKER_UFFD_WP
 	uffdio_api.features &= ~UFFD_FEATURE_WP_HUGETLBFS_SHMEM;
 #endif
+
+	ret = -EINVAL;
+	if (features & ~uffdio_api.features)
+		goto err_out;
+
 	uffdio_api.ioctls = UFFD_API_IOCTLS;
 	ret = -EFAULT;
 	if (copy_to_user(buf, &uffdio_api, sizeof(uffdio_api)))

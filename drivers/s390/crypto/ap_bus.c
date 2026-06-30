@@ -1088,7 +1088,7 @@ static int hex2bitmap(const char *str, unsigned long *bitmap, int bits)
  */
 static int modify_bitmap(const char *str, unsigned long *bitmap, int bits)
 {
-	int a, i, z;
+	unsigned long a, i, z;
 	char *np, sign;
 
 	/* bits needs to be a multiple of 8 */
@@ -2196,14 +2196,14 @@ static int __init ap_module_init(void)
 {
 	int rc;
 
-	rc = ap_debug_init();
-	if (rc)
-		return rc;
-
 	if (!ap_instructions_available()) {
 		pr_warn("The hardware system does not support AP instructions\n");
 		return -ENODEV;
 	}
+
+	rc = ap_debug_init();
+	if (rc)
+		return rc;
 
 	/* init ap_queue hashtable */
 	hash_init(ap_queues);

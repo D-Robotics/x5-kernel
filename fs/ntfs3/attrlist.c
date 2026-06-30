@@ -29,7 +29,7 @@ static inline bool al_is_valid_le(const struct ntfs_inode *ni,
 void al_destroy(struct ntfs_inode *ni)
 {
 	run_close(&ni->attr_list.run);
-	kfree(ni->attr_list.le);
+	kvfree(ni->attr_list.le);
 	ni->attr_list.le = NULL;
 	ni->attr_list.size = 0;
 	ni->attr_list.dirty = false;
@@ -52,6 +52,11 @@ int ntfs_load_attr_list(struct ntfs_inode *ni, struct ATTRIB *attr)
 
 	if (!attr->non_res) {
 		lsize = le32_to_cpu(attr->res.data_size);
+		if (!lsize) {
+			err = -EINVAL;
+			goto out;
+		}
+
 		/* attr is resident: lsize < record_size (1K or 4K) */
 		le = kvmalloc(al_aligned(lsize), GFP_KERNEL);
 		if (!le) {
@@ -66,6 +71,10 @@ int ntfs_load_attr_list(struct ntfs_inode *ni, struct ATTRIB *attr)
 		u16 run_off = le16_to_cpu(attr->nres.run_off);
 
 		lsize = le64_to_cpu(attr->nres.data_size);
+		if (!lsize) {
+			err = -EINVAL;
+			goto out;
+		}
 
 		run_init(&ni->attr_list.run);
 
@@ -318,7 +327,7 @@ int al_add_le(struct ntfs_inode *ni, enum ATTR_TYPE type, const __le16 *name,
 		memcpy(ptr, al->le, off);
 		memcpy(Add2Ptr(ptr, off + sz), le, old_size - off);
 		le = Add2Ptr(ptr, off);
-		kfree(al->le);
+		kvfree(al->le);
 		al->le = ptr;
 	} else {
 		memmove(Add2Ptr(le, sz), le, old_size - off);

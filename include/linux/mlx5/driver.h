@@ -100,6 +100,8 @@ enum {
 };
 
 enum {
+	MLX5_REG_SBPR            = 0xb001,
+	MLX5_REG_SBCM            = 0xb002,
 	MLX5_REG_QPTS            = 0x4002,
 	MLX5_REG_QETCR		 = 0x4005,
 	MLX5_REG_QTCT		 = 0x400a,
@@ -385,6 +387,7 @@ struct mlx5_core_rsc_common {
 	enum mlx5_res_type	res;
 	refcount_t		refcount;
 	struct completion	free;
+	bool			invalid;
 };
 
 struct mlx5_uars_page {
@@ -716,7 +719,6 @@ struct mlx5_timer {
 	struct timecounter         tc;
 	u32                        nominal_c_mult;
 	unsigned long              overflow_period;
-	struct delayed_work        overflow_work;
 };
 
 struct mlx5_clock {
@@ -753,6 +755,7 @@ enum {
 struct mlx5_profile {
 	u64	mask;
 	u8	log_max_qp;
+	u8	num_cmd_caches;
 	struct {
 		int	size;
 		int	limit;
@@ -850,6 +853,7 @@ struct mlx5_cmd_work_ent {
 	void		       *context;
 	int			idx;
 	struct completion	handling;
+	struct completion	slotted;
 	struct completion	done;
 	struct mlx5_cmd        *cmd;
 	struct work_struct	work;
@@ -1209,6 +1213,12 @@ static inline bool mlx5_core_is_pf(const struct mlx5_core_dev *dev)
 static inline bool mlx5_core_is_vf(const struct mlx5_core_dev *dev)
 {
 	return dev->coredev_type == MLX5_COREDEV_VF;
+}
+
+static inline bool mlx5_core_same_coredev_type(const struct mlx5_core_dev *dev1,
+					       const struct mlx5_core_dev *dev2)
+{
+	return dev1->coredev_type == dev2->coredev_type;
 }
 
 static inline bool mlx5_core_is_ecpf(const struct mlx5_core_dev *dev)

@@ -21,6 +21,7 @@
 #include <linux/rtnetlink.h>
 #include <linux/ucs2_string.h>
 #include <linux/string.h>
+#include <linux/slab.h>
 
 #include "hyperv_net.h"
 #include "netvsc_trace.h"
@@ -225,8 +226,7 @@ static int rndis_filter_send_request(struct rndis_device *dev,
 				  struct rndis_request *req)
 {
 	struct hv_netvsc_packet *packet;
-	struct hv_page_buffer page_buf[2];
-	struct hv_page_buffer *pb = page_buf;
+	struct hv_page_buffer pb;
 	int ret;
 
 	/* Setup the packet to send it */
@@ -235,27 +235,14 @@ static int rndis_filter_send_request(struct rndis_device *dev,
 	packet->total_data_buflen = req->request_msg.msg_len;
 	packet->page_buf_cnt = 1;
 
-	pb[0].pfn = virt_to_phys(&req->request_msg) >>
-					HV_HYP_PAGE_SHIFT;
-	pb[0].len = req->request_msg.msg_len;
-	pb[0].offset = offset_in_hvpage(&req->request_msg);
-
-	/* Add one page_buf when request_msg crossing page boundary */
-	if (pb[0].offset + pb[0].len > HV_HYP_PAGE_SIZE) {
-		packet->page_buf_cnt++;
-		pb[0].len = HV_HYP_PAGE_SIZE -
-			pb[0].offset;
-		pb[1].pfn = virt_to_phys((void *)&req->request_msg
-			+ pb[0].len) >> HV_HYP_PAGE_SHIFT;
-		pb[1].offset = 0;
-		pb[1].len = req->request_msg.msg_len -
-			pb[0].len;
-	}
+	pb.pfn = virt_to_phys(&req->request_msg) >> HV_HYP_PAGE_SHIFT;
+	pb.len = req->request_msg.msg_len;
+	pb.offset = offset_in_hvpage(&req->request_msg);
 
 	trace_rndis_send(dev->ndev, 0, &req->request_msg);
 
 	rcu_read_lock_bh();
-	ret = netvsc_send(dev->ndev, packet, NULL, pb, NULL, false);
+	ret = netvsc_send(dev->ndev, packet, NULL, &pb, NULL, false);
 	rcu_read_unlock_bh();
 
 	return ret;
@@ -927,7 +914,7 @@ static int rndis_set_rss_param_msg(struct rndis_device *rdev,
 	struct rndis_set_request *set;
 	struct rndis_set_complete *set_complete;
 	u32 extlen = sizeof(struct ndis_recv_scale_param) +
-		     4 * ITAB_NUM + NETVSC_HASH_KEYLEN;
+		     4 * ndc->rx_table_sz + NETVSC_HASH_KEYLEN;
 	struct ndis_recv_scale_param *rssp;
 	u32 *itab;
 	u8 *keyp;
@@ -953,7 +940,7 @@ static int rndis_set_rss_param_msg(struct rndis_device *rdev,
 	rssp->hashinfo = NDIS_HASH_FUNC_TOEPLITZ | NDIS_HASH_IPV4 |
 			 NDIS_HASH_TCP_IPV4 | NDIS_HASH_IPV6 |
 			 NDIS_HASH_TCP_IPV6;
-	rssp->indirect_tabsize = 4*ITAB_NUM;
+	rssp->indirect_tabsize = 4 * ndc->rx_table_sz;
 	rssp->indirect_taboffset = sizeof(struct ndis_recv_scale_param);
 	rssp->hashkey_size = NETVSC_HASH_KEYLEN;
 	rssp->hashkey_offset = rssp->indirect_taboffset +
@@ -961,7 +948,7 @@ static int rndis_set_rss_param_msg(struct rndis_device *rdev,
 
 	/* Set indirection table entries */
 	itab = (u32 *)(rssp + 1);
-	for (i = 0; i < ITAB_NUM; i++)
+	for (i = 0; i < ndc->rx_table_sz; i++)
 		itab[i] = ndc->rx_table[i];
 
 	/* Set hask key values */
@@ -1548,6 +1535,18 @@ struct netvsc_device *rndis_filter_device_add(struct hv_device *dev,
 	if (ret || rsscap.num_recv_que < 2)
 		goto out;
 
+	if (rsscap.num_indirect_tabent &&
+	    rsscap.num_indirect_tabent <= ITAB_NUM_MAX)
+		ndc->rx_table_sz = rsscap.num_indirect_tabent;
+	else
+		ndc->rx_table_sz = ITAB_NUM;
+
+	ndc->rx_table = kcalloc(ndc->rx_table_sz, sizeof(u16), GFP_KERNEL);
+	if (!ndc->rx_table) {
+		ret = -ENOMEM;
+		goto err_dev_remv;
+	}
+
 	/* This guarantees that num_possible_rss_qs <= num_online_cpus */
 	num_possible_rss_qs = min_t(u32, num_online_cpus(),
 				    rsscap.num_recv_que);
@@ -1558,7 +1557,7 @@ struct netvsc_device *rndis_filter_device_add(struct hv_device *dev,
 	net_device->num_chn = min(net_device->max_chn, device_info->num_chn);
 
 	if (!netif_is_rxfh_configured(net)) {
-		for (i = 0; i < ITAB_NUM; i++)
+		for (i = 0; i < ndc->rx_table_sz; i++)
 			ndc->rx_table[i] = ethtool_rxfh_indir_default(
 						i, net_device->num_chn);
 	}
@@ -1596,11 +1595,19 @@ void rndis_filter_device_remove(struct hv_device *dev,
 				struct netvsc_device *net_dev)
 {
 	struct rndis_device *rndis_dev = net_dev->extension;
+	struct net_device *net = hv_get_drvdata(dev);
+	struct net_device_context *ndc;
+
+	ndc = netdev_priv(net);
 
 	/* Halt and release the rndis device */
 	rndis_filter_halt_device(net_dev, rndis_dev);
 
 	netvsc_device_remove(dev);
+
+	ndc->rx_table_sz = 0;
+	kfree(ndc->rx_table);
+	ndc->rx_table = NULL;
 }
 
 int rndis_filter_open(struct netvsc_device *nvdev)

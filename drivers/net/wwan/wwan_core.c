@@ -994,7 +994,7 @@ static const struct nla_policy wwan_rtnl_policy[IFLA_WWAN_MAX + 1] = {
 
 static struct rtnl_link_ops wwan_rtnl_link_ops __read_mostly = {
 	.kind = "wwan",
-	.maxtype = __IFLA_WWAN_MAX,
+	.maxtype = IFLA_WWAN_MAX,
 	.alloc = wwan_rtnl_alloc,
 	.validate = wwan_rtnl_validate,
 	.newlink = wwan_rtnl_newlink,
@@ -1058,7 +1058,7 @@ static void wwan_create_default_link(struct wwan_device *wwandev,
 		goto unlock;
 	}
 
-	rtnl_configure_link(dev, NULL); /* Link initialized, notify new link */
+	rtnl_configure_link(dev, NULL, 0, NULL); /* Link initialized, notify new link */
 
 unlock:
 	rtnl_unlock();

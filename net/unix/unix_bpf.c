@@ -54,6 +54,9 @@ static int unix_bpf_recvmsg(struct sock *sk, struct msghdr *msg,
 	struct sk_psock *psock;
 	int copied;
 
+	if (flags & MSG_OOB)
+		return -EOPNOTSUPP;
+
 	if (!len)
 		return 0;
 
@@ -181,6 +184,9 @@ int unix_stream_bpf_update_proto(struct sock *sk, struct sk_psock *psock, bool r
 	 */
 	if (!psock->sk_pair) {
 		sk_pair = unix_peer(sk);
+		if (unlikely(!sk_pair))
+			return -EINVAL;
+
 		sock_hold(sk_pair);
 		psock->sk_pair = sk_pair;
 	}

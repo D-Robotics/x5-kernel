@@ -38,8 +38,8 @@
 #define USB_ABE_CANDEBUGGER_FD_VENDOR_ID 0x16d0
 #define USB_ABE_CANDEBUGGER_FD_PRODUCT_ID 0x10b8
 
-#define GS_USB_ENDPOINT_IN 1
-#define GS_USB_ENDPOINT_OUT 2
+#define USB_XYLANTA_SAINT3_VENDOR_ID 0x16d0
+#define USB_XYLANTA_SAINT3_PRODUCT_ID 0x0f30
 
 /* Timestamp 32 bit timer runs at 1 MHz (1 µs tick). Worker accounts
  * for timer overflow (will be after ~71 minutes)
@@ -252,13 +252,15 @@ struct canfd_quirk {
 } __packed;
 
 struct gs_host_frame {
-	u32 echo_id;
-	__le32 can_id;
+	struct_group(header,
+		u32 echo_id;
+		__le32 can_id;
 
-	u8 can_dlc;
-	u8 channel;
-	u8 flags;
-	u8 reserved;
+		u8 can_dlc;
+		u8 channel;
+		u8 flags;
+		u8 reserved;
+	);
 
 	union {
 		DECLARE_FLEX_ARRAY(struct classic_can, classic_can);
@@ -277,10 +279,6 @@ struct gs_host_frame {
 #define GS_MAX_TX_URBS 10
 /* Only launch a max of GS_MAX_RX_URBS usb requests at a time. */
 #define GS_MAX_RX_URBS 30
-/* Maximum number of interfaces the driver supports per device.
- * Current hardware only supports 3 interfaces. The future may vary.
- */
-#define GS_MAX_INTF 3
 
 struct gs_tx_context {
 	struct gs_can *dev;
@@ -318,11 +316,15 @@ struct gs_can {
 
 /* usb interface struct */
 struct gs_usb {
-	struct gs_can *canch[GS_MAX_INTF];
 	struct usb_anchor rx_submitted;
 	struct usb_device *udev;
 	unsigned int hf_size_rx;
 	u8 active_channels;
+	u8 channel_cnt;
+
+	unsigned int pipe_in;
+	unsigned int pipe_out;
+	struct gs_can *canch[];
 };
 
 /* 'allocate' a tx context.
@@ -522,18 +524,19 @@ static void gs_usb_set_timestamp(struct gs_can *dev, struct sk_buff *skb,
 
 static void gs_usb_receive_bulk_callback(struct urb *urb)
 {
-	struct gs_usb *usbcan = urb->context;
+	struct gs_usb *parent = urb->context;
 	struct gs_can *dev;
-	struct net_device *netdev;
+	struct net_device *netdev = NULL;
 	int rc;
 	struct net_device_stats *stats;
 	struct gs_host_frame *hf = urb->transfer_buffer;
+	unsigned int minimum_length;
 	struct gs_tx_context *txc;
 	struct can_frame *cf;
 	struct canfd_frame *cfd;
 	struct sk_buff *skb;
 
-	BUG_ON(!usbcan);
+	BUG_ON(!parent);
 
 	switch (urb->status) {
 	case 0: /* success */
@@ -546,11 +549,20 @@ static void gs_usb_receive_bulk_callback(struct urb *urb)
 		return;
 	}
 
+	minimum_length = sizeof(hf->header);
+	if (urb->actual_length < minimum_length) {
+		dev_err_ratelimited(&parent->udev->dev,
+				    "short read (actual_length=%u, minimum_length=%u)\n",
+				    urb->actual_length, minimum_length);
+
+		goto resubmit_urb;
+	}
+
 	/* device reports out of range channel id */
-	if (hf->channel >= GS_MAX_INTF)
+	if (hf->channel >= parent->channel_cnt)
 		goto device_detach;
 
-	dev = usbcan->canch[hf->channel];
+	dev = parent->canch[hf->channel];
 
 	netdev = dev->netdev;
 	stats = &netdev->stats;
@@ -639,27 +651,35 @@ static void gs_usb_receive_bulk_callback(struct urb *urb)
 		netif_rx(skb);
 	}
 
- resubmit_urb:
-	usb_fill_bulk_urb(urb, usbcan->udev,
-			  usb_rcvbulkpipe(usbcan->udev, GS_USB_ENDPOINT_IN),
-			  hf, dev->parent->hf_size_rx,
-			  gs_usb_receive_bulk_callback, usbcan);
+resubmit_urb:
+	usb_fill_bulk_urb(urb, parent->udev,
+			  parent->pipe_in,
+			  hf, parent->hf_size_rx,
+			  gs_usb_receive_bulk_callback, parent);
+
+	usb_anchor_urb(urb, &parent->rx_submitted);
 
 	rc = usb_submit_urb(urb, GFP_ATOMIC);
+	if (!rc)
+		return;
+
+	usb_unanchor_urb(urb);
 
 	/* USB failure take down all interfaces */
 	if (rc == -ENODEV) {
- device_detach:
-		for (rc = 0; rc < GS_MAX_INTF; rc++) {
-			if (usbcan->canch[rc])
-				netif_device_detach(usbcan->canch[rc]->netdev);
+device_detach:
+		for (rc = 0; rc < parent->channel_cnt; rc++) {
+			if (parent->canch[rc])
+				netif_device_detach(parent->canch[rc]->netdev);
 		}
+	} else if (rc != -ESHUTDOWN && net_ratelimit()) {
+		netdev_info(netdev, "failed to re-submit IN URB: %pe\n",
+			    ERR_PTR(rc));
 	}
 }
 
-static int gs_usb_set_bittiming(struct net_device *netdev)
+static int gs_usb_set_bittiming(struct gs_can *dev)
 {
-	struct gs_can *dev = netdev_priv(netdev);
 	struct can_bittiming *bt = &dev->can.bittiming;
 	struct gs_device_bittiming dbt = {
 		.prop_seg = cpu_to_le32(bt->prop_seg),
@@ -677,9 +697,8 @@ static int gs_usb_set_bittiming(struct net_device *netdev)
 				    GFP_KERNEL);
 }
 
-static int gs_usb_set_data_bittiming(struct net_device *netdev)
+static int gs_usb_set_data_bittiming(struct gs_can *dev)
 {
-	struct gs_can *dev = netdev_priv(netdev);
 	struct can_bittiming *bt = &dev->can.data_bittiming;
 	struct gs_device_bittiming dbt = {
 		.prop_seg = cpu_to_le32(bt->prop_seg),
@@ -707,8 +726,21 @@ static void gs_usb_xmit_callback(struct urb *urb)
 	struct gs_can *dev = txc->dev;
 	struct net_device *netdev = dev->netdev;
 
-	if (urb->status)
-		netdev_info(netdev, "usb xmit fail %u\n", txc->echo_id);
+	if (!urb->status)
+		return;
+
+	if (urb->status != -ESHUTDOWN && net_ratelimit())
+		netdev_info(netdev, "failed to xmit URB %u: %pe\n",
+			    txc->echo_id, ERR_PTR(urb->status));
+
+	netdev->stats.tx_dropped++;
+	netdev->stats.tx_errors++;
+
+	can_free_echo_skb(netdev, txc->echo_id, NULL);
+	gs_free_tx_context(txc);
+	atomic_dec(&dev->active_tx_urbs);
+
+	netif_wake_queue(netdev);
 }
 
 static netdev_tx_t gs_can_start_xmit(struct sk_buff *skb,
@@ -777,7 +809,7 @@ static netdev_tx_t gs_can_start_xmit(struct sk_buff *skb,
 	}
 
 	usb_fill_bulk_urb(urb, dev->udev,
-			  usb_sndbulkpipe(dev->udev, GS_USB_ENDPOINT_OUT),
+			  dev->parent->pipe_out,
 			  hf, dev->hf_size_tx,
 			  gs_usb_xmit_callback, txc);
 
@@ -814,12 +846,12 @@ static netdev_tx_t gs_can_start_xmit(struct sk_buff *skb,
 
 	return NETDEV_TX_OK;
 
- badidx:
+badidx:
 	kfree(hf);
- nomem_hf:
+nomem_hf:
 	usb_free_urb(urb);
 
- nomem_urb:
+nomem_urb:
 	gs_free_tx_context(txc);
 	dev_kfree_skb(skb);
 	stats->tx_dropped++;
@@ -882,8 +914,7 @@ static int gs_can_open(struct net_device *netdev)
 			/* fill, anchor, and submit rx urb */
 			usb_fill_bulk_urb(urb,
 					  dev->udev,
-					  usb_rcvbulkpipe(dev->udev,
-							  GS_USB_ENDPOINT_IN),
+					  dev->parent->pipe_in,
 					  buf,
 					  dev->parent->hf_size_rx,
 					  gs_usb_receive_bulk_callback, parent);
@@ -928,6 +959,20 @@ static int gs_can_open(struct net_device *netdev)
 	if (dev->feature & GS_CAN_FEATURE_HW_TIMESTAMP)
 		flags |= GS_CAN_MODE_HW_TIMESTAMP;
 
+	rc = gs_usb_set_bittiming(dev);
+	if (rc) {
+		netdev_err(netdev, "failed to set bittiming: %pe\n", ERR_PTR(rc));
+		goto out_usb_kill_anchored_urbs;
+	}
+
+	if (ctrlmode & CAN_CTRLMODE_FD) {
+		rc = gs_usb_set_data_bittiming(dev);
+		if (rc) {
+			netdev_err(netdev, "failed to set data bittiming: %pe\n", ERR_PTR(rc));
+			goto out_usb_kill_anchored_urbs;
+		}
+	}
+
 	/* start polling timestamp */
 	if (dev->feature & GS_CAN_FEATURE_HW_TIMESTAMP)
 		gs_usb_timestamp_init(dev);
@@ -961,7 +1006,7 @@ out_usb_free_urb:
 	usb_free_urb(urb);
 out_usb_kill_anchored_urbs:
 	if (!parent->active_channels)
-		usb_kill_anchored_urbs(&dev->tx_submitted);
+		usb_kill_anchored_urbs(&parent->rx_submitted);
 
 	close_candev(netdev);
 
@@ -1198,7 +1243,6 @@ static struct gs_can *gs_make_candev(unsigned int channel,
 	dev->can.state = CAN_STATE_STOPPED;
 	dev->can.clock.freq = le32_to_cpu(bt_const.fclk_can);
 	dev->can.bittiming_const = &dev->bt_const;
-	dev->can.do_set_bittiming = gs_usb_set_bittiming;
 
 	dev->can.ctrlmode_supported = CAN_CTRLMODE_CC_LEN8_DLC;
 
@@ -1222,7 +1266,6 @@ static struct gs_can *gs_make_candev(unsigned int channel,
 		 * GS_CAN_FEATURE_BT_CONST_EXT is set.
 		 */
 		dev->can.data_bittiming_const = &dev->bt_const;
-		dev->can.do_set_data_bittiming = gs_usb_set_data_bittiming;
 	}
 
 	if (feature & GS_CAN_FEATURE_TERMINATION) {
@@ -1311,7 +1354,7 @@ static struct gs_can *gs_make_candev(unsigned int channel,
 
 	return dev;
 
- out_free_candev:
+out_free_candev:
 	free_candev(dev->netdev);
 	return ERR_PTR(rc);
 }
@@ -1327,14 +1370,22 @@ static int gs_usb_probe(struct usb_interface *intf,
 			const struct usb_device_id *id)
 {
 	struct usb_device *udev = interface_to_usbdev(intf);
+	struct usb_endpoint_descriptor *ep_in, *ep_out;
 	struct gs_host_frame *hf;
-	struct gs_usb *dev;
+	struct gs_usb *parent;
 	struct gs_host_config hconf = {
 		.byte_order = cpu_to_le32(0x0000beef),
 	};
 	struct gs_device_config dconf;
 	unsigned int icount, i;
 	int rc;
+
+	rc = usb_find_common_endpoints(intf->cur_altsetting,
+				       &ep_in, &ep_out, NULL, NULL);
+	if (rc) {
+		dev_err(&intf->dev, "Required endpoints not found\n");
+		return rc;
+	}
 
 	/* send host config */
 	rc = usb_control_msg_send(udev, 0,
@@ -1364,56 +1415,62 @@ static int gs_usb_probe(struct usb_interface *intf,
 	icount = dconf.icount + 1;
 	dev_info(&intf->dev, "Configuring for %u interfaces\n", icount);
 
-	if (icount > GS_MAX_INTF) {
+	if (icount > type_max(typeof(parent->channel_cnt))) {
 		dev_err(&intf->dev,
 			"Driver cannot handle more that %u CAN interfaces\n",
-			GS_MAX_INTF);
+			type_max(typeof(parent->channel_cnt)));
 		return -EINVAL;
 	}
 
-	dev = kzalloc(sizeof(*dev), GFP_KERNEL);
-	if (!dev)
+	parent = kzalloc(struct_size(parent, canch, icount), GFP_KERNEL);
+	if (!parent)
 		return -ENOMEM;
 
-	init_usb_anchor(&dev->rx_submitted);
+	parent->channel_cnt = icount;
 
-	usb_set_intfdata(intf, dev);
-	dev->udev = udev;
+	init_usb_anchor(&parent->rx_submitted);
+
+	usb_set_intfdata(intf, parent);
+	parent->udev = udev;
+
+	/* store the detected endpoints */
+	parent->pipe_in = usb_rcvbulkpipe(parent->udev, ep_in->bEndpointAddress);
+	parent->pipe_out = usb_sndbulkpipe(parent->udev, ep_out->bEndpointAddress);
 
 	for (i = 0; i < icount; i++) {
 		unsigned int hf_size_rx = 0;
 
-		dev->canch[i] = gs_make_candev(i, intf, &dconf);
-		if (IS_ERR_OR_NULL(dev->canch[i])) {
+		parent->canch[i] = gs_make_candev(i, intf, &dconf);
+		if (IS_ERR_OR_NULL(parent->canch[i])) {
 			/* save error code to return later */
-			rc = PTR_ERR(dev->canch[i]);
+			rc = PTR_ERR(parent->canch[i]);
 
 			/* on failure destroy previously created candevs */
 			icount = i;
 			for (i = 0; i < icount; i++)
-				gs_destroy_candev(dev->canch[i]);
+				gs_destroy_candev(parent->canch[i]);
 
-			usb_kill_anchored_urbs(&dev->rx_submitted);
-			kfree(dev);
+			usb_kill_anchored_urbs(&parent->rx_submitted);
+			kfree(parent);
 			return rc;
 		}
-		dev->canch[i]->parent = dev;
+		parent->canch[i]->parent = parent;
 
 		/* set RX packet size based on FD and if hardware
-                * timestamps are supported.
-		*/
-		if (dev->canch[i]->can.ctrlmode_supported & CAN_CTRLMODE_FD) {
-			if (dev->canch[i]->feature & GS_CAN_FEATURE_HW_TIMESTAMP)
+		 * timestamps are supported.
+		 */
+		if (parent->canch[i]->can.ctrlmode_supported & CAN_CTRLMODE_FD) {
+			if (parent->canch[i]->feature & GS_CAN_FEATURE_HW_TIMESTAMP)
 				hf_size_rx = struct_size(hf, canfd_ts, 1);
 			else
 				hf_size_rx = struct_size(hf, canfd, 1);
 		} else {
-			if (dev->canch[i]->feature & GS_CAN_FEATURE_HW_TIMESTAMP)
+			if (parent->canch[i]->feature & GS_CAN_FEATURE_HW_TIMESTAMP)
 				hf_size_rx = struct_size(hf, classic_can_ts, 1);
 			else
 				hf_size_rx = struct_size(hf, classic_can, 1);
 		}
-		dev->hf_size_rx = max(dev->hf_size_rx, hf_size_rx);
+		parent->hf_size_rx = max(parent->hf_size_rx, hf_size_rx);
 	}
 
 	return 0;
@@ -1421,22 +1478,22 @@ static int gs_usb_probe(struct usb_interface *intf,
 
 static void gs_usb_disconnect(struct usb_interface *intf)
 {
-	struct gs_usb *dev = usb_get_intfdata(intf);
+	struct gs_usb *parent = usb_get_intfdata(intf);
 	unsigned int i;
 
 	usb_set_intfdata(intf, NULL);
 
-	if (!dev) {
+	if (!parent) {
 		dev_err(&intf->dev, "Disconnect (nodata)\n");
 		return;
 	}
 
-	for (i = 0; i < GS_MAX_INTF; i++)
-		if (dev->canch[i])
-			gs_destroy_candev(dev->canch[i]);
+	for (i = 0; i < parent->channel_cnt; i++)
+		if (parent->canch[i])
+			gs_destroy_candev(parent->canch[i]);
 
-	usb_kill_anchored_urbs(&dev->rx_submitted);
-	kfree(dev);
+	usb_kill_anchored_urbs(&parent->rx_submitted);
+	kfree(parent);
 }
 
 static const struct usb_device_id gs_usb_table[] = {
@@ -1448,6 +1505,8 @@ static const struct usb_device_id gs_usb_table[] = {
 				      USB_CES_CANEXT_FD_PRODUCT_ID, 0) },
 	{ USB_DEVICE_INTERFACE_NUMBER(USB_ABE_CANDEBUGGER_FD_VENDOR_ID,
 				      USB_ABE_CANDEBUGGER_FD_PRODUCT_ID, 0) },
+	{ USB_DEVICE_INTERFACE_NUMBER(USB_XYLANTA_SAINT3_VENDOR_ID,
+				      USB_XYLANTA_SAINT3_PRODUCT_ID, 0) },
 	{} /* Terminating entry */
 };
 

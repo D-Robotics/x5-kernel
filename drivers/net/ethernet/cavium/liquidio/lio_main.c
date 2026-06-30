@@ -1512,14 +1512,17 @@ static void free_netsgbuf_with_resp(void *buf)
 }
 
 /**
- * liquidio_ptp_adjfreq - Adjust ptp frequency
+ * liquidio_ptp_adjfine - Adjust ptp frequency
  * @ptp: PTP clock info
- * @ppb: how much to adjust by, in parts-per-billion
+ * @scaled_ppm: how much to adjust by, in scaled parts-per-million
+ *
+ * Scaled parts per million is ppm with a 16-bit binary fractional field.
  */
-static int liquidio_ptp_adjfreq(struct ptp_clock_info *ptp, s32 ppb)
+static int liquidio_ptp_adjfine(struct ptp_clock_info *ptp, long scaled_ppm)
 {
 	struct lio *lio = container_of(ptp, struct lio, ptp_info);
 	struct octeon_device *oct = (struct octeon_device *)lio->oct_dev;
+	s32 ppb = scaled_ppm_to_ppb(scaled_ppm);
 	u64 comp, delta;
 	unsigned long flags;
 	bool neg_adj = false;
@@ -1643,7 +1646,7 @@ static void oct_ptp_open(struct net_device *netdev)
 	lio->ptp_info.n_ext_ts = 0;
 	lio->ptp_info.n_per_out = 0;
 	lio->ptp_info.pps = 0;
-	lio->ptp_info.adjfreq = liquidio_ptp_adjfreq;
+	lio->ptp_info.adjfine = liquidio_ptp_adjfine;
 	lio->ptp_info.adjtime = liquidio_ptp_adjtime;
 	lio->ptp_info.gettime64 = liquidio_ptp_gettime;
 	lio->ptp_info.settime64 = liquidio_ptp_settime;
@@ -3522,6 +3525,23 @@ static int setup_nic_devices(struct octeon_device *octeon_dev)
 		 */
 		netdev->netdev_ops = &lionetdevops;
 
+		lio = GET_LIO(netdev);
+
+		memset(lio, 0, sizeof(struct lio));
+
+		lio->ifidx = ifidx_or_pfnum;
+
+		props = &octeon_dev->props[i];
+		props->gmxport = resp->cfg_info.linfo.gmxport;
+		props->netdev = netdev;
+
+		/* Point to the  properties for octeon device to which this
+		 * interface belongs.
+		 */
+		lio->oct_dev = octeon_dev;
+		lio->octprops = props;
+		lio->netdev = netdev;
+
 		retval = netif_set_real_num_rx_queues(netdev, num_oqueues);
 		if (retval) {
 			dev_err(&octeon_dev->pci_dev->dev,
@@ -3537,16 +3557,6 @@ static int setup_nic_devices(struct octeon_device *octeon_dev)
 			WRITE_ONCE(sc->caller_is_done, true);
 			goto setup_nic_dev_free;
 		}
-
-		lio = GET_LIO(netdev);
-
-		memset(lio, 0, sizeof(struct lio));
-
-		lio->ifidx = ifidx_or_pfnum;
-
-		props = &octeon_dev->props[i];
-		props->gmxport = resp->cfg_info.linfo.gmxport;
-		props->netdev = netdev;
 
 		lio->linfo.num_rxpciq = num_oqueues;
 		lio->linfo.num_txpciq = num_iqueues;
@@ -3612,13 +3622,6 @@ static int setup_nic_devices(struct octeon_device *octeon_dev)
 		/* MTU range: 68 - 16000 */
 		netdev->min_mtu = LIO_MIN_MTU_SIZE;
 		netdev->max_mtu = LIO_MAX_MTU_SIZE;
-
-		/* Point to the  properties for octeon device to which this
-		 * interface belongs.
-		 */
-		lio->oct_dev = octeon_dev;
-		lio->octprops = props;
-		lio->netdev = netdev;
 
 		dev_dbg(&octeon_dev->pci_dev->dev,
 			"if%d gmx: %d hw_addr: 0x%llx\n", i,
@@ -3767,6 +3770,7 @@ static int setup_nic_devices(struct octeon_device *octeon_dev)
 	if (!devlink) {
 		device_unlock(&octeon_dev->pci_dev->dev);
 		dev_err(&octeon_dev->pci_dev->dev, "devlink alloc failed\n");
+		i--;
 		goto setup_nic_dev_free;
 	}
 
@@ -3782,11 +3786,11 @@ static int setup_nic_devices(struct octeon_device *octeon_dev)
 
 setup_nic_dev_free:
 
-	while (i--) {
+	do {
 		dev_err(&octeon_dev->pci_dev->dev,
 			"NIC ifidx:%d Setup failed\n", i);
 		liquidio_destroy_nic_device(octeon_dev, i);
-	}
+	} while (i--);
 
 setup_nic_dev_done:
 

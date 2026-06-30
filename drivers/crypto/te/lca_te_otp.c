@@ -8,7 +8,7 @@
 #include "lca_te_otp.h"
 #include "driver/te_drv_otp.h"
 
-#define MAX(a,b,c) ((a)>(b)?((a)>(c)?(a):(c)):((b)>(c)?(b):(c)))
+#define MAX_3WAY(a,b,c) ((a)>(b)?((a)>(c)?(a):(c)):((b)>(c)?(b):(c)))
 #define MAX_BASIC_OTP_PART_SIZE (32)
 #define BASIC_OTP_PART_NUM (7)
 #define EXT_OTP_PART_NUM (3)
@@ -101,7 +101,7 @@ static ssize_t otp_show(struct device *dev,
 	if(rc != TE_SUCCESS || !otp_conf.otp_exist) {
 		goto fail0;
 	}
-	otp_ext_size = MAX(otp_conf.otp_ns_sz,
+	otp_ext_size = MAX_3WAY(otp_conf.otp_ns_sz,
 			   otp_conf.otp_s_sz, otp_conf.otp_tst_sz);
 	q_size = ((MAX_BASIC_OTP_PART_SIZE > otp_ext_size) ?
 			MAX_BASIC_OTP_PART_SIZE : otp_ext_size);
@@ -239,4 +239,3 @@ int lca_te_otp_read(size_t offset, uint8_t *buf, size_t len)
 }
 
 EXPORT_SYMBOL_GPL(lca_te_otp_read);
-

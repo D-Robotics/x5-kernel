@@ -396,6 +396,11 @@ static int drobot_pm_add_one_domain(struct drobot_pmu *pmu, struct device_node *
 	pd->genpd.power_on = drobot_pd_power_on;
 	pd->genpd.flags	    = pd_info->flag;
 	ret		    = pm_genpd_init(&pd->genpd, NULL, !boot_on);
+	if (ret) {
+		dev_err(pmu->dev, "failed to init domain %s: %d\n",
+			pd_info->name, ret);
+		return ret;
+	}
 
 	pmu->genpd_data.domains[id] = &pd->genpd;
 

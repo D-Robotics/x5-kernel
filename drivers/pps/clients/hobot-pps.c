@@ -1,7 +1,7 @@
 /*
  * pps-gpio.c -- PPS client driver using GPIO
  *
- * Copyright (C) 2020 Hobot Robotics. 
+ * Copyright (C) 2020 Hobot Robotics.
  *
  *   This program is free software; you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -185,11 +185,11 @@ static int32_t hobot_pps_probe(struct platform_device *pdev)
 
 	ret = hobot_pps_register_source(pdev, data);
 	if (ret) {
-		dev_info(data->pps->dev, "hobot_pps_register_source error\n");
+		dev_info(&data->pps->dev, "hobot_pps_register_source error\n");
 	}
 
 	platform_set_drvdata(pdev, (void *)data);
-	dev_info(data->pps->dev, "Registered IRQ %d as PPS source\n",
+	dev_info(&data->pps->dev, "Registered IRQ %d as PPS source\n",
 		 data->irq);
 
 	return ret;
