@@ -11,6 +11,7 @@
 
 #include <linux/clk.h>
 #include <linux/device.h>
+#include <linux/spinlock.h>
 #include <linux/types.h>
 #include <sound/dmaengine_pcm.h>
 #include <sound/pcm.h>
@@ -101,6 +102,7 @@ struct dw_i2s_dev {
 	struct clk *mux_clk;
 	struct clk *ext_io_clk;
 	struct clk *mclk;
+	spinlock_t lock;
 	int active;
 	unsigned int capability;
 	unsigned int quirks;
