@@ -199,28 +199,39 @@ static void i2s_start(struct dw_i2s_dev *dev,
 		      struct snd_pcm_substream *substream)
 {
 	struct i2s_clk_config_data *config = &dev->config;
+	unsigned long flags;
 	u32 val;
 
-	val = ((config->chan_nr - 1) << 8);
-	if (dev->capability & DW_I2S_MASTER) {
-		val |= BIT(15);
+	/*
+	 * IER[0] is the global I2S enable (IEN). Clearing it flushes all FIFOs
+	 * and resets the TDM frame. Playback and capture triggers are not
+	 * serialized by ASoC; only the first active stream programs IER[0].
+	 */
+	spin_lock_irqsave(&dev->lock, flags);
+	if (++dev->active == 1) {
+		val = ((config->chan_nr - 1) << 8);
+		if (dev->capability & DW_I2S_MASTER)
+			val |= BIT(15);
+
+		switch (dev->tdm_mode) {
+		case SND_SOC_DAIFMT_DSP_A:
+			val |= BIT(1) | BIT(5);
+			break;
+		case SND_SOC_DAIFMT_DSP_B:
+			val |= BIT(1);
+			break;
+		case SND_SOC_DAIFMT_I2S:
+			break;
+		}
+
+		i2s_write_reg(dev->i2s_base, IER, val);
+		val |= BIT(0);
+		i2s_write_reg(dev->i2s_base, IER, val);
+
+		if (dev->capability & DW_I2S_MASTER)
+			i2s_write_reg(dev->i2s_base, CER, 1);
 	}
-
-	switch (dev->tdm_mode) {
-	case SND_SOC_DAIFMT_DSP_A:
-		val |= BIT(1) | BIT(5);
-		break;
-	case SND_SOC_DAIFMT_DSP_B:
-		val |= BIT(1);
-		break;
-	case SND_SOC_DAIFMT_I2S:
-		break;
-	}
-
-	i2s_write_reg(dev->i2s_base, IER, val);
-	val |= BIT(0);
-
-	i2s_write_reg(dev->i2s_base, IER, val);
+	spin_unlock_irqrestore(&dev->lock, flags);
 
 	i2s_enable_irqs(dev, substream->stream, config->chan_nr);
 
@@ -231,14 +242,12 @@ static void i2s_start(struct dw_i2s_dev *dev,
 
 	if (!dev->use_pio)
 		i2s_dma_block_enable(dev, substream->stream);
-
-	if (dev->capability & DW_I2S_MASTER)
-		i2s_write_reg(dev->i2s_base, CER, 1);
 }
 
 static void i2s_stop(struct dw_i2s_dev *dev,
 		struct snd_pcm_substream *substream)
 {
+	unsigned long flags;
 
 	i2s_clear_irqs(dev, substream->stream);
 	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
@@ -246,9 +255,10 @@ static void i2s_stop(struct dw_i2s_dev *dev,
 	else
 		i2s_write_reg(dev->i2s_base, IRER, 0);
 
-	i2s_disable_irqs(dev, substream->stream, 8);
+	i2s_disable_irqs(dev, substream->stream, dev->config.chan_nr);
 
-	if (!dev->active) {
+	spin_lock_irqsave(&dev->lock, flags);
+	if (--dev->active == 0) {
 		if (dev->capability & DW_I2S_MASTER) {
 			i2s_write_reg(dev->i2s_base, CER, 0);
 			i2s_write_reg(dev->i2s_base, IER, 0x8000);
@@ -256,6 +266,7 @@ static void i2s_stop(struct dw_i2s_dev *dev,
 			i2s_write_reg(dev->i2s_base, IER, 0x0);
 		}
 	}
+	spin_unlock_irqrestore(&dev->lock, flags);
 
 	if (!dev->use_pio)
 		i2s_dma_block_disable(dev, substream->stream);
@@ -466,14 +477,12 @@ static int dw_i2s_trigger(struct snd_pcm_substream *substream,
 	case SNDRV_PCM_TRIGGER_START:
 	case SNDRV_PCM_TRIGGER_RESUME:
 	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
-		dev->active++;
 		i2s_start(dev, substream);
 		break;
 
 	case SNDRV_PCM_TRIGGER_STOP:
 	case SNDRV_PCM_TRIGGER_SUSPEND:
 	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
-		dev->active--;
 		i2s_stop(dev, substream);
 		break;
 	default:
@@ -868,6 +877,8 @@ static int dw_i2s_probe(struct platform_device *pdev)
 	if (!dev)
 		return -ENOMEM;
 
+	spin_lock_init(&dev->lock);
+
 	dw_i2s_dai = devm_kzalloc(&pdev->dev, sizeof(*dw_i2s_dai), GFP_KERNEL);
 	if (!dw_i2s_dai)
 		return -ENOMEM;
@@ -926,6 +937,15 @@ static int dw_i2s_probe(struct platform_device *pdev)
 		if (IS_ERR(dev->sclk))
 			return PTR_ERR(dev->sclk);
 
+		dev->pclk = devm_clk_get(&pdev->dev, pclk);
+		if (IS_ERR(dev->pclk))
+			return PTR_ERR(dev->pclk);
+
+		ret = clk_prepare_enable(dev->pclk);
+		if (ret) {
+			return ret;
+		}
+
 		ret = clk_prepare_enable(dev->mclk);
 		if (ret) {
 			return ret;
@@ -954,15 +974,6 @@ static int dw_i2s_probe(struct platform_device *pdev)
 			dev_err(&pdev->dev, "Error: failed to set slave clock parent\n");
 			return ret;
 		}
-	}
-	
-	dev->pclk = devm_clk_get(&pdev->dev, pclk);
-	if (IS_ERR(dev->pclk))
-		return PTR_ERR(dev->pclk);
-
-	ret = clk_prepare_enable(dev->pclk);
-	if (ret) {
-		return ret;
 	}
 
 	if (pdata) {
