@@ -20,6 +20,10 @@
 #include <linux/regmap.h>
 #include <linux/regulator/consumer.h>
 #include <linux/clk.h>
+#include <linux/device.h>
+#include <linux/of.h>
+#include <linux/of_platform.h>
+#include <linux/platform_device.h>
 
 #include <drm/drm_atomic_helper.h>
 #include <drm/drm_bridge.h>
@@ -175,6 +179,8 @@
 
 #define SII902X_AUDIO_PORT_INDEX		3
 
+#define SII902X_DISPLAY_COMPAT			"verisilicon,display-subsystem"
+
 struct sii902x {
 	struct i2c_client *i2c;
 	struct regmap *regmap;
@@ -183,6 +189,7 @@ struct sii902x {
 	struct drm_connector connector;
 	struct gpio_desc *reset_gpio;
 	struct i2c_mux_core *i2cmux;
+	struct device_link *display_link;
 	bool sink_is_hdmi;
 	/*
 	 * Mutex protects audio and video functions from interfering
@@ -1063,6 +1070,41 @@ static const struct drm_bridge_timings default_sii902x_timings = {
 		 | DRM_BUS_FLAG_DE_HIGH,
 };
 
+/*
+ * Link sii902x as supplier to display-subsystem (vs_drm consumer) so that
+ * sii902x resumes before vs_drm and drm_mode_config_helper_resume().
+ */
+static int sii902x_link_display_subsystem(struct sii902x *sii902x)
+{
+	struct device *dev = &sii902x->i2c->dev;
+	struct device_node *np;
+	struct platform_device *display;
+
+	np = of_find_compatible_node(NULL, NULL, SII902X_DISPLAY_COMPAT);
+	if (!np) {
+		dev_dbg(dev, "no %s in DT, skip device_link\n",
+			SII902X_DISPLAY_COMPAT);
+		return 0;
+	}
+
+	display = of_find_device_by_node(np);
+	of_node_put(np);
+	if (!display)
+		return -EPROBE_DEFER;
+
+	sii902x->display_link = device_link_add(&display->dev, dev,
+						DL_FLAG_STATELESS |
+						DL_FLAG_PM_RUNTIME);
+	put_device(&display->dev);
+
+	if (!sii902x->display_link) {
+		dev_err(dev, "device_link_add to display-subsystem failed\n");
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
 static int sii902x_init(struct sii902x *sii902x)
 {
 	struct device *dev = &sii902x->i2c->dev;
@@ -1235,12 +1277,21 @@ static int sii902x_probe(struct i2c_client *client,
 	if (ret < 0)
 		return dev_err_probe(dev, ret, "Failed to enable supplies");
 
+	ret = sii902x_link_display_subsystem(sii902x);
+	if (ret)
+		return ret;
+
 	return sii902x_init(sii902x);
 }
 
 static void sii902x_remove(struct i2c_client *client)
 {
 	struct sii902x *sii902x = i2c_get_clientdata(client);
+
+	if (sii902x->display_link) {
+		device_link_del(sii902x->display_link);
+		sii902x->display_link = NULL;
+	}
 
 	drm_bridge_remove(&sii902x->bridge);
 	i2c_mux_del_adapters(sii902x->i2cmux);
