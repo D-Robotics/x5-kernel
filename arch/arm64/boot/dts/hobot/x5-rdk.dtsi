@@ -63,7 +63,7 @@
 		status = "okay";
 	};
 
-	sound-machine {
+	sound_machine: sound-machine {
 		compatible = "gua,sound-card";
 		model = "gua-audio";
 		cpu-dai = <&sound_cpu>;
