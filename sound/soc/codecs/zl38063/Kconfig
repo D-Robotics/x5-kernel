@@ -1,0 +1,6 @@
+config SND_SOC_ZL38063
+	tristate "SoC Audio support for zl380xx codec"
+	depends on I2C
+	default y
+	help
+	  Say Y or M here

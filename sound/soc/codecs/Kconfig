@@ -99,6 +99,7 @@ config SND_SOC_ALL_CODECS
 	imply SND_SOC_DMIC
 	imply SND_SOC_ES8316
 	imply SND_SOC_ES8326
+	imply SND_SOC_TPA2016D2
 	imply SND_SOC_ES8328_SPI
 	imply SND_SOC_ES8328_I2C
 	imply SND_SOC_ES7134
@@ -931,6 +932,10 @@ config SND_SOC_ES8316
 
 config SND_SOC_ES8326
 	tristate "Everest Semi ES8326 CODEC"
+	depends on I2C
+
+config SND_SOC_TPA2016D2
+	tristate "TI Audio TDA2016D2"
 	depends on I2C
 
 config SND_SOC_ES8328
@@ -2183,4 +2188,6 @@ config SND_SOC_HIWONDER_GOOGLEVOICEHAT_SOUNDCARD
 	help
           Say Y or M if you want to add support for voiceHAT soundcard.
 
+
+source "sound/soc/codecs/zl38063/Kconfig"
 endmenu
