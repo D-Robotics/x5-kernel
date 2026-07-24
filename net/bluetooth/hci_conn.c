@@ -390,9 +390,22 @@ static int hci_enhanced_setup_sync(struct hci_dev *hdev, void *data)
 	__u16 handle = conn_handle->handle;
 	struct hci_cp_enhanced_setup_sync_conn cp;
 	const struct sco_param *param;
+	struct hci_conn_hash *hdev_conn_hash = &hdev->conn_hash;
+	struct hci_conn *hdev_conn;
 
 	kfree(conn_handle);
 
+	rcu_read_lock();
+	list_for_each_entry_rcu(hdev_conn, &hdev_conn_hash->list, list) {
+		if (hdev_conn == conn) {
+			rcu_read_unlock();
+			goto conn_valid;
+		}
+	}
+	rcu_read_unlock();
+	return -ECANCELED;
+
+conn_valid:
 	bt_dev_dbg(hdev, "hcon %p", conn);
 
 	configure_datapath_sync(hdev, &conn->codec);
