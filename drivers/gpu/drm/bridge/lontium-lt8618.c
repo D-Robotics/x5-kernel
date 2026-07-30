@@ -1761,6 +1761,22 @@ MODULE_DEVICE_TABLE(i2c, lt8618_i2c_ids);
 #ifdef CONFIG_PM_SLEEP
 static int lt8618_suspend(struct device *dev)
 {
+	struct i2c_client *client = to_i2c_client(dev);
+	struct lt8618 *lt8618 = i2c_get_clientdata(client);
+
+	/*
+	 * Mask the HPD IRQ before the i2c adapter suspends. Otherwise the
+	 * INT pin (level-triggered, active low) can stay asserted while the
+	 * chip is powered down; on resume the kernel unmasks IRQs before the
+	 * i2c bus is back, the threaded handler runs, blocks on regmap_read
+	 * via i2c_transfer, and the whole dpm_resume chain hangs.
+	 *
+	 * disable_irq() also synchronizes against an in-flight threaded
+	 * handler so we won't race with it.
+	 */
+	if (lt8618 && client->irq > 0)
+		disable_irq(client->irq);
+
 	return 0;
 }
 
@@ -1771,8 +1787,16 @@ static int lt8618_resume(struct device *dev)
 
 	dev_dbg(dev, "resume\n");
 
+	if (!lt8618)
+		return 0;
+
 	lt8618_sw_enable(lt8618);
 	lt8618_sw_reset(lt8618);
+	lt8618_irq_enable(lt8618);
+
+	/* i2c and chip regs are ready now; safe to service HPD again. */
+	if (client->irq > 0)
+		enable_irq(client->irq);
 
 	return 0;
 }
