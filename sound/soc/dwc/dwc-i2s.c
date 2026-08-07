@@ -58,6 +58,11 @@ static inline u32 i2s_read_reg(void __iomem *io_base, int reg)
 	return readl(io_base + reg);
 }
 
+static inline u32 dw_i2s_slot_pairs(int chan_nr)
+{
+	return DIV_ROUND_UP(chan_nr, 2);
+}
+
 static inline void i2s_disable_channels(struct dw_i2s_dev *dev, u32 stream)
 {
 	u32 i = 0;
@@ -90,12 +95,12 @@ static inline void i2s_disable_irqs(struct dw_i2s_dev *dev, u32 stream,
 	u32 i, irq;
 
 	if (stream == SNDRV_PCM_STREAM_PLAYBACK) {
-		for (i = 0; i < (chan_nr / 2); i++) {
+		for (i = 0; i < dw_i2s_slot_pairs(chan_nr); i++) {
 			irq = i2s_read_reg(dev->i2s_base, IMR(i));
 			i2s_write_reg(dev->i2s_base, IMR(i), irq | 0x30);
 		}
 	} else {
-		for (i = 0; i < (chan_nr / 2); i++) {
+		for (i = 0; i < dw_i2s_slot_pairs(chan_nr); i++) {
 			irq = i2s_read_reg(dev->i2s_base, IMR(i));
 			i2s_write_reg(dev->i2s_base, IMR(i), irq | 0x03);
 		}
@@ -108,12 +113,12 @@ static inline void i2s_enable_irqs(struct dw_i2s_dev *dev, u32 stream,
 	u32 i, irq;
 
 	if (stream == SNDRV_PCM_STREAM_PLAYBACK) {
-		for (i = 0; i < (chan_nr / 2); i++) {
+		for (i = 0; i < dw_i2s_slot_pairs(chan_nr); i++) {
 			irq = i2s_read_reg(dev->i2s_base, IMR(i));
 			i2s_write_reg(dev->i2s_base, IMR(i), irq & ~0x30);
 		}
 	} else {
-		for (i = 0; i < (chan_nr / 2); i++) {
+		for (i = 0; i < dw_i2s_slot_pairs(chan_nr); i++) {
 			irq = i2s_read_reg(dev->i2s_base, IMR(i));
 			i2s_write_reg(dev->i2s_base, IMR(i), irq & ~0x03);
 		}
@@ -302,10 +307,11 @@ static void dw_i2s_config(struct dw_i2s_dev *dev, int stream)
 	u32 ch_reg;
 	struct i2s_clk_config_data *config = &dev->config;
 	u32 val = 0;
+	u32 ch_en = (config->chan_nr == 1) ? 0x1 : 0x3;
 
 	i2s_disable_channels(dev, stream);
 
-	for (ch_reg = 0; ch_reg < (config->chan_nr / 2); ch_reg++) {
+	for (ch_reg = 0; ch_reg < dw_i2s_slot_pairs(config->chan_nr); ch_reg++) {
 		if (stream == SNDRV_PCM_STREAM_PLAYBACK) {
 			i2s_write_reg(dev->i2s_base, TCR(ch_reg),
 				      dev->xfer_resolution);
@@ -317,7 +323,7 @@ static void dw_i2s_config(struct dw_i2s_dev *dev, int stream)
 			i2s_write_reg(dev->i2s_base, RFCR(ch_reg),
 				      dev->fifo_th - 1);
 		}
-		val |= (0x3 << (2 * ch_reg + 8));
+		val |= ch_en << (2 * ch_reg + 8);
 	}
 
 	val |= 0x1;
@@ -416,6 +422,7 @@ static int dw_i2s_hw_params(struct snd_pcm_substream *substream,
 	case SIX_CHANNEL_SUPPORT:
 	case FOUR_CHANNEL_SUPPORT:
 	case TWO_CHANNEL_SUPPORT:
+	case ONE_CHANNEL_SUPPORT:
 		break;
 	default:
 		dev_err(dev->dev, "channel not supported\n");
@@ -797,14 +804,14 @@ static struct snd_soc_dai_driver dw_i2s_dai_drv[] = {
         {
                 .playback = {
                         .stream_name = "Playback0",
-                        .channels_min = 2,
+                        .channels_min = 1,
                         .channels_max = 8,
                         .rates = SNDRV_PCM_RATE_8000_192000,
                         .formats = g_formats[4],
                 },
                 .capture = {
                         .stream_name = "Capture0",
-                        .channels_min = 2,
+                        .channels_min = 1,
                         .channels_max = 8,
                         .rates = SNDRV_PCM_RATE_8000_192000,
                         .formats = g_formats[4],
@@ -816,14 +823,14 @@ static struct snd_soc_dai_driver dw_i2s_dai_drv[] = {
         {
                 .playback = {
                         .stream_name = "Playback1",
-                        .channels_min = 2,
+                        .channels_min = 1,
                         .channels_max = 8,
                         .rates = SNDRV_PCM_RATE_8000_192000,
                         .formats = g_formats[4],
                 },
                 .capture = {
                         .stream_name = "Capture1",
-                        .channels_min = 2,
+                        .channels_min = 1,
                         .channels_max = 8,
                         .rates = SNDRV_PCM_RATE_8000_192000,
                         .formats = g_formats[4],
@@ -835,14 +842,14 @@ static struct snd_soc_dai_driver dw_i2s_dai_drv[] = {
         {
                 .playback = {
                         .stream_name = "Playback2",
-                        .channels_min = 2,
+                        .channels_min = 1,
                         .channels_max = 8,
                         .rates = SNDRV_PCM_RATE_8000_192000,
                         .formats = g_formats[4],
                 },
                 .capture = {
                         .stream_name = "Capture2",
-                        .channels_min = 2,
+                        .channels_min = 1,
                         .channels_max = 8,
                         .rates = SNDRV_PCM_RATE_8000_192000,
                         .formats = g_formats[4],

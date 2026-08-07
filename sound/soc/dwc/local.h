@@ -88,7 +88,7 @@
 #define	COMP_MAX_DATA_WIDTH	(1 << 2)
 
 #define MAX_CHANNEL_NUM		16
-#define MIN_CHANNEL_NUM		2
+#define MIN_CHANNEL_NUM		1
 
 union dw_i2s_snd_dma_data {
 	struct i2s_dma_data pd;
