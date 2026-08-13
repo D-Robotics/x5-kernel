@@ -678,6 +678,10 @@
 		compatible = "wh-cm480";
 		reg = <0>;
 
+		pinctrl-names = "default";
+		pinctrl-0 = <&lsio_gpio0_14>;
+		reset-gpios = <&ls_gpio0_porta 14 GPIO_ACTIVE_HIGH>;
+
 		port {
 			panel_in: endpoint {
 				remote-endpoint =

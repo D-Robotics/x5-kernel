@@ -582,12 +582,12 @@ static int crm_hps_clk_init(struct platform_device *pdev)
 		hws[X5_DISP_BT1120_PIXEL_CLK] = drobot_clk_register_generator("bt1120_pixel_clk", disp_gen_src_sels, ARRAY_SIZE(disp_gen_src_sels),
 			base + HPS_CLK_GEN + 0x4A0, CLK_SET_RATE_PARENT | CLK_SET_RATE_NO_REPARENT, ctx->idle, ISO_CG_BT1120, false);
 		hws[X5_DISP_DC8000_PIXEL_CLK] = drobot_clk_register_generator("dc8000_pixel_clk", disp_gen_src_sels, ARRAY_SIZE(disp_gen_src_sels),
-			base + HPS_CLK_GEN + 0x4C0, CLK_SET_RATE_PARENT | CLK_SET_RATE_NO_REPARENT, ctx->idle, ISO_CG_DC8000, false);
+			base + HPS_CLK_GEN + 0x4C0, CLK_SET_RATE_NO_REPARENT, ctx->idle, ISO_CG_DC8000, false);
 	} else {
 		hws[X5_DISP_BT1120_PIXEL_CLK] = drobot_clk_register_generator("bt1120_pixel_clk", disp_no_pix_gen_src_sels, ARRAY_SIZE(disp_no_pix_gen_src_sels),
 			base + HPS_CLK_GEN + 0x4A0, CLK_SET_RATE_PARENT | CLK_SET_RATE_NO_REPARENT, ctx->idle, ISO_CG_BT1120, false);
 		hws[X5_DISP_DC8000_PIXEL_CLK] = drobot_clk_register_generator("dc8000_pixel_clk", disp_no_pix_gen_src_sels, ARRAY_SIZE(disp_no_pix_gen_src_sels),
-			base + HPS_CLK_GEN + 0x4C0, CLK_SET_RATE_PARENT | CLK_SET_RATE_NO_REPARENT, ctx->idle, ISO_CG_DC8000, false);
+			base + HPS_CLK_GEN + 0x4C0, CLK_SET_RATE_NO_REPARENT, ctx->idle, ISO_CG_DC8000, false);
 	}
 
 	hws[X5_DISP_SIF_ACLK] = drobot_clk_register_gen_no_flags("disp_sif_aclk", soc_gen_src_sels, ARRAY_SIZE(soc_gen_src_sels), base + HPS_CLK_GEN + 0x4E0, ctx->idle, ISO_CG_DISP_SIF);

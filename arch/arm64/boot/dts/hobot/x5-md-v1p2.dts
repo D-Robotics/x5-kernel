@@ -166,7 +166,7 @@
 
 /* WH-CM480 I2C backlight controller (hobot_bl_controller) */
 &i2c3 {
-	pinctrl-names = "default";
+	pinctrl-names = "default", "recovery";
 	pinctrl-0 = <&pinctrl_i2c3>;
 	status = "okay";
 
