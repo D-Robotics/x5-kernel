@@ -1497,7 +1497,7 @@ static ssize_t uvcg_uncompressed_guid_format_store(struct config_item *item,
 	 */
 	memcpy(ch->desc.guidFormat, page,
 	       min(sizeof(ch->desc.guidFormat), len - 1));
-	ret = sizeof(ch->desc.guidFormat);
+	ret = len;
 
 	fcc = v4l2_fourcc(ch->desc.guidFormat[0], ch->desc.guidFormat[1],
 		ch->desc.guidFormat[2], ch->desc.guidFormat[3]);
