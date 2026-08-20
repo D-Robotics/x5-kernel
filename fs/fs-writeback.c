@@ -506,7 +506,9 @@ relock:
 		if (*inodep && need_resched()) {
 			spin_unlock(&new_wb->list_lock);
 			spin_unlock(&old_wb->list_lock);
+			up_read(&bdi->wb_switch_rwsem);
 			cond_resched();
+			down_read(&bdi->wb_switch_rwsem);
 			goto relock;
 		}
 	}
