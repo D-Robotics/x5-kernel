@@ -7,13 +7,60 @@
 #include <linux/tty.h>
 #include <linux/tty_flip.h>
 #include <linux/serial_reg.h>
+#include <linux/serial_8250.h>
 #include <linux/dma-mapping.h>
 
 #include "8250.h"
 
 #define RX_DMA_SIZE	(1024)
-#define RX_DMA_PERIODS	(RX_DMA_SIZE / 16) /* TODO: Set from FIFO size and Trig lvl */
-#define TX_DMA_SIZE	(RX_DMA_SIZE / RX_DMA_PERIODS)
+
+/*
+ * Pick a DMA burst/period length from slave config, falling back to
+ * fifosize/4 (DW APB UART default) then 16. Used so cyclic RX period and
+ * TX chunk size track the FIFO trigger instead of a hardcoded 16.
+ */
+static size_t serial8250_dma_burst_len(struct uart_8250_port *p, bool rx)
+{
+	struct uart_8250_dma *dma = p->dma;
+	size_t burst = 0;
+
+	if (rx) {
+		if (dma->rxconf.src_msize)
+			burst = dma->rxconf.src_msize;
+		else if (dma->rxconf.src_maxburst)
+			burst = dma->rxconf.src_maxburst;
+	} else {
+		if (dma->txconf.dst_maxburst)
+			burst = dma->txconf.dst_maxburst;
+		else if (dma->txconf.dst_msize)
+			burst = dma->txconf.dst_msize;
+	}
+
+	if (!burst && p->port.fifosize)
+		burst = p->port.fifosize / 4;
+	if (!burst)
+		burst = 16;
+
+	return burst;
+}
+
+static void serial8250_dma_setup_periods(struct uart_8250_port *p)
+{
+	struct uart_8250_dma *dma = p->dma;
+
+	dma->rx_period = serial8250_dma_burst_len(p, true);
+	dma->tx_burst = serial8250_dma_burst_len(p, false);
+
+	/* Cyclic period must divide the ring buffer length. */
+	while (dma->rx_period > 1 && (dma->rx_size % dma->rx_period))
+		dma->rx_period >>= 1;
+
+	if (!dma->tx_burst)
+		dma->tx_burst = 16;
+
+	dev_dbg(p->port.dev, "dma rx_period=%zu tx_burst=%zu fifosize=%u\n",
+		dma->rx_period, dma->tx_burst, p->port.fifosize);
+}
 
 static void __dma_tx_complete(void *param)
 {
@@ -139,6 +186,7 @@ int serial8250_tx_dma(struct uart_8250_port *p)
 	struct circ_buf			*xmit = &p->port.state->xmit;
 	struct dma_async_tx_descriptor	*desc;
 	struct uart_port		*up = &p->port;
+	size_t				tx_limit;
 	int ret;
 
 	if (dma->tx_running) {
@@ -157,8 +205,9 @@ int serial8250_tx_dma(struct uart_8250_port *p)
 		return 0;
 	}
 
+	tx_limit = dma->tx_burst ? dma->tx_burst : 16;
 	dma->tx_size = CIRC_CNT_TO_END(xmit->head, xmit->tail, UART_XMIT_SIZE);
-	dma->tx_size = min_t(unsigned int, dma->tx_size , TX_DMA_SIZE);
+	dma->tx_size = min_t(unsigned int, dma->tx_size, tx_limit);
 
 	serial8250_do_prepare_tx_dma(p);
 
@@ -225,14 +274,21 @@ int serial8250_rx_dma_cyclic(struct uart_8250_port *p)
 {
 	struct uart_8250_dma		*dma = p->dma;
 	struct dma_async_tx_descriptor	*desc;
+	size_t				period;
 
 	if (dma->rx_running)
 		return 0;
 
 	serial8250_do_prepare_rx_dma(p);
 
+	period = dma->rx_period ? dma->rx_period : 16;
+	if (period > dma->rx_size)
+		period = dma->rx_size;
+	while (period > 1 && (dma->rx_size % period))
+		period >>= 1;
+
 	desc = dmaengine_prep_dma_cyclic(dma->rxchan, dma->rx_addr,
-					 dma->rx_size, dma->rx_size / RX_DMA_PERIODS,
+					 dma->rx_size, period,
 					 DMA_DEV_TO_MEM,
 					 DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
 	if (!desc)
@@ -280,12 +336,48 @@ int serial8250_rx_dma(struct uart_8250_port *p)
 void serial8250_rx_dma_flush(struct uart_8250_port *p)
 {
 	struct uart_8250_dma *dma = p->dma;
+	u16 status;
+	int ret;
 
-	if (dma->rx_running) {
-		dmaengine_pause(dma->rxchan);
-		__dma_rx_complete(p);
-		dmaengine_terminate_async(dma->rxchan);
+	if (!dma || !dma->rx_running)
+		return;
+
+	if (p->port.cyclic) {
+		/*
+		 * Cyclic RX only notifies on full periods. Character timeout
+		 * means a partial period (and/or bytes still below the DMA
+		 * burst watermark) is sitting in hardware. Pause the channel,
+		 * push whatever already reached the ring, PIO-drain the UART
+		 * FIFO, then resume cyclic RX so DMA stays enabled.
+		 */
+		ret = dmaengine_pause(dma->rxchan);
+		if (ret) {
+			/*
+			 * Channel may still be draining RBR. Do not touch the
+			 * FIFO via PIO or we race the DMA engine. Resume to
+			 * clear PAUSED bookkeeping some providers set even on
+			 * pause timeout (e.g. dw-axi-dmac -EAGAIN).
+			 */
+			dev_err_ratelimited(p->port.dev,
+					    "cyclic RX DMA pause failed: %d\n",
+					    ret);
+			dmaengine_resume(dma->rxchan);
+			return;
+		}
+
+		__dma_rx_complete_cyclic(p);
+
+		status = serial_lsr_in(p);
+		if (status & (UART_LSR_DR | UART_LSR_BI))
+			serial8250_rx_chars(p, status);
+
+		dmaengine_resume(dma->rxchan);
+		return;
 	}
+
+	dmaengine_pause(dma->rxchan);
+	__dma_rx_complete(p);
+	dmaengine_terminate_async(dma->rxchan);
 }
 EXPORT_SYMBOL_GPL(serial8250_rx_dma_flush);
 
@@ -360,6 +452,8 @@ int serial8250_request_dma(struct uart_8250_port *p)
 	/* RX buffer */
 	if (!dma->rx_size)
 		dma->rx_size = RX_DMA_SIZE;
+
+	serial8250_dma_setup_periods(p);
 
 	dma->rx_buf = dma_alloc_coherent(dma->rxchan->device->dev, dma->rx_size,
 					&dma->rx_addr, GFP_KERNEL);

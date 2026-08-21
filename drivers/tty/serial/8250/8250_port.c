@@ -1907,20 +1907,26 @@ static bool handle_rx_dma(struct uart_8250_port *up, unsigned int iir)
 		 */
 		return false;
 	case UART_IIR_RDI:
+		/*
+		 * RDI while cyclic DMA is running: FIFO hit the RX trigger
+		 * and DMA will drain the burst. Keep IER_RDI enabled so a
+		 * later character timeout can still recover sub-burst
+		 * residuals (e.g. 17-byte frames leaving 1 byte in FIFO).
+		 */
 		if (!up->dma->rx_running)
 			break;
+		if (up->port.cyclic)
+			return false;
 		fallthrough;
 	case UART_IIR_RLSI:
 	case UART_IIR_RX_TIMEOUT:
-		if (!up->port.cyclic) {
-			serial8250_rx_dma_flush(up);
-			return true;
-		} else {
-			up->ier = serial_port_in(&up->port, UART_IER);
-			up->ier &= ~(UART_IER_RLSI | UART_IER_RDI);
-			serial_port_out(&up->port, UART_IER, up->ier);
-			return false;
-		}
+		serial8250_rx_dma_flush(up);
+		/*
+		 * Non-cyclic flush terminates the RX DMA descriptor and
+		 * leaves FIFO residuals for the caller to PIO-drain.
+		 * Cyclic flush already pause/push/PIO/resume'd residuals.
+		 */
+		return !up->port.cyclic;
 	}
 	return up->dma->rx_dma(up);
 }

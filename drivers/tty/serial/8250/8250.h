@@ -47,6 +47,9 @@ struct uart_8250_dma {
 
 	size_t			rx_size;
 	size_t			tx_size;
+	/* Cyclic RX period / TX chunk; derived from FIFO trigger / burst */
+	size_t			rx_period;
+	size_t			tx_burst;
 	/* DMA cyclic buffer position */
 	unsigned int rx_pos;
 
