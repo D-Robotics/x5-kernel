@@ -735,9 +735,27 @@ static struct plat_config_data *eth_probe_config_dt(struct platform_device *pdev
 		err_ptr = ERR_PTR(-ENOMEM);
 		goto err_kalloc;
 	}
-	ret = of_get_mac_address(np, (u8 *)*mac);
-	if (!ret) {
-		*mac = NULL;
+
+	/*
+	 * of_get_mac_address() copies into a caller buffer.  mac_res.mac starts
+	 * as NULL; previously DT had no mac-address so this path returned
+	 * -ENODEV without writing.  Once U-Boot injects mac-address via
+	 * fdt_fixup_ethernet(), writing to *mac (NULL) panics.
+	 */
+	{
+		u8 tmp_mac[ETH_ALEN];
+
+		ret = of_get_mac_address(np, tmp_mac);
+		if (!ret) {
+			*mac = devm_kmemdup(&pdev->dev, tmp_mac, ETH_ALEN,
+					    GFP_KERNEL);
+			if (!*mac) {
+				err_ptr = ERR_PTR(-ENOMEM);
+				goto free_plat;
+			}
+		} else {
+			*mac = NULL;
+		}
 	}
 
 	of_get_phy_mode(np, (phy_interface_t *)&plat->interface);

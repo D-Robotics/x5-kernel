@@ -65,6 +65,8 @@
 
 		mmc0 = &emmc;
 		mmc1 = &sdio_0;
+
+		ethernet0 = &horizon_tsn;
 	};
 
 	ddrc_opp_table: opp-table {

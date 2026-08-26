@@ -282,6 +282,74 @@ static int gd5fxgq4ufxxg_ecc_get_status(struct spinand_device *spinand,
 	return -EINVAL;
 }
 
+#define GD5F1GQ5_CFG_OTP_LOCK	(CFG_OTP_ENABLE | CFG_OTP_PROTECT)
+
+static int gd5f1gq5_otp_info(struct spinand_device *spinand, size_t len,
+			     struct otp_info *buf, size_t *retlen)
+{
+	u8 cfg;
+	int ret;
+
+	if (len < sizeof(*buf))
+		return -EINVAL;
+
+	ret = spinand_get_cfg(spinand, &cfg);
+	if (ret)
+		return ret;
+
+	buf->locked = !!(cfg & CFG_OTP_PROTECT);
+	buf->start = 0;
+	buf->length = spinand_user_otp_size(spinand);
+
+	*retlen = sizeof(*buf);
+	return 0;
+}
+
+static int gd5f1gq5_otp_lock(struct spinand_device *spinand, loff_t from,
+			     size_t len)
+{
+	struct spi_mem_op exec_op = SPINAND_PROG_EXEC_OP(0);
+	u8 status;
+	int ret;
+
+	ret = spinand_upd_cfg(spinand, GD5F1GQ5_CFG_OTP_LOCK,
+			      GD5F1GQ5_CFG_OTP_LOCK);
+	if (ret)
+		return ret;
+
+	ret = spinand_write_enable_op(spinand);
+	if (ret)
+		goto out;
+
+	ret = spi_mem_exec_op(spinand->spimem, &exec_op);
+	if (ret)
+		goto out;
+
+	ret = spinand_wait(spinand,
+			   SPINAND_WRITE_INITIAL_DELAY_US,
+			   SPINAND_WRITE_POLL_DELAY_US,
+			   &status);
+	if (!ret && (status & STATUS_PROG_FAILED))
+		ret = -EIO;
+
+out:
+	/* OTP_PRT is non-volatile; only leave OTP access mode. */
+	if (spinand_upd_cfg(spinand, CFG_OTP_ENABLE, 0)) {
+		dev_warn(&spinand_to_mtd(spinand)->dev,
+			 "Can not disable OTP mode\n");
+		ret = -EIO;
+	}
+
+	return ret;
+}
+
+static const struct spinand_user_otp_ops gd5f1gq5_user_otp_ops = {
+	.info = gd5f1gq5_otp_info,
+	.lock = gd5f1gq5_otp_lock,
+	.read = spinand_user_otp_read,
+	.write = spinand_user_otp_write,
+};
+
 static const struct spinand_info gigadevice_spinand_table[] = {
 	SPINAND_INFO("GD5F1GQ4xA",
 		     SPINAND_ID(SPINAND_READID_METHOD_OPCODE_ADDR, 0xf1),
@@ -392,7 +460,8 @@ static const struct spinand_info gigadevice_spinand_table[] = {
 					      &update_cache_variants),
 		     SPINAND_HAS_QE_BIT,
 		     SPINAND_ECCINFO(&gd5fxgqx_variant2_ooblayout,
-				     gd5fxgq5xexxg_ecc_get_status)),
+				     gd5fxgq5xexxg_ecc_get_status),
+		     SPINAND_USER_OTP_INFO(4, 0, &gd5f1gq5_user_otp_ops)),
 	SPINAND_INFO("GD5F1GQ5RExxG",
 		     SPINAND_ID(SPINAND_READID_METHOD_OPCODE_DUMMY, 0x41),
 		     NAND_MEMORG(1, 2048, 128, 64, 1024, 20, 1, 1, 1),
@@ -402,7 +471,8 @@ static const struct spinand_info gigadevice_spinand_table[] = {
 					      &update_cache_variants),
 		     SPINAND_HAS_QE_BIT,
 		     SPINAND_ECCINFO(&gd5fxgqx_variant2_ooblayout,
-				     gd5fxgq5xexxg_ecc_get_status)),
+				     gd5fxgq5xexxg_ecc_get_status),
+		     SPINAND_USER_OTP_INFO(4, 0, &gd5f1gq5_user_otp_ops)),
 	SPINAND_INFO("GD5F2GQ5UExxG",
 		     SPINAND_ID(SPINAND_READID_METHOD_OPCODE_DUMMY, 0x52),
 		     NAND_MEMORG(1, 2048, 128, 64, 2048, 40, 1, 1, 1),
