@@ -399,13 +399,26 @@ enum mm_msg_tag {
     MM_SET_TXPWR_LVL_ADJ_REQ,
     MM_SET_TXPWR_LVL_ADJ_CFM,
 
-	MM_RADAR_DETECT_IND,
+    MM_RADAR_DETECT_IND,
 
-	MM_SET_APF_PROG_REQ,
-	MM_SET_APF_PROG_CFM,
+    MM_SET_APF_PROG_REQ,
+    MM_SET_APF_PROG_CFM,
 
-	MM_GET_APF_PROG_REQ,
-	MM_GET_APF_PROG_CFM,
+    MM_GET_APF_PROG_REQ,
+    MM_GET_APF_PROG_CFM,
+
+    MM_SET_TXPWR_PER_STA_REQ,
+    MM_SET_TXPWR_PER_STA_CFM,
+
+    MM_GET_STATISTIC_REQ,
+    MM_GET_STATISTIC_CFM,
+
+    MM_VENDOR_SWCONFIG_IND,
+    MM_FW_PANIC_IND,
+    MM_FW_ASSERT_IND,
+    MM_MCC_STATUS_IND = MM_FW_ASSERT_IND + 100,
+
+    MM_STAT_INFO_IND,
 
     /// MAX number of messages
     MM_MAX,
@@ -827,6 +840,7 @@ struct mm_key_add_cfm {
 	u8_l status;
 	/// HW index of the key just added
 	u8_l hw_key_idx;
+	u8_l alligned[2];
 };
 
 /// Structure containing the parameters of the @ref MM_KEY_DEL_REQ message.
@@ -1205,6 +1219,18 @@ struct mm_set_rf_config_req
     u32_l data[64];
 };
 
+typedef struct
+{
+	u32_l magic_num; /*“GWCR” or ’SWCR”*/
+	u32_l info_flag;
+	u32_l calib_flag;
+	u32_l reserved0;
+	u32_l res_data[536/sizeof(u32_l)];
+}wf_rf_calib_res_drv_t;
+
+#define DRIVER_GET_WIFI_CALRES_MAGIC_NUM 0x52435747
+#define DRIVER_SET_WIFI_CALRES_MAGIC_NUM 0x52435753
+
 struct mm_set_rf_calib_req {
 	u32_l cal_cfg_24g;
 	u32_l cal_cfg_5g;
@@ -1215,11 +1241,34 @@ struct mm_set_rf_calib_req {
 	u8_l xtal_cap_fine;
 };
 
+struct mm_set_rf_calib_req_v2
+{
+	u32_l cal_cfg_24g;
+	u32_l cal_cfg_5g;
+	u32_l param_alpha;
+	u32_l bt_calib_en;
+	u32_l bt_calib_param;
+    u8_l xtal_cap;
+	u8_l xtal_cap_fine;
+	u8_l reserved0[2];
+	wf_rf_calib_res_drv_t cal_res;
+
+};
+
 struct mm_set_rf_calib_cfm {
 	u32_l rxgain_24g_addr;
 	u32_l rxgain_5g_addr;
 	u32_l txgain_24g_addr;
 	u32_l txgain_5g_addr;
+};
+
+struct mm_set_rf_calib_cfm_v2
+{
+	u32_l rxgain_24g_addr;
+	u32_l rxgain_5g_addr;
+	u32_l txgain_24g_addr;
+	u32_l txgain_5g_addr;
+	wf_rf_calib_res_drv_t cal_res;
 };
 
 struct mm_get_mac_addr_req {
@@ -1234,11 +1283,16 @@ struct mm_get_sta_info_req {
 	u8_l sta_idx;
 };
 
+struct mm_get_sta_info_compat_req {
+    u8_l sta_idx;
+    char pattern[3];
+};
 struct mm_get_sta_info_cfm {
 	u32_l rate_info;
 	u32_l txfailed;
 	u8    rssi;
     u8    reserved[3];
+    u32_l chan_time;
     u32_l chan_busy_time;
     u32_l ack_fail_stat;
     u32_l ack_succ_stat;
@@ -1891,6 +1945,7 @@ struct me_sta_add_cfm {
 	u8_l status;
 	/// PM state of the station
 	u8_l pm_state;
+	u8_l alligned;
 };
 
 /// Structure containing the parameters of the @ref ME_STA_DEL_REQ message.
@@ -1928,6 +1983,25 @@ struct mm_apm_staloss_ind
 	u8_l mac_addr[6];
 };
 
+struct fw_panic_info_ind
+{
+    uint32_t len;
+    uint8_t info[384];
+};
+
+struct fw_assert_info_ind
+{
+    uint32_t len;
+    uint8_t info[384];
+};
+
+struct mcc_status_ind
+{
+    uint8_t channel_number;
+    uint8_t mcc;
+    uint8_t scc;
+};
+
 #ifdef CONFIG_SDIO_BT
 struct mm_bt_recv_ind
 {
@@ -1948,6 +2022,25 @@ enum vendor_hwconfig_tag{
 	WAKEUP_INFO_REQ,
 	KEEPALIVE_PKT_REQ,
 };
+
+enum vendor_hwconfig_tag_x2{
+	ACS_TXOP_REQ_X2 = 0,
+	CHANNEL_ACCESS_REQ_X2,
+	MAC_TIMESCALE_REQ_X2,
+	CCA_THRESHOLD_REQ_X2,
+	BWMODE_REQ_X2,
+	CHIP_TEMP_GET_REQ_X2,
+	STBC_MCS_SET_REQ_X2,
+	MAX_AGG_TX_CNT_REQ_X2,
+	MAX_BW_MCS_THRESH_SET_REQ_X2,
+	DCM_FORCE_EN_REQ_X2,
+	AUTO_CCA_EN_REQ_X2,
+	NSS_1T2R_REQ_X2,//b
+	ON_AIR_DUTY_CYCLE_REQ_X2,
+	WAKEUP_INFO_REQ_X2,
+	MSIC_CTRL_REQ_X2,
+};
+
 
 enum {
     BWMODE20M = 0,
@@ -2022,6 +2115,62 @@ struct mm_set_ap_ps_level_req
     u32_l hwconfig_id;
     u8 ap_ps_level;
 };
+struct mm_get_stbc_msc_req
+{
+    u32_l hwconfig_id;
+    u8_l enable;
+    u8_l mcs_thresh;
+};
+
+struct mm_set_max_tx_agg_cnt_req
+{
+    u32_l hwconfig_id;
+    u8_l enale;
+    u8_l mcs_thresh;
+    u8_l max_agg_cnt[AC_MAX];
+};
+
+struct mm_set_max_bw_mcs_thresh_req
+{
+    u32_l hwconfig_id;
+    u8_l enale;
+    u8_l max_bw_mcs_thresh;
+};
+
+struct mm_set_dcm_force_en_req
+{
+    u32_l hwconfig_id;
+    u8_l enable;
+};
+
+
+struct mm_set_auto_cca_en_req
+{
+    u32_l hwconfig_id;
+    u8_l enable;
+    int8_t max_cca_thresh;
+    u8_l default_cca_set;
+    int8_t default_cca_thresh;
+};
+
+struct mm_set_nss_1t2r_req
+{
+    u32_l hwconfig_id;
+    u8_l enable;
+};
+
+struct mm_set_on_air_duty_cycle_req
+{
+    u32_l hwconfig_id;
+    u8_l enable;
+    u8_l percent;//10 means 10%, 1-99
+};
+
+struct mm_set_misc_ctrl_req
+{
+    u32_l hwconfig_id;
+    u8_l ctrl[16];
+};
 
 struct mm_set_vendor_hwconfig_cfm
 {
@@ -2041,9 +2190,10 @@ struct mm_set_customized_freq_req
 struct mm_set_wakeup_info_req
 {
 	u32_l hwconfig_id;
+	u16_l code;
 	u16_l offset;
-	u8_l  length;
-	u8_l  mask_and_patten[];
+	u16_l  length;
+	u8_l  mask_and_pattern[];
 
 };
 
@@ -2095,13 +2245,40 @@ struct mm_get_wifi_disable_cfm
 
 enum vendor_swconfig_tag
 {
-    BCN_CFG_REQ = 0,
-    TEMP_COMP_SET_REQ,
-    TEMP_COMP_GET_REQ,
-    EXT_FLAGS_SET_REQ,
-    EXT_FLAGS_GET_REQ,
-    EXT_FLAGS_MASK_SET_REQ,
+    BCN_CFG_REQ             = 0,
+    TEMP_COMP_SET_REQ       = 1,
+    TEMP_COMP_GET_REQ       = 2,
+    EXT_FLAGS_SET_REQ       = 3,
+    EXT_FLAGS_GET_REQ       = 4,
+    EXT_FLAGS_MASK_SET_REQ  = 5,
+    DYN_DPD_CAL_RES_SET_REQ = 6,
+    DYN_DPD_CAL_RES_IND     = 7,
+    FORCE_2ANT_ANT_NUM_REQ  = 8,
+    FWLOG_REDIR_ENABLE_REQ  = 9,
+    GTK_REKEY_REQ           = 10,
+    CSI_CFG_REQ             = 11,
+    P2P_STA_MCC_PRI_REQ     = 12,
+
+    // Customized commands
+    SWOW_START              = 256, // 0x100
+    SWOW_SET_PATTERN_REQ    = 257,
+    SWOW_OID_FILTER_SRC_IP  = 258,
+    SWOW_OID_PULSETEST      = 259,
+    SWOW_OID_KEEPALIVE      = 260,
 };
+
+enum vendor_swconfig_tag_x2
+{
+    BCN_CFG_REQ_X2 = 0,
+    TEMP_COMP_SET_REQ_X2,
+    TEMP_COMP_GET_REQ_X2,
+    EXT_FLAGS_SET_REQ_X2,
+    EXT_FLAGS_GET_REQ_X2,
+    EXT_FLAGS_MASK_SET_REQ_X2,
+    TWO_ANT_RSSI_GET_REQ_X2,
+    FWLOG_REDIR_ENABLE_REQ_X2,
+};
+
 
 struct mm_set_bcn_cfg_req
 {
@@ -2163,6 +2340,11 @@ struct mm_mask_set_ext_flags_cfm
     u32_l user_flags;
 };
 
+struct mm_fwlog_redir_enable_req
+{
+	u8_l enable;
+};
+
 struct mm_set_vendor_swconfig_req
 {
     u32_l swconfig_id;
@@ -2171,6 +2353,7 @@ struct mm_set_vendor_swconfig_req
         struct mm_set_temp_comp_req temp_comp_set_req;
         struct mm_set_ext_flags_req ext_flags_set_req;
         struct mm_mask_set_ext_flags_req ext_flags_mask_set_req;
+		struct mm_fwlog_redir_enable_req fwlog_redir_req;
     };
 };
 
@@ -2968,7 +3151,7 @@ struct dbg_mem_mask_write_cfm {
 struct dbg_rftest_cmd_req {
 	u32_l cmd;
 	u32_l argc;
-	u8_l argv[10];
+	u8_l argv[30];
 };
 
 struct dbg_rftest_cmd_cfm {

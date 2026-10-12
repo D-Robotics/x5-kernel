@@ -779,22 +779,68 @@ void rwnx_txq_offchan_start(struct rwnx_hw *rwnx_hw)
  * If an AP_vlan vif is removed, then STA will be moved back to mastert AP vif.
  *
  */
-void rwnx_txq_sta_switch_vif(struct rwnx_sta *sta, struct rwnx_vif *old_vif,
-							 struct rwnx_vif *new_vif)
+void rwnx_txq_sta_switch_vif(struct rwnx_sta *sta,
+                             struct rwnx_vif *old_vif,
+                             struct rwnx_vif *new_vif)
 {
-	struct rwnx_hw *rwnx_hw = new_vif->rwnx_hw;
-	struct rwnx_txq *txq;
-	int i;
+    struct rwnx_hw *rwnx_hw;
+    struct rwnx_txq *txq;
+    struct net_device *ndev;
+    int i;
 
-	/* start TXQ on the new interface, and update ndev field in txq */
-	if (!netif_carrier_ok(new_vif->ndev))
-		netif_carrier_on(new_vif->ndev);
-	txq = rwnx_txq_sta_get(sta, 0, rwnx_hw);
-	for (i = 0; i < NX_NB_TID_PER_STA; i++, txq++) {
-		txq->ndev = new_vif->ndev;
-		netif_wake_subqueue(txq->ndev, txq->ndev_idx);
-	}
+    if (!new_vif) {
+        AICWFDBG(LOGERROR, "%s: new_vif is NULL!\n", __func__);
+        return;
+    }
+
+    rwnx_hw = new_vif->rwnx_hw;
+    ndev = new_vif->ndev;
+
+
+    if (!ndev) {
+        AICWFDBG(LOGERROR, "%s: new_vif->ndev is NULL!\n", __func__);
+        return;
+    }
+
+    if (!(ndev->reg_state == NETREG_REGISTERED)) {
+        AICWFDBG(LOGINFO, "%s: ndev %s not in REGISTERED state (state=%d)\n",
+                __func__, ndev->name, ndev->reg_state);
+    }
+
+    if (!netif_carrier_ok(ndev))
+        netif_carrier_on(ndev);
+
+    txq = rwnx_txq_sta_get(sta, 0, rwnx_hw);
+    if (!txq) {
+        AICWFDBG(LOGERROR, "%s: failed to get txq for sta\n", __func__);
+        return;
+    }
+
+    AICWFDBG(LOGINFO, "switching STA %pM TXQs from vif %s to vif %s\n",
+             sta->mac_addr,
+             old_vif ? old_vif->ndev->name : "NULL",
+             ndev->name);
+
+    for (i = 0; i < NX_NB_TID_PER_STA; i++, txq++) {
+        txq->ndev = ndev;
+
+        if (txq->ndev_idx >= ndev->num_tx_queues) {
+            AICWFDBG(LOGERROR, "%s: invalid ndev_idx=%d for ndev %s (max=%d)\n",
+                   __func__, txq->ndev_idx, ndev->name, ndev->num_tx_queues);
+            continue;
+        }
+
+        if (ndev->reg_state == NETREG_REGISTERED && netif_running(ndev)) {
+            netif_wake_subqueue(ndev, txq->ndev_idx);
+            AICWFDBG(LOGINFO, "woke subqueue %d on %s\n", txq->ndev_idx, ndev->name);
+        } else {
+            AICWFDBG(LOGINFO, "skip waking subqueue %d on %s (state=%d, running=%d)\n",
+                     txq->ndev_idx, ndev->name,
+                     ndev->reg_state, netif_running(ndev));
+        }
+    }
 }
+
 #endif /* CONFIG_RWNX_FULLMAC */
 
 /******************************************************************************
