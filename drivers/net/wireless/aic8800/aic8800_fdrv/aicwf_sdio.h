@@ -58,8 +58,8 @@
 
 #define DATA_FLOW_CTRL_THRESH 2
 #ifdef CONFIG_TX_NETIF_FLOWCTRL
-#define AICWF_SDIO_TX_LOW_WATER          100
-#define AICWF_SDIO_TX_HIGH_WATER         500
+#define AICWF_SDIO_TX_LOW_WATER          500
+#define AICWF_SDIO_TX_HIGH_WATER         1500
 #endif
 
 #ifdef CONFIG_TEMP_CONTROL
@@ -84,17 +84,26 @@ typedef enum {
 #define SDIO_VENDOR_ID_AIC8801                0x5449
 #define SDIO_VENDOR_ID_AIC8800DC              0xc8a1
 #define SDIO_VENDOR_ID_AIC8800D80             0xc8a1
+#define SDIO_VENDOR_ID_AIC8800D80N            0xc8a1
 #define SDIO_VENDOR_ID_AIC8800D80X2           0xc8a1
 
 #define SDIO_DEVICE_ID_AIC8801				0x0145
 #define SDIO_DEVICE_ID_AIC8800DC			0xc08d
 #define SDIO_DEVICE_ID_AIC8800D80           0x0082
+#define SDIO_DEVICE_ID_AIC8800D80N          0x9081
+#define SDIO_DEVICE_ID_AIC8800D80LN         0x9082
+#define SDIO_DEVICE_ID_AIC8800D80WN         0x9083
+#define SDIO_DEVICE_ID_AIC8800D40N          0x9084
+#define SDIO_DEVICE_ID_AIC8800D40LN         0x9085
+#define SDIO_DEVICE_ID_AIC8800D40WN         0x9086
 #define SDIO_DEVICE_ID_AIC8800D80X2         0x2082
 
 enum AICWF_IC{
 	PRODUCT_ID_AIC8801	=	0,
 	PRODUCT_ID_AIC8800DC,
 	PRODUCT_ID_AIC8800DW,
+	PRODUCT_ID_AIC8800D80N,
+	PRODUCT_ID_AIC8800D80WN,
 	PRODUCT_ID_AIC8800D80,
 	PRODUCT_ID_AIC8800D80X2
 };
@@ -155,6 +164,7 @@ struct aic_sdio_dev {
 	struct timer_list tp_ctrl_timer;
 	struct work_struct tp_ctrl_work;
 	struct work_struct netif_work;
+	spinlock_t tm_lock;
 	s8_l cur_temp;
 	bool net_stop;
 	bool on_off;	  //for command, 0 - off, 1 - on
@@ -163,6 +173,9 @@ struct aic_sdio_dev {
 	int interval_t1;
 	int interval_t2;
 	u8_l cur_stat;	  //0--normal temp, 1/2--buffering temp
+	s8_l tp_thd_1; // temperature threshold 1
+	s8_l tp_thd_2; // temperature threshold 2
+	int8_t tm_start; //timer start flag
 #endif
 
 };

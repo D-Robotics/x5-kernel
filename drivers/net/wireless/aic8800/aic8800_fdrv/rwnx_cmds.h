@@ -62,6 +62,11 @@ struct rwnx_hw;
 struct rwnx_cmd;
 typedef int (*msg_cb_fct)(struct rwnx_hw *rwnx_hw, struct rwnx_cmd *cmd,
 						  struct rwnx_cmd_e2amsg *msg);
+struct msg_task_desc {
+	const msg_cb_fct *task_hdlrs_base;
+	const int task_index_max;
+};
+
 static inline void put_u16(u8 *buf, u16 data)
 {
 	buf[0] = (u8)(data&0x00ff);

@@ -98,7 +98,7 @@ void aicwf_sdio_host_tx_cfm_handler(struct sdio_host_env_tag *env, u32 *data)
 			// No more confirmations, so put back the used index at its initial value
 			env->txdesc_used_idx[queue_idx] = used_idx;
 			AICWFDBG(LOGERROR, "ERROR:No more confirmations\r\n");
-			//break;
+			return ;
 		}
 		// set the cfm status
 		skb = (struct sk_buff *)host_id;
