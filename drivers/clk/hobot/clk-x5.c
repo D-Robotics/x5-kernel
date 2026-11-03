@@ -376,7 +376,13 @@ static int crm_hps_clk_init(struct platform_device *pdev)
 	u32 qspi_boot = 0;
 #if IS_ENABLED(CONFIG_X5_SEAMLESS_DISPLAY)
 	bool seamless = false;
-	unsigned long disp_pixel_flags = CLK_SET_RATE_PARENT | CLK_SET_RATE_NO_REPARENT;
+	/*
+	 * [X5-4518] dc8000_pixel_clk: drop CLK_SET_RATE_PARENT so the 29.7 MHz
+	 * pixel clock is divided from the shared DISP_PLL instead of
+	 * propagating to DISP_PLL and disturbing the HDMI link clock that
+	 * U-Boot already configured for the seamless handoff.
+	 */
+	unsigned long disp_pixel_flags = CLK_SET_RATE_NO_REPARENT;
 	unsigned long disp_gate_critical = 0;
 	unsigned long bl_gate_critical = 0;
 #endif
@@ -581,13 +587,15 @@ static int crm_hps_clk_init(struct platform_device *pdev)
 	if (pll_match == 0) {
 		hws[X5_DISP_BT1120_PIXEL_CLK] = drobot_clk_register_generator("bt1120_pixel_clk", disp_gen_src_sels, ARRAY_SIZE(disp_gen_src_sels),
 			base + HPS_CLK_GEN + 0x4A0, CLK_SET_RATE_PARENT | CLK_SET_RATE_NO_REPARENT, ctx->idle, ISO_CG_BT1120, false);
+		/* [X5-4518] no CLK_SET_RATE_PARENT: divide from DISP_PLL, do not
+		 * propagate to the shared PLL and disturb the HDMI link clock. */
 		hws[X5_DISP_DC8000_PIXEL_CLK] = drobot_clk_register_generator("dc8000_pixel_clk", disp_gen_src_sels, ARRAY_SIZE(disp_gen_src_sels),
-			base + HPS_CLK_GEN + 0x4C0, CLK_SET_RATE_PARENT | CLK_SET_RATE_NO_REPARENT, ctx->idle, ISO_CG_DC8000, false);
+			base + HPS_CLK_GEN + 0x4C0, CLK_SET_RATE_NO_REPARENT, ctx->idle, ISO_CG_DC8000, false);
 	} else {
 		hws[X5_DISP_BT1120_PIXEL_CLK] = drobot_clk_register_generator("bt1120_pixel_clk", disp_no_pix_gen_src_sels, ARRAY_SIZE(disp_no_pix_gen_src_sels),
 			base + HPS_CLK_GEN + 0x4A0, CLK_SET_RATE_PARENT | CLK_SET_RATE_NO_REPARENT, ctx->idle, ISO_CG_BT1120, false);
 		hws[X5_DISP_DC8000_PIXEL_CLK] = drobot_clk_register_generator("dc8000_pixel_clk", disp_no_pix_gen_src_sels, ARRAY_SIZE(disp_no_pix_gen_src_sels),
-			base + HPS_CLK_GEN + 0x4C0, CLK_SET_RATE_PARENT | CLK_SET_RATE_NO_REPARENT, ctx->idle, ISO_CG_DC8000, false);
+			base + HPS_CLK_GEN + 0x4C0, CLK_SET_RATE_NO_REPARENT, ctx->idle, ISO_CG_DC8000, false);
 	}
 
 	hws[X5_DISP_SIF_ACLK] = drobot_clk_register_gen_no_flags("disp_sif_aclk", soc_gen_src_sels, ARRAY_SIZE(soc_gen_src_sels), base + HPS_CLK_GEN + 0x4E0, ctx->idle, ISO_CG_DISP_SIF);

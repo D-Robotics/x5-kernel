@@ -21,6 +21,11 @@
 #include <drm/drm_mipi_dsi.h>
 #include <drm/drm_panel.h>
 
+/* WH-CM480 reset timing, matches U-Boot wh_cm480_reset(). */
+#define WH_CM480_RESET_HIGH_MS	2
+#define WH_CM480_RESET_LOW_MS	2
+#define WH_CM480_RESET_INIT_MS	25
+
 /**
  * @modes: Pointer to array of fixed modes appropriate for this panel.  If
  *         only one mode then this can just be the address of this the mode.
@@ -88,6 +93,7 @@ struct panel_simple {
 	const struct panel_desc *desc;
 
 	struct regulator *supply;
+	struct gpio_desc *reset_gpio;
 
 	struct drm_display_mode override_mode;
 
@@ -230,6 +236,7 @@ static int panel_simple_unprepare(struct drm_panel *panel)
 
 	regulator_disable(p->supply);
 	msleep(10);
+	gpiod_set_value_cansleep(p->reset_gpio, 0);
 
 	if (p->desc->delay.unprepare)
 		msleep(p->desc->delay.unprepare);
@@ -260,11 +267,22 @@ static int panel_simple_prepare(struct drm_panel *panel)
 	if (p->prepared)
 		return 0;
 
+	dev_dbg(panel->dev, "wh-cm480: prepare() called, reset_gpio=%p\n",
+		p->reset_gpio);
+
 	err = regulator_enable(p->supply);
 	if (err < 0) {
 		dev_err(panel->dev, "failed to enable supply: %d\n", err);
 		return err;
 	}
+
+	/* Reset pulse matches U-Boot wh_cm480_reset(): high, low, high. */
+	gpiod_set_value_cansleep(p->reset_gpio, 1);
+	msleep(WH_CM480_RESET_HIGH_MS);
+	gpiod_set_value_cansleep(p->reset_gpio, 0);
+	msleep(WH_CM480_RESET_LOW_MS);
+	gpiod_set_value_cansleep(p->reset_gpio, 1);
+	msleep(WH_CM480_RESET_INIT_MS);
 
 	panel_simple_dsi_init(dsi);
 
@@ -348,6 +366,24 @@ static int panel_simple_probe(struct device *dev, const struct panel_desc *desc)
 	panel->supply = devm_regulator_get(dev, "power");
 	if (IS_ERR(panel->supply))
 		return PTR_ERR(panel->supply);
+
+	/*
+	 * U-Boot seamless off => nobody initializes the panel. Kernel must
+	 * pulse reset itself so the panel accepts the DSI video stream.
+	 * Matches U-Boot wh_cm480_reset(): high 2ms, low 2 ms, high 25 ms.
+	 */
+	panel->reset_gpio = devm_gpiod_get_optional(dev, "reset", GPIOD_OUT_LOW);
+	if (IS_ERR(panel->reset_gpio)) {
+		err = PTR_ERR(panel->reset_gpio);
+		if (err != -EPROBE_DEFER)
+			dev_err(dev, "failed to request reset GPIO: %d\n", err);
+		return err;
+	}
+	if (panel->reset_gpio) {
+		dev_dbg(dev, "wh-cm480: reset gpio initialized\n");
+	} else {
+		dev_warn(dev, "wh-cm480: reset gpio not present, panel may not work\n");
+	}
 
 	err = of_drm_get_panel_orientation(dev->of_node, &panel->orientation);
 	if (err) {
