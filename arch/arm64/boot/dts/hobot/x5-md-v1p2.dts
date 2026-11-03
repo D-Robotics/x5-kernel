@@ -156,6 +156,10 @@
 		compatible = "wh-cm480";
 		reg = <0>;
 
+		pinctrl-names = "default";
+		pinctrl-0 = <&lsio_gpio0_14>;
+		reset-gpios = <&ls_gpio0_porta 14 GPIO_ACTIVE_HIGH>;
+
 		port {
 			panel_in: endpoint {
 				remote-endpoint = <&mipi_dsi_out>;
@@ -166,7 +170,7 @@
 
 /* WH-CM480 I2C backlight controller (hobot_bl_controller) */
 &i2c3 {
-	pinctrl-names = "default";
+	pinctrl-names = "default", "recovery";
 	pinctrl-0 = <&pinctrl_i2c3>;
 	status = "okay";
 
