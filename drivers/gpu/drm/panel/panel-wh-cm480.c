@@ -268,7 +268,7 @@ static int panel_simple_prepare(struct drm_panel *panel)
 		return 0;
 
 	dev_dbg(panel->dev, "wh-cm480: prepare() called, reset_gpio=%p\n",
-		 p->reset_gpio);
+		p->reset_gpio);
 
 	err = regulator_enable(p->supply);
 	if (err < 0) {
@@ -367,7 +367,8 @@ static int panel_simple_probe(struct device *dev, const struct panel_desc *desc)
 	if (IS_ERR(panel->supply))
 		return PTR_ERR(panel->supply);
 
-	/* U-Boot seamless off => nobody initializes the panel. Kernel must
+	/*
+	 * U-Boot seamless off => nobody initializes the panel. Kernel must
 	 * pulse reset itself so the panel accepts the DSI video stream.
 	 * Matches U-Boot wh_cm480_reset(): high 2ms, low 2 ms, high 25 ms.
 	 */
