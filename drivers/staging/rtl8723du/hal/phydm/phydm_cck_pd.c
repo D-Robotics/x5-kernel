@@ -1882,7 +1882,7 @@ void phydm_dig_cckpd_coex_dbg(void *dm_void, char input[][16], u32 *_used,
 	u8 i = 0;
 
 	for (i = 0; i < 3; i++) {
-		if (input[i + 1])
+		if (input[i + 1][0])
 			PHYDM_SSCANF(input[i + 1], DCMD_DECIMAL, &var[i]);
 	}
 

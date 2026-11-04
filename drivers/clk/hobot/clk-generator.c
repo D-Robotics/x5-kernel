@@ -176,9 +176,12 @@ static unsigned int clk_generator_bestdiv(struct clk_hw *hw, struct clk_hw *pare
 	 * The maximum divider we can use without overflowing
 	 * unsigned long in rate * i below
 	 */
+	if (!rate)
+		return (1 << GEN_DIV_WIDTH);
+
 	maxdiv = min(ULONG_MAX / rate, maxdiv);
 
-	for (i = 0; i <= maxdiv; i++) {
+	for (i = 1; i <= maxdiv; i++) {
 		if (rate * i == parent_rate_saved) {
 			/*
 			 * It's the most ideal case if the requested rate can be

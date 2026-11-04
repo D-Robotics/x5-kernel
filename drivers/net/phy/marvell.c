@@ -767,14 +767,15 @@ static void marvell_config_led(struct phy_device *phydev)
 	 * LED[2] .. Blink, Activity
 	 */
 	case MARVELL_PHY_FAMILY_ID(MARVELL_PHY_ID_88E1510):
-		if (phydev->dev_flags & MARVELL_PHY_LED0_LINK_LED1_ACTIVE)
-			def_config = MII_88E1510_PHY_LED0_LINK_LED1_ACTIVE;
-		else
-			def_config = MII_88E1510_PHY_LED_DEF;
+			def_config = 0x1061;
 		break;
 	default:
 		return;
 	}
+
+	err = phy_write_paged(phydev, MII_MARVELL_LED_PAGE, 17, 0x2A);
+	if (err < 0)
+		phydev_warn(phydev, "Fail to config marvell phy LED.\n");
 
 	err = phy_write_paged(phydev, MII_MARVELL_LED_PAGE, MII_PHY_LED_CTRL,
 			      def_config);

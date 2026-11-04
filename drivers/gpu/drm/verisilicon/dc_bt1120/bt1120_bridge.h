@@ -41,6 +41,7 @@
 #include <drm/drm_bridge.h>
 #include <linux/kconfig.h>
 #include <linux/atomic.h>
+#include <linux/workqueue.h>
 
 #include "vs_bt1120.h"
 
@@ -57,6 +58,9 @@ struct bt1120_bridge {
 	 * consumed with atomic_cmpxchg (see bt1120_bridge_atomic_disable).
 	 */
 	atomic_t seamless_skip_disable_once;
+
+	/** [X5-4518] deferred vblank-aligned capture re-arm (see bt1120_bridge.c). */
+	struct delayed_work rearm_work;
 #endif
 };
 

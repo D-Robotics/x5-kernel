@@ -319,7 +319,7 @@ void phydm_cumitek_smt_ant_debug(
 	} else if (dm_value[0] == 2) { /*@fix tx pattern*/
 
 		for (i = 1; i < 4; i++) {
-			if (input[i + 1])
+			if (input[i + 1][0])
 				PHYDM_SSCANF(input[i + 1], DCMD_DECIMAL, &dm_value[i]);
 		}
 
@@ -333,7 +333,7 @@ void phydm_cumitek_smt_ant_debug(
 		u8 table_path_b[8] = {0};
 
 		for (i = 1; i < 4; i++) {
-			if (input[i + 1])
+			if (input[i + 1][0])
 				PHYDM_SSCANF(input[i + 1], DCMD_HEX, &dm_value[i]);
 		}
 

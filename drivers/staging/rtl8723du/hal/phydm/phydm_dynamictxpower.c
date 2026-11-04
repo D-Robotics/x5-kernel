@@ -653,7 +653,7 @@ void phydm_dtp_debug(void *dm_void, char input[][16], u32 *_used, char *output,
 		#endif
 	} else {
 		for (i = 0; i < 7; i++) {
-			if (input[i + 1])
+			if (input[i + 1][0])
 				PHYDM_SSCANF(input[i + 1], DCMD_DECIMAL,
 					     &var1[i]);
 		}

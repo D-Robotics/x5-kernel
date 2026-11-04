@@ -256,6 +256,11 @@ static int mtdblock_open(struct mtd_blktrans_dev *mbd)
 
 	pr_debug("mtdblock_open\n");
 
+	if (strcmp(mbd->mtd->name, "miniboot") == 0 || strcmp(mbd->mtd->name, "ubootenv") == 0) {
+		pr_warn("mtdblock_open: Access to '%s' is not allowed.\n", mbd->mtd->name);
+		return -EPERM;
+	}
+
 	if (mtdblk->count) {
 		mtdblk->count++;
 		return 0;

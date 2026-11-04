@@ -1469,7 +1469,7 @@ void phydm_auto_agc_tab_debug(void *dm_void, char input[][16], u32 *_used,
 	} else {
 		PHYDM_SSCANF(input[1], DCMD_DECIMAL, &var1[0]);
 		for (i = 1; i < 10; i++) {
-			if (input[i + 1])
+			if (input[i + 1][0])
 				PHYDM_SSCANF(input[i + 1], DCMD_DECIMAL,
 					     &var1[i]);
 		}
@@ -1553,7 +1553,7 @@ void phydm_lna_sat_debug(void *dm_void,	char input[][16], u32 *_used,
 		PHYDM_SSCANF(input[1], DCMD_DECIMAL, &var1[0]);
 
 		for (i = 1; i < 10; i++) {
-			if (input[i + 1])
+			if (input[i + 1][0])
 				PHYDM_SSCANF(input[i + 1], DCMD_DECIMAL,
 					     &var1[i]);
 		}

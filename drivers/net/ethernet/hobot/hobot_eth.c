@@ -379,10 +379,18 @@ struct plat_config_data *xj3_probe_config_dt(struct platform_device *pdev,
         goto err_out;
     }
 
-    ret = of_get_mac_address(np, (u8 *)*mac);
-    if (!ret) {
-        dev_err(&pdev->dev, "missing get mac address\n");
-		goto err_out;
+    {
+        u8 tmp_mac[ETH_ALEN];
+
+        /* of_get_mac_address() needs a real buffer; *mac may be NULL. */
+        ret = of_get_mac_address(np, tmp_mac);
+        if (!ret) {
+            *mac = devm_kmemdup(&pdev->dev, tmp_mac, ETH_ALEN, GFP_KERNEL);
+            if (!*mac)
+                return ERR_PTR(-ENOMEM);
+        } else {
+            *mac = NULL;
+        }
     }
 
     ret = of_get_phy_mode(np,  &plat->interface);
