@@ -289,12 +289,12 @@ static int32_t hobot_pps_probe(struct platform_device *pdev)
 
 	ret = hobot_pps_register_source(pdev, data);
 	if (ret != 0) {
-		dev_info(data->pps->dev, "hobot_pps_register_source error\n");
+		dev_info(&data->pps->dev, "hobot_pps_register_source error\n");
 		//pps_send_diag_error_event((u16)EventIdRegisterErr, (u8)ERR_SEQ_1, data->safety_moduleId, __LINE__);
 	}
 
 	platform_set_drvdata(pdev, (void *)data);
-	dev_info(data->pps->dev, "Registered IRQ %d as PPS source\n",
+	dev_info(&data->pps->dev, "Registered IRQ %d as PPS source\n",
 		 data->irq);
 
 	return 0;
