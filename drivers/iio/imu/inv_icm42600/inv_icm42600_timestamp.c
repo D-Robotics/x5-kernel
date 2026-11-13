@@ -75,7 +75,7 @@ int inv_icm42600_timestamp_setup(struct inv_icm42600_state *st)
 	ret |= regmap_update_bits(st->map,
 					INV_ICM42600_REG_INTF_CONFIG5,
 					INV_ICM42600_INTF_CONFIG5_PIN9_FUNCTION_MASK,
-					0x2); /* PIN9 as TMST_FSYNC */
+					0x0); /* PIN9 = INT2 (not TMST_FSYNC: INT2 must output DRDY IRQ) */
 
 	return ret;
 }

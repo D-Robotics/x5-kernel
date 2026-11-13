@@ -533,14 +533,24 @@ static int inv_icm42688_input_init(struct inv_icm42600_state *st)
 	mutex_lock(&st->lock);
 
 	conf.mode = INV_ICM42600_SENSOR_MODE_LOW_NOISE;
-	conf.odr = INV_ICM42600_ODR_2KHZ_LN;
+	/* 1kHz @ 400kHz bus: full read rate, uniform ~1.2ms interval (2kHz skips ~40%) */
+	conf.odr = INV_ICM42600_ODR_1KHZ_LN;
 	ret = inv_icm42600_set_gyro_conf(st, &conf, NULL);
 	if (!ret)
 		ret = inv_icm42600_set_accel_conf(st, &conf, NULL);
 	if (!ret) {
+		/* route DRDY to both INT1/INT2: module jumper may expose either pin */
 		ret = regmap_update_bits(st->map, INV_ICM42600_REG_INT_SOURCE0,
 					 INV_ICM42600_INT_SOURCE0_UI_DRDY_INT1_EN,
 					 INV_ICM42600_INT_SOURCE0_UI_DRDY_INT1_EN);
+		if (!ret)
+			ret = regmap_update_bits(st->map, 0x0068 /* INT_SOURCE3 */,
+						 BIT(3) /* UI_DRDY_INT2_EN */,
+						 BIT(3));
+	}
+	if (!ret) {
+		/* gyro bias loop needs the temp sensor; TEMP_DIS leaves large DC offset */
+		ret = inv_icm42600_set_temp_conf(st, true, NULL);
 	}
 
 	mutex_unlock(&st->lock);
@@ -663,6 +673,20 @@ static int inv_icm42600_irq_init(struct inv_icm42600_state *st, int irq,
 
 	if (!open_drain)
 		val |= INV_ICM42600_INT_CONFIG_INT1_PUSH_PULL;
+
+	/* configure INT2 as well: module boards may wire the IRQ to INT2 */
+	switch (irq_type) {
+	case IRQF_TRIGGER_RISING:
+	case IRQF_TRIGGER_HIGH:
+		val |= INV_ICM42600_INT_CONFIG_INT2_ACTIVE_HIGH;
+		break;
+	default:
+		val |= INV_ICM42600_INT_CONFIG_INT2_ACTIVE_LOW;
+		break;
+	}
+	val |= INV_ICM42600_INT_CONFIG_INT2_LATCHED;
+	if (!open_drain)
+		val |= INV_ICM42600_INT_CONFIG_INT2_PUSH_PULL;
 
 	ret = regmap_write(st->map, INV_ICM42600_REG_INT_CONFIG, val);
 	if (ret)
@@ -945,6 +969,10 @@ static int __maybe_unused inv_icm42600_runtime_resume(struct device *dev)
 	mutex_lock(&st->lock);
 
 	ret = inv_icm42600_enable_regulator_vddio(st);
+	if (!ret) {
+		/* restore temp sensor for gyro bias loop (cf inv_icm42688_input_init) */
+		ret = inv_icm42600_set_temp_conf(st, true, NULL);
+	}
 
 	mutex_unlock(&st->lock);
 	return ret;
