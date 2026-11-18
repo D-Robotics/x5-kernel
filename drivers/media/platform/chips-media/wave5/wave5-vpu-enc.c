@@ -1367,7 +1367,15 @@ static int wave5_vpu_enc_start_streaming(struct vb2_queue *q, unsigned int count
 		if (ret)
 			goto return_buffers;
 	}
-	if (inst->state == VPU_INST_STATE_OPEN && m2m_ctx->cap_q_ctx.q.streaming) {
+	/*
+	 * NOTE: Do not gate on m2m_ctx->cap_q_ctx.q.streaming. With ffmpeg's
+	 * ioctl order (STREAMON(OUTPUT) first, STREAMON(CAPTURE) after and
+	 * inside v4l2_m2m the cap stream flag is not yet set when the output
+	 * queue starts), initialize_sequence is never reached and the encoder
+	 * stays in VPU_INST_STATE_OPEN forever (job never ready, no IRQ).
+	 * Same fix as the S100 kernel already carries.
+	 */
+	if (inst->state == VPU_INST_STATE_OPEN) {
 		ret = initialize_sequence(inst);
 		if (ret) {
 			dev_warn(inst->dev->dev, "Sequence not found: %d\n", ret);
