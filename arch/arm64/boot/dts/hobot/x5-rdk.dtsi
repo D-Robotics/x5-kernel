@@ -345,6 +345,27 @@
 		/* no drive-open-drain: bool prop (presence==true), push-pull default */
 		status = "disabled";
 	};
+
+	icm42607_i2c4: icm42607@68 {
+		compatible = "invensense,icm43600";
+		reg = <0x68>;
+		/* INT2 -> 40pin-37 = ls_gpio0 line 22; edge mode, level irq would storm */
+		pinctrl-names = "default";
+		pinctrl-0 = <&lsio_gpio0_22>;
+		interrupt-parent = <&ls_gpio0_porta>;
+		interrupts = <22 IRQ_TYPE_EDGE_RISING>;
+		axis_map_x = <1>;
+		axis_map_y = <0>;
+		axis_map_z = <2>;
+		negate_x = <1>;
+		negate_y = <0>;
+		negate_z = <0>;
+		inven,secondary_type = "none";
+		inven,aux_type = "none";
+		inven,read_only_slave_type = "none";
+		/* no drive-open-drain: bool prop (presence==true), push-pull default */
+		status = "disabled";
+	};
 };
 
 &i2c5 {
@@ -373,6 +394,27 @@
 		compatible = "invensense,icm42688";
 		reg = <0x68>;
 		/* INT1 -> 40pin-37 = ls_gpio0 line 22 (gpio401); edge mode, level irq would storm */
+		pinctrl-names = "default";
+		pinctrl-0 = <&lsio_gpio0_22>;
+		interrupt-parent = <&ls_gpio0_porta>;
+		interrupts = <22 IRQ_TYPE_EDGE_RISING>;
+		axis_map_x = <1>;
+		axis_map_y = <0>;
+		axis_map_z = <2>;
+		negate_x = <1>;
+		negate_y = <0>;
+		negate_z = <0>;
+		inven,secondary_type = "none";
+		inven,aux_type = "none";
+		inven,read_only_slave_type = "none";
+		/* no drive-open-drain: bool prop (presence==true), push-pull default */
+		status = "disabled";
+	};
+
+	icm42607_i2c6: icm42607@68 {
+		compatible = "invensense,icm43600";
+		reg = <0x68>;
+		/* INT2 -> 40pin-37 = ls_gpio0 line 22; edge mode, level irq would storm */
 		pinctrl-names = "default";
 		pinctrl-0 = <&lsio_gpio0_22>;
 		interrupt-parent = <&ls_gpio0_porta>;
