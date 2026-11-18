@@ -1,0 +1,114 @@
+Kernel driver inv-mpu-iio
+Author: InvenSense, Inc.
+
+
+Table of Contents
+=================
+- Description
+- Integrating the Driver in the Linux Kernel
+- Dts file
+- Communicating with the Driver in Userspace
+
+
+Description
+===========
+This document describes how to install the Invensense device driver into a
+Linux kernel. The supported chips are listed in Kconfig and user selects an
+appropriate one from .e.g. menuconfig.
+
+
+Integrating the Driver in the Linux Kernel
+==========================================
+Please add the files as follows:
+- Copy mpu.h to <kernel_root>/include/linux/iio/imu/
+- Copy inv_mpu folder under <kernel_root>/drivers/iio/imu/
+
+In order to see the driver in menuconfig when building the kernel, please
+make modifications as shown below:
+
+    add "source "drivers/iio/imu/inv_mpu/Kconfig""
+      in <kernel_root>/drivers/iio/imu/Kconfig
+
+    add "obj-y += inv_mpu/"
+      in <kernel_root>/drivers/iio/imu/Makefile
+
+
+Dts file
+========
+In order to recognize the Invensense device on the I2C/SPI bus, dts (or dtsi)
+file must be modified.
+
+Example for ICM-42607/42670, ICM-42608/42671 (ICM-43600 driver):
+
+On I2C bus:
+
+&invn_i2c {
+	icm42670@68 {
+		compatible = "invensense,icm43600";
+		reg = <0x68>;
+		interrupt-parent = <&invn_gpio>;
+		interrupts = <0 IRQ_TYPE_EDGE_RISING>;
+		inven,vdd_ana-supply = <&invn_vdd>;
+		inven,vcc_i2c-supply = <&invn_vddio>;
+		/* mount matrix */
+		axis_map_x = <1>;
+		axis_map_y = <0>;
+		axis_map_z = <2>;
+		negate_x = <0>;
+		negate_y = <0>;
+		negate_z = <1>;
+		inven,secondary_type = "none";
+		inven,aux_type = "none";
+		inven,read_only_slave_type = "none";
+	};
+};
+
+
+On SPI bus:
+
+&invn_spi {
+	icm42670@0 {
+		compatible = "invensense,icm43600";
+		reg = <0>;
+		spi-max-frequency = <24000000>;
+		inven,vdd_ana-supply = <&invn_vdd>;
+		inven,vcc_i2c-supply = <&invn_vddio>;
+		/* mount matrix */
+		axis_map_x = <0>;
+		axis_map_y = <1>;
+		axis_map_z = <2>;
+		negate_x = <1>;
+		negate_y = <1>;
+		negate_z = <0>;
+		inven,secondary_type = "none";
+		inven,aux_type = "none";
+		inven,read_only_slave_type = "none";
+	};
+};
+
+
+Communicating with the Driver in Userspace
+==========================================
+The driver generates several files in sysfs upon installation.
+These files are used to communicate with the driver. The files can be found at:
+
+(I2C) /sys/devices/*.i2c/i2c-*/*-*/iio:device*
+(SPI) /sys/devices/*.spi/spi_master/spi*/spi*.*/iio:device*
+
+Group and Owner for all entries should be updated to system/system at
+boot time to allow userspace to access properly.
+
+
+License
+=======
+Copyright (C) 2022 InvenSense, Inc.
+
+This software is licensed under the terms of the GNU General Public
+License version 2, as published by the Free Software Foundation, and
+may be copied, distributed, and modified under those terms.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
