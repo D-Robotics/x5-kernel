@@ -1948,13 +1948,12 @@ static int es7210_pcm_startup(struct snd_pcm_substream *substream,
 
 	es7210_tdm_init_codec(es7210->tdm_mode);
 
-	/* Setting MIC GAIN */
-	if (es7210->channels > 0) {
-		es7210_write(ES7210_MIC1_GAIN_REG43, 0x1e, i2c_clt1[0]);
-		es7210_write(ES7210_MIC2_GAIN_REG44, 0x1e, i2c_clt1[0]);
-		es7210_write(ES7210_MIC3_GAIN_REG45, 0x1e, i2c_clt1[0]);
-		es7210_write(ES7210_MIC4_GAIN_REG46, 0x1e, i2c_clt1[0]);
-	}
+	/* Restore SELMIC only (DS: REG43~46 bit4); keep the gain nibble
+	 * set by userspace. BIAS_OFF clears this bit on suspend. */
+	es7210_multi_chips_update_bits(ES7210_MIC1_GAIN_REG43, 0x10, 0x10);
+	es7210_multi_chips_update_bits(ES7210_MIC2_GAIN_REG44, 0x10, 0x10);
+	es7210_multi_chips_update_bits(ES7210_MIC3_GAIN_REG45, 0x10, 0x10);
+	es7210_multi_chips_update_bits(ES7210_MIC4_GAIN_REG46, 0x10, 0x10);
 
 	return 0;
 }
@@ -2684,7 +2683,25 @@ static int es7210_i2c_probe(struct i2c_client *i2c,
 		return ret;
 	}
 
-	ret = regmap_read(es7210->regmap, ES7210_CHP_ID1_REG3D, &val);
+	/* Chip readiness retry: after warm reboots the ES7210 may not answer
+	 * I2C during the first seconds of boot (es8156 on the same bus is
+	 * ready earlier). Retry the chip-ID read before giving up, otherwise
+	 * the codec never probes again and the sound card is lost until the
+	 * HAT is power-cycled. */
+	ret = -1;
+	{
+		int retry;
+		for (retry = 0; retry < 10; retry++) {
+			ret = regmap_read(es7210->regmap, ES7210_CHP_ID1_REG3D,
+					  &val);
+			if (ret >= 0)
+				break;
+			msleep(500);
+			dev_info(&i2c->dev,
+				 "es7210 not ready (probe retry %d/10)\n",
+				 retry + 1);
+		}
+	}
 	if (ret < 0) {
 		dev_err(&i2c->dev, "failed to read i2c at addr %X\n",
 			   i2c->addr);
