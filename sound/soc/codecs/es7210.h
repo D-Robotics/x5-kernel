@@ -88,7 +88,7 @@
 #define MIC_CHN_4       4
 #define MIC_CHN_2       2
 
-#define ES7210_CHANNELS_MAX     MIC_CHN_4
+#define ES7210_CHANNELS_MAX     MIC_CHN_8
 
 /*TDM mode is used when ES7210_TDM_ENABLE == 1*/
 #define ES7210_TDM_ENABLE       ENABLE
@@ -202,10 +202,7 @@ static const struct es7210_reg_config es7210_tdm_reg_common_cfg2[] = {
 	{0x48, 0x06},
 	{0x49, 0x26},
 	{0x4A, 0x06},
-	{0x43, 0x10},
-	{0x44, 0x10},
-	{0x45, 0x10},
-	{0x46, 0x10},
+	/* 0x43-0x46 (mic gain) intentionally omitted: owned by userspace */
 	{0x07, 0x20},
 };
 

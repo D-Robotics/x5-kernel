@@ -361,7 +361,10 @@ int es8156_startup(struct snd_pcm_substream *substream,
 		snd_soc_component_write(codec, ES8156_SCLK_MODE_REG02,0x04);
 		snd_soc_component_write(codec, ES8156_ANALOG_SYS1_REG20,0x2A);
 		snd_soc_component_write(codec, ES8156_ANALOG_SYS2_REG21,0x3C);
-		snd_soc_component_write(codec, ES8156_ANALOG_SYS3_REG22,0x00);
+		/* Keep the HP bit (bit3) owned by userspace: a plain 0x00 write
+		 * clears it on every init/playback open and re-mutes the output
+		 * after a profile set it. Preserve the bit, clear the rest. */
+		snd_soc_component_update_bits(codec, ES8156_ANALOG_SYS3_REG22, ~0x08, 0x00);
 		snd_soc_component_write(codec, ES8156_ANALOG_LP_REG24,0x07);
 		snd_soc_component_write(codec, ES8156_ANALOG_SYS4_REG23,0x3A);
 	/*
@@ -415,7 +418,10 @@ static int es8156_init_regs(struct snd_soc_component *codec)
 		snd_soc_component_write(codec, ES8156_SCLK_MODE_REG02,0x04);
 		snd_soc_component_write(codec, ES8156_ANALOG_SYS1_REG20,0x2A);
 		snd_soc_component_write(codec, ES8156_ANALOG_SYS2_REG21,0x3C);
-		snd_soc_component_write(codec, ES8156_ANALOG_SYS3_REG22,0x00);
+		/* Keep the HP bit (bit3) owned by userspace: a plain 0x00 write
+		 * clears it on every init/playback open and re-mutes the output
+		 * after a profile set it. Preserve the bit, clear the rest. */
+		snd_soc_component_update_bits(codec, ES8156_ANALOG_SYS3_REG22, ~0x08, 0x00);
 		snd_soc_component_write(codec, ES8156_ANALOG_LP_REG24,0x07);
 		snd_soc_component_write(codec, ES8156_ANALOG_SYS4_REG23,0x3A);
 	/*
